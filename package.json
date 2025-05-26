@@ -23,7 +23,7 @@
     "clean": "shx rm -rf dist"
   },
   "dependencies": {
-    "@azure/identity": "^4.8.0",
+    "@azure/identity": "^4.10.0",
     "@modelcontextprotocol/sdk": "1.11.3",
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^2.0.0",
