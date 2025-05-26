@@ -25,7 +25,7 @@
   "dependencies": {
     "@azure/identity": "^4.8.0",
     "@modelcontextprotocol/sdk": "1.11.3",
-    "azure-devops-extension-api": "^4.252.0",
+    "azure-devops-extension-api": "^4.253.0",
     "azure-devops-extension-sdk": "^2.0.0",
     "azure-devops-node-api": "^15.1.0",
     "save-dev": "^0.0.1-security",
