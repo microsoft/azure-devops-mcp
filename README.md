@@ -110,6 +110,12 @@ Interact with these Azure DevOps services:
 - **ado_show_test_results_from_build_id**: List test results for a build.
 - **ado_list_test_cases**: List test cases in a test plan.
 - **ado_list_test_plans**: List test plans by project.
+- **ado_create_test_suite**: Creates a new test suite in a test plan.
+- **ado_list_test_cases_in_test_suite**: Gets a detailed list of test cases in a test suite with filtering options.
+- **ado_list_test_suites**: Gets a list of test suites for a test plan.
+- **ado_update_test_case**: Updates an existing test case work item.
+- **ado_update_test_suite**: Updates an existing test suite.
+- **ado_update_test_plan**: Updates an existing test plan.
 
 ### 📄 Wiki
 

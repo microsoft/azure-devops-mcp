@@ -3,7 +3,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import {
   TestPlanCreateParams,
-  TestCase,
+  TestSuiteUpdateParams,
+  TestPlanUpdateParams,
 } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
 
@@ -13,7 +14,13 @@ const Test_Plan_Tools = {
   add_test_cases_to_suite: "ado_add_test_cases_to_suite",
   test_results_from_build_id: "ado_show_test_results_from_build_id",
   list_test_cases: "ado_list_test_cases",
-  list_test_plans: "ado_list_test_plans"
+  list_test_plans: "ado_list_test_plans",
+  create_test_suite: "ado_create_test_suite",
+  list_test_cases_in_test_suite: "ado_list_test_cases_in_test_suite",
+  list_test_suites: "ado_list_test_suites",
+  update_test_case: "ado_update_test_case",
+  update_test_suite: "ado_update_test_suite",
+  update_test_plan: "ado_update_test_plan"
 };
 
 function configureTestPlanTools(
@@ -268,6 +275,317 @@ function configureTestPlanTools(
   );
 
 }
+
+ /*
+    Create Test Suite - CREATE
+  */
+  server.tool(
+    Test_Plan_Tools.create_test_suite,
+    "Creates a new test suite in a test plan.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      planId: z.number().describe("ID of the test plan that contains the suites"),
+      parentSuiteId: z.number().describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
+      name: z.string().describe("Name of the test suite")
+    },
+    async ({ project, planId, parentSuiteId, name }) => {
+      const connection = await connectionProvider();
+      const testPlanApi = await connection.getTestPlanApi();
+
+      const testSuiteToCreate = {
+        name,
+        parentSuite: {
+          id: parentSuiteId,
+          name: ""
+        },
+        suiteType: 2
+      };
+
+      const createdTestSuite = await testPlanApi.createTestSuite(
+        testSuiteToCreate,
+        project,
+        planId
+      );
+
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(createdTestSuite, null, 2) },
+        ],
+      };
+    }
+  );
+
+  /*
+    Get Test Cases List - GET
+    This tool retrieves test cases from a test suite with additional filtering options
+  */
+  server.tool(
+    Test_Plan_Tools.list_test_cases_in_test_suite,
+    "Gets a detailed list of test cases in a test suite with filtering options.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      planId: z.number().describe("ID of the test plan for which test cases are requested"),
+      suiteId: z.number().describe("ID of the test suite for which test cases are requested")
+    },
+    async ({ project, planId, suiteId }) => {
+      const connection = await connectionProvider();
+      const testPlanApi = await connection.getTestPlanApi();
+
+      const testCases = await testPlanApi.getTestCaseList(
+        project,
+        planId,
+        suiteId
+      );
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(testCases, null, 2) }],
+      };
+    }
+  );
+
+  /*
+    Get Test Suites for Plan - LIST
+    This tool retrieves test suites for a given test plan
+  */
+  server.tool(
+    Test_Plan_Tools.list_test_suites,
+    "Gets a list of test suites for a test plan.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      planId: z.number().describe("ID of the test plan for which suites are requested"),
+      continuationToken: z.string().optional().describe("If the list of suites returned is not complete, a continuation token to query next batch of suites")
+    },
+    async ({ project, planId, continuationToken }) => {
+      const connection = await connectionProvider();
+      const testPlanApi = await connection.getTestPlanApi();
+
+      const testSuites = await testPlanApi.getTestSuitesForPlan(
+        project,
+        planId,
+        undefined,
+        continuationToken
+      );
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(testSuites, null, 2) }],
+      };
+    }
+  );
+
+  /*
+    Update Test Case - UPDATE
+  */
+  server.tool(
+    Test_Plan_Tools.update_test_case,
+    "Updates an existing test case work item.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      testCaseId: z.number().describe("ID of the test case to update"),
+      title: z.string().optional().describe("New title for the test case"),
+      steps: z.string().optional().describe("New test steps (one per line, optionally numbered)"),
+      priority: z.number().optional().describe("New priority value (1-4, where 1 is highest)"),
+      areaPath: z.string().optional().describe("New area path for the test case"),
+      iterationPath: z.string().optional().describe("New iteration path for the test case"),
+      state: z.string().optional().describe("New state (e.g., Active, Resolved, Closed)"),
+      assignedTo: z.string().optional().describe("New assignee (user name or email)")
+    },
+    async ({ project, testCaseId, title, steps, priority, areaPath, iterationPath, state, assignedTo }) => {
+      const connection = await connectionProvider();
+      const witClient = await connection.getWorkItemTrackingApi();
+
+      // Create JSON patch document for work item update
+      const patchDocument = [];
+
+      if (title) {
+        patchDocument.push({
+          op: "replace",
+          path: "/fields/System.Title",
+          value: title,
+        });
+      }
+
+      if (steps) {
+        const stepsXml = convertStepsToXml(steps);
+        patchDocument.push({
+          op: "replace",
+          path: "/fields/Microsoft.VSTS.TCM.Steps",
+          value: stepsXml,
+        });
+      }
+
+      if (priority) {
+        patchDocument.push({
+          op: "replace",
+          path: "/fields/Microsoft.VSTS.Common.Priority",
+          value: priority,
+        });
+      }
+
+      if (areaPath) {
+        patchDocument.push({
+          op: "replace",
+          path: "/fields/System.AreaPath",
+          value: areaPath,
+        });
+      }
+
+      if (iterationPath) {
+        patchDocument.push({
+          op: "replace",
+          path: "/fields/System.IterationPath",
+          value: iterationPath,
+        });
+      }
+
+      if (state) {
+        patchDocument.push({
+          op: "replace",
+          path: "/fields/System.State",
+          value: state,
+        });
+      }
+
+      if (assignedTo) {
+        patchDocument.push({
+          op: "replace",
+          path: "/fields/System.AssignedTo",
+          value: assignedTo,
+        });
+      }
+
+      const updatedWorkItem = await witClient.updateWorkItem(
+        {},
+        patchDocument,
+        testCaseId,
+        project
+      );
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(updatedWorkItem, null, 2) }],
+      };
+    }
+  );
+
+  /*
+    Update Test Suite - UPDATE
+  */
+  server.tool(
+    Test_Plan_Tools.update_test_suite,
+    "Updates an existing test suite.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      planId: z.number().describe("ID of the test plan that contains the suite"),
+      suiteId: z.number().describe("ID of the test suite to update"),
+      name: z.string().optional().describe("New name for the test suite"),
+      queryString: z.string().optional().describe("New query string for dynamic test suites"),
+      revision: z.number().optional().describe("Revision number for optimistic concurrency control")
+    },
+    async ({ project, planId, suiteId, name, queryString, revision }) => {
+      const connection = await connectionProvider();
+      const testPlanApi = await connection.getTestPlanApi();
+
+      const testSuiteUpdateParams: Partial<TestSuiteUpdateParams> = {};
+
+      if (name) {
+        testSuiteUpdateParams.name = name;
+      }
+
+      if (queryString) {
+        testSuiteUpdateParams.queryString = queryString;
+      }
+
+      if (revision) {
+        testSuiteUpdateParams.revision = revision;
+      }
+
+      if (Object.keys(testSuiteUpdateParams).length === 0) {
+        throw new Error("At least one field must be provided to update the test suite");
+      }
+
+      const updatedTestSuite = await testPlanApi.updateTestSuite(
+        testSuiteUpdateParams as TestSuiteUpdateParams,
+        project,
+        planId,
+        suiteId
+      );
+
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(updatedTestSuite, null, 2) },
+        ],
+      };
+    }
+  );
+
+  /*
+    Update Test Plan - UPDATE
+  */
+  server.tool(
+    Test_Plan_Tools.update_test_plan,
+    "Updates an existing test plan.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      planId: z.number().describe("ID of the test plan to update"),
+      name: z.string().optional().describe("New name for the test plan"),
+      description: z.string().optional().describe("New description for the test plan"),
+      startDate: z.string().optional().describe("New start date for the test plan (ISO date string)"),
+      endDate: z.string().optional().describe("New end date for the test plan (ISO date string)"),
+      areaPath: z.string().optional().describe("New area path for the test plan"),
+      iteration: z.string().optional().describe("New iteration path for the test plan"),
+      state: z.string().optional().describe("New state for the test plan"),
+      revision: z.number().optional().describe("Revision number for optimistic concurrency control")
+    },
+    async ({ project, planId, name, description, startDate, endDate, areaPath, iteration, state, revision }) => {
+      const connection = await connectionProvider();
+      const testPlanApi = await connection.getTestPlanApi();
+
+      const testPlanUpdateParams: Partial<TestPlanUpdateParams> = {};
+
+      if (name) {
+        testPlanUpdateParams.name = name;
+      }
+
+      if (description) {
+        testPlanUpdateParams.description = description;
+      }
+
+      if (startDate) {
+        testPlanUpdateParams.startDate = new Date(startDate);
+      }
+
+      if (endDate) {
+        testPlanUpdateParams.endDate = new Date(endDate);
+      }
+
+      if (areaPath) {
+        testPlanUpdateParams.areaPath = areaPath;
+      }
+
+      if (iteration) {
+        testPlanUpdateParams.iteration = iteration;
+      }
+
+      if (state) {
+        testPlanUpdateParams.state = state;
+      }
+
+      if (revision) {
+        testPlanUpdateParams.revision = revision;
+      }
+
+      const updatedTestPlan = await testPlanApi.updateTestPlan(
+        testPlanUpdateParams as TestPlanUpdateParams,
+        project,
+        planId
+      );
+
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(updatedTestPlan, null, 2) },
+        ],
+      };
+    }
+  );
 
 /*
  * Helper function to convert steps text to XML format required
