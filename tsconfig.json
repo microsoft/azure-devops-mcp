@@ -22,7 +22,7 @@
         "config/*"
       ],
       "@utils": [
-        "utils.js"
+        "utils.ts"
      ]
     }
   },

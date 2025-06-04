@@ -16,7 +16,7 @@
   "scripts": {
     "preinstall": "npm config set registry https://registry.npmjs.org/",
     "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\r'\" > src/version.ts",
-    "build": "tsc && shx chmod +x dist/*.js",
+    "build": "tsc && tsc-alias && shx chmod +x dist/*.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
