@@ -21,10 +21,6 @@ const WORKITEM_TOOLS = {
   get_work_items_for_iteration: "ado_get_work_items_for_iteration",
   add_work_item_comment: "ado_add_work_item_comment",
   add_child_work_item: "ado_add_child_work_item",
-<<<<<<< Updated upstream
-=======
-  update_work_item_assign: "ado_update_work_item_assign",
->>>>>>> Stashed changes
   link_work_item_to_pull_request: "ado_link_work_item_to_pull_request",
   get_work_item_type: "ado_get_work_item_type",
   get_query: "ado_get_query",
@@ -41,7 +37,7 @@ function configureWorkItemTools(
 
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
-    "Revieve a list of backlogs for a given project and team.",
+    "Retrieve a list of backlogs for a given project and team.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team.")
