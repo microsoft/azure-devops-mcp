@@ -90,18 +90,28 @@ function configureWorkItemTools(
       type: z.enum(["assignedtome", "myactivity"]).default("assignedtome").describe("The type of work items to retrieve. Defaults to 'assignedtome'."),
       top: z.number().default(50).describe("The maximum number of work items to return. Defaults to 50."),
       includeCompleted: z.boolean().default(false).describe("Whether to include completed work items. Defaults to false."),
+      includeDetails: z.boolean().default(false).describe("Whether to return full work item details. When false, returns only basic work item information."),
     },
-    async ({ projectId, type, top, includeCompleted }) => {
+    async ({ projectId, type, top, includeCompleted, includeDetails }) => {
       const connection = await connectionProvider();
       const workApi = await connection.getWorkApi();
       const workItemApi = await connection.getWorkItemTrackingApi();
 
-      const query= await workApi.getPredefinedQueryResults(
+      const query = await workApi.getPredefinedQueryResults(
         projectId,
         type,
         top,
         includeCompleted
       );
+
+      // If not requesting details, return the query results directly
+      if (!includeDetails) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(query, null, 2) }],
+        };
+      }
+
+      // Otherwise, get full work item details
       const workItemIds = query.results?.map(item => item.id).filter(id => id !== undefined) || [];
       const workItems = await workItemApi.getWorkItemsBatch(
         { ids: workItemIds },
