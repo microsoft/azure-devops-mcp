@@ -15,7 +15,7 @@
     "customizations": {
       "codespaces": {
         "openFiles": [
-          "./devcontainer/CONTRIBUTING.md"
+          "./CONTRIBUTING.md"
         ]
       },
       "vscode": {
