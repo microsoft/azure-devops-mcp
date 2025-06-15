@@ -35,7 +35,6 @@
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
-    "save-dev": "^0.0.1-security",
     "zod": "^3.25.63",
     "zod-to-json-schema": "^3.24.5"
   },
