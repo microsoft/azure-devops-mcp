@@ -130,7 +130,8 @@ For the best experience, use Visual Studio Code and GitHub Copilot.
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Open VS Code in an empty folder
+3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
+4. Open VS Code in an empty folder
 
 ### Azure Login
 
