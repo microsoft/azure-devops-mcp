@@ -200,6 +200,7 @@ This installation method is recommended for advanced users and contributors who 
 1. Clone the repository.
 2. Install dependencies:
    ```sh
+   npm install
    npm install -g .
    ```
 3. Edit or add `.vscode/mcp.json`:
