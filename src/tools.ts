@@ -6,6 +6,7 @@ import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
 
 import { configureCoreTools } from "./tools/core.js";
+import { configureWorkTools } from "./tools/work.js";
 import { configureBuildTools } from "./tools/builds.js";
 import { configureRepoTools } from "./tools/repos.js";
 import { configureWorkItemTools } from "./tools/workitems.js";
@@ -20,6 +21,7 @@ function configureAllTools(
   connectionProvider: () => Promise<WebApi>
 ) {
     configureCoreTools(server, tokenProvider, connectionProvider);
+    configureWorkTools(server, tokenProvider, connectionProvider);
     configureBuildTools(server, tokenProvider, connectionProvider);
     configureRepoTools(server, tokenProvider, connectionProvider);
     configureWorkItemTools(server, tokenProvider, connectionProvider);
