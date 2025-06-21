@@ -27,19 +27,32 @@ function configureCoreTools(
       skip: z.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),     
     },
     async ({ project, mine, top, skip }) => {
-      const connection = await connectionProvider();
-      const coreApi = await connection.getCoreApi();
-      const teams = await coreApi.getTeams(
-        project,
-        mine,
-        top,
-        skip,
-        false
-      );
+      try {
+        const connection = await connectionProvider();
+        const coreApi = await connection.getCoreApi();
+        const teams = await coreApi.getTeams(
+          project,
+          mine,
+          top,
+          skip,
+          false
+        );
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(teams, null, 2) }],
-      };
+        if (!teams) {
+          return { content: [{ type: "text", text: "No teams found" }], isError: true };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(teams, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        
+        return { 
+          content: [{ type: "text", text: `Error fetching project teams: ${errorMessage}` }], 
+          isError: true
+        };
+      }
     }
   );
  
@@ -53,19 +66,32 @@ function configureCoreTools(
       continuationToken: z.number().optional().describe("Continuation token for pagination. Used to fetch the next set of results if available."),      
     },
     async ({ stateFilter, top, skip, continuationToken }) => {
-      const connection = await connectionProvider();
-      const coreApi = await connection.getCoreApi();
-      const projects = await coreApi.getProjects(
-        stateFilter,
-        top,
-        skip,
-        continuationToken,
-        false
-      );
+      try {
+        const connection = await connectionProvider();
+        const coreApi = await connection.getCoreApi();
+        const projects = await coreApi.getProjects(
+          stateFilter,
+          top,
+          skip,
+          continuationToken,
+          false
+        );
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(projects, null, 2) }],
-      };
+        if (!projects) {
+          return { content: [{ type: "text", text: "No projects found" }], isError: true };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(projects, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        
+        return { 
+          content: [{ type: "text", text: `Error fetching projects: ${errorMessage}` }], 
+          isError: true
+        };
+      }
     }
   ); 
 }

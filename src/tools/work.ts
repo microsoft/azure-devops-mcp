@@ -28,16 +28,29 @@ function configureWorkTools(
       timeframe: z.enum(["current"]).optional().describe("The timeframe for which to retrieve iterations. Currently, only 'current' is supported."),
     },
     async ({ project, team, timeframe }) => {
-      const connection = await connectionProvider();
-      const workApi = await connection.getWorkApi();
-      const iterations = await workApi.getTeamIterations(
-        { project, team },
-        timeframe
-      );
+      try {
+        const connection = await connectionProvider();
+        const workApi = await connection.getWorkApi();
+        const iterations = await workApi.getTeamIterations(
+          { project, team },
+          timeframe
+        );
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(iterations, null, 2) }],
-      };
+        if (!iterations) {
+          return { content: [{ type: "text", text: "No iterations found" }], isError: true };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(iterations, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        
+        return { 
+          content: [{ type: "text", text: `Error fetching team iterations: ${errorMessage}` }], 
+          isError: true
+        };
+      }
     }
   );
 
@@ -53,29 +66,45 @@ function configureWorkTools(
       })).describe("An array of iterations to create. Each iteration must have a name and can optionally have start and finish dates in ISO format.")
     },
     async ({ project, iterations }) => {
-      const connection = await connectionProvider();
-      const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+      try {
+        const connection = await connectionProvider();
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const results = [];
 
-      const results = [];
-      for (const { iterationName, startDate, finishDate } of iterations) {
-        // Step 1: Create the iteration
-        const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
-          {
-            name: iterationName,
-            attributes: {
-              startDate: startDate ? new Date(startDate) : undefined,
-              finishDate: finishDate ? new Date(finishDate) : undefined,
+        for (const { iterationName, startDate, finishDate } of iterations) {
+          // Step 1: Create the iteration
+          const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
+            {
+              name: iterationName,
+              attributes: {
+                startDate: startDate ? new Date(startDate) : undefined,
+                finishDate: finishDate ? new Date(finishDate) : undefined,
+              },
             },
-          },
-          project,
-          TreeStructureGroup.Iterations
-        );
-        results.push(iteration);
-      }
+            project,
+            TreeStructureGroup.Iterations
+          );
+          
+          if (iteration) {
+            results.push(iteration);
+          }
+        }
+        
+        if (results.length === 0) {
+          return { content: [{ type: "text", text: "No iterations were created" }], isError: true };
+        }
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        
+        return { 
+          content: [{ type: "text", text: `Error creating iterations: ${errorMessage}` }], 
+          isError: true
+        };
+      }
     }
   );
   
@@ -91,24 +120,38 @@ function configureWorkTools(
       })).describe("An array of iterations to assign. Each iteration must have an identifier and a path."),
     },
     async ({ project, team, iterations }) => {
-      const connection = await connectionProvider();
-      const workApi = await connection.getWorkApi();
+      try {
+        const connection = await connectionProvider();
+        const workApi = await connection.getWorkApi();
+        const teamContext = { project, team };
+        const results = [];
+        
+        for (const { identifier, path } of iterations) {
+          const assignment = await workApi.postTeamIteration(
+            { path: path, id: identifier },
+            teamContext
+          );
 
-      const teamContext = { project, team };
-      const results = [];
-      
-      for (const { identifier, path } of iterations) {
-        const assignment = await workApi.postTeamIteration(
-          { path: path, id: identifier },
-          teamContext
-        );
+          if (assignment) {
+            results.push(assignment);
+          }
+        }
+        
+        if (results.length === 0) {
+          return { content: [{ type: "text", text: "No iterations were assigned to the team" }], isError: true };
+        }
 
-        results.push(assignment);
+        return {
+          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        
+        return { 
+          content: [{ type: "text", text: `Error assigning iterations: ${errorMessage}` }], 
+          isError: true
+        };
       }
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-      };
     }
   );
  

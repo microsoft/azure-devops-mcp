@@ -49,6 +49,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(
         ([toolName]) => toolName === "core_list_projects"
       );
+
       if (!call) throw new Error("core_list_projects tool not registered");
       const [, , , handler] = call;
 
@@ -122,6 +123,59 @@ describe("configureCoreTools", () => {
         )
       );
     });
+
+    it("should handle API errors correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "core_list_projects"
+      );
+
+      if (!call) throw new Error("core_list_projects tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("API connection failed");
+      (mockCoreApi.getProjects as jest.Mock).mockRejectedValue(testError);
+
+      const params = {
+        stateFilter: "wellFormed",
+        top: undefined,
+        skip: undefined,
+        continuationToken: undefined
+      };
+
+      const result = await handler(params);
+
+      expect(mockCoreApi.getProjects).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching projects: API connection failed");
+    });
+
+    it("should handle null API results correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "core_list_projects"
+      );
+
+      if (!call) throw new Error("core_list_projects tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        stateFilter: "wellFormed",
+        top: undefined,
+        skip: undefined,
+        continuationToken: undefined
+      };
+
+      const result = await handler(params);
+
+      expect(mockCoreApi.getProjects).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No projects found");
+    });
   });
 
   describe("list_project_teams tool", () => {
@@ -131,6 +185,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(
         ([toolName]) => toolName === "core_list_project_teams"
       );
+
       if (!call) throw new Error("core_list_project_teams tool not registered");
       const [, , , handler] = call;
 
@@ -195,6 +250,59 @@ describe("configureCoreTools", () => {
           2
         )
       );
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "core_list_project_teams"
+      );
+
+      if (!call) throw new Error("core_list_project_teams tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Team not found");
+      (mockCoreApi.getTeams as jest.Mock).mockRejectedValue(testError);
+
+      const params = {
+        project: "eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+        mine: undefined,
+        top: undefined,
+        skip: undefined
+      };
+
+      const result = await handler(params);
+
+      expect(mockCoreApi.getTeams).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching project teams: Team not found");
+    });
+
+    it("should handle null API results correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "core_list_project_teams"
+      );
+      
+      if (!call) throw new Error("core_list_project_teams tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+        mine: undefined,
+        top: undefined,
+        skip: undefined
+      };
+
+      const result = await handler(params);
+
+      expect(mockCoreApi.getTeams).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No teams found");
     });
   });
 });
