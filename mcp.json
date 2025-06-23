@@ -7,10 +7,11 @@
         }
     ],
     "servers": {
-        "ado": {
+        "ado-in-dev": {
             "type": "stdio",
-            "command": "mcp-server-azuredevops",
+            "command": "node",
             "args": [
+                "dist/index.js",
                 "${input:ado_org}"
             ]
         }

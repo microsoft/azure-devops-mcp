@@ -13,6 +13,7 @@ import { GitItem } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
 const SEARCH_TOOLS = {
   search_code: "search_code",
+  get_code_content: "get_code_content",
   search_wiki: "search_wiki",
   search_workitem: "search_workitem"
 };
@@ -51,7 +52,6 @@ server.tool(
   },
   async ({  searchRequest }) => {
     const accessToken = await tokenProvider();
-    const connection = await connectionProvider();
     const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
 
     const response = await fetch(url, {
@@ -70,17 +70,79 @@ server.tool(
 
     const resultText = await response.text();
     const resultJson = JSON.parse(resultText) as { results?: SearchResult[] };
-
+    
     const topResults: SearchResult[] = Array.isArray(resultJson.results)
       ? resultJson.results.slice(0, Math.min(searchRequest.$top, resultJson.results.length))
       : [];
 
+    const ret: any[] = [];
+    topResults.forEach((result) => {
+      // result.matches.content may be an array or undefined; if array, flatten all .content arrays
+      const matchesArray = Array.isArray(result.matches?.content)
+        ? result.matches.content
+        : [];
+      const matchSummary = {
+        totalResults: matchesArray.length,
+        matchTypeSummary: {} as Record<string, number>
+      };
+      matchesArray.forEach((match: any) => {
+        const matchType = match.type || 'unknown';
+        matchSummary.matchTypeSummary[matchType] = (matchSummary.matchTypeSummary[matchType] || 0) + 1;
+      });
+      ret.push({
+        ...result,
+        matches: matchSummary
+      });
+    });
+    
+    return {
+      content: [
+        { type: "text", text: JSON.stringify(ret, null, 2) }
+      ]
+    };
+  }
+);
+
+/*
+  GET CODE CONTENT
+  Get the actual file content for specific search results.
+*/
+server.tool(
+  SEARCH_TOOLS.get_code_content,
+  "Get the actual file content for specific search results. Using search_code tool to find the file first.",
+  {
+    getCodeContentRequest: z.object({
+      projectId: z.string().describe("Project ID"),
+      repositoryId: z.string().describe("Repository ID"),
+      path: z.string().describe("File path"),
+      versionsChangeId: z.string().describe("Change ID/commit hash")
+    }).describe("A search result to fetch content for"),
+    maxResults: z.number().default(5).describe("Maximum number of files to fetch content for")
+  },
+  async ({ getCodeContentRequest }) => {
+    const connection = await connectionProvider();
     const gitApi = await connection.getGitApi();
-    const combinedResults = await fetchCombinedResults(topResults, gitApi);
+    const versionDescriptor = getCodeContentRequest.versionsChangeId
+      ? { version: getCodeContentRequest.versionsChangeId, versionType: 2, versionOptions: 0 }
+      : undefined;
+    const item = await gitApi.getItem(
+      getCodeContentRequest.repositoryId,
+      getCodeContentRequest.path,
+      getCodeContentRequest.projectId,
+      undefined,
+      VersionControlRecursionType.None,
+      true, // includeContentMetadata
+      false, // latestProcessedChange
+      false, // download
+      versionDescriptor,
+      true, // includeContent
+      true, // resolveLfs
+      true  // sanitize
+    );
 
     return {
       content: [
-        { type: "text", text: resultText + JSON.stringify(combinedResults) }
+        { type: "text", text: JSON.stringify(item, null, 2) }
       ]
     };
   }
@@ -191,6 +253,13 @@ interface SearchResult {
   repository?: { id?: string };
   path?: string;
   versions?: { changeId?: string }[];
+  matches?: {
+    content?: Array<{
+      type?: string;
+      [key: string]: unknown;
+    }>;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
