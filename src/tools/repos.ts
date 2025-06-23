@@ -9,14 +9,15 @@ import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 
 const REPO_TOOLS = {
-  list_repos_by_project: "repo_list_repos_by_project",
+  list_all_repos_by_project: "repo_list_repos_by_project",
+  search_repos_by_name: "repo_search_repos_by_name",
+  get_repo_by_name_or_id: "repo_get_repo_by_name_or_id",
   list_pull_requests_by_repo: "repo_list_pull_requests_by_repo",
   list_pull_requests_by_project: "repo_list_pull_requests_by_project",
   list_branches_by_repo: "repo_list_branches_by_repo",
   list_my_branches_by_repo: "repo_list_my_branches_by_repo",
   list_pull_request_threads: "repo_list_pull_request_threads",
   list_pull_request_thread_comments: "repo_list_pull_request_thread_comments",
-  get_repo_by_name_or_id: "repo_get_repo_by_name_or_id",
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",  
@@ -108,7 +109,7 @@ function configureRepoTools(
   ); 
  
   server.tool(
-    REPO_TOOLS.list_repos_by_project,
+    REPO_TOOLS.list_all_repos_by_project,
     "Retrieve a list of repositories for a given project",
     { 
       project: z.string().describe("The name or ID of the Azure DevOps project."), 
@@ -502,6 +503,47 @@ function configureRepoTools(
 
       return {
         content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.search_repos_by_name,
+    "Search and retrieve a list of repositories for a given project filtered by repository name",
+    { 
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      searchText: z.string().describe("The search text to filter repositories by name. Case-insensitive partial matching."),
+    },
+    async ({ project, searchText }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+      const repositories = await gitApi.getRepositories(
+        project,
+        false,
+        false,
+        false
+      );
+
+      // Filter repositories by name using case-insensitive search
+      const filteredByName = repositories?.filter((repo) => 
+        repo.name?.toLowerCase().includes(searchText.toLowerCase())
+      );
+
+      // Filter out the irrelevant properties
+      const filteredRepositories = filteredByName?.map((repo) => ({
+        id: repo.id,
+        name: repo.name,
+        isDisabled: repo.isDisabled,
+        isFork: repo.isFork,
+        isInMaintenance: repo.isInMaintenance,
+        webUrl: repo.webUrl,
+        size: repo.size,
+      }));
+
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(filteredRepositories, null, 2) },
+        ],
       };
     }
   );

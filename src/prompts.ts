@@ -21,7 +21,7 @@ function configurePrompts(server: McpServer) {
             text: String.raw`
 # Prerequisites
 1. Unless already provided, ask user for the project name
-2. Unless already provided, use '${REPO_TOOLS.list_repos_by_project}' tool to get a summarized response of the repositories in this project and ask user to select one
+2. Unless already provided, use '${REPO_TOOLS.list_all_repos_by_project}' tool to get a summarized response of the repositories in this project and ask user to select one
 
 # Task
 Find all pull requests for repository ${repositoryId} using '${REPO_TOOLS.list_pull_requests_by_repo}' tool and summarize them in a table.
