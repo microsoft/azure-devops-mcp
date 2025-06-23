@@ -29,7 +29,7 @@ function configureSearchTools(
   */
 server.tool(
   SEARCH_TOOLS.search_code,
-  "Get the code search results for a given search text.",
+  "Get the code search results for a given search text. No content is returned, only metadata about the search results. Use the get_code_content tool to fetch actual file content.",
   {
     searchRequest: z.object({
       searchText: z.string().describe("Search text to find in code"),
