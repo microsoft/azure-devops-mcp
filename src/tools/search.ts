@@ -115,7 +115,7 @@ server.tool(
       projectId: z.string().describe("Project ID"),
       repositoryId: z.string().describe("Repository ID"),
       path: z.string().describe("File path"),
-      versionsChangeId: z.string().describe("Change ID/commit hash")
+      versionsChangeId: z.string().describe("Change ID/commit hash, **Don't use branchName**. If not provided, the latest version will be fetched."),
     }).describe("A search result to fetch content for"),
     maxResults: z.number().default(5).describe("Maximum number of files to fetch content for")
   },
