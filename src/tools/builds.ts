@@ -311,14 +311,35 @@ function configureBuildTools(
       stageRefName: z.string().describe("Reference name of the stage to update (e.g., 'stage1', 'Deploy')"),
       updateParameters: z.object({
         forceRetryAllJobs: z.boolean().optional().describe("Whether to force retry all jobs in the stage"),
-        state: z.enum(["Pending", "InProgress", "Completed", "Cancelling", "Cancelled"]).optional().describe("New state for the stage")
+        state: z.enum(["Cancel", "Retry", "Run"]).optional().describe("Update type for the stage: Cancel (0), Retry (1), or Run (2)")
       }).describe("Parameters for updating the stage")
     },
     async ({ project, buildId, stageRefName, updateParameters }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
       
-      await buildApi.updateStage(updateParameters as UpdateStageParameters, buildId, stageRefName, project);
+      // Convert string state to enum value
+      let stageUpdateType: number | undefined;
+      if (updateParameters.state) {
+        switch (updateParameters.state) {
+          case "Cancel":
+            stageUpdateType = 0;
+            break;
+          case "Retry":
+            stageUpdateType = 1;
+            break;
+          case "Run":
+            stageUpdateType = 2;
+            break;
+        }
+      }
+      
+      const apiUpdateParameters: UpdateStageParameters = {
+        ...updateParameters,
+        state: stageUpdateType
+      };
+      
+      await buildApi.updateStage(apiUpdateParameters, buildId, stageRefName, project);
 
       return {
         content: [
@@ -329,7 +350,7 @@ function configureBuildTools(
               message: `Stage '${stageRefName}' in build ${buildId} has been updated successfully`,
               buildId,
               stageRefName,
-              updateParameters
+              updateParameters: apiUpdateParameters
             }, null, 2)
           }
         ],
