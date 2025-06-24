@@ -4,7 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
+import { BuildQueryOrder, DefinitionQueryOrder, UpdateStageParameters } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
 
 const BUILD_TOOLS = {
@@ -15,7 +15,8 @@ const BUILD_TOOLS = {
   get_log_by_id: "build_get_log_by_id",
   get_changes: "build_get_changes",
   run_build: "build_run_build",
-  get_status: "build_get_status"
+  get_status: "build_get_status",
+  update_stage: "build_update_stage"
 };
 
 function configureBuildTools(
@@ -297,6 +298,41 @@ function configureBuildTools(
 
       return {
         content: [{ type: "text", text: JSON.stringify(build, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    BUILD_TOOLS.update_stage,
+    "Updates a stage in a running build.",
+    {
+      project: z.string().optional().describe("Project ID or name. If not provided, the project from the build context will be used."),
+      buildId: z.number().describe("ID of the build containing the stage to update"),
+      stageRefName: z.string().describe("Reference name of the stage to update (e.g., 'stage1', 'Deploy')"),
+      updateParameters: z.object({
+        forceRetryAllJobs: z.boolean().optional().describe("Whether to force retry all jobs in the stage"),
+        state: z.enum(["Pending", "InProgress", "Completed", "Cancelling", "Cancelled"]).optional().describe("New state for the stage")
+      }).describe("Parameters for updating the stage")
+    },
+    async ({ project, buildId, stageRefName, updateParameters }) => {
+      const connection = await connectionProvider();
+      const buildApi = await connection.getBuildApi();
+      
+      await buildApi.updateStage(updateParameters as UpdateStageParameters, buildId, stageRefName, project);
+
+      return {
+        content: [
+          { 
+            type: "text", 
+            text: JSON.stringify({
+              success: true,
+              message: `Stage '${stageRefName}' in build ${buildId} has been updated successfully`,
+              buildId,
+              stageRefName,
+              updateParameters
+            }, null, 2)
+          }
+        ],
       };
     }
   );
