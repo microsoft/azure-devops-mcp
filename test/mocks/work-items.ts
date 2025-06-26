@@ -1,4 +1,3 @@
-
 export const _mockWorkItems = {
   count: 3,
   value: [
@@ -602,4 +601,118 @@ export const _mockQueryResults = {
       },
     },
   ],
+};
+
+export const _mockWorkItemWithRelations = {
+  id: 131489,
+  rev: 1,
+  fields: {
+    "System.AreaPath": "CustomProcessPrj",
+    "System.TeamProject": "CustomProcessPrj",
+    "System.IterationPath": "CustomProcessPrj",
+    "System.WorkItemType": "Task",
+    "System.State": "New",
+    "System.Reason": "New",
+    "System.CreatedDate": "2017-10-06T01:04:51.57Z",
+    "System.CreatedBy": {
+      displayName: "Jamal Hartnett",
+      url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      _links: {
+        avatar: {
+          href: "https://dev.azure.com/mseng/_apis/GraphProfile/MemberAvatars/aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+        },
+      },
+      id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      uniqueName: "fabrikamfiber4@hotmail.com",
+      imageUrl:
+        "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+    },
+    "System.ChangedDate": "2017-10-06T01:04:51.57Z",
+    "System.ChangedBy": {
+      displayName: "Jamal Hartnett",
+      url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      _links: {
+        avatar: {
+          href: "https://dev.azure.com/mseng/_apis/GraphProfile/MemberAvatars/aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+        },
+      },
+      id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      uniqueName: "fabrikamfiber4@hotmail.com",
+      imageUrl:
+        "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+    },
+    "System.Title": "Sample task with relations",
+    "Microsoft.VSTS.Common.StateChangeDate": "2017-10-06T01:04:51.57Z",
+    "Microsoft.VSTS.Common.Priority": 2,
+  },
+  relations: [
+    {
+      rel: "System.LinkTypes.Related",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/123456",
+      attributes: {
+        comment: "Related work item"
+      }
+    },
+    {
+      rel: "System.LinkTypes.Hierarchy-Forward", 
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/789012",
+      attributes: {
+        comment: "Child work item"
+      }
+    },
+    {
+      rel: "System.LinkTypes.Duplicate-Forward",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/555666",
+      attributes: {
+        comment: "Duplicate work item"
+      }
+    }
+  ],
+  _links: {
+    self: {
+      href: "https://dev.azure.com/fabrikam/_apis/wit/workItems/131489",
+    },
+    workItemUpdates: {
+      href: "https://dev.azure.com/fabrikam/_apis/wit/workItems/131489/updates",
+    },
+    workItemRevisions: {
+      href: "https://dev.azure.com/fabrikam/_apis/wit/workItems/131489/revisions",
+    },
+    workItemHistory: {
+      href: "https://dev.azure.com/fabrikam/_apis/wit/workItems/131489/history",
+    },
+    html: {
+      href: "https://dev.azure.com/fabrikam/web/wi.aspx?pcguid=20cda608-32f0-4e6e-9b7c-8def7b38d15a&id=131489",
+    },
+    workItemType: {
+      href: "https://dev.azure.com/fabrikam/aaee31d9-14cf-48b9-a92b-3f1446c13f80/_apis/wit/workItemTypes/Task",
+    },
+    fields: {
+      href: "https://dev.azure.com/fabrikam/_apis/wit/fields",
+    },
+  },
+  url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/131489",
+};
+
+export const _mockWorkItemWithNoRelations = {
+  id: 131490,  
+  rev: 1,
+  fields: {
+    "System.AreaPath": "CustomProcessPrj",
+    "System.TeamProject": "CustomProcessPrj", 
+    "System.IterationPath": "CustomProcessPrj",
+    "System.WorkItemType": "Task",
+    "System.State": "New",
+    "System.Title": "Sample task with no relations",
+    "Microsoft.VSTS.Common.Priority": 2,
+  },
+  relations: [],
+  _links: {
+    self: {
+      href: "https://dev.azure.com/fabrikam/_apis/wit/workItems/131490",
+    },
+  },
+  url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/131490",
 };

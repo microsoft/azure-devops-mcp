@@ -25,7 +25,7 @@ const WORKITEM_TOOLS = {
   get_work_item_type: "wit_get_work_item_type",
   get_query: "wit_get_query", 
   get_query_results_by_id: "wit_get_query_results_by_id",
-  update_work_items_batch: "wit_update_work_items_batch",
+  update_work_items_batch: "wit_update_work_items_batch", 
   close_and_link_workitem_duplicates: "wit_close_and_link_workitem_duplicates",
   work_items_link: "wit_work_items_link"
 };
@@ -53,6 +53,204 @@ function getLinkTypeFromName(name: string) {
     default:
       throw new Error(`Unknown link type: ${name}`);
   }
+}
+
+interface LinkOperation {
+  id: number;
+  linkToId: number;
+  operation: "link" | "unlink";
+  type: string;
+  comment?: string;
+}
+
+interface LinkResult {
+  success: boolean;
+  workItemId: number;
+  operation: string;
+  error?: string;
+}
+
+async function processLinkOperations(
+  linkOperations: LinkOperation[],
+  project: string,
+  orgUrl: string,
+  accessToken: { token: string }
+): Promise<{ results: LinkResult[]; batchResponse?: unknown }> {
+  if (linkOperations.length === 0) {
+    return { results: [] };
+  }
+
+  // Group link operations by work item ID
+  const uniqueIds = Array.from(new Set(linkOperations.map((op) => op.id)));
+
+  const body = uniqueIds.map((id) => ({
+    method: "PATCH",
+    uri: `/_apis/wit/workitems/${id}?api-version=${batchApiVersion}`,
+    headers: {
+      "Content-Type": "application/json-patch+json",
+    },
+    body: linkOperations.filter((op) => op.id === id).map(({ linkToId, type, comment }) => ({
+        op: "add",
+        path: "/relations/-",
+        value: {
+          rel: `${getLinkTypeFromName(type)}`,
+          url: `${orgUrl}/${project}/_apis/wit/workItems/${linkToId}`,
+          attributes: {
+            comment: comment || "",
+          },
+        }
+      })),
+  }));
+
+  const response = await fetch(
+    `${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken.token}`,
+        "Content-Type": "application/json",
+        "User-Agent": `${userAgent}`,
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to process link operations: ${response.statusText}`
+    );
+  }
+
+  const batchResponse = await response.json();
+  
+  // Create results based on batch response
+  const results: LinkResult[] = [];
+  for (let i = 0; i < linkOperations.length; i++) {
+    const operation = linkOperations[i];
+    const batchResult = batchResponse.value[i];
+    results.push({
+      success: batchResult.code >= 200 && batchResult.code < 300,
+      workItemId: operation.id,
+      operation: `link to ${operation.linkToId} (${operation.type})`,
+      error: batchResult.code >= 400 ? batchResult.body : undefined
+    });
+  }
+
+  return { results, batchResponse };
+}
+
+async function processUnlinkOperations(
+  unlinkOperations: LinkOperation[],
+  project: string,
+  connectionProvider: () => Promise<WebApi>
+): Promise<{ results: LinkResult[] }> {
+  if (unlinkOperations.length === 0) {
+    return { results: [] };
+  }
+
+  const connection = await connectionProvider();
+  const workItemApi = await connection.getWorkItemTrackingApi();
+  const results: LinkResult[] = [];
+  // Group unlink operations by work item ID for efficiency
+  const groupedOperations = new Map<number, LinkOperation[]>();
+  for (const op of unlinkOperations) {
+    if (!groupedOperations.has(op.id)) {
+      groupedOperations.set(op.id, []);
+    }
+    const operations = groupedOperations.get(op.id);
+    if (operations) {
+      operations.push(op);
+    }
+  }
+
+  // Process each work item that needs unlink operations
+  for (const [workItemId, operations] of groupedOperations) {
+    try {
+      // Get the work item with relations
+      const workItem = await workItemApi.getWorkItem(workItemId, undefined, undefined, WorkItemExpand.Relations, project);
+      
+      if (!workItem.relations || workItem.relations.length === 0) {
+        for (const op of operations) {
+          results.push({
+            success: false,
+            workItemId: op.id,
+            operation: `unlink from ${op.linkToId} (${op.type})`,
+            error: `Work item ${op.id} has no relations to unlink.`
+          });
+        }
+        continue;
+      }      // Find indices for each unlink operation
+      const unlinkPatches: { op: string; path: string }[] = [];
+      const processedOperations: LinkOperation[] = [];
+
+      for (const operation of operations) {
+        const relationIndex = workItem.relations.findIndex(
+          relation => {
+            const matchesId = relation.url?.endsWith(operation.linkToId.toString());
+            const matchesType = relation.rel === getLinkTypeFromName(operation.type);
+            return matchesId && matchesType;
+          }
+        );
+        
+        if (relationIndex === -1) {
+          results.push({
+            success: false,
+            workItemId: operation.id,
+            operation: `unlink from ${operation.linkToId} (${operation.type})`,
+            error: `No relation found between work item ${operation.id} and ${operation.linkToId} of type '${operation.type}'.`
+          });
+        } else {
+          unlinkPatches.push({
+            op: "remove",
+            path: `/relations/${relationIndex}`
+          });
+          processedOperations.push(operation);
+        }
+      }
+
+      // Sort unlink patches by index in descending order to remove from the end first
+      unlinkPatches.sort((a, b) => {
+        const indexA = parseInt(a.path.split('/')[2]);
+        const indexB = parseInt(b.path.split('/')[2]);
+        return indexB - indexA;
+      });
+
+      // Apply unlink patches if any were found
+      if (unlinkPatches.length > 0) {
+        try {
+          await workItemApi.updateWorkItem(null, unlinkPatches, workItemId, project);
+          
+          for (const op of processedOperations) {
+            results.push({
+              success: true,
+              workItemId: op.id,
+              operation: `unlink from ${op.linkToId} (${op.type})`
+            });
+          }
+        } catch (error) {
+          for (const op of processedOperations) {
+            results.push({
+              success: false,
+              workItemId: op.id,
+              operation: `unlink from ${op.linkToId} (${op.type})`,
+              error: `Failed to unlink: ${error instanceof Error ? error.message : String(error)}`
+            });
+          }
+        }
+      }
+    } catch (error) {
+      for (const op of operations) {
+        results.push({
+          success: false,
+          workItemId: op.id,
+          operation: `unlink from ${op.linkToId} (${op.type})`,
+          error: `Failed to retrieve work item: ${error instanceof Error ? error.message : String(error)}`
+        });
+      }
+    }
+  }
+
+  return { results };
 }
 
 function configureWorkItemTools(
@@ -624,72 +822,70 @@ function configureWorkItemTools(
 
   server.tool(
     WORKITEM_TOOLS.work_items_link,
-    "Link work items together in batch.",
+    "Link or unlink work items together in batch.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       updates: z.array(
         z.object({
           id: z.number().describe("The ID of the work item to update."),
-          linkToId: z.number().describe("The ID of the work item to link to."),
-          type: z.enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests"]).default("related").describe("Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'referenced by', and 'references'. Defaults to 'related'."),             
-          comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
+          linkToId: z.number().describe("The ID of the work item to link to or unlink from."),
+          operation: z.enum(["link", "unlink"]).default("link").describe("The operation to perform: 'link' to create a relationship or 'unlink' to remove a relationship. Defaults to 'link'."),
+          type: z.enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests"]).default("related").describe("Type of link to create or remove between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'referenced by', and 'references'. Defaults to 'related'."),             
+          comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created. Only applies to link operations."),
         })
-      ).describe(""),
-    },
-    async ({ project, updates }) => {
+      ).describe("An array of updates to apply to work items. Each update specifies whether to link or unlink work items."),
+    },    async ({ project, updates }) => {
       const connection = await connectionProvider();
       const orgUrl = connection.serverUrl;
       const accessToken = await tokenProvider();
 
-      // Extract unique IDs from the updates array
-      const uniqueIds = Array.from(new Set(updates.map((update) => update.id)));
+      try {
+        // Separate link and unlink operations
+        const linkOperations = updates.filter(update => update.operation === "link");
+        const unlinkOperations = updates.filter(update => update.operation === "unlink");
 
-      const body = uniqueIds.map((id) => ({
-        method: "PATCH",
-        uri: `/_apis/wit/workitems/${id}?api-version=${batchApiVersion}`,
-        headers: {
-          "Content-Type": "application/json-patch+json",
-        },
-        body: updates.filter((update) => update.id === id).map(({ linkToId, type, comment }) => ({
-            op: "add",
-            path: "/relations/-",
-            value: {
-              rel: `${getLinkTypeFromName(type)}`,
-              url: `${orgUrl}/${project}/_apis/wit/workItems/${linkToId}`,
-              attributes: {
-                comment: comment || "",
-              },
-            }
-          })),
-      }));     
+        // Process operations
+        const [linkResults, unlinkResults] = await Promise.all([
+          processLinkOperations(linkOperations, project, orgUrl, accessToken),
+          processUnlinkOperations(unlinkOperations, project, connectionProvider)
+        ]);        // Combine results
+        const allResults = [...linkResults.results, ...unlinkResults.results];
+        const successCount = allResults.filter(r => r.success).length;
+        const failureCount = allResults.filter(r => !r.success).length;
 
-      const response = await fetch(
-        `${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${accessToken.token}`,
-            "Content-Type": "application/json",
-            "User-Agent": `${userAgent}`,
-          },
-          body: JSON.stringify(body),
+        const summary: {
+          totalOperations: number;
+          successful: number;
+          failed: number;
+          linkOperations: number;
+          unlinkOperations: number;
+          results: LinkResult[];
+          linkBatchResponse?: unknown;
+        } = {
+          totalOperations: updates.length,
+          successful: successCount,
+          failed: failureCount,
+          linkOperations: linkOperations.length,
+          unlinkOperations: unlinkOperations.length,
+          results: allResults
+        };
+
+        // Include batch response for link operations if available
+        if (linkResults.batchResponse) {
+          summary.linkBatchResponse = linkResults.batchResponse;
         }
-      );
 
-      if (!response.ok) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+        };
+      } catch (error) {
         throw new Error(
-          `Failed to update work items in batch: ${response.statusText}`
+          `Failed to process work item operations: ${error instanceof Error ? error.message : String(error)}`
         );
       }
-
-      const result = await response.json();
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
     }
   );
- 
+  
   server.tool (
     WORKITEM_TOOLS.close_and_link_workitem_duplicates,
     "Close duplicate work items by id.",
