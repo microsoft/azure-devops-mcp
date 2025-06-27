@@ -13,7 +13,8 @@ const Test_Plan_Tools = {
   add_test_cases_to_suite: "testplan_add_test_cases_to_suite",
   test_results_from_build_id: "testplan_show_test_results_from_build_id",
   list_test_cases: "testplan_list_test_cases",
-  list_test_plans: "testplan_list_test_plans"
+  list_test_plans: "testplan_list_test_plans",
+  run_test_points_with_options: "testplan_run_test_points_with_options",
 };
 
 function configureTestPlanTools(
@@ -263,6 +264,131 @@ function configureTestPlanTools(
 
       return {
         content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
+      };
+    }
+  );
+
+  /*
+    Runs selected test points from a test plan using an automated release pipeline stage.
+  */
+  server.tool(
+    Test_Plan_Tools.run_test_points_with_options,
+    "Runs selected test points from a test plan using an automated release pipeline stage.",
+    {
+      project: z.string().describe("Azure DevOps project ID or name."),
+      planId: z.number().describe("Test plan ID."),
+      testPointIds: z.array(z.number()).describe("List of test point IDs to run.")
+    },
+    async ({
+      project,
+      planId,
+      testPointIds
+    }) => {
+      const connection = await connectionProvider();
+      const testPlanApi = await connection.getTestPlanApi();
+      const buildApi = await connection.getBuildApi();
+      const releaseApi = await connection.getReleaseApi();
+      const testApi = await connection.getTestApi();
+
+      // Retrieve the test plan configuration
+      const testPlanDefinition = await testPlanApi.getTestPlanById(project, planId);
+      if (!testPlanDefinition) throw new Error("Test plan not found.");
+
+      // Extract build definition ID from test plan - required for getting build artifacts
+      const buildId = testPlanDefinition.buildDefinition?.id;
+      if (!buildId) throw new Error("No build ID found in test plan definition.");
+
+      // Get the latest successful build from the build definition to use as artifact source
+      const buildDefinition = await buildApi.getLatestBuild(project, buildId.toString());
+      const artifactBuildId = buildDefinition?.id;
+      if (!artifactBuildId) throw new Error("No latest build ID found in test plan definition.");
+
+      // Extract release definition ID - required for creating the release pipeline
+      const releaseDefinitionId = testPlanDefinition.releaseEnvironmentDefinition?.definitionId;
+      if (!releaseDefinitionId) throw new Error("No release definition ID found in test plan definition.");
+
+      // Step 1: Get release definition and extract alias and stage name
+      const releaseDefinition = await releaseApi.getReleaseDefinition(project, releaseDefinitionId);
+      const artifact = releaseDefinition.artifacts?.[0];
+      if (!artifact?.alias) throw new Error("No artifact alias found in release definition.");
+
+      const releaseStageName = releaseDefinition?.environments?.[0]?.name;
+      if (!releaseStageName) throw new Error("No stage name found in release definition.");
+
+      const alias = artifact.alias;
+
+      // Step 2: Create the test run
+      const testRunPayload = {
+        name: `RunWithOptions ${new Date().toLocaleString()}`,
+        automated: true,
+        plan: { id: planId.toString() },
+        pointIds: testPointIds,
+        filter: {
+          sourceFilter: "*.dll",
+          testCaseFilter: ""
+        },
+        dtlTestEnvironment: { id: "vstfs://dummy" },
+        state: "NotStarted",
+      };
+
+      const testRun = await testApi.createTestRun(testRunPayload, project);
+      if (!testRun?.id) throw new Error("Failed to create test run.");
+
+      // Step 3: Create a release
+      const releasePayload = {
+        definitionId: releaseDefinitionId,
+        artifacts: [{
+          alias,
+          instanceReference: {
+            id: artifactBuildId.toString(),
+            name: `Build-${artifactBuildId}`
+          }
+        }],
+        reason: 1,
+        description: "Triggered via MCP tool",
+        isDraft: false,
+        manualEnvironments: [releaseStageName],
+        environmentsMetadata: [],
+        variables: {
+          "test.RunId": {
+            value: testRun.id.toString(),
+            isSecret: false,
+            allowOverride: true
+          }
+        },
+        properties: {}
+      };
+
+      const release = await releaseApi.createRelease(releasePayload, project);
+      if (!release?.id) throw new Error("Failed to create release.");
+
+
+      const releaseEnv = release.environments?.find(env => env.name === releaseStageName);
+      if (!releaseEnv?.id) throw new Error("Could not extract release environment ID from newly created release.");
+
+      // Step 4: Trigger the release environment to start test execution
+      try {
+        await releaseApi.updateReleaseEnvironment(
+          {
+            status: 2, // InProgress
+            variables: {},
+            comment: "Triggered via MCP tool with runId"
+          },
+          project,
+          release.id,
+          releaseEnv.id
+        );
+      } catch (error) {
+        throw new Error("Failed to update release environment status.");
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(testRun, null, 2)
+          }
+        ]
       };
     }
   );
