@@ -5,6 +5,8 @@ import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { RunCreateModel } from "azure-devops-node-api/interfaces/TestInterfaces.js";
+import { ReleaseStartMetadata } from "azure-devops-node-api/interfaces/ReleaseInterfaces.js";
 import { z } from "zod";
 
 const Test_Plan_Tools = {
@@ -318,7 +320,7 @@ function configureTestPlanTools(
       const alias = artifact.alias;
 
       // Step 2: Create the test run
-      const testRunPayload = {
+      const testRunPayload : RunCreateModel = {
         name: `RunWithOptions ${new Date().toLocaleString()}`,
         automated: true,
         plan: { id: planId.toString() },
@@ -335,7 +337,7 @@ function configureTestPlanTools(
       if (!testRun?.id) throw new Error("Failed to create test run.");
 
       // Step 3: Create a release
-      const releasePayload = {
+      const releasePayload : ReleaseStartMetadata = {
         definitionId: releaseDefinitionId,
         artifacts: [{
           alias,
@@ -348,7 +350,6 @@ function configureTestPlanTools(
         description: "Triggered via MCP tool",
         isDraft: false,
         manualEnvironments: [releaseStageName],
-        environmentsMetadata: [],
         variables: {
           "test.RunId": {
             value: testRun.id.toString(),
@@ -356,12 +357,10 @@ function configureTestPlanTools(
             allowOverride: true
           }
         },
-        properties: {}
       };
 
       const release = await releaseApi.createRelease(releasePayload, project);
       if (!release?.id) throw new Error("Failed to create release.");
-
 
       const releaseEnv = release.environments?.find(env => env.name === releaseStageName);
       if (!releaseEnv?.id) throw new Error("Could not extract release environment ID from newly created release.");
@@ -371,7 +370,6 @@ function configureTestPlanTools(
         await releaseApi.updateReleaseEnvironment(
           {
             status: 2, // InProgress
-            variables: {},
             comment: "Triggered via MCP tool with runId"
           },
           project,
