@@ -309,6 +309,10 @@ function configureTestPlanTools(
       const releaseDefinitionId = testPlanDefinition.releaseEnvironmentDefinition?.definitionId;
       if (!releaseDefinitionId) throw new Error("No release definition ID found in test plan definition.");
 
+      // Retrieve test configurations for the test plan
+      const configurations = await testPlanApi.getTestConfigurations(project);
+      const configurationIds = configurations.map((config) => config.id);
+
       // Step 1: Get release definition and extract alias and stage name
       const releaseDefinition = await releaseApi.getReleaseDefinition(project, releaseDefinitionId);
       const artifact = releaseDefinition.artifacts?.[0];
@@ -325,6 +329,7 @@ function configureTestPlanTools(
         automated: true,
         plan: { id: planId.toString() },
         pointIds: testPointIds,
+        configurationIds,
         filter: {
           sourceFilter: "*.dll",
           testCaseFilter: ""
