@@ -26,6 +26,9 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 
 - "List my ADO projects"
 - "List ADO Builds for 'Contoso'"
+- "Download build logs for build ID 12345 in project 'Contoso'"
+- "List ADO Pipelines for 'Contoso'"
+- "Run pipeline 123 in project 'Contoso'"
 - "List ADO Releases for 'Contoso'"
 - "List ADO Repos for 'Contoso'"
 - "List test plans for 'Contoso'"
@@ -94,9 +97,21 @@ Interact with these Azure DevOps services:
 - **build_get_builds**: Retrieves a list of builds for a given project.
 - **build_get_log**: Retrieves the logs for a specific build.
 - **build_get_log_by_id**: Get a specific build log by log ID.
+- **build_get_logs_zip**: Downloads build logs as ZIP, extracts with nested archive support, creates analysis guide, and opens in VS Code for comprehensive build failure investigation.
 - **build_get_changes**: Get the changes associated with a specific build.
 - **build_run_build**: Triggers a new build for a specified definition.
 - **build_get_status**: Fetches the status of a specific build.
+- **build_get_templates**: Retrieves a list of build templates for a given project.
+
+### 🔄 Pipelines
+
+- **list_pipelines**: Retrieve a list of pipelines for the specified Azure DevOps project.
+- **get_pipeline**: Get a pipeline by its ID for a given Azure DevOps project.
+- **list_pipeline_runs**: List runs for a specific pipeline in a project.
+- **list_run_logs**: List logs for a specific run in a pipeline.
+- **get_log_content**: Get the content of a specific log for a run.
+- **preview**: Preview the final YAML for a pipeline without running it.
+- **run_pipeline**: Run a pipeline for a given Azure DevOps project.
 
 ### 🚀 Releases
 
