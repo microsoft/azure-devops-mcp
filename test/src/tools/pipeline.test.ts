@@ -1,26 +1,45 @@
 import { AccessToken } from "@azure/identity";
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { configurePipelineTools } from "../../../src/tools/pipeline";
 import { WebApi } from "azure-devops-node-api";
-import { configurePipelineTools } from '../../../src/tools/pipeline';
-import { IPipelinesApi } from "azure-devops-node-api/PipelinesApi";
+import { 
+  _mockPipelines, 
+  _mockPipeline, 
+  _mockPipelineRuns, 
+  _mockRunLogs, 
+  _mockLogContent, 
+  _mockPipelinePreview, 
+  _mockPipelineRun 
+} from "../../mocks/pipelines";
 
 type TokenProviderMock = () => Promise<AccessToken>;
 type ConnectionProviderMock = () => Promise<WebApi>;
+
+interface PipelineApiMock {
+  listPipelines: jest.Mock;
+  getPipeline: jest.Mock;
+  listRuns: jest.Mock;
+  listLogs: jest.Mock;
+  getLog: jest.Mock;
+  preview: jest.Mock;
+  runPipeline: jest.Mock;
+}
 
 describe("configurePipelineTools", () => {
   let server: McpServer;
   let tokenProvider: TokenProviderMock;
   let connectionProvider: ConnectionProviderMock;
   let mockConnection: {
-    getPipelinesApi: () => Promise<IPipelinesApi>;
+    getPipelinesApi: jest.Mock;
   };
-  let mockPipelinesApi: IPipelinesApi;
+  let mockPipelineApi: PipelineApiMock;
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
     tokenProvider = jest.fn();
-    mockPipelinesApi = {
+
+    mockPipelineApi = {
       listPipelines: jest.fn(),
       getPipeline: jest.fn(),
       listRuns: jest.fn(),
@@ -28,10 +47,12 @@ describe("configurePipelineTools", () => {
       getLog: jest.fn(),
       preview: jest.fn(),
       runPipeline: jest.fn(),
-    } as unknown as IPipelinesApi;
-    mockConnection = {
-      getPipelinesApi: jest.fn().mockResolvedValue(mockPipelinesApi),
     };
+
+    mockConnection = {
+      getPipelinesApi: jest.fn().mockResolvedValue(mockPipelineApi),
+    };
+
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
   });
 
@@ -40,190 +61,224 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
       expect((server.tool as jest.Mock).mock.calls.map(call => call[0])).toEqual(
         expect.arrayContaining([
-          "list_pipelines",
-          "get_pipeline",
-          "list_pipeline_runs",
-          "list_run_logs",
-          "get_log_content",
-          "preview",
-          "run_pipeline",
+          "pipeline_list_pipelines",
+          "pipeline_get_pipeline",
+          "pipeline_list_pipeline_runs",
+          "pipeline_list_run_logs",
+          "pipeline_get_log_content",
+          "pipeline_preview",
+          "pipeline_run_pipeline",
         ])
       );
     });
   });
 
-  describe("list_pipelines tool", () => {
-    it("should call listPipelines with the correct parameters and return the expected result", async () => {
+  describe("pipeline_list_pipelines tool", () => {
+    it("should call listPipelines API with the correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
+
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "list_pipelines"
+        ([toolName]) => toolName === "pipeline_list_pipelines"
       );
-      if (!call) throw new Error("list_pipelines tool not registered");
+      if (!call) throw new Error("pipeline_list_pipelines tool not registered");
       const [, , , handler] = call;
 
-      (mockPipelinesApi.listPipelines as jest.Mock).mockResolvedValue([{ id: 1, name: "Pipeline 1" }]);
+      (mockPipelineApi.listPipelines as jest.Mock).mockResolvedValue(_mockPipelines);
+
       const params = {
-        project: "proj1",
+        project: "MyProject",
       };
+
       const result = await handler(params);
 
-      expect(mockPipelinesApi.listPipelines).toHaveBeenCalledWith("proj1");
-      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Pipeline 1" }], null, 2));
+      expect(mockPipelineApi.listPipelines).toHaveBeenCalledWith(params.project);
+      expect(result.content[0].text).toBe(JSON.stringify(_mockPipelines, null, 2));
     });
   });
 
-  describe("get_pipeline tool", () => {
-    it("should call getPipeline with the correct parameters and return the expected result", async () => {
+  describe("pipeline_get_pipeline tool", () => {
+    it("should call getPipeline API with the correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "get_pipeline"
-      );
-      if (!call) throw new Error("get_pipeline tool not registered");
-      const [, , , handler] = call;
 
-      (mockPipelinesApi.getPipeline as jest.Mock).mockResolvedValue({ id: 1, name: "Pipeline 1" });
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "pipeline_get_pipeline"
+      );
+      if (!call) throw new Error("pipeline_get_pipeline tool not registered");
+      const [, , , handler] = call;      (mockPipelineApi.getPipeline as jest.Mock).mockResolvedValue(_mockPipeline);
+
       const params = {
-        project: "proj1",
+        project: "MyProject",
         pipelineId: 1,
       };
+
       const result = await handler(params);
 
-      expect(mockPipelinesApi.getPipeline).toHaveBeenCalledWith("proj1", 1);
-      expect(result.content[0].text).toBe(JSON.stringify({ id: 1, name: "Pipeline 1" }, null, 2));
+      expect(mockPipelineApi.getPipeline).toHaveBeenCalledWith(
+        params.project,
+        params.pipelineId
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(_mockPipeline, null, 2));
     });
   });
 
-  describe("list_pipeline_runs tool", () => {
-    it("should call listRuns with the correct parameters and return the expected result", async () => {
+  describe("pipeline_list_pipeline_runs tool", () => {
+    it("should call listRuns API with the correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
+
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "list_pipeline_runs"
+        ([toolName]) => toolName === "pipeline_list_pipeline_runs"
       );
-      if (!call) throw new Error("list_pipeline_runs tool not registered");
+      if (!call) throw new Error("pipeline_list_pipeline_runs tool not registered");
       const [, , , handler] = call;
 
-      (mockPipelinesApi.listRuns as jest.Mock).mockResolvedValue([{ id: 1, name: "Run 1" }]);
+      (mockPipelineApi.listRuns as jest.Mock).mockResolvedValue(_mockPipelineRuns);
+
       const params = {
-        project: "proj1",
+        project: "MyProject",
         pipelineId: 1,
       };
+
       const result = await handler(params);
 
-      expect(mockPipelinesApi.listRuns).toHaveBeenCalledWith("proj1", 1);
-      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Run 1" }], null, 2));
+      expect(mockPipelineApi.listRuns).toHaveBeenCalledWith(
+        params.project,
+        params.pipelineId
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(_mockPipelineRuns, null, 2));
     });
   });
 
-  describe("list_run_logs tool", () => {
-    it("should call listLogs with the correct parameters and return the expected result", async () => {
+  describe("pipeline_list_run_logs tool", () => {
+    it("should call listLogs API with the correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
+
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "list_run_logs"
+        ([toolName]) => toolName === "pipeline_list_run_logs"
       );
-      if (!call) throw new Error("list_run_logs tool not registered");
+      if (!call) throw new Error("pipeline_list_run_logs tool not registered");
       const [, , , handler] = call;
 
-      (mockPipelinesApi.listLogs as jest.Mock).mockResolvedValue([{ id: 1, name: "Log 1" }]);
+      (mockPipelineApi.listLogs as jest.Mock).mockResolvedValue(_mockRunLogs);
+
       const params = {
-        project: "proj1",
+        project: "MyProject",
         pipelineId: 1,
-        runId: 123,
+        runId: 101,
       };
+
       const result = await handler(params);
 
-      expect(mockPipelinesApi.listLogs).toHaveBeenCalledWith("proj1", 1, 123);
-      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Log 1" }], null, 2));
+      expect(mockPipelineApi.listLogs).toHaveBeenCalledWith(
+        params.project,
+        params.pipelineId,
+        params.runId
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(_mockRunLogs, null, 2));
     });
   });
 
-  describe("get_log_content tool", () => {
-    it("should call getLog with the correct parameters and return the expected result", async () => {
+  describe("pipeline_get_log_content tool", () => {
+    it("should call getLog API with the correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
+
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "get_log_content"
+        ([toolName]) => toolName === "pipeline_get_log_content"
       );
-      if (!call) throw new Error("get_log_content tool not registered");
+      if (!call) throw new Error("pipeline_get_log_content tool not registered");
       const [, , , handler] = call;
 
-      (mockPipelinesApi.getLog as jest.Mock).mockResolvedValue({ content: "Log content" });
+      (mockPipelineApi.getLog as jest.Mock).mockResolvedValue(_mockLogContent);
+
       const params = {
-        project: "proj1",
+        project: "MyProject",
         pipelineId: 1,
-        runId: 123,
-        logId: 456,
+        runId: 101,
+        logId: 2,
       };
+
       const result = await handler(params);
 
-      expect(mockPipelinesApi.getLog).toHaveBeenCalledWith("proj1", 1, 123, 456);
-      expect(result.content[0].text).toBe(JSON.stringify({ content: "Log content" }, null, 2));
+      expect(mockPipelineApi.getLog).toHaveBeenCalledWith(
+        params.project,
+        params.pipelineId,
+        params.runId,
+        params.logId
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(_mockLogContent, null, 2));
     });
   });
 
-  describe("preview tool", () => {
-    it("should call preview with the correct parameters and return the expected result", async () => {
+  describe("pipeline_preview tool", () => {
+    it("should call preview API with the correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
+
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "preview"
+        ([toolName]) => toolName === "pipeline_preview"
       );
-      if (!call) throw new Error("preview tool not registered");
+      if (!call) throw new Error("pipeline_preview tool not registered");
       const [, , , handler] = call;
 
-      (mockPipelinesApi.preview as jest.Mock).mockResolvedValue({ finalYaml: "pipeline: yaml" });
+      (mockPipelineApi.preview as jest.Mock).mockResolvedValue(_mockPipelinePreview);
+
       const params = {
-        project: "proj1",
+        project: "MyProject",
         pipelineId: 1,
         runParameters: {
           previewRun: true,
-          variables: { key: { value: "value" } },
+          templateParameters: {
+            environment: "staging"
+          }
         },
-        pipelineVersion: 2,
+        pipelineVersion: 1,
       };
+
       const result = await handler(params);
 
-      expect(mockPipelinesApi.preview).toHaveBeenCalledWith(
-        {
-          previewRun: true,
-          variables: { key: { value: "value" } },
-        },
-        "proj1",
-        1,
-        2
+      expect(mockPipelineApi.preview).toHaveBeenCalledWith(
+        params.runParameters,
+        params.project,
+        params.pipelineId,
+        params.pipelineVersion
       );
-      expect(result.content[0].text).toBe(JSON.stringify({ finalYaml: "pipeline: yaml" }, null, 2));
+      expect(result.content[0].text).toBe(JSON.stringify(_mockPipelinePreview, null, 2));
     });
   });
 
-  describe("run_pipeline tool", () => {
-    it("should call runPipeline with the correct parameters and return the expected result", async () => {
+  describe("pipeline_run_pipeline tool", () => {
+    it("should call runPipeline API with the correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider);
+
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "run_pipeline"
+        ([toolName]) => toolName === "pipeline_run_pipeline"
       );
-      if (!call) throw new Error("run_pipeline tool not registered");
+      if (!call) throw new Error("pipeline_run_pipeline tool not registered");
       const [, , , handler] = call;
 
-      (mockPipelinesApi.runPipeline as jest.Mock).mockResolvedValue({ id: 789, state: "queued" });
+      (mockPipelineApi.runPipeline as jest.Mock).mockResolvedValue(_mockPipelineRun);
+
       const params = {
-        project: "proj1",
+        project: "MyProject",
         pipelineId: 1,
         runParameters: {
-          variables: { env: { value: "prod" } },
-          templateParameters: { param1: "value1" },
+          templateParameters: {
+            environment: "production"
+          },
+          variables: {
+            buildConfiguration: "Release"
+          }
         },
-        pipelineVersion: 3,
+        pipelineVersion: 1,
       };
+
       const result = await handler(params);
 
-      expect(mockPipelinesApi.runPipeline).toHaveBeenCalledWith(
-        {
-          variables: { env: { value: "prod" } },
-          templateParameters: { param1: "value1" },
-        },
-        "proj1",
-        1,
-        3
+      expect(mockPipelineApi.runPipeline).toHaveBeenCalledWith(
+        params.runParameters,
+        params.project,
+        params.pipelineId,
+        params.pipelineVersion
       );
-      expect(result.content[0].text).toBe(JSON.stringify({ id: 789, state: "queued" }, null, 2));
+      expect(result.content[0].text).toBe(JSON.stringify(_mockPipelineRun, null, 2));
     });
   });
 });

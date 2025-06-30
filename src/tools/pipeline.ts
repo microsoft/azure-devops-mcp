@@ -4,13 +4,13 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 
 const PIPELINE_TOOLS = {
-    list_pipelines: "list_pipelines",
-    get_pipeline: "get_pipeline",
-    list_pipeline_runs: "list_pipeline_runs",
-    list_run_logs: "list_run_logs",
-    get_log_content: "get_log_content",
-    preview: "preview",
-    run_pipeline: "run_pipeline",
+    list_pipelines: "pipeline_list_pipelines",
+    get_pipeline: "pipeline_get_pipeline",
+    list_pipeline_runs: "pipeline_list_pipeline_runs",
+    list_run_logs: "pipeline_list_run_logs",
+    get_log_content: "pipeline_get_log_content",
+    preview: "pipeline_preview",
+    run_pipeline: "pipeline_run_pipeline",
 };
 
 function configurePipelineTools(
