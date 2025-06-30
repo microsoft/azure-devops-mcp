@@ -105,13 +105,13 @@ Interact with these Azure DevOps services:
 
 ### 🔄 Pipelines
 
-- **list_pipelines**: Retrieve a list of pipelines for the specified Azure DevOps project.
-- **get_pipeline**: Get a pipeline by its ID for a given Azure DevOps project.
-- **list_pipeline_runs**: List runs for a specific pipeline in a project.
-- **list_run_logs**: List logs for a specific run in a pipeline.
-- **get_log_content**: Get the content of a specific log for a run.
-- **preview**: Preview the final YAML for a pipeline without running it.
-- **run_pipeline**: Run a pipeline for a given Azure DevOps project.
+- **pipeline_list_pipelines**: Retrieve a list of pipelines for the specified Azure DevOps project.
+- **pipeline_get_pipeline**: Get a pipeline by its ID for a given Azure DevOps project.
+- **pipeline_list_pipeline_runs**: List runs for a specific pipeline in a project.
+- **pipeline_list_run_logs**: List logs for a specific run in a pipeline.
+- **pipeline_get_log_content**: Get the content of a specific log for a run.
+- **pipeline_preview**: Preview the final YAML for a pipeline without running it.
+- **pipeline_run_pipeline**: Run a pipeline for a given Azure DevOps project.
 
 ### 🚀 Releases
 
