@@ -30,6 +30,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "@azure/identity": "^4.10.0",
     "@modelcontextprotocol/sdk": "1.13.0",
     "azure-devops-extension-api": "^4.252.0",
@@ -40,6 +41,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.14.0",
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^22",
     "@types/jest": "^30.0.0",
     "eslint-plugin-header": "^3.1.1",

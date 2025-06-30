@@ -6,6 +6,17 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
+import * as fs from "fs";
+import AdmZip from "adm-zip";
+import { 
+  streamToBuffer, 
+  createLogPaths, 
+  ensureDownloadsDirectory, 
+  extractNestedZips, 
+  createAnalysisPrompt, 
+  openInVSCode, 
+  cleanupZipFile 
+} from "../utils.js";
 
 const BUILD_TOOLS = {
   get_definitions: "build_get_definitions",
@@ -13,9 +24,11 @@ const BUILD_TOOLS = {
   get_builds: "build_get_builds",
   get_log: "build_get_log",
   get_log_by_id: "build_get_log_by_id",
+  get_logs_zip: "build_get_logs_zip",
   get_changes: "build_get_changes",
   run_build: "build_run_build",
-  get_status: "build_get_status"
+  get_status: "build_get_status",
+  get_templates: "build_get_templates"
 };
 
 function configureBuildTools(
@@ -300,6 +313,81 @@ function configureBuildTools(
       };
     }
   );
+
+  server.tool(
+  BUILD_TOOLS.get_templates,
+  "Retrieves a list of build templates for a given project.",
+  {
+    project: z.string().describe("Project ID or name to get build templates for"),
+  },
+  async ({ project }) => {
+    const connection = await connectionProvider();
+    const buildApi = await connection.getBuildApi();
+    const templates = await buildApi.getTemplates(project);
+    return {
+      content: [{ type: "text", text: JSON.stringify(templates, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  BUILD_TOOLS.get_logs_zip,
+  "Downloads build logs as ZIP, extracts with nested archive support, creates analysis guide, and opens in VS Code for comprehensive build failure investigation.",
+  {
+    project: z.string().describe("Project ID or name to get the build logs for"),
+    buildId: z.number().describe("ID of the build to get the logs ZIP for"),
+  },
+  async ({ project, buildId }) => {
+    const connection = await connectionProvider();
+    const buildApi = await connection.getBuildApi();
+    const logsZip = await buildApi.getBuildLogsZip(project, buildId);
+
+    // Convert the stream to buffer
+    const buffer = await streamToBuffer(logsZip);
+
+    // Create paths for ZIP and extraction
+    const { filename, folderName, zipFilePath, extractDir } = createLogPaths(buildId);
+    
+    // Ensure downloads directory exists
+    ensureDownloadsDirectory();
+    
+    // Write the ZIP file to downloads directory
+    fs.writeFileSync(zipFilePath, buffer);
+
+    // Extract the ZIP file
+    const zip = new AdmZip(zipFilePath);
+    zip.extractAllTo(extractDir, true);
+
+    // Recursively extract any nested ZIP files
+    extractNestedZips(extractDir);
+
+    // Create analysis prompt file
+    createAnalysisPrompt(extractDir, project, buildId);
+
+    // Open the extracted folder in VS Code
+    openInVSCode(extractDir);
+
+    // Clean up original ZIP file
+    cleanupZipFile(zipFilePath);
+
+    return {
+      content: [
+        { 
+          type: "text", 
+          text: JSON.stringify({
+            buildId,
+            project,
+            zipSizeBytes: buffer.length,
+            extractedPath: extractDir,
+            folderName,
+            message: `Build logs extracted and opened in VS Code at: ${extractDir}`
+          }, null, 2) 
+        }
+      ],
+    };
+  }
+);
 }
+
 
 export { BUILD_TOOLS, configureBuildTools };

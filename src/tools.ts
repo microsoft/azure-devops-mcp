@@ -14,6 +14,7 @@ import { configureReleaseTools } from "./tools/releases.js";
 import { configureWikiTools } from "./tools/wiki.js";
 import { configureTestPlanTools } from "./tools/testplans.js";
 import { configureSearchTools } from "./tools/search.js";
+import { configurePipelineTools } from "./tools/pipeline.js";
 
 function configureAllTools(
   server: McpServer,
@@ -29,6 +30,7 @@ function configureAllTools(
     configureWikiTools(server, tokenProvider, connectionProvider);
     configureTestPlanTools(server, tokenProvider, connectionProvider);
     configureSearchTools(server, tokenProvider, connectionProvider);
+    configurePipelineTools(server, tokenProvider, connectionProvider);
 }
 
 export { configureAllTools };
