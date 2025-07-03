@@ -384,4 +384,104 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("Error fetching wiki page content: Stream read error");
     });
   });
+
+  describe("wiki_get_page_content_by_url", () => {
+    it("should handle valid wiki URL correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "wiki_get_page_content_by_url"
+      );
+      if (!call) throw new Error("wiki_get_page_content_by_url tool not registered");
+      const [, , , handler] = call;
+
+      // Mock a stream with content
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: string) => void) {
+          if (event === "data") {
+            setImmediate(() => cb("Page content"));
+          } else if (event === "end") {
+            setImmediate(() => cb());
+          }
+          return this;
+        }
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const params = {
+        url: "https://dev.azure.com/myorg/myproject/_wiki/wikis/mywiki/123?pagePath=/my-page"
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith(
+        "myproject",
+        "123",
+        "my-page",
+        undefined,
+        undefined,
+        true
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toBe('"Page content"');
+    });
+
+    it("should handle invalid URL format", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "wiki_get_page_content_by_url"
+      );
+      if (!call) throw new Error("wiki_get_page_content_by_url tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        url: "https://example.com/invalid/url"
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Invalid wiki URL format");
+    });
+
+    it("should handle URL without pagePath parameter", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "wiki_get_page_content_by_url"
+      );
+      if (!call) throw new Error("wiki_get_page_content_by_url tool not registered");
+      const [, , , handler] = call;
+
+      // Mock a stream with content
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: string) => void) {
+          if (event === "data") {
+            setImmediate(() => cb("Root page content"));
+          } else if (event === "end") {
+            setImmediate(() => cb());
+          }
+          return this;
+        }
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const params = {
+        url: "https://dev.azure.com/myorg/myproject/_wiki/wikis/mywiki/123"
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith(
+        "myproject",
+        "123",
+        "/",
+        undefined,
+        undefined,
+        true
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toBe('"Root page content"');
+    });
+  });
 });
