@@ -11,6 +11,7 @@ interface WikiApiMock {
   getAllWikis: jest.Mock;
   getPagesBatch: jest.Mock;
   getPageText: jest.Mock;
+  getPageByIdText: jest.Mock;
 }
 
 describe("configureWikiTools", () => {
@@ -28,6 +29,7 @@ describe("configureWikiTools", () => {
       getAllWikis: jest.fn(),
       getPagesBatch: jest.fn(),
       getPageText: jest.fn(),
+      getPageByIdText: jest.fn(),
     };
     mockConnection = {
       getWikiApi: jest.fn().mockResolvedValue(mockWikiApi),
@@ -385,14 +387,19 @@ describe("configureWikiTools", () => {
     });
   });
 
-  describe("wiki_get_page_content_by_url", () => {
+  describe("wiki_get_page_content with URL", () => {
     it("should handle valid wiki URL correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_page_content_by_url"
+        ([toolName]) => toolName === "wiki_get_page_content"
       );
-      if (!call) throw new Error("wiki_get_page_content_by_url tool not registered");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
+
+      // Mock getAllWikis to resolve wiki name to GUID
+      mockWikiApi.getAllWikis.mockResolvedValue([
+        { id: "wiki-guid-123", name: "mywiki" }
+      ]);
 
       // Mock a stream with content
       const mockStream = {
@@ -406,7 +413,7 @@ describe("configureWikiTools", () => {
           return this;
         }
       };
-      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+      mockWikiApi.getPageByIdText.mockResolvedValue(mockStream as unknown);
 
       const params = {
         url: "https://dev.azure.com/myorg/myproject/_wiki/wikis/mywiki/123?pagePath=/my-page"
@@ -414,11 +421,11 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWikiApi.getPageText).toHaveBeenCalledWith(
+      expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith("myproject");
+      expect(mockWikiApi.getPageByIdText).toHaveBeenCalledWith(
         "myproject",
-        "123",
-        "my-page",
-        undefined,
+        "wiki-guid-123",
+        123,
         undefined,
         true
       );
@@ -429,9 +436,9 @@ describe("configureWikiTools", () => {
     it("should handle invalid URL format", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_page_content_by_url"
+        ([toolName]) => toolName === "wiki_get_page_content"
       );
-      if (!call) throw new Error("wiki_get_page_content_by_url tool not registered");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
 
       const params = {
@@ -447,10 +454,15 @@ describe("configureWikiTools", () => {
     it("should handle URL without pagePath parameter", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_page_content_by_url"
+        ([toolName]) => toolName === "wiki_get_page_content"
       );
-      if (!call) throw new Error("wiki_get_page_content_by_url tool not registered");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
+
+      // Mock getAllWikis to resolve wiki name to GUID
+      mockWikiApi.getAllWikis.mockResolvedValue([
+        { id: "wiki-guid-123", name: "mywiki" }
+      ]);
 
       // Mock a stream with content
       const mockStream = {
@@ -464,7 +476,7 @@ describe("configureWikiTools", () => {
           return this;
         }
       };
-      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+      mockWikiApi.getPageByIdText.mockResolvedValue(mockStream as unknown);
 
       const params = {
         url: "https://dev.azure.com/myorg/myproject/_wiki/wikis/mywiki/123"
@@ -472,16 +484,61 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWikiApi.getPageText).toHaveBeenCalledWith(
+      expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith("myproject");
+      expect(mockWikiApi.getPageByIdText).toHaveBeenCalledWith(
         "myproject",
-        "123",
-        "/",
-        undefined,
+        "wiki-guid-123",
+        123,
         undefined,
         true
       );
       expect(result.isError).toBeUndefined();
       expect(result.content[0].text).toBe('"Root page content"');
+    });
+
+    it("should handle URL with page ID and use getPageByIdText", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(
+        ([toolName]) => toolName === "wiki_get_page_content"
+      );
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      // Mock getAllWikis to resolve wiki name to GUID
+      mockWikiApi.getAllWikis.mockResolvedValue([
+        { id: "wiki-guid-456", name: "mywiki" }
+      ]);
+
+      // Mock getPageByIdText since page ID is detected in URL
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: string) => void) {
+          if (event === "data") {
+            setImmediate(() => cb("Page content by ID"));
+          } else if (event === "end") {
+            setImmediate(() => cb());
+          }
+          return this;
+        }
+      };
+      mockWikiApi.getPageByIdText.mockResolvedValue(mockStream as unknown);
+
+      const params = {
+        url: "https://dev.azure.com/myorg/myproject/_wiki/wikis/mywiki/5015?pagePath=/my-page"
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith("myproject");
+      expect(mockWikiApi.getPageByIdText).toHaveBeenCalledWith(
+        "myproject",
+        "wiki-guid-456",
+        5015,
+        undefined,
+        true
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toBe('"Page content by ID"');
     });
   });
 });

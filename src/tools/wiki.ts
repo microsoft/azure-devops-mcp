@@ -12,7 +12,6 @@ const WIKI_TOOLS = {
   get_wiki: "wiki_get_wiki",
   list_wiki_pages: "wiki_list_pages",
   get_wiki_page_content: "wiki_get_page_content",
-  get_wiki_page_content_by_url: "wiki_get_page_content_by_url",
 };
 
 function configureWikiTools(
@@ -134,81 +133,63 @@ function configureWikiTools(
 
   server.tool(
     WIKI_TOOLS.get_wiki_page_content,
-    "Retrieve wiki page content by wikiIdentifier and path.",
+    "Retrieve wiki page content. Provide either a 'url' parameter OR the combination of 'wikiIdentifier' and 'project' parameters.",
     {
-      wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
-      project: z.string().describe("The project name or ID where the wiki is located."),
-      path: z.string().describe("The path of the wiki page to retrieve content for."),
+      url: z.string().optional().describe("The full URL of the wiki page to retrieve content for. If provided, wikiIdentifier, project, and path are ignored."),
+      wikiIdentifier: z.string().optional().describe("The unique identifier of the wiki. Required if url is not provided."),
+      project: z.string().optional().describe("The project name or ID where the wiki is located. Required if url is not provided."),
+      path: z.string().optional().describe("The path of the wiki page to retrieve content for. Optional, defaults to root page if not provided."),
     },
-    async ({ wikiIdentifier, project, path }) => {
+    async ({ url, wikiIdentifier, project, path }) => {
       try {
         const connection = await connectionProvider();
         const wikiApi = await connection.getWikiApi();
 
-        const stream = await wikiApi.getPageText(
-          project,
-          wikiIdentifier,
-          path,
-          undefined,
-          undefined,
-          true
-        );
+        let actualProject: string;
+        let actualWikiId: string;
+        let actualPath: string | undefined;
+        let pageId: number | undefined;
 
-        if (!stream) {
-          return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
-        }
-
-        const content = await streamToString(stream);
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(content, null, 2) }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        
-        return { 
-          content: [{ type: "text", text: `Error fetching wiki page content: ${errorMessage}` }], 
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.tool(
-    WIKI_TOOLS.get_wiki_page_content_by_url,
-    "Retrieve wiki page content by URL.",
-    {
-      url: z.string().describe("The full URL of the wiki page to retrieve content for."),
-    },
-    async ({ url }) => {
-      try {
-        const parsedUrl = parseWikiUrl(url);
-        
-        if (!parsedUrl) {
-          return { 
-            content: [{ type: "text", text: "Invalid wiki URL format. Expected format: https://{organization}.visualstudio.com/{project}/_wiki/wikis/{wikiName}/{wikiId}?pagePath={pagePath} (pagePath is optional, defaults to root page)" }], 
-            isError: true 
-          };
-        }
-
-        const { project, wikiIdentifier, path, pageId } = parsedUrl;
-        
-        const connection = await connectionProvider();
-        const wikiApi = await connection.getWikiApi();
-
-        // If wikiIdentifier is a wiki name (not a GUID), resolve it to the actual wiki GUID
-        let actualWikiId = wikiIdentifier;
-        if (!isGuid(wikiIdentifier)) {
-          // Get all wikis and find the one with matching name
-          const wikis = await wikiApi.getAllWikis(project);
-          const matchingWiki = wikis?.find(wiki => wiki.name === wikiIdentifier);
-          if (!matchingWiki) {
+        // If URL is provided, parse it and use those values
+        if (url) {
+          const parsedUrl = parseWikiUrl(url);
+          
+          if (!parsedUrl) {
             return { 
-              content: [{ type: "text", text: `No wiki found with name '${wikiIdentifier}' in project '${project}'` }], 
+              content: [{ type: "text", text: "Invalid wiki URL format. Expected format: https://{organization}.visualstudio.com/{project}/_wiki/wikis/{wikiName}/{pageId}[/pagePath]" }], 
               isError: true 
             };
           }
-          actualWikiId = matchingWiki.id!;
+
+          actualProject = parsedUrl.project;
+          actualWikiId = parsedUrl.wikiIdentifier;
+          actualPath = parsedUrl.path;
+          pageId = parsedUrl.pageId;
+
+          // If wikiIdentifier is a wiki name (not a GUID), resolve it to the actual wiki GUID
+          if (!isGuid(actualWikiId)) {
+            const wikis = await wikiApi.getAllWikis(actualProject);
+            const matchingWiki = wikis?.find(wiki => wiki.name === actualWikiId);
+            if (!matchingWiki) {
+              return { 
+                content: [{ type: "text", text: `No wiki found with name '${actualWikiId}' in project '${actualProject}'` }], 
+                isError: true 
+              };
+            }
+            actualWikiId = matchingWiki.id!;
+          }
+        } else {
+          // Use traditional parameters
+          if (!wikiIdentifier || !project) {
+            return { 
+              content: [{ type: "text", text: "Either 'url' parameter or both 'wikiIdentifier' and 'project' parameters are required." }], 
+              isError: true 
+            };
+          }
+
+          actualProject = project;
+          actualWikiId = wikiIdentifier;
+          actualPath = path;
         }
 
         let stream: NodeJS.ReadableStream;
@@ -216,7 +197,7 @@ function configureWikiTools(
         // Use page ID if available, otherwise use path
         if (pageId) {
           stream = await wikiApi.getPageByIdText(
-            project,
+            actualProject,
             actualWikiId,
             pageId,
             undefined, // recursionLevel
@@ -224,9 +205,9 @@ function configureWikiTools(
           );
         } else {
           stream = await wikiApi.getPageText(
-            project,
+            actualProject,
             actualWikiId,
-            path || '/',
+            actualPath || '/',
             undefined,
             undefined,
             true
@@ -246,7 +227,7 @@ function configureWikiTools(
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         
         return { 
-          content: [{ type: "text", text: `Error fetching wiki page content by URL: ${errorMessage}` }], 
+          content: [{ type: "text", text: `Error fetching wiki page content: ${errorMessage}` }], 
           isError: true
         };
       }
@@ -274,24 +255,37 @@ function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; p
   try {
     const urlObj = new URL(url);
     
-    // Handle dev.azure.com format: https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiName}/{wikiId}[/pagePath]?[pagePath=...]
+    // Handle dev.azure.com format: https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiName}/{pageId}[?pagePath=...]
     if (urlObj.hostname === 'dev.azure.com') {
       const pathSegments = urlObj.pathname.split('/').filter(segment => segment.length > 0);
       if (pathSegments.length >= 6 && pathSegments[2] === '_wiki' && pathSegments[3] === 'wikis') {
         const project = pathSegments[1];
-        const wikiIdentifier = pathSegments[5]; // This is the wikiId
+        const wikiName = pathSegments[4]; // Wiki name
         
         // Check for page path in query parameter first, then in URL path
         let pagePath = urlObj.searchParams.get('pagePath');
-        if (!pagePath && pathSegments.length > 6) {
-          // Page path is in the URL after the wikiId
-          pagePath = '/' + pathSegments.slice(6).join('/');
+        let pageId: number | undefined;
+        
+        if (pathSegments.length > 5) {
+          // Check if the next segment is a page ID (numeric) or part of the path
+          const nextSegment = pathSegments[5];
+          if (/^\d+$/.test(nextSegment)) {
+            // It's a page ID
+            pageId = parseInt(nextSegment, 10);
+            if (pathSegments.length > 6) {
+              pagePath = pagePath || ('/' + pathSegments.slice(6).join('/'));
+            }
+          } else {
+            // It's part of the path
+            pagePath = pagePath || ('/' + pathSegments.slice(5).join('/'));
+          }
         }
         
         return {
           project,
-          wikiIdentifier,
-          path: normalizePath(pagePath)
+          wikiIdentifier: wikiName, // Use wiki name, will need to resolve to GUID later
+          path: pagePath ? normalizePath(pagePath) : undefined,
+          pageId
         };
       }
     }
