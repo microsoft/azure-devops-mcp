@@ -21,6 +21,7 @@
     "vscode": {
       "extensions": [
         "ms-azuretools.vscode-docker",
+        "EditorConfig.EditorConfig",
         "GitHub.copilot",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
