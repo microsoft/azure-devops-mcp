@@ -3,7 +3,7 @@
 
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiVersion } from "@utils";
+import { apiVersion } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
@@ -367,7 +367,7 @@ function configureBuildTools(
         throw new Error(`Failed to update build stage: ${response.status} ${errorText}`);
       }
 
-      const updatedBuild = await response.json();
+      const updatedBuild = await response.text();
 
       return {
         content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }],
