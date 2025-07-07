@@ -97,6 +97,7 @@ Interact with these Azure DevOps services:
 - **build_get_changes**: Get the changes associated with a specific build.
 - **build_run_build**: Triggers a new build for a specified definition.
 - **build_get_status**: Fetches the status of a specific build.
+- **update_build_stage**: Updates the stage of a specific build.
 
 ### 🚀 Releases
 
