@@ -36,7 +36,8 @@
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
     "zod": "^3.25.63",
-    "zod-to-json-schema": "^3.24.5"
+    "zod-to-json-schema": "^3.24.5",
+    "adm-zip": "^0.5.16"
   },
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.15.0",
@@ -50,6 +51,7 @@
     "ts-jest": "^29.4.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.32.1"
+    "typescript-eslint": "^8.32.1",
+    "@types/adm-zip": "^0.5.7"
   }
 }

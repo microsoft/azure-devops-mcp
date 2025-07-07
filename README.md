@@ -94,6 +94,7 @@ Interact with these Azure DevOps services:
 - **build_get_builds**: Retrieves a list of builds for a given project.
 - **build_get_log**: Retrieves the logs for a specific build.
 - **build_get_log_by_id**: Get a specific build log by log ID.
+- **build_get_logs_zip**: Downloads build logs as ZIP, extracts with nested archive support creates analysis guide, and opens in VS Code for comprehensive build failure investigation.
 - **build_get_changes**: Get the changes associated with a specific build.
 - **build_run_build**: Triggers a new build for a specified definition.
 - **build_get_status**: Fetches the status of a specific build.
