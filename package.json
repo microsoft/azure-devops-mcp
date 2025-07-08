@@ -30,8 +30,8 @@
     "start": "node -r tsconfig-paths/register dist/index.js",
     "eslint": "eslint",
     "eslint-fix": "eslint --fix",
-    "format": "prettier --write .",
-    "format-check": "prettier --check .",
+    "format": "prettier --write --end-of-line=lf .",
+    "format-check": "prettier --check --end-of-line=lf .",
     "clean": "shx rm -rf dist",
     "test": "jest"
   },

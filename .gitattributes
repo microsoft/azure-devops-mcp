@@ -1,0 +1,20 @@
+# Ensure consistent line endings across all platforms
+* text=auto eol=lf
+
+# Explicitly set line endings for specific file types
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+
+# Binary files should be left untouched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
