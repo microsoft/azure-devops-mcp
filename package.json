@@ -6,6 +6,10 @@
   "author": "Microsoft Corporation",
   "homepage": "https://github.com/microsoft/azure-devops-mcp",
   "bugs": "https://github.com/microsoft/azure-devops-mcp/issues",
+  "repository":{
+    "type" : "git",
+    "url" : "https://github.com/microsoft/azure-devops-mcp.git"
+  }
   "type": "module",
   "bin": {
     "mcp-server-azuredevops": "dist/index.js"
