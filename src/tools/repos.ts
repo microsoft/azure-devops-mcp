@@ -151,9 +151,11 @@ function configureRepoTools(
     "Retrieve a list of repositories for a given project",
     { 
       project: z.string().describe("The name or ID of the Azure DevOps project."),
+      top: z.number().default(100).describe("The maximum number of repositories to return."),
+      skip: z.number().default(0).describe("The number of repositories to skip. Defaults to 0."),
       repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."), 
     },
-    async ({ project, repoNameFilter }) => {
+    async ({ project, top, skip, repoNameFilter }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const repositories = await gitApi.getRepositories(
@@ -167,8 +169,13 @@ function configureRepoTools(
         ? filterReposByName(repositories, repoNameFilter)
         : repositories;
 
+      const paginatedRepositories = filteredRepositories?.slice(
+        skip,
+        skip + top
+      );
+
       // Filter out the irrelevant properties
-      const trimmedRepositories = filteredRepositories?.map((repo) => ({
+      const trimmedRepositories = paginatedRepositories?.map((repo) => ({
         id: repo.id,
         name: repo.name,
         isDisabled: repo.isDisabled,
@@ -191,11 +198,13 @@ function configureRepoTools(
     "Retrieve a list of pull requests for a given repository.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull requests are located."),
+      top: z.number().default(100).describe("The maximum number of pull requests to return."),
+      skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
       status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
     },
-    async ({ repositoryId, created_by_me, i_am_reviewer, status }) => {
+    async ({ repositoryId, top, skip, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -226,7 +235,11 @@ function configureRepoTools(
 
       const pullRequests = await gitApi.getPullRequests(
         repositoryId,
-        searchCriteria
+        searchCriteria,
+        undefined, // project
+        undefined, // maxCommentLength
+        skip,
+        top
       );
 
       // Filter out the irrelevant properties
@@ -256,11 +269,13 @@ function configureRepoTools(
     "Retrieve a list of pull requests for a given project Id or Name.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
+      top: z.number().default(100).describe("The maximum number of pull requests to return."),
+      skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
       status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
     },
-    async ({ project, created_by_me, i_am_reviewer, status }) => {
+    async ({ project, top, skip, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -289,7 +304,10 @@ function configureRepoTools(
 
       const pullRequests = await gitApi.getPullRequestsByProject(
         project,
-        gitPullRequestSearchCriteria
+        gitPullRequestSearchCriteria,
+        undefined, // maxCommentLength
+        skip,
+        top
       );
 
       // Filter out the irrelevant properties
@@ -324,6 +342,8 @@ function configureRepoTools(
       project: z.string().optional().describe("Project ID or project name (optional)"),
       iteration: z.number().optional().describe("The iteration ID for which to retrieve threads. Optional, defaults to the latest iteration."),
       baseIteration: z.number().optional().describe("The base iteration ID for which to retrieve threads. Optional, defaults to the latest base iteration."),
+      top: z.number().default(100).describe("The maximum number of threads to return."),
+      skip: z.number().default(0).describe("The number of threads to skip."),
     },
     async ({
       repositoryId,
@@ -331,6 +351,8 @@ function configureRepoTools(
       project,
       iteration,
       baseIteration,
+      top,
+      skip
     }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
@@ -343,8 +365,13 @@ function configureRepoTools(
         baseIteration
       );
 
+      const paginatedThreads = threads?.slice(
+        skip,
+        skip + top
+      );
+
       return {
-        content: [{ type: "text", text: JSON.stringify(threads, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
       };
     }
   );
@@ -357,8 +384,10 @@ function configureRepoTools(
       pullRequestId: z.number().describe("The ID of the pull request for which to retrieve thread comments."),
       threadId: z.number().describe("The ID of the thread for which to retrieve comments."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
+      top: z.number().default(100).describe("The maximum number of comments to return."),
+      skip: z.number().default(0).describe("The number of comments to skip."),
     },
-    async ({ repositoryId, pullRequestId, threadId, project }) => {
+    async ({ repositoryId, pullRequestId, threadId, project, top, skip }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -370,8 +399,13 @@ function configureRepoTools(
         project
       );
 
+      const paginatedComments = comments?.slice(
+        skip,
+        skip + top
+      );
+
       return {
-        content: [{ type: "text", text: JSON.stringify(comments, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
       };
     }
   );
@@ -406,8 +440,9 @@ function configureRepoTools(
     "Retrieve a list of my branches for a given repository Id.",
     {
       repositoryId: z.string().describe("The ID of the repository where the branches are located."),
+      top: z.number().default(100).describe("The maximum number of branches to return."),
     },
-    async ({ repositoryId }) => {
+    async ({ repositoryId, top }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const branches = await gitApi.getRefs(
@@ -419,8 +454,13 @@ function configureRepoTools(
         true
       );
 
+      const filteredBranches = branchesFilterOutIrrelevantProperties(
+        branches,
+        top
+      );
+
       return {
-        content: [{ type: "text", text: JSON.stringify(branches, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
       };
     }
   );
