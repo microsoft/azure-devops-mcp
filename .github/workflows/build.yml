@@ -8,14 +8,21 @@ on:
     branches:
       - "main"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build the project
     runs-on: windows-latest
 
     steps:
+      - uses: step-security/harden-runner@6c439dc8bdf85cadbbce9ed30d1c7b959517bc49 # v2.12.2
+        with:
+          egress-policy: audit
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Remove .npmrc - uses standard registry for internal build check - non-release version
         run: |
@@ -25,7 +32,7 @@ jobs:
         shell: pwsh
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
 
@@ -55,11 +62,15 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      - uses: step-security/harden-runner@6c439dc8bdf85cadbbce9ed30d1c7b959517bc49 # v2.12.2
+        with:
+          egress-policy: audit
+
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
 

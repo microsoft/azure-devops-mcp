@@ -36,10 +36,10 @@ function configureBuildTools(
       queryOrder: z.nativeEnum(DefinitionQueryOrder).optional().describe("Order in which build definitions are returned"),
       top: z.number().optional().describe("Maximum number of build definitions to return"),
       continuationToken: z.string().optional().describe("Token for continuing paged results"),
-      minMetricsTime: z.date().optional().describe("Minimum metrics time to filter build definitions"),
+      minMetricsTime: z.coerce.date().optional().describe("Minimum metrics time to filter build definitions"),
       definitionIds: z.array(z.number()).optional().describe("Array of build definition IDs to filter"),
-      builtAfter: z.date().optional().describe("Return definitions that have builds after this date"),
-      notBuiltAfter: z.date().optional().describe("Return definitions that do not have builds after this date"),
+      builtAfter: z.coerce.date().optional().describe("Return definitions that have builds after this date"),
+      notBuiltAfter: z.coerce.date().optional().describe("Return definitions that do not have builds after this date"),
       includeAllProperties: z.boolean().optional().describe("Whether to include all properties in the results"),
       includeLatestBuilds: z.boolean().optional().describe("Whether to include the latest builds for each definition"),
       taskIdFilter: z.string().optional().describe("Task ID to filter build definitions"),
@@ -119,8 +119,8 @@ function configureBuildTools(
       definitions: z.array(z.number()).optional().describe("Array of build definition IDs to filter builds"),
       queues: z.array(z.number()).optional().describe("Array of queue IDs to filter builds"),
       buildNumber: z.string().optional().describe("Build number to filter builds"),
-      minTime: z.date().optional().describe("Minimum finish time to filter builds"),
-      maxTime: z.date().optional().describe("Maximum finish time to filter builds"),
+      minTime: z.coerce.date().optional().describe("Minimum finish time to filter builds"),
+      maxTime: z.coerce.date().optional().describe("Maximum finish time to filter builds"),
       requestedFor: z.string().optional().describe("User ID or name who requested the build"),
       reasonFilter: z.number().optional().describe("Reason filter for the build (see BuildReason enum)"),
       statusFilter: z.number().optional().describe("Status filter for the build (see BuildStatus enum)"),
@@ -271,15 +271,42 @@ function configureBuildTools(
       project: z.string().describe("Project ID or name to run the build in"),
       definitionId: z.number().describe("ID of the build definition to run"),
       sourceBranch: z.string().optional().describe("Source branch to run the build from. If not provided, the default branch will be used."),
+      parameters: z.record(z.string(), z.string()).optional().describe("Custom build parameters as key-value pairs"),
     },
-    async ({ project, definitionId, sourceBranch }) => {
+    async ({ project, definitionId, sourceBranch, parameters }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const build = await buildApi.queueBuild({ definition: { id: definitionId }, sourceBranch }, project);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(build, null, 2) }],
+      const pipelinesApi = await connection.getPipelinesApi();
+      const definition = await buildApi.getDefinition(project, definitionId);
+      const runRequest = {
+        resources: {
+          repositories: {
+            self: {
+              refName:
+                sourceBranch ||
+                definition.repository?.defaultBranch ||
+                "refs/heads/main",
+            },
+          },
+        },
+        templateParameters: parameters,
       };
+      
+      const pipelineRun = await pipelinesApi.runPipeline(
+        runRequest,
+        project,
+        definitionId
+      );
+      const queuedBuild = { id: pipelineRun.id };
+      const buildId = queuedBuild.id;
+      if (buildId === undefined) {
+        throw new Error("Failed to get build ID from pipeline run");
+      }
+
+      const buildReport = await buildApi.getBuildReport(project, buildId);
+      return {
+        content: [{ type: "text", text: JSON.stringify(buildReport, null, 2) }],
+      };      
     }
   );
 

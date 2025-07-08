@@ -6,10 +6,23 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 
+import type { ProjectInfo } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
+
 const CORE_TOOLS = {
   list_project_teams: "core_list_project_teams",
   list_projects: "core_list_projects",  
 };
+
+function filterProjectsByName(
+  projects: ProjectInfo[],
+  projectNameFilter: string
+): ProjectInfo[]
+{
+  const lowerCaseFilter = projectNameFilter.toLowerCase();
+  return projects.filter((project) =>
+    project.name?.toLowerCase().includes(lowerCaseFilter)
+  );
+}
 
 function configureCoreTools(
   server: McpServer,
@@ -63,9 +76,10 @@ function configureCoreTools(
       stateFilter: z.enum(["all", "wellFormed", "createPending", "deleted"]).default("wellFormed").describe("Filter projects by their state. Defaults to 'wellFormed'."),
       top: z.number().optional().describe("The maximum number of projects to return. Defaults to 100."),
       skip: z.number().optional().describe("The number of projects to skip for pagination. Defaults to 0."),
-      continuationToken: z.number().optional().describe("Continuation token for pagination. Used to fetch the next set of results if available."),      
+      continuationToken: z.number().optional().describe("Continuation token for pagination. Used to fetch the next set of results if available."),
+      projectNameFilter: z.string().optional().describe("Filter projects by name. Supports partial matches."),
     },
-    async ({ stateFilter, top, skip, continuationToken }) => {
+    async ({ stateFilter, top, skip, continuationToken, projectNameFilter }) => {
       try {
         const connection = await connectionProvider();
         const coreApi = await connection.getCoreApi();
@@ -81,8 +95,12 @@ function configureCoreTools(
           return { content: [{ type: "text", text: "No projects found" }], isError: true };
         }
 
+        const filteredProject = projectNameFilter
+          ? filterProjectsByName(projects, projectNameFilter)
+          : projects;
+
         return {
-          content: [{ type: "text", text: JSON.stringify(projects, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(filteredProject, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

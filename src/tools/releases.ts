@@ -100,12 +100,12 @@ function configureReleaseTools(
       createdBy: z.string().optional().describe("User ID or name who created the release"),
       statusFilter: z.nativeEnum(ReleaseStatus).optional().default(ReleaseStatus.Active).describe("Status of the releases to filter (default: Active)"),
       environmentStatusFilter: z.number().optional().describe("Environment status to filter releases"),
-      minCreatedTime: z.date().optional().default(() => {
+      minCreatedTime: z.coerce.date().optional().default(() => {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         return sevenDaysAgo;
       }).describe("Minimum created time for releases (default: 7 days ago)"),
-      maxCreatedTime: z.date().optional().default(() => new Date()).describe("Maximum created time for releases (default: now)"),
+      maxCreatedTime: z.coerce.date().optional().default(() => new Date()).describe("Maximum created time for releases (default: now)"),
       queryOrder: z.nativeEnum(ReleaseQueryOrder).optional().default(ReleaseQueryOrder.Ascending).describe("Order in which to return releases (default: Ascending)"),
       top: z.number().optional().describe("Number of releases to return"),
       continuationToken: z.number().optional().describe("Continuation token for pagination"),

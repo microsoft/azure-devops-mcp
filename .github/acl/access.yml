@@ -12,9 +12,13 @@ configuration:
     role: Maintain
   - member: aaudzei
     role: Maintain
+  - member: kboom
+    role: Maintain    
   - member: skmanoj
     role: Write
   - member: KathanS
     role: Write
   - member: vinayakmsft
+    role: Write
+  - member: nikolapeja6
     role: Write

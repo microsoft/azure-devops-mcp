@@ -156,7 +156,7 @@ function configureWorkItemTools(
       id: z.number().describe("The ID of the work item to retrieve."),
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, all fields will be returned."),
-      asOf: z.date().optional().describe("Optional date to retrieve the work item as of a specific time. If not provided, the current state will be returned."),
+      asOf: z.coerce.date().optional().describe("Optional date string to retrieve the work item as of a specific time. If not provided, the current state will be returned."),
       expand: z
         .enum(["all", "fields", "links", "none", "relations"])
         .describe("Optional expand parameter to include additional details in the response.")

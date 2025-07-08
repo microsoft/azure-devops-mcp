@@ -4,9 +4,10 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { GitRef } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { GitRef, PullRequestStatus } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
+import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -36,6 +37,37 @@ function branchesFilterOutIrrelevantProperties(
     .slice(0, top);
 }
 
+function pullRequestStatusStringToInt(
+  status: string)
+: number {
+  switch (status) {
+    case "abandoned":
+      return PullRequestStatus.Abandoned.valueOf();
+    case "active":
+      return PullRequestStatus.Active.valueOf();
+    case "all":
+      return PullRequestStatus.All.valueOf();
+    case "completed":
+      return PullRequestStatus.Completed.valueOf();
+    case "notSet":
+      return PullRequestStatus.NotSet.valueOf();
+    default:
+      throw new Error(`Unknown pull request status: ${status}`);
+  }
+}
+
+function filterReposByName(
+  repositories: GitRepository[],
+  repoNameFilter: string
+): GitRepository[] {
+  const lowerCaseFilter = repoNameFilter.toLowerCase();
+  const filteredByName = repositories?.filter((repo) =>
+    repo.name?.toLowerCase().includes(lowerCaseFilter)
+  );
+
+  return filteredByName;
+}
+
 function configureRepoTools(
   server: McpServer,
   tokenProvider: () => Promise<AccessToken>,
@@ -52,6 +84,7 @@ function configureRepoTools(
       title: z.string().describe("The title of the pull request."),
       description: z.string().optional().describe("The description of the pull request. Optional."),
       isDraft: z.boolean().optional().default(false).describe("Indicates whether the pull request is a draft. Defaults to false."),
+      workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
     },
     async ({
       repositoryId,
@@ -60,9 +93,14 @@ function configureRepoTools(
       title,
       description,
       isDraft,
+      workItems,
     }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
+      const workItemRefs = workItems
+        ? workItems.split(" ").map((id) => ({ id: id.trim() }))
+        : [];
+
       const pullRequest = await gitApi.createPullRequest(
         {
           sourceRefName,
@@ -70,6 +108,7 @@ function configureRepoTools(
           title,
           description,
           isDraft,
+          workItemRefs: workItemRefs,
         },
         repositoryId
       );
@@ -111,9 +150,10 @@ function configureRepoTools(
     REPO_TOOLS.list_repos_by_project,
     "Retrieve a list of repositories for a given project",
     { 
-      project: z.string().describe("The name or ID of the Azure DevOps project."), 
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."), 
     },
-    async ({ project }) => {
+    async ({ project, repoNameFilter }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const repositories = await gitApi.getRepositories(
@@ -123,8 +163,12 @@ function configureRepoTools(
         false
       );
 
+      const filteredRepositories = repoNameFilter
+        ? filterReposByName(repositories, repoNameFilter)
+        : repositories;
+
       // Filter out the irrelevant properties
-      const filteredRepositories = repositories?.map((repo) => ({
+      const trimmedRepositories = filteredRepositories?.map((repo) => ({
         id: repo.id,
         name: repo.name,
         isDisabled: repo.isDisabled,
@@ -136,7 +180,7 @@ function configureRepoTools(
 
       return {
         content: [
-          { type: "text", text: JSON.stringify(filteredRepositories, null, 2) },
+          { type: "text", text: JSON.stringify(trimmedRepositories, null, 2) },
         ],
       };
     }
@@ -149,8 +193,9 @@ function configureRepoTools(
       repositoryId: z.string().describe("The ID of the repository where the pull requests are located."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
     },
-    async ({ repositoryId, created_by_me, i_am_reviewer }) => {
+    async ({ repositoryId, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -161,7 +206,7 @@ function configureRepoTools(
         creatorId?: string;
         reviewerId?: string;
       } = {
-        status: 1,
+        status: pullRequestStatusStringToInt(status),
         repositoryId: repositoryId,
       };
 
@@ -213,8 +258,9 @@ function configureRepoTools(
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
     },
-    async ({ project, created_by_me, i_am_reviewer }) => {
+    async ({ project, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -224,7 +270,7 @@ function configureRepoTools(
         creatorId?: string;
         reviewerId?: string;
       } = {
-        status: 1,
+        status: pullRequestStatusStringToInt(status),
       };
 
       if (created_by_me || i_am_reviewer) {
