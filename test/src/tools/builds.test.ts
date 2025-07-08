@@ -29,7 +29,6 @@ describe("configureBuildTools", () => {
       serverUrl: "https://dev.azure.com/test-org"
     };
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
-    // Clear fetch mock
     (global.fetch as jest.MockedFunction<typeof fetch>).mockClear();
   });
 
