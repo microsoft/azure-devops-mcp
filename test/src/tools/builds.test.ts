@@ -220,7 +220,6 @@ describe("configureBuildTools", () => {
       };
       (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
 
-      // Test with Cancel status
       const params = {
         project: "test-project",
         buildId: 123,
