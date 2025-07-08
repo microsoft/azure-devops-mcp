@@ -34,6 +34,7 @@ function branchesFilterOutIrrelevantProperties(
     ?.flatMap((branch) => (branch.name ? [branch.name] : []))
     ?.filter((branch) => branch.startsWith("refs/heads/"))
     .map((branch) => branch.replace("refs/heads/", ""))
+    .sort((a, b) => b.localeCompare(a))
     .slice(0, top);
 }
 
@@ -169,10 +170,9 @@ function configureRepoTools(
         ? filterReposByName(repositories, repoNameFilter)
         : repositories;
 
-      const paginatedRepositories = filteredRepositories?.slice(
-        skip,
-        skip + top
-      );
+      const paginatedRepositories = filteredRepositories
+        ?.sort((a, b) => a.name?.localeCompare(b.name ?? "") ?? 0)
+        .slice(skip, skip + top);
 
       // Filter out the irrelevant properties
       const trimmedRepositories = paginatedRepositories?.map((repo) => ({
@@ -365,10 +365,9 @@ function configureRepoTools(
         baseIteration
       );
 
-      const paginatedThreads = threads?.slice(
-        skip,
-        skip + top
-      );
+      const paginatedThreads = threads
+        ?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
+        .slice(skip, skip + top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
@@ -399,10 +398,9 @@ function configureRepoTools(
         project
       );
 
-      const paginatedComments = comments?.slice(
-        skip,
-        skip + top
-      );
+      const paginatedComments = comments
+        ?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
+        .slice(skip, skip + top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
