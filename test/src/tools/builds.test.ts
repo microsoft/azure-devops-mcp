@@ -211,7 +211,6 @@ describe("configureBuildTools", () => {
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
 
-      // Mock the token provider
       const mockToken = { token: "mock-token" };
       (tokenProvider as jest.Mock).mockResolvedValue(mockToken);
 
