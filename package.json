@@ -31,6 +31,7 @@
     "eslint": "eslint",
     "eslint-fix": "eslint --fix",
     "format": "prettier --write .",
+    "format-check": "prettier --check .",
     "clean": "shx rm -rf dist",
     "test": "jest"
   },
