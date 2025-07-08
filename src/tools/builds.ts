@@ -352,7 +352,6 @@ function configureBuildTools(
         state: status.valueOf(),
       };
 
-      // Make the PATCH request
       const response = await fetch(endpoint, {
         method: "PATCH",
         headers: {
