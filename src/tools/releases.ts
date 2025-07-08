@@ -4,13 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import {
-  ReleaseDefinitionExpands,
-  ReleaseDefinitionQueryOrder,
-  ReleaseExpands,
-  ReleaseStatus,
-  ReleaseQueryOrder,
-} from "azure-devops-node-api/interfaces/ReleaseInterfaces.js";
+import { ReleaseDefinitionExpands, ReleaseDefinitionQueryOrder, ReleaseExpands, ReleaseStatus, ReleaseQueryOrder } from "azure-devops-node-api/interfaces/ReleaseInterfaces.js";
 import { z } from "zod";
 
 const RELEASE_TOOLS = {
@@ -18,12 +12,7 @@ const RELEASE_TOOLS = {
   get_releases: "release_get_releases",
 };
 
-function configureReleaseTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
-  
+function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     RELEASE_TOOLS.get_release_definitions,
     "Retrieves list of release definitions for a given project.",
@@ -44,51 +33,17 @@ function configureReleaseTools(
       isDeleted: z.boolean().default(false).describe("Whether to include deleted release definitions. Default is false."),
       searchTextContainsFolderName: z.boolean().optional().describe("Whether to include folder names in the search text"),
     },
-    async ({
-      project,
-      searchText,
-      expand,
-      artifactType,
-      artifactSourceId,
-      top,
-      continuationToken,
-      queryOrder,
-      path,
-      isExactNameMatch,
-      tagFilter,
-      propertyFilters,
-      definitionIdFilter,
-      isDeleted,
-      searchTextContainsFolderName,
-    }) => {
+    async ({ project, searchText, expand, artifactType, artifactSourceId, top, continuationToken, queryOrder, path, isExactNameMatch, tagFilter, propertyFilters, definitionIdFilter, isDeleted, searchTextContainsFolderName }) => {
       const connection = await connectionProvider();
       const releaseApi = await connection.getReleaseApi();
-      const releaseDefinitions = await releaseApi.getReleaseDefinitions(
-        project,
-        searchText,
-        expand,
-        artifactType,
-        artifactSourceId,
-        top,
-        continuationToken,
-        queryOrder,
-        path,
-        isExactNameMatch,
-        tagFilter,
-        propertyFilters,
-        definitionIdFilter,
-        isDeleted,
-        searchTextContainsFolderName
-      );
+      const releaseDefinitions = await releaseApi.getReleaseDefinitions(project, searchText, expand, artifactType, artifactSourceId, top, continuationToken, queryOrder, path, isExactNameMatch, tagFilter, propertyFilters, definitionIdFilter, isDeleted, searchTextContainsFolderName);
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(releaseDefinitions, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(releaseDefinitions, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     RELEASE_TOOLS.get_releases,
     "Retrieves a list of releases for a given project.",
@@ -100,12 +55,20 @@ function configureReleaseTools(
       createdBy: z.string().optional().describe("User ID or name who created the release"),
       statusFilter: z.nativeEnum(ReleaseStatus).optional().default(ReleaseStatus.Active).describe("Status of the releases to filter (default: Active)"),
       environmentStatusFilter: z.number().optional().describe("Environment status to filter releases"),
-      minCreatedTime: z.coerce.date().optional().default(() => {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        return sevenDaysAgo;
-      }).describe("Minimum created time for releases (default: 7 days ago)"),
-      maxCreatedTime: z.coerce.date().optional().default(() => new Date()).describe("Maximum created time for releases (default: now)"),
+      minCreatedTime: z.coerce
+        .date()
+        .optional()
+        .default(() => {
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return sevenDaysAgo;
+        })
+        .describe("Minimum created time for releases (default: 7 days ago)"),
+      maxCreatedTime: z.coerce
+        .date()
+        .optional()
+        .default(() => new Date())
+        .describe("Maximum created time for releases (default: now)"),
       queryOrder: z.nativeEnum(ReleaseQueryOrder).optional().default(ReleaseQueryOrder.Ascending).describe("Order in which to return releases (default: Ascending)"),
       top: z.number().optional().describe("Number of releases to return"),
       continuationToken: z.number().optional().describe("Continuation token for pagination"),
@@ -120,56 +83,10 @@ function configureReleaseTools(
       releaseIdFilter: z.array(z.number()).optional().describe("Filter by specific release IDs"),
       path: z.string().optional().describe("Path to filter releases"),
     },
-    async ({
-      project,
-      definitionId,
-      definitionEnvironmentId,
-      searchText,
-      createdBy,
-      statusFilter,
-      environmentStatusFilter,
-      minCreatedTime,
-      maxCreatedTime,
-      queryOrder,
-      top,
-      continuationToken,
-      expand,
-      artifactTypeId,
-      sourceId,
-      artifactVersionId,
-      sourceBranchFilter,
-      isDeleted,
-      tagFilter,
-      propertyFilters,
-      releaseIdFilter,
-      path,
-    }) => {
+    async ({ project, definitionId, definitionEnvironmentId, searchText, createdBy, statusFilter, environmentStatusFilter, minCreatedTime, maxCreatedTime, queryOrder, top, continuationToken, expand, artifactTypeId, sourceId, artifactVersionId, sourceBranchFilter, isDeleted, tagFilter, propertyFilters, releaseIdFilter, path }) => {
       const connection = await connectionProvider();
       const releaseApi = await connection.getReleaseApi();
-      const releases = await releaseApi.getReleases(
-        project,
-        definitionId,
-        definitionEnvironmentId,
-        searchText,
-        createdBy,
-        statusFilter,
-        environmentStatusFilter,
-        minCreatedTime,
-        maxCreatedTime,
-        queryOrder,
-        top,
-        continuationToken,
-        expand,
-        artifactTypeId,
-        sourceId,
-        artifactVersionId,
-        sourceBranchFilter,
-        isDeleted,
-        tagFilter,
-        propertyFilters,
-        releaseIdFilter,
-        path
-      );
+      const releases = await releaseApi.getReleases(project, definitionId, definitionEnvironmentId, searchText, createdBy, statusFilter, environmentStatusFilter, minCreatedTime, maxCreatedTime, queryOrder, top, continuationToken, expand, artifactTypeId, sourceId, artifactVersionId, sourceBranchFilter, isDeleted, tagFilter, propertyFilters, releaseIdFilter, path);
 
       return {
         content: [{ type: "text", text: JSON.stringify(releases, null, 2) }],

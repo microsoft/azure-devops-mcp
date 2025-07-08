@@ -16,7 +16,7 @@ When creating an issue:
 - **DO** provide a detailed description of the issue or feature request.
 - **DO** include any relevant REST endpoints you wish to integrate with. Refer to the [public REST API documentation](https://learn.microsoft.com/en-us/rest/api/azure/devops).
 
-For reference, see [this example of a well-formed issue](<repo>_issues/41).
+For reference, see [this example of a well-formed issue](<repo>\_issues/41).
 
 ## 👩‍💻 Writing code
 

@@ -15,20 +15,16 @@ import { configureWikiTools } from "./tools/wiki.js";
 import { configureTestPlanTools } from "./tools/testplans.js";
 import { configureSearchTools } from "./tools/search.js";
 
-function configureAllTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
-    configureCoreTools(server, tokenProvider, connectionProvider);
-    configureWorkTools(server, tokenProvider, connectionProvider);
-    configureBuildTools(server, tokenProvider, connectionProvider);
-    configureRepoTools(server, tokenProvider, connectionProvider);
-    configureWorkItemTools(server, tokenProvider, connectionProvider);
-    configureReleaseTools(server, tokenProvider, connectionProvider);
-    configureWikiTools(server, tokenProvider, connectionProvider);
-    configureTestPlanTools(server, tokenProvider, connectionProvider);
-    configureSearchTools(server, tokenProvider, connectionProvider);
+function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+  configureCoreTools(server, tokenProvider, connectionProvider);
+  configureWorkTools(server, tokenProvider, connectionProvider);
+  configureBuildTools(server, tokenProvider, connectionProvider);
+  configureRepoTools(server, tokenProvider, connectionProvider);
+  configureWorkItemTools(server, tokenProvider, connectionProvider);
+  configureReleaseTools(server, tokenProvider, connectionProvider);
+  configureWikiTools(server, tokenProvider, connectionProvider);
+  configureTestPlanTools(server, tokenProvider, connectionProvider);
+  configureSearchTools(server, tokenProvider, connectionProvider);
 }
 
 export { configureAllTools };

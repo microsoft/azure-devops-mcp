@@ -82,15 +82,11 @@ describe("configureWorkItemTools", () => {
     it("should call getBacklogs API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_list_backlogs"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_backlogs");
       if (!call) throw new Error("wit_list_backlogs tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkApi.getBacklogs as jest.Mock).mockResolvedValue([
-        _mockBacklogs,
-      ]);
+      (mockWorkApi.getBacklogs as jest.Mock).mockResolvedValue([_mockBacklogs]);
 
       const params = {
         project: "Contoso",
@@ -104,15 +100,7 @@ describe("configureWorkItemTools", () => {
         team: params.team,
       });
 
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockBacklogs,
-          ],
-          null,
-          2
-        )
-      );
+      expect(result.content[0].text).toBe(JSON.stringify([_mockBacklogs], null, 2));
     });
   });
 
@@ -120,11 +108,8 @@ describe("configureWorkItemTools", () => {
     it("should call getBacklogLevelWorkItems API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_list_backlog_work_items"
-      );
-      if (!call)
-        throw new Error("wit_list_backlog_work_items tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_backlog_work_items");
+      if (!call) throw new Error("wit_list_backlog_work_items tool not registered");
       const [, , , handler] = call;
 
       (mockWorkApi.getBacklogLevelWorkItems as jest.Mock).mockResolvedValue([
@@ -156,31 +141,30 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkApi.getBacklogLevelWorkItems).toHaveBeenCalledWith(
-        { project: params.project, team: params.team },
-        params.backlogId
-      );
+      expect(mockWorkApi.getBacklogLevelWorkItems).toHaveBeenCalledWith({ project: params.project, team: params.team }, params.backlogId);
 
       expect(result.content[0].text).toBe(
-        JSON.stringify([
-          {
-            workItems: [
-              {
-                rel: null,
-                source: null,
-                target: {
-                  id: 50,
+        JSON.stringify(
+          [
+            {
+              workItems: [
+                {
+                  rel: null,
+                  source: null,
+                  target: {
+                    id: 50,
+                  },
                 },
-              },
-              {
-                rel: null,
-                source: null,
-                target: {
-                  id: 49,
+                {
+                  rel: null,
+                  source: null,
+                  target: {
+                    id: 49,
+                  },
                 },
-              },
-            ],
-          }],
+              ],
+            },
+          ],
           null,
           2
         )
@@ -192,11 +176,8 @@ describe("configureWorkItemTools", () => {
     it("should call getPredefinedQueryResults API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_my_work_items"
-      );
-      if (!call)
-        throw new Error("wit_my_work_items tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_my_work_items");
+      if (!call) throw new Error("wit_my_work_items tool not registered");
       const [, , , handler] = call;
 
       (mockWorkApi.getPredefinedQueryResults as jest.Mock).mockResolvedValue([
@@ -204,7 +185,7 @@ describe("configureWorkItemTools", () => {
           id: "assignedtome",
           name: "Assigned to me",
           url: "https://dev.azure.com/org/project/_apis/work/predefinedQueries/assignedtome",
-          webUrl:"https://dev.azure.com/org/project/project/_workitems/assignedtome",
+          webUrl: "https://dev.azure.com/org/project/project/_workitems/assignedtome",
           hasMore: false,
           results: [
             {
@@ -218,7 +199,7 @@ describe("configureWorkItemTools", () => {
             {
               id: 115792,
               url: "https://dev.azure.com/org/_apis/wit/workItems/115792",
-            },            
+            },
           ],
         },
       ]);
@@ -232,36 +213,33 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkApi.getPredefinedQueryResults).toHaveBeenCalledWith(
-        params.project,
-        params.type,
-        params.top,
-        params.includeCompleted
-      );
-      
+      expect(mockWorkApi.getPredefinedQueryResults).toHaveBeenCalledWith(params.project, params.type, params.top, params.includeCompleted);
+
       expect(result.content[0].text).toBe(
-        JSON.stringify([
-           {
-          id: "assignedtome",
-          name: "Assigned to me",
-          url: "https://dev.azure.com/org/project/_apis/work/predefinedQueries/assignedtome",
-          webUrl:"https://dev.azure.com/org/project/project/_workitems/assignedtome",
-          hasMore: false,
-          results: [
+        JSON.stringify(
+          [
             {
-              id: 115784,
-              url: "https://dev.azure.com/org/_apis/wit/workItems/115784",
+              id: "assignedtome",
+              name: "Assigned to me",
+              url: "https://dev.azure.com/org/project/_apis/work/predefinedQueries/assignedtome",
+              webUrl: "https://dev.azure.com/org/project/project/_workitems/assignedtome",
+              hasMore: false,
+              results: [
+                {
+                  id: 115784,
+                  url: "https://dev.azure.com/org/_apis/wit/workItems/115784",
+                },
+                {
+                  id: 115794,
+                  url: "https://dev.azure.com/org/_apis/wit/workItems/115794",
+                },
+                {
+                  id: 115792,
+                  url: "https://dev.azure.com/org/_apis/wit/workItems/115792",
+                },
+              ],
             },
-            {
-              id: 115794,
-              url: "https://dev.azure.com/org/_apis/wit/workItems/115794",
-            },
-            {
-              id: 115792,
-              url: "https://dev.azure.com/org/_apis/wit/workItems/115792",
-            },            
           ],
-        },],
           null,
           2
         )
@@ -273,16 +251,12 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.getWorkItemsBatch API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_get_work_items_batch_by_ids"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
       if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue([
-        _mockWorkItems,
-      ]);
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue([_mockWorkItems]);
 
       const params = {
         ids: [297, 299, 300],
@@ -292,22 +266,14 @@ describe("configureWorkItemTools", () => {
       const result = await handler(params);
 
       expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(
-        { 
-          ids: params.ids, 
-          fields: ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags"] 
+        {
+          ids: params.ids,
+          fields: ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags"],
         },
         params.project
       );
 
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-           _mockWorkItems,
-          ],
-          null,
-          2
-        )
-      );
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItems], null, 2));
     });
   });
 
@@ -315,44 +281,26 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.getWorkItem API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_get_work_item"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item");
 
       if (!call) throw new Error("wit_get_work_item tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue([
-        _mockWorkItem
-      ]);
+      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
 
       const params = {
         id: 12,
         fields: undefined,
         asOf: undefined,
         expand: "none",
-        project: "Contoso", 
+        project: "Contoso",
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(
-        params.id,
-        params.fields,
-        params.asOf,
-        params.expand,
-        params.project,     
-      );
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(params.id, params.fields, params.asOf, params.expand, params.project);
 
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItem,
-          ],
-          null,
-          2
-        )
-      );
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
     });
   });
 
@@ -360,16 +308,12 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.getComments API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_list_work_item_comments"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_comments");
 
-      if (!call)throw new Error("wit_list_work_item_comments tool not registered");
+      if (!call) throw new Error("wit_list_work_item_comments tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getComments as jest.Mock).mockResolvedValue([
-        _mockWorkItemComments
-      ]);
+      (mockWorkItemTrackingApi.getComments as jest.Mock).mockResolvedValue([_mockWorkItemComments]);
 
       const params = {
         project: "Contoso",
@@ -379,21 +323,9 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith(
-        params.project,
-        params.workItemId,
-        params.top,      
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItemComments,
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith(params.project, params.workItemId, params.top);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemComments], null, 2));
     });
   });
 
@@ -401,40 +333,24 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.addComment API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_add_work_item_comment"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
 
-      if (!call)throw new Error("wit_add_work_item_comment tool not registered");
+      if (!call) throw new Error("wit_add_work_item_comment tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.addComment as jest.Mock).mockResolvedValue([
-        _mockWorkItemComment,
-      ]);
+      (mockWorkItemTrackingApi.addComment as jest.Mock).mockResolvedValue([_mockWorkItemComment]);
 
       const params = {
         comment: "hello world!",
         project: "Contoso",
-        workItemId: 299,       
+        workItemId: 299,
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.addComment).toHaveBeenCalledWith(
-        {text: params.comment},
-        params.project,
-        params.workItemId,
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItemComment
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.addComment).toHaveBeenCalledWith({ text: params.comment }, params.project, params.workItemId);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemComment], null, 2));
     });
   });
 
@@ -442,76 +358,59 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.add_child_work_item API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_add_child_work_item"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_item");
 
-      if (!call)throw new Error("wit_add_child_work_item tool not registered");
+      if (!call) throw new Error("wit_add_child_work_item tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue([
-        _mockWorkItem,
-      ]);
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
 
       const params = {
         parentId: 299,
         project: "Contoso",
-        workItemType: "Task",   
+        workItemType: "Task",
         title: "Sample task",
         description: "This is a sample task",
         areaPath: "Contoso\\Development",
-        iterationPath: "Contoso\\Sprint 1",    
+        iterationPath: "Contoso\\Sprint 1",
       };
 
-        const document = [
-          { 
-            op: "add", 
-            path: "/fields/System.Title", 
-            value: params.title 
+      const document = [
+        {
+          op: "add",
+          path: "/fields/System.Title",
+          value: params.title,
+        },
+        {
+          op: "add",
+          path: "/fields/System.Description",
+          value: params.description,
+        },
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "System.LinkTypes.Hierarchy-Reverse",
+            url: `undefined/${params.project}/_apis/wit/workItems/${params.parentId}`,
           },
-          { 
-            op: "add", 
-            path: "/fields/System.Description", 
-            value: params.description 
-          },       
-          {
-            op: "add",
-            path: "/relations/-",
-            value: {
-              rel: "System.LinkTypes.Hierarchy-Reverse",
-              url: `undefined/${params.project}/_apis/wit/workItems/${params.parentId}`,
-            },
-          },
-          {
-            op: "add",
-            path: "/fields/System.AreaPath",
-            value: params.areaPath,
-          },
-          {
-            op: "add",
-            path: "/fields/System.IterationPath",
-            value: params.iterationPath,
-          }
-        ];
+        },
+        {
+          op: "add",
+          path: "/fields/System.AreaPath",
+          value: params.areaPath,
+        },
+        {
+          op: "add",
+          path: "/fields/System.IterationPath",
+          value: params.iterationPath,
+        },
+      ];
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(
-        null,
-        document,
-        params.project,
-        params.workItemType,
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItem
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(null, document, params.project, params.workItemType);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
     });
   });
 
@@ -519,16 +418,12 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.updateWorkItem API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_link_work_item_to_pull_request"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
 
-      if (!call)throw new Error("wit_link_work_item_to_pull_request tool not registered");
+      if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([
-          _mockWorkItem,
-      ]);
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
 
       const params = {
         project: "Contoso",
@@ -556,13 +451,8 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
-        {},
-        document,
-        params.workItemId,
-        params.project,       
-      );
-      
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.project);
+
       expect(result.content[0].text).toBe(
         JSON.stringify(
           {
@@ -578,15 +468,13 @@ describe("configureWorkItemTools", () => {
 
     it("should handle errors from updateWorkItem and return a descriptive error", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_link_work_item_to_pull_request"
-      );
-      
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
+
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
-      
+
       const [, , , handler] = call;
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockRejectedValue(new Error("API failure"));
-      
+
       const params = {
         project: "Contoso",
         repositoryId: 12345,
@@ -601,16 +489,12 @@ describe("configureWorkItemTools", () => {
 
     it("should encode special characters in project and repositoryId for vstfsUrl", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_link_work_item_to_pull_request"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
-      
+
       const [, , , handler] = call;
-      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([
-        _mockWorkItem,
-      ]);
-      
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+
       const params = {
         project: "Contoso Project",
         repositoryId: "repo/with/slash",
@@ -633,12 +517,7 @@ describe("configureWorkItemTools", () => {
         },
       ];
       await handler(params);
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
-        {},
-        document,
-        params.workItemId,
-        params.project,
-      );
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.project);
     });
   });
 
@@ -646,42 +525,30 @@ describe("configureWorkItemTools", () => {
     it("should call workApi.getIterationWorkItems API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_get_work_items_for_iteration"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_for_iteration");
 
-      if (!call)throw new Error("wit_get_work_items_for_iterationt tool not registered");
+      if (!call) throw new Error("wit_get_work_items_for_iterationt tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkApi.getIterationWorkItems as jest.Mock).mockResolvedValue([        
-          _mockWorkItemsForIteration,
-      ]);
+      (mockWorkApi.getIterationWorkItems as jest.Mock).mockResolvedValue([_mockWorkItemsForIteration]);
 
       const params = {
         project: "Contoso",
         team: "Fabrikam",
         iterationId: "6bfde89e-b22e-422e-814a-e8db432f5a58",
-      };     
+      };
 
       const result = await handler(params);
 
       expect(mockWorkApi.getIterationWorkItems).toHaveBeenCalledWith(
-        { 
-          project: params.project, 
-          team: params.team 
+        {
+          project: params.project,
+          team: params.team,
         },
-        params.iterationId,       
+        params.iterationId
       );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItemsForIteration,
-          ],
-          null,
-          2
-        )
-      );
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemsForIteration], null, 2));
     });
   });
 
@@ -689,45 +556,29 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.updateWorkItem API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_update_work_item"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_item");
 
-      if (!call)throw new Error("wit_update_work_item tool not registered");
+      if (!call) throw new Error("wit_update_work_item tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([        
-          _mockWorkItem,
-      ]);
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
 
       const params = {
-        id : 131489,
+        id: 131489,
         updates: [
-          { 
+          {
             op: "add",
             path: "/fields/System.Title",
-            value: "Updated Sample Task"
-          }
-        ]
-      };     
+            value: "Updated Sample Task",
+          },
+        ],
+      };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
-        null,
-        params.updates,
-        params.id,      
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItem
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, params.updates, params.id);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
     });
   });
 
@@ -735,38 +586,23 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.getWorkItemType API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_get_work_item_type"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_type");
 
-      if (!call)throw new Error("wit_get_work_item_type tool not registered");
+      if (!call) throw new Error("wit_get_work_item_type tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getWorkItemType as jest.Mock).mockResolvedValue([        
-          _mockWorkItemType,
-      ]);
+      (mockWorkItemTrackingApi.getWorkItemType as jest.Mock).mockResolvedValue([_mockWorkItemType]);
 
       const params = {
-       project: "Contoso",
+        project: "Contoso",
         workItemType: "Bug",
-      };     
+      };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getWorkItemType).toHaveBeenCalledWith(
-        params.project,
-        params.workItemType,      
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItemType
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.getWorkItemType).toHaveBeenCalledWith(params.project, params.workItemType);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemType], null, 2));
     });
   });
 
@@ -774,26 +610,18 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.createWorkItem API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_create_work_item"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
 
-      if (!call)throw new Error("wit_create_work_item tool not registered");
+      if (!call) throw new Error("wit_create_work_item tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue([        
-          _mockWorkItem,
-      ]);
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
 
       const params = {
         project: "Contoso",
         workItemType: "Task",
-        fields: [ 
-          "System.Title", "Hello World!",
-          "System.Description", "This is a sample task",
-          "System.AreaPath", "Contoso\\Development",
-        ]
-      };     
+        fields: ["System.Title", "Hello World!", "System.Description", "This is a sample task", "System.AreaPath", "Contoso\\Development"],
+      };
 
       const document = Object.entries(params.fields).map(([key, value]) => ({
         op: "add",
@@ -803,22 +631,9 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(
-        null,
-        document,
-        params.project,
-        params.workItemType,     
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockWorkItem
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(null, document, params.project, params.workItemType);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
     });
   });
 
@@ -826,16 +641,12 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.getQuery API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_get_query"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_query");
 
-      if (!call)throw new Error("wit_get_query tool not registered");
+      if (!call) throw new Error("wit_get_query tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getQuery as jest.Mock).mockResolvedValue([        
-        _mockQuery,
-      ]);
+      (mockWorkItemTrackingApi.getQuery as jest.Mock).mockResolvedValue([_mockQuery]);
 
       const params = {
         project: "Contoso",
@@ -844,28 +655,13 @@ describe("configureWorkItemTools", () => {
         depth: 1,
         includeDeleted: false,
         useIsoDateFormat: false,
-      };     
+      };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(
-        params.project,
-        params.query,
-        params.expand,
-        params.depth,
-        params.includeDeleted,
-        params.useIsoDateFormat,      
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockQuery,
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(params.project, params.query, params.expand, params.depth, params.includeDeleted, params.useIsoDateFormat);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockQuery], null, 2));
     });
   });
 
@@ -873,44 +669,26 @@ describe("configureWorkItemTools", () => {
     it("should call workItemApi.getQueryById API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wit_get_query_results_by_id"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_query_results_by_id");
 
-      if (!call)throw new Error("wit_get_query_results_by_id tool not registered");
+      if (!call) throw new Error("wit_get_query_results_by_id tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.queryById as jest.Mock).mockResolvedValue([        
-        _mockQueryResults,
-      ]);
+      (mockWorkItemTrackingApi.queryById as jest.Mock).mockResolvedValue([_mockQueryResults]);
 
-      const params = {        
+      const params = {
         id: "342f0f44-4069-46b1-a940-3d0468979ceb",
         project: "Contoso",
         team: "Fabrikam",
         timePrecision: false,
         top: 50,
-      };     
+      };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.queryById).toHaveBeenCalledWith(
-        params.id,
-        { project: params.project, team: params.team },
-        params.timePrecision,
-        params.top     
-      );
-      
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            _mockQueryResults,
-          ],
-          null,
-          2
-        )
-      );
+      expect(mockWorkItemTrackingApi.queryById).toHaveBeenCalledWith(params.id, { project: params.project, team: params.team }, params.timePrecision, params.top);
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockQueryResults], null, 2));
     });
   });
-
 });

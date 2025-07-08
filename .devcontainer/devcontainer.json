@@ -14,19 +14,10 @@
   "postCreateCommand": "rm -f .npmrc && npm install && npm install -g . ; az login --use-device-code",
   "customizations": {
     "codespaces": {
-      "openFiles": [
-        "CONTRIBUTING.md"
-      ]
+      "openFiles": ["CONTRIBUTING.md"]
     },
     "vscode": {
-      "extensions": [
-        "ms-azuretools.vscode-docker",
-        "EditorConfig.EditorConfig",
-        "GitHub.copilot",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "ms-vscode.vscode-typescript-next"
-      ]
+      "extensions": ["ms-azuretools.vscode-docker", "EditorConfig.EditorConfig", "GitHub.copilot", "dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"]
     }
   },
   "remoteUser": "node"

@@ -15,15 +15,10 @@ const BUILD_TOOLS = {
   get_log_by_id: "build_get_log_by_id",
   get_changes: "build_get_changes",
   run_build: "build_run_build",
-  get_status: "build_get_status"
+  get_status: "build_get_status",
 };
 
-function configureBuildTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
-  
+function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     BUILD_TOOLS.get_definitions,
     "Retrieves a list of build definitions for a given project.",
@@ -46,53 +41,17 @@ function configureBuildTools(
       processType: z.number().optional().describe("Process type to filter build definitions"),
       yamlFilename: z.string().optional().describe("YAML filename to filter build definitions"),
     },
-    async ({
-      project,
-      repositoryId,
-      repositoryType,
-      name,
-      path,
-      queryOrder,
-      top,
-      continuationToken,
-      minMetricsTime,
-      definitionIds,
-      builtAfter,
-      notBuiltAfter,
-      includeAllProperties,
-      includeLatestBuilds,
-      taskIdFilter,
-      processType,
-      yamlFilename,
-    }) => {
+    async ({ project, repositoryId, repositoryType, name, path, queryOrder, top, continuationToken, minMetricsTime, definitionIds, builtAfter, notBuiltAfter, includeAllProperties, includeLatestBuilds, taskIdFilter, processType, yamlFilename }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const buildDefinitions = await buildApi.getDefinitions(
-        project,
-        name,
-        repositoryId,
-        repositoryType,
-        queryOrder,
-        top,
-        continuationToken,
-        minMetricsTime,
-        definitionIds,
-        path,
-        builtAfter,
-        notBuiltAfter,
-        includeAllProperties,
-        includeLatestBuilds,
-        taskIdFilter,
-        processType,
-        yamlFilename
-      );
+      const buildDefinitions = await buildApi.getDefinitions(project, name, repositoryId, repositoryType, queryOrder, top, continuationToken, minMetricsTime, definitionIds, path, builtAfter, notBuiltAfter, includeAllProperties, includeLatestBuilds, taskIdFilter, processType, yamlFilename);
 
       return {
         content: [{ type: "text", text: JSON.stringify(buildDefinitions, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_definition_revisions,
     "Retrieves a list of revisions for a specific build definition.",
@@ -110,7 +69,7 @@ function configureBuildTools(
       };
     }
   );
- 
+
   server.tool(
     BUILD_TOOLS.get_builds,
     "Retrieves a list of builds for a given project.",
@@ -137,61 +96,17 @@ function configureBuildTools(
       repositoryId: z.string().optional().describe("Repository ID to filter builds"),
       repositoryType: z.enum(["TfsGit", "GitHub", "BitbucketCloud"]).optional().describe("Type of repository to filter builds"),
     },
-    async ({
-      project,
-      definitions,
-      queues,
-      buildNumber,
-      minTime,
-      maxTime,
-      requestedFor,
-      reasonFilter,
-      statusFilter,
-      resultFilter,
-      tagFilters,
-      properties,
-      top,
-      continuationToken,
-      maxBuildsPerDefinition,
-      deletedFilter,
-      queryOrder,
-      branchName,
-      buildIds,
-      repositoryId,
-      repositoryType,
-    }) => {
+    async ({ project, definitions, queues, buildNumber, minTime, maxTime, requestedFor, reasonFilter, statusFilter, resultFilter, tagFilters, properties, top, continuationToken, maxBuildsPerDefinition, deletedFilter, queryOrder, branchName, buildIds, repositoryId, repositoryType }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const builds = await buildApi.getBuilds(
-        project,
-        definitions,
-        queues,
-        buildNumber,
-        minTime,
-        maxTime,
-        requestedFor,
-        reasonFilter,
-        statusFilter,
-        resultFilter,
-        tagFilters,
-        properties,
-        top,
-        continuationToken,
-        maxBuildsPerDefinition,
-        deletedFilter,
-        queryOrder,
-        branchName,
-        buildIds,
-        repositoryId,
-        repositoryType
-      );
+      const builds = await buildApi.getBuilds(project, definitions, queues, buildNumber, minTime, maxTime, requestedFor, reasonFilter, statusFilter, resultFilter, tagFilters, properties, top, continuationToken, maxBuildsPerDefinition, deletedFilter, queryOrder, branchName, buildIds, repositoryId, repositoryType);
 
       return {
         content: [{ type: "text", text: JSON.stringify(builds, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_log,
     "Retrieves the logs for a specific build.",
@@ -209,12 +124,12 @@ function configureBuildTools(
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_log_by_id,
     "Get a specific build log by log ID.",
     {
-      project: z.string().describe("Project ID or name to get the build log for"),  
+      project: z.string().describe("Project ID or name to get the build log for"),
       buildId: z.number().describe("ID of the build to get the log for"),
       logId: z.number().describe("ID of the log to retrieve"),
       startLine: z.number().optional().describe("Starting line number for the log content, defaults to 0"),
@@ -223,20 +138,14 @@ function configureBuildTools(
     async ({ project, buildId, logId, startLine, endLine }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const logLines = await buildApi.getBuildLogLines(
-        project,
-        buildId,
-        logId,
-        startLine,
-        endLine
-      );
+      const logLines = await buildApi.getBuildLogLines(project, buildId, logId, startLine, endLine);
 
       return {
         content: [{ type: "text", text: JSON.stringify(logLines, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_changes,
     "Get the changes associated with a specific build.",
@@ -250,13 +159,7 @@ function configureBuildTools(
     async ({ project, buildId, continuationToken, top, includeSourceChange }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const changes = await buildApi.getBuildChanges(
-        project,
-        buildId,
-        continuationToken,
-        top,
-        includeSourceChange
-      );
+      const changes = await buildApi.getBuildChanges(project, buildId, continuationToken, top, includeSourceChange);
 
       return {
         content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
@@ -282,21 +185,14 @@ function configureBuildTools(
         resources: {
           repositories: {
             self: {
-              refName:
-                sourceBranch ||
-                definition.repository?.defaultBranch ||
-                "refs/heads/main",
+              refName: sourceBranch || definition.repository?.defaultBranch || "refs/heads/main",
             },
           },
         },
         templateParameters: parameters,
       };
-      
-      const pipelineRun = await pipelinesApi.runPipeline(
-        runRequest,
-        project,
-        definitionId
-      );
+
+      const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, definitionId);
       const queuedBuild = { id: pipelineRun.id };
       const buildId = queuedBuild.id;
       if (buildId === undefined) {
@@ -306,7 +202,7 @@ function configureBuildTools(
       const buildReport = await buildApi.getBuildReport(project, buildId);
       return {
         content: [{ type: "text", text: JSON.stringify(buildReport, null, 2) }],
-      };      
+      };
     }
   );
 

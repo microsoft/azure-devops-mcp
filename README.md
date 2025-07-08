@@ -160,28 +160,25 @@ This installation method is the easiest for all users using Visual Studio Code.
 
 1. In your project, add a `.vscode\mcp.json` file and add the following:
 
-   ``` json
+   ```json
    {
-      "inputs": [
-        {
-            "id": "ado_org",
-            "type": "promptString",
-            "description": "Azure DevOps organization name  (e.g. 'contoso')"
-        }
-      ],
-      "servers": {
-        "ado": {
-            "type": "stdio",
-            "command": "npx",
-            "args": [
-                "-y",
-                "@azure-devops/mcp",
-                "${input:ado_org}"
-            ]
-         }
-      }
+     "inputs": [
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization name  (e.g. 'contoso')"
+       }
+     ],
+     "servers": {
+       "ado": {
+         "type": "stdio",
+         "command": "npx",
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+       }
+     }
    }
    ```
+
 2. Save the file, then click 'Start`
 
    <img src="./docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
@@ -208,18 +205,18 @@ This installation method is recommended for advanced users and contributors who 
    ```json
    {
      "inputs": [
-        {
-           "id": "ado_org",
-           "type": "promptString",
-           "description": "Azure DevOps organization's name  (e.g. 'contoso')"
-        }
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization's name  (e.g. 'contoso')"
+       }
      ],
      "servers": {
-        "ado": {
-            "type": "stdio",
-            "command": "mcp-server-azuredevops",
-            "args": ["${input:ado_org}"]
-        }
+       "ado": {
+         "type": "stdio",
+         "command": "mcp-server-azuredevops",
+         "args": ["${input:ado_org}"]
+       }
      }
    }
    ```
@@ -227,7 +224,7 @@ This installation method is recommended for advanced users and contributors who 
 4. Start the Azure DevOps MCP Server
 
    <img src="./docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
-  
+
 5. In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
 6. Click "Select Tools" and choose the available tools.
 7. We strongly recommend that you create a `.github\copilot-instructions.md` in your project and copy and paste the contents from this [copilot-instructions.md](./.github/copilot-instructions.md) file. This will help your experience when it comes to using the Azure DevOps MCP Server in GitHub Copilot Chat.
@@ -245,7 +242,7 @@ See [How To](./docs/HOWTO.md) section for details
 
 ### Visual Studio + GitHub Copilot
 
-> *Prerequisites:* Visual Studio 2022 v17.14+, Agent mode enabled in Tools > Options > GitHub > Copilot > Copilot Chat.
+> _Prerequisites:_ Visual Studio 2022 v17.14+, Agent mode enabled in Tools > Options > GitHub > Copilot > Copilot Chat.
 
 1. Switch to Agent mode in the Copilot Chat window.
 2. Enter your Azure DevOps organization name.
@@ -272,10 +269,10 @@ We welcome contributions! During preview, please file Issues for bugs, enhanceme
 
 See our [Contributions Guide](./CONTRIBUTING.md) for:
 
- - 🛠️ Development setup
- - ✨ Adding new tools
- - 📝 Code style & testing
- - 🔄 Pull request process
+- 🛠️ Development setup
+- ✨ Adding new tools
+- 📝 Code style & testing
+- 🔄 Pull request process
 
 ## 🤝 Code of conduct
 

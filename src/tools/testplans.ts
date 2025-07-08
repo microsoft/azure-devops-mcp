@@ -13,14 +13,10 @@ const Test_Plan_Tools = {
   add_test_cases_to_suite: "testplan_add_test_cases_to_suite",
   test_results_from_build_id: "testplan_show_test_results_from_build_id",
   list_test_cases: "testplan_list_test_cases",
-  list_test_plans: "testplan_list_test_plans"
+  list_test_plans: "testplan_list_test_plans",
 };
 
-function configureTestPlanTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
+function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   /*
     LIST OF TEST PLANS
     get list of test plans by project
@@ -34,23 +30,12 @@ function configureTestPlanTools(
       includePlanDetails: z.boolean().default(false).describe("Include detailed information about each test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
-    async ({
-      project,
-      filterActivePlans,
-      includePlanDetails,
-      continuationToken,
-    }) => {
+    async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
       const owner = ""; //making owner an empty string untill we can figure out how to get owner id
       const connection = await connectionProvider();
       const testPlanApi = await connection.getTestPlanApi();
 
-      const testPlans = await testPlanApi.getTestPlans(
-        project,
-        owner,
-        continuationToken,
-        includePlanDetails,
-        filterActivePlans
-      );
+      const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
 
       return {
         content: [{ type: "text", text: JSON.stringify(testPlans, null, 2) }],
@@ -73,15 +58,7 @@ function configureTestPlanTools(
       endDate: z.string().optional().describe("The end date of the test plan"),
       areaPath: z.string().optional().describe("The area path for the test plan"),
     },
-    async ({
-      project,
-      name,
-      iteration,
-      description,
-      startDate,
-      endDate,
-      areaPath,
-    }) => {
+    async ({ project, name, iteration, description, startDate, endDate, areaPath }) => {
       const connection = await connectionProvider();
       const testPlanApi = await connection.getTestPlanApi();
 
@@ -94,15 +71,10 @@ function configureTestPlanTools(
         areaPath,
       };
 
-      const createdTestPlan = await testPlanApi.createTestPlan(
-        testPlanToCreate,
-        project
-      );
+      const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, project);
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(createdTestPlan, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(createdTestPlan, null, 2) }],
       };
     }
   );
@@ -124,21 +96,12 @@ function configureTestPlanTools(
       const testApi = await connection.getTestApi();
 
       // If testCaseIds is an array, convert it to comma-separated string
-      const testCaseIdsString = Array.isArray(testCaseIds)
-        ? testCaseIds.join(",")
-        : testCaseIds;
+      const testCaseIdsString = Array.isArray(testCaseIds) ? testCaseIds.join(",") : testCaseIds;
 
-      const addedTestCases = await testApi.addTestCasesToSuite(
-        project,
-        planId,
-        suiteId,
-        testCaseIdsString
-      );
+      const addedTestCases = await testApi.addTestCasesToSuite(project, planId, suiteId, testCaseIdsString);
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(addedTestCases, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }],
       };
     }
   );
@@ -207,12 +170,7 @@ function configureTestPlanTools(
         });
       }
 
-      const workItem = await witClient.createWorkItem(
-        {},
-        patchDocument,
-        project,
-        "Test Case"
-      );
+      const workItem = await witClient.createWorkItem({}, patchDocument, project, "Test Case");
 
       return {
         content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
@@ -256,22 +214,18 @@ function configureTestPlanTools(
     async ({ project, buildid }) => {
       const connection = await connectionProvider();
       const coreApi = await connection.getTestResultsApi();
-      const testResults = await coreApi.getTestResultDetailsForBuild(
-        project,
-        buildid
-      );
+      const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
 
       return {
         content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
       };
     }
   );
-
 }
 
 /*
  * Helper function to convert steps text to XML format required
-*/
+ */
 function convertStepsToXml(steps: string): string {
   const stepsLines = steps.split("\n").filter((line) => line.trim() !== "");
 
@@ -285,9 +239,7 @@ function convertStepsToXml(steps: string): string {
 
       xmlSteps += `
                 <step id="${i + 1}" type="ActionStep">
-                    <parameterizedString isformatted="true">${escapeXml(
-                      stepText
-                    )}</parameterizedString>
+                    <parameterizedString isformatted="true">${escapeXml(stepText)}</parameterizedString>
                     <parameterizedString isformatted="true">Verify step completes successfully</parameterizedString>
                 </step>`;
     }
@@ -299,7 +251,7 @@ function convertStepsToXml(steps: string): string {
 
 /*
  * Helper function to escape XML special characters
-*/
+ */
 function escapeXml(unsafe: string): string {
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {

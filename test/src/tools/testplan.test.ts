@@ -1,8 +1,8 @@
 import { AccessToken } from "@azure/identity";
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { configureTestPlanTools } from '../../../src/tools/testplans';
+import { configureTestPlanTools } from "../../../src/tools/testplans";
 import { ITestPlanApi } from "azure-devops-node-api/TestPlanApi";
 import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 
@@ -13,7 +13,7 @@ describe("configureTestPlanTools", () => {
   let server: McpServer;
   let tokenProvider: TokenProviderMock;
   let connectionProvider: ConnectionProviderMock;
-   let mockConnection: {
+  let mockConnection: {
     getTestPlanApi: () => Promise<ITestPlanApi>;
     getTestResultsApi: () => Promise<ITestResultsApi>;
   };
@@ -42,24 +42,14 @@ describe("configureTestPlanTools", () => {
   describe("tool registration", () => {
     it("registers test plan tools on the server", () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
-      expect((server.tool as jest.Mock).mock.calls.map(call => call[0])).toEqual(
-        expect.arrayContaining([
-          "testplan_list_test_plans",
-          "testplan_create_test_plan",
-          "testplan_add_test_cases_to_suite",
-          "testplan_list_test_cases",
-          "testplan_show_test_results_from_build_id",
-        ])
-      );
+      expect((server.tool as jest.Mock).mock.calls.map((call) => call[0])).toEqual(expect.arrayContaining(["testplan_list_test_plans", "testplan_create_test_plan", "testplan_add_test_cases_to_suite", "testplan_list_test_cases", "testplan_show_test_results_from_build_id"]));
     });
   });
 
   describe("list_test_plans tool", () => {
     it("should call getTestPlans with the correct parameters and return the expected result", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "testplan_list_test_plans"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_plans");
       if (!call) throw new Error("testplan_list_test_plans tool not registered");
       const [, , , handler] = call;
 
@@ -72,13 +62,7 @@ describe("configureTestPlanTools", () => {
       };
       const result = await handler(params);
 
-      expect(mockTestPlanApi.getTestPlans).toHaveBeenCalledWith(
-        "proj1",
-        "",
-        undefined,
-        false,
-        true
-      );
+      expect(mockTestPlanApi.getTestPlans).toHaveBeenCalledWith("proj1", "", undefined, false, true);
       expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Test Plan 1" }], null, 2));
     });
   });
@@ -86,9 +70,7 @@ describe("configureTestPlanTools", () => {
   describe("create_test_plan tool", () => {
     it("should call createTestPlan with the correct parameters and return the expected result", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "testplan_create_test_plan"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_plan");
       if (!call) throw new Error("testplan_create_test_plan tool not registered");
       const [, , , handler] = call;
 
@@ -122,9 +104,7 @@ describe("configureTestPlanTools", () => {
   describe("list_test_cases tool", () => {
     it("should call getTestCaseList with the correct parameters and return the expected result", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "testplan_list_test_cases"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_cases");
       if (!call) throw new Error("testplan_list_test_cases tool not registered");
       const [, , , handler] = call;
 
@@ -136,11 +116,7 @@ describe("configureTestPlanTools", () => {
       };
       const result = await handler(params);
 
-      expect(mockTestPlanApi.getTestCaseList).toHaveBeenCalledWith(
-        "proj1",
-        1,
-        2
-      );
+      expect(mockTestPlanApi.getTestCaseList).toHaveBeenCalledWith("proj1", 1, 2);
       expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Test Case 1" }], null, 2));
     });
   });
@@ -148,9 +124,7 @@ describe("configureTestPlanTools", () => {
   describe("test_results_from_build_id tool", () => {
     it("should call getTestResultDetailsForBuild with the correct parameters and return the expected result", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "testplan_show_test_results_from_build_id"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
       const [, , , handler] = call;
 
@@ -161,10 +135,7 @@ describe("configureTestPlanTools", () => {
       };
       const result = await handler(params);
 
-      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith(
-        "proj1",
-        123
-      );
+      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith("proj1", 123);
       expect(result.content[0].text).toBe(JSON.stringify({ results: ["Result 1"] }, null, 2));
     });
   });
