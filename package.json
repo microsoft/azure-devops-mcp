@@ -4,8 +4,8 @@
   "description": "MCP server for interacting with Azure DevOps",
   "license": "MIT",
   "author": "Microsoft Corporation",
-  "homepage": "TBD",
-  "bugs": "TBD",
+  "homepage": "https://github.com/microsoft/azure-devops-mcp",
+  "bugs": "https://github.com/microsoft/azure-devops-mcp/issues",
   "type": "module",
   "bin": {
     "mcp-server-azuredevops": "dist/index.js"
