@@ -118,11 +118,11 @@ function configureCoreTools(
 
   server.tool(
     CORE_TOOLS.get_identity_ids,
-    "Retrieve Azure DevOps identity IDs for a list of unique names.",
+    "Retrieve Azure DevOps identity IDs for a provided search filter.",
     {
-      uniqueNames: z.array(z.string()).describe("List of unique names to retrieve identity IDs for."),
+      searchFilter: z.string().describe("Search filter (unique namme, display name, email) to retrieve identity IDs for."),
     },
-    async ({ uniqueNames }) => {
+    async ({ searchFilter }) => {
       try {
         const token = await tokenProvider();
         const connection = await connectionProvider();
@@ -132,7 +132,7 @@ function configureCoreTools(
         const params = new URLSearchParams({
           'api-version': apiVersion,
           'searchFilter': 'General',
-          'filterValue': uniqueNames.join(',')
+          'filterValue': searchFilter
         });
 
         const response = await fetch(`${baseUrl}?${params}`, {
