@@ -12,13 +12,14 @@ This TypeScript project defines the **local** MCP server for Azure DevOps, enabl
 ## 📄 Table of contents
 
 1. [📺 Overview](#-overview)
-2. [⚙️ Supported tools](#️-supported-tools)
-3. [🔌 Installation & getting started](#-installation--getting-started)
-4. [🔦 Usage](#-usage)
-5. [📝 Troubleshooting](#-troubleshooting)
-6. [🎩 Samples & best practices](#-samples--best-practices)
-7. [🙋‍♀️ Frequently asked questions](#️-frequently-asked-questions)
-8. [📌 Contributing](#-contributing)
+2. [🏆 Expectations](#-expectations)
+3. [⚙️ Supported tools](#️-supported-tools)
+4. [🔌 Installation & getting started](#-installation--getting-started)
+5. [🔦 Usage](#-usage)
+6. [📝 Troubleshooting](#-troubleshooting)
+7. [🎩 Samples & best practices](#-samples--best-practices)
+8. [🙋‍♀️ Frequently asked questions](#️-frequently-asked-questions)
+9. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -33,6 +34,10 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 - "List iterations for project 'Contoso'"
 - "List my work items for project 'Contoso'"
 - "List work items in current iteration for 'Contoso' project and 'Contoso Team'"
+
+## 🏆 Expectations
+
+The Azure DevOps MCP Server is built from tools that are concise, simple, focused, and easy to use. Each designed for a specific scenario. We intentionally avoid complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs, making data access straightforward and letting the language model handle the complex reasoning.
 
 ## ⚙️ Supported tools
 

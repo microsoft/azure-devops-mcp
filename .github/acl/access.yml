@@ -13,7 +13,7 @@ configuration:
     - member: aaudzei
       role: Maintain
     - member: kboom
-      role: Maintain
+      role: Maintain    
     - member: skmanoj
       role: Write
     - member: KathanS
@@ -21,4 +21,8 @@ configuration:
     - member: vinayakmsft
       role: Write
     - member: nikolapeja6
+      role: Write
+    - member: egor-bryzgalov
+      role: Write
+    - member: polatengin
       role: Write
