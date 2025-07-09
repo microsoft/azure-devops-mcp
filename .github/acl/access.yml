@@ -13,7 +13,7 @@ configuration:
     - member: aaudzei
       role: Maintain
     - member: kboom
-      role: Maintain    
+      role: Maintain
     - member: skmanoj
       role: Write
     - member: KathanS

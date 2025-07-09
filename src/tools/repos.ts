@@ -132,9 +132,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
       const filteredRepositories = repoNameFilter ? filterReposByName(repositories, repoNameFilter) : repositories;
 
-      const paginatedRepositories = filteredRepositories
-        ?.sort((a, b) => a.name?.localeCompare(b.name ?? "") ?? 0)
-        .slice(skip, skip + top);
+      const paginatedRepositories = filteredRepositories?.sort((a, b) => a.name?.localeCompare(b.name ?? "") ?? 0).slice(skip, skip + top);
 
       // Filter out the irrelevant properties
       const trimmedRepositories = paginatedRepositories?.map((repo) => ({
@@ -295,23 +293,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       top: z.number().default(100).describe("The maximum number of threads to return."),
       skip: z.number().default(0).describe("The number of threads to skip."),
     },
-    async ({
-      repositoryId,
-      pullRequestId,
-      project,
-      iteration,
-      baseIteration,
-      top,
-      skip
-    }) => {
+    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
       const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
 
-      const paginatedThreads = threads
-        ?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
-        .slice(skip, skip + top);
+      const paginatedThreads = threads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
@@ -337,9 +325,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       // Get thread comments - GitApi uses getComments for retrieving comments from a specific thread
       const comments = await gitApi.getComments(repositoryId, pullRequestId, threadId, project);
 
-      const paginatedComments = comments
-        ?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
-        .slice(skip, skip + top);
+      const paginatedComments = comments?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
@@ -379,10 +365,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       const gitApi = await connection.getGitApi();
       const branches = await gitApi.getRefs(repositoryId, undefined, undefined, undefined, undefined, true);
 
-      const filteredBranches = branchesFilterOutIrrelevantProperties(
-        branches,
-        top
-      );
+      const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
