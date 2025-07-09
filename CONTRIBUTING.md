@@ -1,5 +1,7 @@
 # Contributing to Azure DevOps MCP Server
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/azure-devops-mcp)
+
 Thank you for your interest in contributing to the Azure DevOps MCP Server! Your participation—whether through discussions, reporting issues, or suggesting improvements—helps us make the project better for everyone.
 
 ## 🪲 Bugs and feature requests
