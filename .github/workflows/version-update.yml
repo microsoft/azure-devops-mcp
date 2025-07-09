@@ -1,5 +1,10 @@
 name: Update Package Version
 
+permissions:
+  contents: read
+  pull-requests: write
+  packages: write
+
 on:
   pull_request:
     types:
