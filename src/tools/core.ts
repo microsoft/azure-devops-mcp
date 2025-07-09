@@ -9,7 +9,6 @@ import { apiVersion } from "../utils.js";
 
 import type { ProjectInfo } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
-import { orgName } from "../index.js";
 
 const CORE_TOOLS = {
   list_project_teams: "core_list_project_teams",
@@ -126,6 +125,8 @@ function configureCoreTools(
     async ({ uniqueNames }) => {
       try {
         const token = await tokenProvider();
+        const connection = await connectionProvider();
+        const orgName = connection.serverUrl.split("/")[3];
         const baseUrl = `https://vssps.dev.azure.com/${orgName}/_apis/identities`;
         
         const params = new URLSearchParams({
