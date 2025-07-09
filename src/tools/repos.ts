@@ -22,7 +22,7 @@ const REPO_TOOLS = {
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",  
   update_pull_request_status: "repo_update_pull_request_status",
-  repo_update_pull_request_add_or_remove_reviewers: "repo_update_pull_request_add_or_remove_reviewers",
+  update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
 };
@@ -148,7 +148,7 @@ function configureRepoTools(
   );
 
   server.tool(
-    REPO_TOOLS.repo_update_pull_request_add_or_remove_reviewers,
+    REPO_TOOLS.update_pull_request_reviewers,
     "Add or remove reviewers for an existing pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
