@@ -12,13 +12,14 @@ This TypeScript project defines the **local** MCP server for Azure DevOps, enabl
 ## 📄 Table of contents
 
 1. [📺 Overview](#-overview)
-2. [⚙️ Supported tools](#️-supported-tools)
-3. [🔌 Installation & getting started](#-installation--getting-started)
-4. [🔦 Usage](#-usage)
-5. [📝 Troubleshooting](#-troubleshooting)
-6. [🎩 Samples & best practices](#-samples--best-practices)
-7. [🙋‍♀️ Frequently asked questions](#️-frequently-asked-questions)
-8. [📌 Contributing](#️-contributing)
+2. [🏆 Expectations](#-expectations)
+3. [⚙️ Supported tools](#️-supported-tools)
+4. [🔌 Installation & getting started](#-installation--getting-started)
+5. [🔦 Usage](#-usage)
+6. [📝 Troubleshooting](#-troubleshooting)
+7. [🎩 Samples & best practices](#-samples--best-practices)
+8. [🙋‍♀️ Frequently asked questions](#️-frequently-asked-questions)
+9. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -33,6 +34,10 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 - "List iterations for project 'Contoso'"
 - "List my work items for project 'Contoso'"
 - "List work items in current iteration for 'Contoso' project and 'Contoso Team'"
+
+## 🏆 Expectations
+
+The Azure DevOps MCP Server is built from tools that are concise, simple, focused, and easy to use. Each designed for a specific scenario. We intentionally avoid complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs, making data access straightforward and letting the language model handle the complex reasoning.
 
 ## ⚙️ Supported tools
 
@@ -51,15 +56,15 @@ Interact with these Azure DevOps services:
 
 ### 📅 Work Items
 
-- **wit_my_work_items**: Retrieve a list of work items relevent to the authenticated user.
-- **wit_list_backlogs**: Revieve a list of backlogs for a given project and team.
-- **wit_list_backlog_work_items**: Retrieve a list of backlogs of for a given project, team, and backlog category.
+- **wit_my_work_items**: Retrieve a list of work items relevant to the authenticated user.
+- **wit_list_backlogs**: Retrieve a list of backlogs for a given project and team.
+- **wit_list_backlog_work_items**: Retrieve a list of backlogs for a given project, team, and backlog category.
 - **wit_get_work_item**: Get a single work item by ID.
-- **wit_get_work_items_batch_by_ids**: Retrieve list of work items by IDs in batch.
+- **wit_get_work_items_batch_by_ids**: Retrieves a list of work items by IDs in batch.
 - **wit_update_work_item**: Update a work item by ID with specified fields.
 - **wit_create_work_item**: Create a new work item in a specified project and work item type.
-- **wit_list_work_item_comments**: Retrieve list of comments for a work item by ID.
-- **wit_get_work_items_for_iteration**: Retrieve a list of work items for a specified iteration.
+- **wit_list_work_item_comments**: Retrieves a list of comments for a work item by ID.
+- **wit_get_work_items_for_iteration**: Retrieves a list of work items for a specified iteration.
 - **wit_add_work_item_comment**: Add comment to a work item by ID.
 - **wit_add_child_work_item**: Create a child work item from a parent by ID.
 - **wit_link_work_item_to_pull_request**: Link a single work item to an existing pull request.
@@ -101,7 +106,7 @@ Interact with these Azure DevOps services:
 
 ### 🚀 Releases
 
-- **release_get_definitions**: Retrieves list of release definitions for a given project.
+- **release_get_definitions**: Retrieves a list of release definitions for a given project.
 - **release_get_releases**: Retrieves a list of releases for a given project.
 
 ### 🧪 Test Plans
@@ -183,19 +188,19 @@ This installation method is the easiest for all users using Visual Studio Code.
       }
    }
    ```
-2. Save the file and click 'Start`
+2. Save the file, then click 'Start`
 
    <img src="./docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
 
 3. In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
 4. Click "Select Tools" and choose the available tools.
-5. We strongly recommend that you create a `.github\copilot-instructions.md` in your project and copy and paste the contents from this [copilot-instructions.md](./.github/copilot-instructions.md) file. This will help your experience when it comes to using the Azure DevOps MCP Server in GitHub Copilot Chat.
+5. We strongly recommend that you create a `.github\copilot-instructions.md` in your project and copy and paste the contents from this [copilot-instructions.md](./.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 
 #### 🛠️ Installing from source (dev mode)
 
 This installation method is recommended for advanced users and contributors who want immediate access to the latest updates from the main branch. It is ideal if you are developing new tools, enhancing existing features, or maintaining a custom fork.
 
-> **Note:** For most users, installing from the public feed is simpler and preferred. Use source installation only if you need the latest changes or are actively contributing to the project.
+> **Note:** For most users, installing from the public feed is simpler and preferred. Use the source installation only if you need the latest changes or are actively contributing to the project.
 
 ##### Steps
 
@@ -212,7 +217,7 @@ This installation method is recommended for advanced users and contributors who 
         {
            "id": "ado_org",
            "type": "promptString",
-           "description": "Azure DevOps organization name  (e.g. 'contoso')"
+           "description": "Azure DevOps organization's name  (e.g. 'contoso')"
         }
      ],
      "servers": {

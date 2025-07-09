@@ -1,5 +1,5 @@
 # Define code owners for the codeowners file
-.github/CODEOWNERS @danhellem @Novaes @aaudzei @skmanoj @kboom
+.github/CODEOWNERS @microsoft/azure-devops-mcp-maintainers
 
 # Define maintainers as code owners for the entire repository
-* @danhellem @Novaes @aaudzei @skmanoj @kboom
+* @microsoft/azure-devops-mcp-maintainers

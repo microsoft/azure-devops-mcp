@@ -20,3 +20,9 @@ configuration:
     role: Write
   - member: vinayakmsft
     role: Write
+  - member: nikolapeja6
+    role: Write
+  - member: egor-bryzgalov
+    role: Write
+  - member: polatengin
+    role: Write
