@@ -144,7 +144,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, all fields will be returned."),
       asOf: z.coerce.date().optional().describe("Optional date string to retrieve the work item as of a specific time. If not provided, the current state will be returned."),
-      expand: z.enum(["all", "fields", "links", "none", "relations"]).describe("Optional expand parameter to include additional details in the response.").optional().describe("Expand options include 'all', 'fields', 'links', 'none', and 'relations'. Defaults to 'none'."),
+      expand: z
+        .enum(["all", "fields", "links", "none", "relations"])
+        .describe("Optional expand parameter to include additional details in the response.")
+        .optional()
+        .describe("Expand options include 'all', 'fields', 'links', 'none', and 'relations'. Defaults to 'none'."),
     },
     async ({ id, project, fields, asOf, expand }) => {
       const connection = await connectionProvider();
@@ -544,7 +548,12 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           z.object({
             id: z.number().describe("The ID of the work item to update."),
             linkToId: z.number().describe("The ID of the work item to link to."),
-            type: z.enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests"]).default("related").describe("Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'referenced by', and 'references'. Defaults to 'related'."),
+            type: z
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests"])
+              .default("related")
+              .describe(
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'referenced by', and 'references'. Defaults to 'related'."
+              ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
         )

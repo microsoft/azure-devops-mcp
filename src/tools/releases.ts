@@ -36,7 +36,23 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
     async ({ project, searchText, expand, artifactType, artifactSourceId, top, continuationToken, queryOrder, path, isExactNameMatch, tagFilter, propertyFilters, definitionIdFilter, isDeleted, searchTextContainsFolderName }) => {
       const connection = await connectionProvider();
       const releaseApi = await connection.getReleaseApi();
-      const releaseDefinitions = await releaseApi.getReleaseDefinitions(project, searchText, expand, artifactType, artifactSourceId, top, continuationToken, queryOrder, path, isExactNameMatch, tagFilter, propertyFilters, definitionIdFilter, isDeleted, searchTextContainsFolderName);
+      const releaseDefinitions = await releaseApi.getReleaseDefinitions(
+        project,
+        searchText,
+        expand,
+        artifactType,
+        artifactSourceId,
+        top,
+        continuationToken,
+        queryOrder,
+        path,
+        isExactNameMatch,
+        tagFilter,
+        propertyFilters,
+        definitionIdFilter,
+        isDeleted,
+        searchTextContainsFolderName
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify(releaseDefinitions, null, 2) }],
@@ -83,10 +99,56 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
       releaseIdFilter: z.array(z.number()).optional().describe("Filter by specific release IDs"),
       path: z.string().optional().describe("Path to filter releases"),
     },
-    async ({ project, definitionId, definitionEnvironmentId, searchText, createdBy, statusFilter, environmentStatusFilter, minCreatedTime, maxCreatedTime, queryOrder, top, continuationToken, expand, artifactTypeId, sourceId, artifactVersionId, sourceBranchFilter, isDeleted, tagFilter, propertyFilters, releaseIdFilter, path }) => {
+    async ({
+      project,
+      definitionId,
+      definitionEnvironmentId,
+      searchText,
+      createdBy,
+      statusFilter,
+      environmentStatusFilter,
+      minCreatedTime,
+      maxCreatedTime,
+      queryOrder,
+      top,
+      continuationToken,
+      expand,
+      artifactTypeId,
+      sourceId,
+      artifactVersionId,
+      sourceBranchFilter,
+      isDeleted,
+      tagFilter,
+      propertyFilters,
+      releaseIdFilter,
+      path,
+    }) => {
       const connection = await connectionProvider();
       const releaseApi = await connection.getReleaseApi();
-      const releases = await releaseApi.getReleases(project, definitionId, definitionEnvironmentId, searchText, createdBy, statusFilter, environmentStatusFilter, minCreatedTime, maxCreatedTime, queryOrder, top, continuationToken, expand, artifactTypeId, sourceId, artifactVersionId, sourceBranchFilter, isDeleted, tagFilter, propertyFilters, releaseIdFilter, path);
+      const releases = await releaseApi.getReleases(
+        project,
+        definitionId,
+        definitionEnvironmentId,
+        searchText,
+        createdBy,
+        statusFilter,
+        environmentStatusFilter,
+        minCreatedTime,
+        maxCreatedTime,
+        queryOrder,
+        top,
+        continuationToken,
+        expand,
+        artifactTypeId,
+        sourceId,
+        artifactVersionId,
+        sourceBranchFilter,
+        isDeleted,
+        tagFilter,
+        propertyFilters,
+        releaseIdFilter,
+        path
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify(releases, null, 2) }],

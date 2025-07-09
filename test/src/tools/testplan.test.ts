@@ -42,7 +42,9 @@ describe("configureTestPlanTools", () => {
   describe("tool registration", () => {
     it("registers test plan tools on the server", () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
-      expect((server.tool as jest.Mock).mock.calls.map((call) => call[0])).toEqual(expect.arrayContaining(["testplan_list_test_plans", "testplan_create_test_plan", "testplan_add_test_cases_to_suite", "testplan_list_test_cases", "testplan_show_test_results_from_build_id"]));
+      expect((server.tool as jest.Mock).mock.calls.map((call) => call[0])).toEqual(
+        expect.arrayContaining(["testplan_list_test_plans", "testplan_create_test_plan", "testplan_add_test_cases_to_suite", "testplan_list_test_cases", "testplan_show_test_results_from_build_id"])
+      );
     });
   });
 

@@ -37,20 +37,25 @@ Present the results in a table with the following columns: Project ID, Name, and
     ],
   }));
 
-  server.prompt("getWorkItem", "Retrieves details for a specific Azure DevOps work item by ID.", { id: z.string().describe("The ID of the work item to retrieve."), project: z.string().describe("The name or ID of the Azure DevOps project.") }, ({ id, project }) => ({
-    messages: [
-      {
-        role: "user",
-        content: {
-          type: "text",
-          text: String.raw`
+  server.prompt(
+    "getWorkItem",
+    "Retrieves details for a specific Azure DevOps work item by ID.",
+    { id: z.string().describe("The ID of the work item to retrieve."), project: z.string().describe("The name or ID of the Azure DevOps project.") },
+    ({ id, project }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: String.raw`
   # Task
   Use the '${WORKITEM_TOOLS.get_work_item}' tool to retrieve details for the work item with ID '${id}' in project '${project}'.
   Present the following fields: ID, Title, State, Assigned To, Work Item Type, Description or Repro Steps, and Created Date.`,
+          },
         },
-      },
-    ],
-  }));
+      ],
+    })
+  );
 }
 
 export { configurePrompts };

@@ -41,10 +41,46 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       processType: z.number().optional().describe("Process type to filter build definitions"),
       yamlFilename: z.string().optional().describe("YAML filename to filter build definitions"),
     },
-    async ({ project, repositoryId, repositoryType, name, path, queryOrder, top, continuationToken, minMetricsTime, definitionIds, builtAfter, notBuiltAfter, includeAllProperties, includeLatestBuilds, taskIdFilter, processType, yamlFilename }) => {
+    async ({
+      project,
+      repositoryId,
+      repositoryType,
+      name,
+      path,
+      queryOrder,
+      top,
+      continuationToken,
+      minMetricsTime,
+      definitionIds,
+      builtAfter,
+      notBuiltAfter,
+      includeAllProperties,
+      includeLatestBuilds,
+      taskIdFilter,
+      processType,
+      yamlFilename,
+    }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const buildDefinitions = await buildApi.getDefinitions(project, name, repositoryId, repositoryType, queryOrder, top, continuationToken, minMetricsTime, definitionIds, path, builtAfter, notBuiltAfter, includeAllProperties, includeLatestBuilds, taskIdFilter, processType, yamlFilename);
+      const buildDefinitions = await buildApi.getDefinitions(
+        project,
+        name,
+        repositoryId,
+        repositoryType,
+        queryOrder,
+        top,
+        continuationToken,
+        minMetricsTime,
+        definitionIds,
+        path,
+        builtAfter,
+        notBuiltAfter,
+        includeAllProperties,
+        includeLatestBuilds,
+        taskIdFilter,
+        processType,
+        yamlFilename
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify(buildDefinitions, null, 2) }],
@@ -96,10 +132,54 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       repositoryId: z.string().optional().describe("Repository ID to filter builds"),
       repositoryType: z.enum(["TfsGit", "GitHub", "BitbucketCloud"]).optional().describe("Type of repository to filter builds"),
     },
-    async ({ project, definitions, queues, buildNumber, minTime, maxTime, requestedFor, reasonFilter, statusFilter, resultFilter, tagFilters, properties, top, continuationToken, maxBuildsPerDefinition, deletedFilter, queryOrder, branchName, buildIds, repositoryId, repositoryType }) => {
+    async ({
+      project,
+      definitions,
+      queues,
+      buildNumber,
+      minTime,
+      maxTime,
+      requestedFor,
+      reasonFilter,
+      statusFilter,
+      resultFilter,
+      tagFilters,
+      properties,
+      top,
+      continuationToken,
+      maxBuildsPerDefinition,
+      deletedFilter,
+      queryOrder,
+      branchName,
+      buildIds,
+      repositoryId,
+      repositoryType,
+    }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const builds = await buildApi.getBuilds(project, definitions, queues, buildNumber, minTime, maxTime, requestedFor, reasonFilter, statusFilter, resultFilter, tagFilters, properties, top, continuationToken, maxBuildsPerDefinition, deletedFilter, queryOrder, branchName, buildIds, repositoryId, repositoryType);
+      const builds = await buildApi.getBuilds(
+        project,
+        definitions,
+        queues,
+        buildNumber,
+        minTime,
+        maxTime,
+        requestedFor,
+        reasonFilter,
+        statusFilter,
+        resultFilter,
+        tagFilters,
+        properties,
+        top,
+        continuationToken,
+        maxBuildsPerDefinition,
+        deletedFilter,
+        queryOrder,
+        branchName,
+        buildIds,
+        repositoryId,
+        repositoryType
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify(builds, null, 2) }],
