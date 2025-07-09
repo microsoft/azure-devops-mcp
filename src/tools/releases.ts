@@ -33,7 +33,23 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
       isDeleted: z.boolean().default(false).describe("Whether to include deleted release definitions. Default is false."),
       searchTextContainsFolderName: z.boolean().optional().describe("Whether to include folder names in the search text"),
     },
-    async ({ project, searchText, expand, artifactType, artifactSourceId, top, continuationToken, queryOrder, path, isExactNameMatch, tagFilter, propertyFilters, definitionIdFilter, isDeleted, searchTextContainsFolderName }) => {
+    async ({
+      project,
+      searchText,
+      expand,
+      artifactType,
+      artifactSourceId,
+      top,
+      continuationToken,
+      queryOrder,
+      path,
+      isExactNameMatch,
+      tagFilter,
+      propertyFilters,
+      definitionIdFilter,
+      isDeleted,
+      searchTextContainsFolderName,
+    }) => {
       const connection = await connectionProvider();
       const releaseApi = await connection.getReleaseApi();
       const releaseDefinitions = await releaseApi.getReleaseDefinitions(

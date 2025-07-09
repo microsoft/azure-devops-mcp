@@ -3,7 +3,17 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/workitems";
 import { WebApi } from "azure-devops-node-api";
-import { _mockBacklogs, _mockQuery, _mockQueryResults, _mockWorkItem, _mockWorkItemComment, _mockWorkItemComments, _mockWorkItems, _mockWorkItemsForIteration, _mockWorkItemType } from "../../mocks/work-items";
+import {
+  _mockBacklogs,
+  _mockQuery,
+  _mockQueryResults,
+  _mockWorkItem,
+  _mockWorkItemComment,
+  _mockWorkItemComments,
+  _mockWorkItems,
+  _mockWorkItemsForIteration,
+  _mockWorkItemType,
+} from "../../mocks/work-items";
 
 type TokenProviderMock = () => Promise<AccessToken>;
 type ConnectionProviderMock = () => Promise<WebApi>;

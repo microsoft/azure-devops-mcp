@@ -400,7 +400,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The type of work item to create, e.g., 'Task', 'Bug', etc."),
-      fields: z.record(z.string(), z.string()).describe("A record of field names and values to set on the new work item. Each key is a field name, and each value is the corresponding value to set for that field."),
+      fields: z
+        .record(z.string(), z.string())
+        .describe("A record of field names and values to set on the new work item. Each key is a field name, and each value is the corresponding value to set for that field."),
     },
     async ({ project, workItemType, fields }) => {
       try {

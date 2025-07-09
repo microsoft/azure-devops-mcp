@@ -22,7 +22,7 @@
   },
   "scripts": {
     "preinstall": "npm config set registry https://registry.npmjs.org/",
-    "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write --end-of-line=lf src/version.ts",
+    "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write src/version.ts",
     "build": "tsc && shx chmod +x dist/*.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
@@ -30,8 +30,8 @@
     "start": "node -r tsconfig-paths/register dist/index.js",
     "eslint": "eslint",
     "eslint-fix": "eslint --fix",
-    "format": "prettier --write --end-of-line=lf .",
-    "format-check": "prettier --check --end-of-line=lf .",
+    "format": "prettier --write .",
+    "format-check": "prettier --check .",
     "clean": "shx rm -rf dist",
     "test": "jest"
   },
