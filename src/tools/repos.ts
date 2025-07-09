@@ -128,7 +128,7 @@ function configureRepoTools(
       pullRequestId: z.number().describe("The ID of the pull request to be published."),
       status: z.enum(["active", "abandoned"]).describe("The new status of the pull request. Can be 'active' or 'abandoned'."),
     },
-    async ({ repositoryId, pullRequestId }) => {
+    async ({ repositoryId, pullRequestId, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const statusValue = status === "active" ? 3 : 2;
