@@ -12,7 +12,7 @@ import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfa
 
 const CORE_TOOLS = {
   list_project_teams: "core_list_project_teams",
-  list_projects: "core_list_projects",  
+  list_projects: "core_list_projects",
   get_identity_ids: "core_get_identity_ids",
 };
 
@@ -103,16 +103,16 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<Acce
         const connection = await connectionProvider();
         const orgName = connection.serverUrl.split("/")[3];
         const baseUrl = `https://vssps.dev.azure.com/${orgName}/_apis/identities`;
-        
+
         const params = new URLSearchParams({
-          'api-version': apiVersion,
-          'searchFilter': 'General',
-          'filterValue': searchFilter
+          "api-version": apiVersion,
+          "searchFilter": "General",
+          "filterValue": searchFilter,
         });
 
         const response = await fetch(`${baseUrl}?${params}`, {
           headers: {
-            Authorization: `Bearer ${token.token}`,
+            "Authorization": `Bearer ${token.token}`,
             "Content-Type": "application/json",
           },
         });
@@ -140,11 +140,11 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<Acce
           content: [{ type: "text", text: JSON.stringify(identitiesTrimmed, null, 2) }],
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        
-        return { 
-          content: [{ type: "text", text: `Error fetching identities: ${errorMessage}` }], 
-          isError: true
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching identities: ${errorMessage}` }],
+          isError: true,
         };
       }
     }

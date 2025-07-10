@@ -133,29 +133,21 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       let updatedPullRequest;
       if (action === "add") {
         updatedPullRequest = await gitApi.createPullRequestReviewers(
-          reviewerIds.map((id) => ({ id: id})),
+          reviewerIds.map((id) => ({ id: id })),
           repositoryId,
           pullRequestId
         );
 
         return {
-          content: [
-            { type: "text", text: JSON.stringify(updatedPullRequest, null, 2) },
-          ],
+          content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
         };
       } else {
         for (const reviewerId of reviewerIds) {
-          await gitApi.deletePullRequestReviewer(
-            repositoryId,
-            pullRequestId,
-            reviewerId
-          );
+          await gitApi.deletePullRequestReviewer(repositoryId, pullRequestId, reviewerId);
         }
 
         return {
-          content: [
-            { type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` },
-          ],
+          content: [{ type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` }],
         };
       }
     }
