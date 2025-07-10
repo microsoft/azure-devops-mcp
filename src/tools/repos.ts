@@ -4,7 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { GitRef, PullRequestStatus, GitQueryCommitsCriteria, GitVersionType, GitVersionDescriptor } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { GitRef, PullRequestStatus, GitQueryCommitsCriteria, GitVersionType, GitVersionDescriptor, GitPullRequestQuery, GitPullRequestQueryInput, GitPullRequestQueryType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
@@ -25,6 +25,7 @@ const REPO_TOOLS = {
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
+  list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -492,7 +493,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     REPO_TOOLS.search_commits,
     "Searches for commits in a repository",
     {
-      project: z.string().describe("Project name"),
+      project: z.string().describe("Project name or ID"),
       repository: z.string().describe("Repository name or ID"),
       fromCommit: z.string().optional().describe("Starting commit ID"),
       toCommit: z.string().optional().describe("Ending commit ID"),
@@ -540,6 +541,48 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             {
               type: "text",
               text: `Error searching commits: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.list_pull_requests_by_commits,
+    "Lists pull requests by commit IDs to find which pull requests contain specific commits",
+    {
+      project: z.string().describe("Project name or ID"),
+      repository: z.string().describe("Repository name or ID"),
+      commits: z.array(z.string()).describe("Array of commit IDs to query for"),
+      queryType: z.nativeEnum(GitPullRequestQueryType).optional().default(GitPullRequestQueryType.LastMergeCommit).describe("Type of query to perform"),
+    },
+    async ({ project, repository, commits, queryType }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        const query: GitPullRequestQuery = {
+          queries: [
+            {
+              items: commits,
+              type: queryType,
+            } as GitPullRequestQueryInput,
+          ],
+        };
+
+        const queryResult = await gitApi.getPullRequestQuery(query, repository, project);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error querying pull requests by commits: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
