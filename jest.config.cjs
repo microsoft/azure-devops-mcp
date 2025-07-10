@@ -1,15 +1,15 @@
 module.exports = {
   // Use ts-jest preset for TypeScript support
-  preset: 'ts-jest',
+  preset: "ts-jest",
 
   // Specify the test environment (node for backend projects)
-  testEnvironment: 'node',
+  testEnvironment: "node",
 
   // Root directory for test files
-  roots: ['<rootDir>/test'],
+  roots: ["<rootDir>/test"],
 
   // Glob patterns for test files
-  testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
+  testMatch: ["**/?(*.)+(spec|test).[jt]s?(x)"],
 
   // Automatically clear mock calls and instances between every test
   clearMocks: true,
@@ -18,21 +18,21 @@ module.exports = {
   collectCoverage: true,
 
   // Output directory for coverage reports
-  coverageDirectory: 'coverage',
+  coverageDirectory: "coverage",
 
   // Coverage report formats
-  coverageReporters: ['text', 'lcov'],
+  coverageReporters: ["text", "lcov"],
 
   // Module file extensions for importing
-  moduleFileExtensions: ['ts', 'js'],
+  moduleFileExtensions: ["ts", "js"],
 
   // Transform settings for ts-jest
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest'
+    "^.+\\.(ts|tsx)$": "ts-jest",
   },
 
   moduleNameMapper: {
-    '^(.+)/version\\.js$': '$1/version.ts',
-    '^(.+)/utils\\.js$': '$1/utils.ts'
-  }
+    "^(.+)/version\\.js$": "$1/version.ts",
+    "^(.+)/utils\\.js$": "$1/utils.ts",
+  },
 };

@@ -30,7 +30,7 @@ The [Sequential Thinking](https://mcp.so/server/sequentialthinking) component he
       "type": "promptString",
       "description": "Azure DevOps organization name  (e.g. 'contoso')"
     }
-  ],   
+  ],
   "servers": {
     "ado": {
       "type": "stdio",
@@ -86,7 +86,6 @@ get list of teams for project contoso
 ```
 
 📽️ [Azure DevOps MCP Server: Get list of projects and teams](https://youtu.be/x579E4_jNtY)
-
 
 ### Get my work items
 
