@@ -82,6 +82,7 @@ Interact with these Azure DevOps services:
 - **repo_list_pull_requests_by_project**: Retrieve a list of pull requests for a given project Id or Name.
 - **repo_list_branches_by_repo**: Retrieve a list of branches for a given repository.
 - **repo_list_my_branches_by_repo**: Retrieve a list of my branches for a given repository Id.
+- **repo_list_pull_requests_by_commits**: List pull requests associated with commits.
 - **repo_list_pull_request_threads**: Retrieve a list of comment threads for a pull request.
 - **repo_list_pull_request_thread_comments**: Retrieve a list of comments in a pull request thread.
 - **repo_get_repo_by_name_or_id**: Get the repository by project and repository name or ID.
@@ -91,6 +92,7 @@ Interact with these Azure DevOps services:
 - **repo_update_pull_request_status**: Update status of an existing pull request to active or abandoned.
 - **repo_reply_to_comment**: Replies to a specific comment on a pull request.
 - **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
+- **repo_search_commits**: Searches for commits.
 
 ### 🛰️ Builds
 
