@@ -12,9 +12,8 @@ import { configureAllTools } from "./tools.js";
 import { userAgent } from "./utils.js";
 import { packageVersion } from "./version.js";
 const args = process.argv.slice(2);
-if (args.length === 0) {  console.error(
-    "Usage: mcp-server-azuredevops <organization_name>"
-  );
+if (args.length === 0) {
+  console.error("Usage: mcp-server-azuredevops <organization_name>");
   process.exit(1);
 }
 
@@ -28,13 +27,13 @@ async function getAzureDevOpsToken(): Promise<AccessToken> {
   return token;
 }
 
-async function getAzureDevOpsClient() : Promise<azdev.WebApi> {
+async function getAzureDevOpsClient(): Promise<azdev.WebApi> {
   const token = await getAzureDevOpsToken();
   const authHandler = azdev.getBearerHandler(token.token);
   const connection = new azdev.WebApi(orgUrl, authHandler, undefined, {
     productName: "AzureDevOps.MCP",
     productVersion: packageVersion,
-    userAgent: userAgent
+    userAgent: userAgent,
   });
   return connection;
 }
@@ -46,12 +45,8 @@ async function main() {
   });
 
   configurePrompts(server);
-  
-  configureAllTools(
-    server,
-    getAzureDevOpsToken,
-    getAzureDevOpsClient
-  );
+
+  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

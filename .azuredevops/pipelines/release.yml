@@ -10,12 +10,12 @@ schedules:
 jobs:
   - job: ReleaseLatest
     pool:
-      vmImage: 'windows-latest'
+      vmImage: "windows-latest"
 
     steps:
       - task: UseNode@1
         inputs:
-          version: '20'
+          version: "20"
           checkLatest: false
           retryCountOnDownloadFails: 2
 
@@ -26,24 +26,24 @@ jobs:
 
       - task: Npm@1
         inputs:
-          command: 'ci'
+          command: "ci"
         displayName: Install clean dependencies
 
       - task: Npm@1
         inputs:
-          command: 'custom'
-          customCommand: 'run build'
+          command: "custom"
+          customCommand: "run build"
         displayName: Build the project
 
       - task: EsrpCodeSigning@1
-        displayName: 'Sign Binaries'
+        displayName: "Sign Binaries"
         inputs:
-          ConnectedServiceName: 'ESRP Service'
-          FolderPath: '$(Build.ArtifactStagingDirectory)'
+          ConnectedServiceName: "ESRP Service"
+          FolderPath: "$(Build.ArtifactStagingDirectory)"
           Pattern: |
             **/*.js
             **/*.ts
-          signConfigType: 'inlineSignParams'
+          signConfigType: "inlineSignParams"
           inlineOperation: |
             [
               {
@@ -67,11 +67,11 @@ jobs:
                 "ToolVersion": "6.2.9304.0"
               }
             ]
-          SessionTimeout: '60'
-          MaxConcurrency: '10'
+          SessionTimeout: "60"
+          MaxConcurrency: "10"
 
       - task: Npm@1
         inputs:
-          command: 'custom'
-          customCommand: 'publish --access public --registry=https://registry.npmjs.org/'
+          command: "custom"
+          customCommand: "publish --access public --registry=https://registry.npmjs.org/"
         displayName: Publish package to public npmjs under @azure-devops org scope

@@ -1,4 +1,3 @@
-
 export const _mockWorkItems = {
   count: 3,
   value: [
@@ -84,7 +83,7 @@ export const _mockBacklogs = {
             url: "https://dev.azure.com/fabrikam/_apis/wit/fields/Microsoft.VSTS.Scheduling.Effort",
           },
           width: 50,
-        },        
+        },
         {
           columnFieldReference: {
             referenceName: "System.Tags",
@@ -144,7 +143,7 @@ export const _mockBacklogs = {
             url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.State",
           },
           width: 100,
-        },            
+        },
         {
           columnFieldReference: {
             referenceName: "System.Tags",
@@ -167,7 +166,7 @@ export const _mockBacklogs = {
       color: "773B93",
       isHidden: false,
       type: "portfolio",
-    },    
+    },
   ],
 };
 
@@ -192,8 +191,7 @@ export const _mockWorkItem = {
       },
       id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
       uniqueName: "fabrikamfiber4@hotmail.com",
-      imageUrl:
-        "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
       descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
     },
     "System.ChangedDate": "2017-10-06T01:04:51.57Z",
@@ -207,8 +205,7 @@ export const _mockWorkItem = {
       },
       id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
       uniqueName: "fabrikamfiber4@hotmail.com",
-      imageUrl:
-        "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
       descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
     },
     "System.Title": "Sample task",
@@ -256,8 +253,7 @@ export const _mockWorkItemComment = {
     },
     id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     uniqueName: "fabrikamfiber4@hotmail.com",
-    imageUrl:
-      "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+    imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
   },
   createdDate: "2019-01-16T03:03:28.97Z",
@@ -271,8 +267,7 @@ export const _mockWorkItemComment = {
     },
     id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     uniqueName: "fabrikamfiber4@hotmail.com",
-    imageUrl:
-      "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+    imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
   },
   modifiedDate: "2019-01-16T03:03:28.97Z",
@@ -299,8 +294,7 @@ export const _mockWorkItemComments = {
         },
         id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         uniqueName: "fabrikamfiber4@hotmail.com",
-        imageUrl:
-          "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
       },
       createdDate: "2019-01-21T20:12:14.683Z",
@@ -314,8 +308,7 @@ export const _mockWorkItemComments = {
         },
         id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         uniqueName: "fabrikamfiber4@hotmail.com",
-        imageUrl:
-          "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
       },
       modifiedDate: "2019-01-21T20:12:14.683Z",
@@ -337,8 +330,7 @@ export const _mockWorkItemComments = {
         },
         id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         uniqueName: "fabrikamfiber4@hotmail.com",
-        imageUrl:
-          "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
       },
       createdDate: "2019-01-20T23:26:33.383Z",
@@ -352,8 +344,7 @@ export const _mockWorkItemComments = {
         },
         id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         uniqueName: "fabrikamfiber4@hotmail.com",
-        imageUrl:
-          "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
       },
       modifiedDate: "2019-01-20T23:26:33.383Z",
@@ -361,8 +352,7 @@ export const _mockWorkItemComments = {
       url: "https://dev.azure.com/fabrikam/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c/_apis/wit/workItems/299/comments/44",
     },
   ],
-  nextPage:
-    "https://dev.azure.com/fabrikam/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c/_apis/wit/workItems/299/comments?continuationToken=DFkODYtNTYxYS03ZDdiLWJj&api-version=5.1-preview",
+  nextPage: "https://dev.azure.com/fabrikam/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c/_apis/wit/workItems/299/comments?continuationToken=DFkODYtNTYxYS03ZDdiLWJj&api-version=5.1-preview",
   continuationToken: "DFkODYtNTYxYS03ZDdiLWJj",
 };
 
@@ -402,8 +392,7 @@ export const _mockWorkItemsForIteration = {
 export const _mockWorkItemType = {
   name: "Bug",
   referenceName: "Microsoft.VSTS.WorkItemTypes.Bug",
-  description:
-    "Describes a divergence between required and actual behavior, and tracks the work done to correct the defect and verify the correction.",
+  description: "Describes a divergence between required and actual behavior, and tracks the work done to correct the defect and verify the correction.",
   color: "CC293D",
   icon: {
     id: "icon_insect",
@@ -453,8 +442,7 @@ export const _mockQuery = {
     },
     id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     uniqueName: "fabrikamfiber4@hotmail.com",
-    imageUrl:
-      "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+    imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
   },
   createdDate: "2014-03-18T17:18:36.06Z",
@@ -468,8 +456,7 @@ export const _mockQuery = {
     },
     id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     uniqueName: "fabrikamfiber4@hotmail.com",
-    imageUrl:
-      "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+    imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
   },
   lastModifiedDate: "2014-03-18T17:18:36.06Z",
@@ -483,8 +470,7 @@ export const _mockQuery = {
     },
     id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     uniqueName: "fabrikamfiber4@hotmail.com",
-    imageUrl:
-      "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+    imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
   },
   lastExecutedDate: "2014-03-18T17:19:36.06Z",

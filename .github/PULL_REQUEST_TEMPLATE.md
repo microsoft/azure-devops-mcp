@@ -3,6 +3,7 @@ _Replace_ by description of the work done
 ## GitHub issue number
 
 ## **Associated Risks**
+
 _Replace_ by possible risks this pull request can bring you might have thought of
 
 ## ✅ **PR Checklist**
@@ -16,4 +17,5 @@ _Replace_ by possible risks this pull request can bring you might have thought o
 - [ ] 🛡️ Automated tests added, or N/A
 
 ## 🧪 **How did you test it?**
+
 _Replace_ with use cases tested and models used

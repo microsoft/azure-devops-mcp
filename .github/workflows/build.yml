@@ -80,6 +80,9 @@ jobs:
       - name: Static code analysis
         run: npm run eslint
 
+      - name: Check code formatting
+        run: npm run format-check
+
       - name: Verify package version is synced
         run: |
           git diff --exit-code ./src/version.ts
