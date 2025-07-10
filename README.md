@@ -149,6 +149,12 @@ Ensure you are logged in to Azure DevOps via the Azure CLI:
 az login
 ```
 
+> **Multi-tenant scenarios:** If you have access to multiple Azure tenants, you may need to specify the tenant ID when configuring the MCP server. Use `az login --tenant <tenant-id>` to authenticate with a specific tenant before starting the MCP server.
+
+When working with a tenant that uses a guest user from another tenant to access the Azure Devops Organization. You will need to set the tenant Id in the MCP server settings to use the base tenant id.
+
+Ex. If the user is a guest of the contoso organization and the base tenant is fabrikam. You will need to set the tenant id to the fabrikam id.
+
 ### Installation
 
 #### ✨ One-Click install
@@ -175,13 +181,18 @@ This installation method is the easiest for all users using Visual Studio Code.
          "id": "ado_org",
          "type": "promptString",
          "description": "Azure DevOps organization name  (e.g. 'contoso')"
+       },
+       {
+         "id": "ado_tenant",
+         "type": "promptString",
+         "description": "Azure tenant ID (optional, required for multi-tenant scenarios)"
        }
      ],
      "servers": {
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "${input:ado_tenant}"]
        }
      }
    }
@@ -217,13 +228,18 @@ This installation method is recommended for advanced users and contributors who 
          "id": "ado_org",
          "type": "promptString",
          "description": "Azure DevOps organization's name  (e.g. 'contoso')"
+       },
+       {
+         "id": "ado_tenant",
+         "type": "promptString",
+         "description": "Azure tenant ID (optional, required for multi-tenant scenarios)"
        }
      ],
      "servers": {
        "ado": {
          "type": "stdio",
          "command": "mcp-server-azuredevops",
-         "args": ["${input:ado_org}"]
+         "args": ["${input:ado_org}", "${input:ado_tenant}"]
        }
      }
    }
