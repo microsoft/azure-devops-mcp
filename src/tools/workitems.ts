@@ -27,7 +27,8 @@ const WORKITEM_TOOLS = {
   get_query_results_by_id: "wit_get_query_results_by_id",
   update_work_items_batch: "wit_update_work_items_batch",
   close_and_link_workitem_duplicates: "wit_close_and_link_workitem_duplicates",
-  work_items_link: "wit_work_items_link"
+  work_items_link: "wit_work_items_link",
+  list_user_stories: "wit_list_user_stories"
 };
 
 function getLinkTypeFromName(name: string) {
@@ -751,6 +752,125 @@ function configureWorkItemTools(
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
+    }
+  );
+  server.tool(
+    WORKITEM_TOOLS.list_user_stories,
+    "Retrieve a list of User Story work items from a specified project.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, will search across all teams."),
+      state: z.enum(["Active", "New", "Resolved", "Closed", "Removed"]).optional().describe("Filter by work item state. If not provided, will return User Stories in all states."),
+      assignedTo: z.string().optional().describe("Filter by assignee. Provide the display name or email of the user."),
+      areaPath: z.string().optional().describe("Filter by area path."),
+      iterationPath: z.string().optional().describe("Filter by iteration path."),
+      top: z.number().default(100).describe("The maximum number of User Stories to return. Defaults to 100."),
+      orderBy: z.enum(["System.Id", "System.Title", "System.CreatedDate", "System.ChangedDate", "System.State"]).default("System.Id").describe("Field to order the results by. Defaults to 'System.Id'."),
+      orderDirection: z.enum(["asc", "desc"]).default("asc").describe("Order direction. Defaults to 'asc'."),
+    },
+    async ({ project, team, state, assignedTo, areaPath, iterationPath, top, orderBy, orderDirection }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+
+        // Build WIQL query for User Stories
+        let wiqlQuery = `
+          SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
+                [System.AreaPath], [System.IterationPath], [System.CreatedDate], 
+                [System.ChangedDate], [System.Tags], [Microsoft.VSTS.Common.Priority],
+                [Microsoft.VSTS.Common.ValueArea], [Microsoft.VSTS.Scheduling.StoryPoints]
+          FROM WorkItems 
+          WHERE [System.TeamProject] = '${project}' 
+          AND [System.WorkItemType] = 'User Story'
+        `;
+
+        // Add optional filters
+        if (state) {
+          wiqlQuery += ` AND [System.State] = '${state}'`;
+        }
+
+        if (assignedTo) {
+          wiqlQuery += ` AND [System.AssignedTo] = '${assignedTo}'`;
+        }
+
+        if (areaPath) {
+          wiqlQuery += ` AND [System.AreaPath] UNDER '${areaPath}'`;
+        }
+
+        if (iterationPath) {
+          wiqlQuery += ` AND [System.IterationPath] UNDER '${iterationPath}'`;
+        }
+
+        // Add ordering
+        wiqlQuery += ` ORDER BY [${orderBy}] ${orderDirection.toUpperCase()}`;
+
+        // Execute the query
+        const teamContext = team ? { project, team } : { project };
+        const queryResult = await workItemApi.queryByWiql(
+          { query: wiqlQuery },
+          teamContext,
+          false, // timePrecision
+          top
+        );
+
+        // If we have work items, get their details
+        if (queryResult.workItems && queryResult.workItems.length > 0) {
+          const workItemIds = queryResult.workItems.map(wi => wi.id!);
+          const fields = [
+            "System.Id",
+            "System.Title", 
+            "System.State",
+            "System.AssignedTo",
+            "System.AreaPath",
+            "System.IterationPath",
+            "System.CreatedDate",
+            "System.ChangedDate",
+            "System.Tags",
+            "System.Description",
+            "Microsoft.VSTS.Common.Priority",
+            "Microsoft.VSTS.Common.ValueArea",
+            "Microsoft.VSTS.Scheduling.StoryPoints",
+            "Microsoft.VSTS.Common.AcceptanceCriteria"
+          ];
+
+          const workItems = await workItemApi.getWorkItemsBatch(
+            { ids: workItemIds, fields },
+            project
+          );
+
+          return {
+            content: [
+              { 
+                type: "text", 
+                text: JSON.stringify({
+                  totalCount: queryResult.workItems.length,
+                  userStories: workItems
+                }, null, 2) 
+              }
+            ],
+          };
+        } else {
+          return {
+            content: [
+              { 
+                type: "text", 
+                text: JSON.stringify({
+                  totalCount: 0,
+                  userStories: [],
+                  message: "No User Stories found matching the specified criteria."
+                }, null, 2) 
+              }
+            ],
+          };
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        
+        return { 
+          content: [{ type: "text", text: `Error retrieving User Stories: ${errorMessage}` }], 
+          isError: true
+        };
+      }
     }
   );
 }
