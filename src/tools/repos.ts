@@ -4,7 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { GitRef, PullRequestStatus } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { GitRef, PullRequestStatus, GitQueryCommitsCriteria, GitVersionType, GitVersionDescriptor } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
@@ -24,6 +24,7 @@ const REPO_TOOLS = {
   update_pull_request_status: "repo_update_pull_request_status",
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
+  search_commits: "repo_search_commits",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -484,6 +485,66 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       return {
         content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
       };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.search_commits,
+    "Searches for commits in a repository",
+    {
+      project: z.string().describe("Project name"),
+      repository: z.string().describe("Repository name or ID"),
+      fromCommit: z.string().optional().describe("Starting commit ID"),
+      toCommit: z.string().optional().describe("Ending commit ID"),
+      version: z.string().optional().describe("The name of the branch, tag or commit to filter commits by"),
+      versionType: z.nativeEnum(GitVersionType).optional().default(GitVersionType.Branch).describe("The meaning of the version parameter, e.g., branch, tag or commit"),
+      skip: z.number().optional().default(0).describe("Number of commits to skip"),
+      top: z.number().optional().default(10).describe("Maximum number of commits to return"),
+      includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
+      includeWorkItems: z.boolean().optional().default(false).describe("Include associated work items"),
+    },
+    async ({ project, repository, fromCommit, toCommit, version, versionType, skip, top, includeLinks, includeWorkItems }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        const searchCriteria: GitQueryCommitsCriteria = {
+          fromCommitId: fromCommit,
+          toCommitId: toCommit,
+          includeLinks: includeLinks,
+          includeWorkItems: includeWorkItems,
+        };
+
+        if (version) {
+          const itemVersion: GitVersionDescriptor = {
+            version: version,
+            versionType: versionType,
+          };
+          searchCriteria.itemVersion = itemVersion;
+        }
+
+        const commits = await gitApi.getCommits(
+          repository,
+          searchCriteria,
+          project,
+          skip, // skip
+          top
+        );
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(commits, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error searching commits: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
   );
 }
