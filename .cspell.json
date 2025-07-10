@@ -1,13 +1,7 @@
 {
   "version": "0.2",
   "language": "en",
-  "ignorePaths": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/*.lock",
-    ".git",
-    "src/Bicep.LangServer/Generated/**/*"
-  ],
+  "ignorePaths": ["**/node_modules/**", "**/dist/**", "**/*.lock", ".git", "src/Bicep.LangServer/Generated/**/*"],
   "dictionaries": ["en_us", "typescript", "html", "softwareterms", "filetypes", "companies", "computing-acronyms"],
   "dictionaryDefinitions": [],
   "words": [
