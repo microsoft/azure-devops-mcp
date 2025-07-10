@@ -58,7 +58,7 @@ function getLinkTypeFromName(name: string) {
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
-    "Revieve a list of backlogs for a given project and team.",
+    "Retrieve a list of backlogs for a given project and team.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team."),
@@ -98,7 +98,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.my_work_items,
-    "Retrieve a list of work items relevent to the authenticated user.",
+    "Retrieve a list of work items relevant to the authenticated user.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       type: z.enum(["assignedtome", "myactivity"]).default("assignedtome").describe("The type of work items to retrieve. Defaults to 'assignedtome'."),

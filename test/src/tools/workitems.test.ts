@@ -506,7 +506,7 @@ describe("configureWorkItemTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_for_iteration");
 
-      if (!call) throw new Error("wit_get_work_items_for_iterationt tool not registered");
+      if (!call) throw new Error("wit_get_work_items_for_iteration tool not registered");
       const [, , , handler] = call;
 
       (mockWorkApi.getIterationWorkItems as jest.Mock).mockResolvedValue([_mockWorkItemsForIteration]);
