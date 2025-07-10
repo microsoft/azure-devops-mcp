@@ -22,13 +22,15 @@ When creating an issue:
 - **DO** provide a detailed description of the issue or feature request.
 - **DO** include any relevant REST endpoints you wish to integrate with. Refer to the [public REST API documentation](https://learn.microsoft.com/en-us/rest/api/azure/devops).
 
-For reference, see [this example of a well-formed issue]({repo}/_issues/41).
+For reference, see [this example of a well-formed issue](https://github.com/microsoft/azure-devops-mcp/issues/70).
 
 ## 👩‍💻 Writing code
 
 We are accepting a limited number of pull requests during the public preview phase. If you notice something that should be changed or added, please create an issue first and provide details. Once reviewed, and if it makes sense to proceed, we will respond with a 👍.
 
 Please include tests with your pull request. Pull requests will not be accepted until all relevant tests are updated and passing.
+
+Code formatting is enforced by CI checks. Run `npm run format` to ensure your changes comply with the rules.
 
 ## 🖊️ Coding style
 
