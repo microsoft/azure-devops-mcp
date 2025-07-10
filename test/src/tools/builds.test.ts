@@ -1,13 +1,11 @@
 import { AccessToken } from "@azure/identity";
-import { describe, expect, it, beforeEach } from '@jest/globals';
+import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
-import { configureBuildTools } from '../../../src/tools/builds';
-import {apiVersion} from '../../../src/utils.js';
-import { 
-  mockUpdateBuildStageResponse 
-} from '../../mocks/builds';
+import { configureBuildTools } from "../../../src/tools/builds";
+import { apiVersion } from "../../../src/utils.js";
+import { mockUpdateBuildStageResponse } from "../../mocks/builds";
 
 // Mock fetch globally
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
@@ -26,7 +24,7 @@ describe("configureBuildTools", () => {
     tokenProvider = jest.fn();
     mockConnection = {
       getBuildApi: jest.fn(),
-      serverUrl: "https://dev.azure.com/test-org"
+      serverUrl: "https://dev.azure.com/test-org",
     };
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
     (global.fetch as jest.MockedFunction<typeof fetch>).mockClear();
@@ -35,16 +33,14 @@ describe("configureBuildTools", () => {
   describe("tool registration", () => {
     it("registers build tools on the server", () => {
       configureBuildTools(server, tokenProvider, connectionProvider);
-      expect((server.tool as jest.Mock)).toHaveBeenCalled();
+      expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
   });
 
   describe("update_build_stage tool", () => {
     it("should update build stage with correct parameters and return the expected result", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "build_update_build_stage"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
 
@@ -55,7 +51,7 @@ describe("configureBuildTools", () => {
       // Mock successful fetch response
       const mockResponse = {
         ok: true,
-        text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse))
+        text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse)),
       };
       (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
 
@@ -64,34 +60,29 @@ describe("configureBuildTools", () => {
         buildId: 123,
         stageName: "Build",
         status: StageUpdateType.Retry,
-        forceRetryAllJobs: true
+        forceRetryAllJobs: true,
       };
-      
+
       const result = await handler(params);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://dev.azure.com/test-org/test-project/_apis/build/builds/123/stages/Build?api-version=${apiVersion}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer mock-token"
-          },
-          body: JSON.stringify({
-            forceRetryAllJobs: true,
-            state: StageUpdateType.Retry.valueOf()
-          })
-        }
-      );
+      expect(global.fetch).toHaveBeenCalledWith(`https://dev.azure.com/test-org/test-project/_apis/build/builds/123/stages/Build?api-version=${apiVersion}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer mock-token",
+        },
+        body: JSON.stringify({
+          forceRetryAllJobs: true,
+          state: StageUpdateType.Retry.valueOf(),
+        }),
+      });
       expect(result.content[0].text).toBe(JSON.stringify(JSON.stringify(mockUpdateBuildStageResponse), null, 2));
       expect(result.isError).toBeUndefined();
     });
 
     it("should handle HTTP errors correctly", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "build_update_build_stage"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
 
@@ -103,7 +94,7 @@ describe("configureBuildTools", () => {
       const mockResponse = {
         ok: false,
         status: 404,
-        text: jest.fn().mockResolvedValue("Build stage not found")
+        text: jest.fn().mockResolvedValue("Build stage not found"),
       };
       (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
 
@@ -112,34 +103,27 @@ describe("configureBuildTools", () => {
         buildId: 999,
         stageName: "NonExistentStage",
         status: StageUpdateType.Retry,
-        forceRetryAllJobs: false
+        forceRetryAllJobs: false,
       };
 
-      await expect(handler(params)).rejects.toThrow(
-        "Failed to update build stage: 404 Build stage not found"
-      );
+      await expect(handler(params)).rejects.toThrow("Failed to update build stage: 404 Build stage not found");
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://dev.azure.com/test-org/test-project/_apis/build/builds/999/stages/NonExistentStage?api-version=${apiVersion}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer mock-token"
-          },
-          body: JSON.stringify({
-            forceRetryAllJobs: false,
-            state: StageUpdateType.Retry.valueOf()
-          })
-        }
-      );
+      expect(global.fetch).toHaveBeenCalledWith(`https://dev.azure.com/test-org/test-project/_apis/build/builds/999/stages/NonExistentStage?api-version=${apiVersion}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer mock-token",
+        },
+        body: JSON.stringify({
+          forceRetryAllJobs: false,
+          state: StageUpdateType.Retry.valueOf(),
+        }),
+      });
     });
 
     it("should handle network errors correctly", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "build_update_build_stage"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
 
@@ -156,32 +140,27 @@ describe("configureBuildTools", () => {
         buildId: 123,
         stageName: "Build",
         status: StageUpdateType.Retry,
-        forceRetryAllJobs: false
+        forceRetryAllJobs: false,
       };
 
       await expect(handler(params)).rejects.toThrow("Network connection failed");
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://dev.azure.com/test-org/test-project/_apis/build/builds/123/stages/Build?api-version=${apiVersion}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer mock-token"
-          },
-          body: JSON.stringify({
-            forceRetryAllJobs: false,
-            state: StageUpdateType.Retry.valueOf()
-          })
-        }
-      );
+      expect(global.fetch).toHaveBeenCalledWith(`https://dev.azure.com/test-org/test-project/_apis/build/builds/123/stages/Build?api-version=${apiVersion}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer mock-token",
+        },
+        body: JSON.stringify({
+          forceRetryAllJobs: false,
+          state: StageUpdateType.Retry.valueOf(),
+        }),
+      });
     });
 
     it("should handle token provider errors correctly", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "build_update_build_stage"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
 
@@ -194,7 +173,7 @@ describe("configureBuildTools", () => {
         buildId: 123,
         stageName: "Build",
         status: StageUpdateType.Retry,
-        forceRetryAllJobs: false
+        forceRetryAllJobs: false,
       };
 
       await expect(handler(params)).rejects.toThrow("Failed to get access token");
@@ -205,9 +184,7 @@ describe("configureBuildTools", () => {
 
     it("should handle different StageUpdateType values correctly", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "build_update_build_stage"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
 
@@ -216,7 +193,7 @@ describe("configureBuildTools", () => {
 
       const mockResponse = {
         ok: true,
-        text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse))
+        text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse)),
       };
       (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
 
@@ -225,9 +202,9 @@ describe("configureBuildTools", () => {
         buildId: 123,
         stageName: "Deploy",
         status: StageUpdateType.Cancel,
-        forceRetryAllJobs: false
+        forceRetryAllJobs: false,
       };
-      
+
       await handler(params);
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -235,8 +212,8 @@ describe("configureBuildTools", () => {
         expect.objectContaining({
           body: JSON.stringify({
             forceRetryAllJobs: false,
-            state: StageUpdateType.Cancel.valueOf()
-          })
+            state: StageUpdateType.Cancel.valueOf(),
+          }),
         })
       );
     });
