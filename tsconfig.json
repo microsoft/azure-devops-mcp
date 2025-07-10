@@ -12,26 +12,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "paths": {
-      "@modules/*": [
-        "modules/*"
-      ],
-      "@tools/*": [
-        "tools/*"
-      ],
-      "@config/*": [
-        "config/*"
-      ],
-      "@utils": [
-        "utils.js"
-     ]
+      "@modules/*": ["modules/*"],
+      "@tools/*": ["tools/*"],
+      "@config/*": ["config/*"],
+      "@utils": ["utils.js"]
     }
   },
-  "include": [
-    "./src/**/*",
-    "./docs/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["./src/**/*", "./docs/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

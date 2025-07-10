@@ -6,9 +6,9 @@
   "author": "Microsoft Corporation",
   "homepage": "https://github.com/microsoft/azure-devops-mcp",
   "bugs": "https://github.com/microsoft/azure-devops-mcp/issues",
-  "repository":{
-    "type" : "git",
-    "url" : "https://github.com/microsoft/azure-devops-mcp.git"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/azure-devops-mcp.git"
   },
   "type": "module",
   "bin": {
@@ -22,7 +22,7 @@
   },
   "scripts": {
     "preinstall": "npm config set registry https://registry.npmjs.org/",
-    "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\r'\" > src/version.ts",
+    "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write src/version.ts",
     "build": "tsc && shx chmod +x dist/*.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
@@ -30,6 +30,8 @@
     "start": "node -r tsconfig-paths/register dist/index.js",
     "eslint": "eslint",
     "eslint-fix": "eslint --fix",
+    "format": "prettier --write .",
+    "format-check": "prettier --check .",
     "clean": "shx rm -rf dist",
     "test": "jest"
   },
@@ -50,6 +52,7 @@
     "eslint-plugin-header": "^3.1.1",
     "jest": "^30.0.2",
     "jest-extended": "^6.0.0",
+    "prettier": "3.6.2",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.0",
     "tsconfig-paths": "^4.2.0",

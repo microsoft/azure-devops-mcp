@@ -1,6 +1,6 @@
-import pluginHeader from 'eslint-plugin-header';
-import tseslint from 'typescript-eslint';
-import eslintConfigPrettier from 'eslint-config-prettier';
+import pluginHeader from "eslint-plugin-header";
+import tseslint from "typescript-eslint";
+import eslintConfigPrettier from "eslint-config-prettier";
 
 pluginHeader.rules.header.meta.schema = false; // workaround for https://github.com/Stuk/eslint-plugin-header/issues/57
 
@@ -23,15 +23,7 @@ export default tseslint.config(
       header: pluginHeader,
     },
     rules: {
-      "header/header": [
-        "error",
-        "line",
-        [
-          " Copyright (c) Microsoft Corporation.",
-          " Licensed under the MIT License."
-        ],
-        2,
-      ],
+      "header/header": ["error", "line", [" Copyright (c) Microsoft Corporation.", " Licensed under the MIT License."], 2],
     },
   },
 
