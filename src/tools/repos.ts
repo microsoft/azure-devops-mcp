@@ -4,7 +4,16 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { GitRef, PullRequestStatus, GitQueryCommitsCriteria, GitVersionType, GitVersionDescriptor, GitPullRequestQuery, GitPullRequestQueryInput, GitPullRequestQueryType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import {
+  GitRef,
+  PullRequestStatus,
+  GitQueryCommitsCriteria,
+  GitVersionType,
+  GitVersionDescriptor,
+  GitPullRequestQuery,
+  GitPullRequestQueryInput,
+  GitPullRequestQueryType,
+} from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
@@ -489,8 +498,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     }
   );
 
-  const gitVersionTypeStrings = Object.values(GitVersionType)
-    .filter((value): value is string => typeof value === "string");
+  const gitVersionTypeStrings = Object.values(GitVersionType).filter((value): value is string => typeof value === "string");
 
   server.tool(
     REPO_TOOLS.search_commits,
@@ -501,7 +509,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       fromCommit: z.string().optional().describe("Starting commit ID"),
       toCommit: z.string().optional().describe("Ending commit ID"),
       version: z.string().optional().describe("The name of the branch, tag or commit to filter commits by"),
-      versionType: z.enum(gitVersionTypeStrings as [string, ...string[]]).optional().default(GitVersionType[GitVersionType.Branch]).describe("The meaning of the version parameter, e.g., branch, tag or commit"),
+      versionType: z
+        .enum(gitVersionTypeStrings as [string, ...string[]])
+        .optional()
+        .default(GitVersionType[GitVersionType.Branch])
+        .describe("The meaning of the version parameter, e.g., branch, tag or commit"),
       skip: z.number().optional().default(0).describe("Number of commits to skip"),
       top: z.number().optional().default(10).describe("Maximum number of commits to return"),
       includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
@@ -552,8 +564,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     }
   );
 
-  const pullRequestQueryTypesStrings = Object.values(GitPullRequestQueryType)
-    .filter((value): value is string => typeof value === "string");
+  const pullRequestQueryTypesStrings = Object.values(GitPullRequestQueryType).filter((value): value is string => typeof value === "string");
 
   server.tool(
     REPO_TOOLS.list_pull_requests_by_commits,
@@ -562,7 +573,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       project: z.string().describe("Project name or ID"),
       repository: z.string().describe("Repository name or ID"),
       commits: z.array(z.string()).describe("Array of commit IDs to query for"),
-      queryType: z.enum(pullRequestQueryTypesStrings as [string, ...string[]]).optional().default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit]).describe("Type of query to perform"),
+      queryType: z
+        .enum(pullRequestQueryTypesStrings as [string, ...string[]])
+        .optional()
+        .default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit])
+        .describe("Type of query to perform"),
     },
     async ({ project, repository, commits, queryType }) => {
       try {
