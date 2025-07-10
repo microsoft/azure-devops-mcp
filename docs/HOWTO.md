@@ -1,5 +1,82 @@
 Before you get started, ensure you follow the steps in the `README.md` file. This will help you get up and running and connected to your Azure DevOps organization.
 
+## 🔧 Tool group configuration
+
+By default, the server registers **all** Azure DevOps tool groups (`core`, `work`, `builds`, `repos`, `workitems`, `releases`, `wiki`, `testplans`, `search`).
+
+If you only need a subset, you can disable unwanted groups to keep your tool list under the 40-tool limit shown in VS Code Agent Mode.
+
+### Disabling tool groups
+
+You can disable tool groups using either:
+
+- **Group names**: `repos`, `builds`, `testplans`, etc.
+- **Tool prefixes**: `repo`, `build`, `testplan`, etc.
+
+Both approaches work identically. For example, `--disable=repo` and `--disable=repos` both disable all `repo_*` tools.
+
+### Configuration methods
+
+1. **Command-line flag**
+
+   ```sh
+   # Using group names
+   mcp-server-azuredevops <org> --disable=testplans,search
+
+   # Using tool prefixes
+   mcp-server-azuredevops <org> --disable=testplan,search
+   ```
+
+2. **Environment variable**
+   ```sh
+   export AZURE_DEVOPS_MCP_DISABLE_GROUPS="testplans,search"
+   mcp-server-azuredevops <org>
+   ```
+
+### Available identifiers
+
+| Group Name  | Tool Prefix | Tools        |
+| ----------- | ----------- | ------------ |
+| `core`      | `core`      | `core_*`     |
+| `work`      | `work`      | `work_*`     |
+| `builds`    | `build`     | `build_*`    |
+| `repos`     | `repo`      | `repo_*`     |
+| `workitems` | `wit`       | `wit_*`      |
+| `releases`  | `release`   | `release_*`  |
+| `wiki`      | `wiki`      | `wiki_*`     |
+| `testplans` | `testplan`  | `testplan_*` |
+| `search`    | `search`    | `search_*`   |
+
+### Example configurations
+
+**VS Code `.vscode/mcp.json`:**
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "cityofottawa", "--disable=testplan,release,build"]
+    }
+  }
+}
+```
+
+**Local development:**
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "mcp-server-azuredevops",
+      "args": ["cityofottawa", "--disable=repo,wiki"]
+    }
+  }
+}
+```
+
 ## ✏️ Modify Copilot Instructions
 
 The `.github/copilot-instructions.md` file is a great way to customize the GitHub Copilot experience, especially when working with MCP Server for Azure DevOps.

@@ -15,16 +15,31 @@ import { configureWikiTools } from "./tools/wiki.js";
 import { configureTestPlanTools } from "./tools/testplans.js";
 import { configureSearchTools } from "./tools/search.js";
 
-function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
-  configureCoreTools(server, tokenProvider, connectionProvider);
-  configureWorkTools(server, tokenProvider, connectionProvider);
-  configureBuildTools(server, tokenProvider, connectionProvider);
-  configureRepoTools(server, tokenProvider, connectionProvider);
-  configureWorkItemTools(server, tokenProvider, connectionProvider);
-  configureReleaseTools(server, tokenProvider, connectionProvider);
-  configureWikiTools(server, tokenProvider, connectionProvider);
-  configureTestPlanTools(server, tokenProvider, connectionProvider);
-  configureSearchTools(server, tokenProvider, connectionProvider);
+export type ToolGroup = "core" | "work" | "builds" | "repos" | "workitems" | "releases" | "wiki" | "testplans" | "search";
+
+const TOOL_GROUPS: { group: ToolGroup; prefix: string; configure: Function }[] = [
+  { group: "core", prefix: "core", configure: configureCoreTools },
+  { group: "work", prefix: "work", configure: configureWorkTools },
+  { group: "builds", prefix: "build", configure: configureBuildTools },
+  { group: "repos", prefix: "repo", configure: configureRepoTools },
+  { group: "workitems", prefix: "wit", configure: configureWorkItemTools },
+  { group: "releases", prefix: "release", configure: configureReleaseTools },
+  { group: "wiki", prefix: "wiki", configure: configureWikiTools },
+  { group: "testplans", prefix: "testplan", configure: configureTestPlanTools },
+  { group: "search", prefix: "search", configure: configureSearchTools },
+];
+
+/**
+ * Registers all tool groups, unless they have been explicitly disabled by the caller.
+ *
+ * @param disabledGroups  A set of lowercase group identifiers or tool prefixes to skip (e.g. "testplans", "testplan", "search").
+ */
+function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, disabledGroups: Set<string> = new Set()) {
+  for (const { group, prefix, configure } of TOOL_GROUPS) {
+    if (!disabledGroups.has(group) && !disabledGroups.has(prefix)) {
+      configure(server, tokenProvider, connectionProvider);
+    }
+  }
 }
 
 export { configureAllTools };

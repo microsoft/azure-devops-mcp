@@ -8,16 +8,34 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import * as azdev from "azure-devops-node-api";
 import { AccessToken, DefaultAzureCredential } from "@azure/identity";
 import { configurePrompts } from "./prompts.js";
-import { configureAllTools } from "./tools.js";
+import { configureAllTools, ToolGroup } from "./tools.js";
 import { userAgent } from "./utils.js";
 import { packageVersion } from "./version.js";
-const args = process.argv.slice(2);
-if (args.length === 0) {
-  console.error("Usage: mcp-server-azuredevops <organization_name>");
+
+const rawArgs = process.argv.slice(2);
+
+if (rawArgs.length === 0) {
+  console.error("Usage: mcp-server-azuredevops <organization_name> [--disable=<group1,group2,...>]");
   process.exit(1);
 }
 
-export const orgName = args[0];
+export const orgName = rawArgs[0];
+
+let disabledGroupNames: string[] = [];
+
+for (const arg of rawArgs.slice(1)) {
+  if (arg.startsWith("--disable=")) {
+    const list = arg.substring("--disable=".length);
+    disabledGroupNames.push(...list.split(","));
+  }
+}
+
+if (process.env.AZURE_DEVOPS_MCP_DISABLE_GROUPS) {
+  disabledGroupNames.push(...process.env.AZURE_DEVOPS_MCP_DISABLE_GROUPS.split(","));
+}
+
+const disabledGroups: Set<ToolGroup> = new Set(disabledGroupNames.map((g) => g.trim().toLowerCase() as ToolGroup).filter(Boolean));
+
 const orgUrl = "https://dev.azure.com/" + orgName;
 
 async function getAzureDevOpsToken(): Promise<AccessToken> {
@@ -46,7 +64,7 @@ async function main() {
 
   configurePrompts(server);
 
-  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient);
+  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient, disabledGroups);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
