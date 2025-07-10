@@ -287,6 +287,18 @@ See our [Contributions Guide](./CONTRIBUTING.md) for:
 This project follows the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For questions, see the [FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [open@microsoft.com](mailto:open@microsoft.com).
 
+## 📈 Project Stats
+
+[![Star History Chart](https://api.star-history.com/svg?repos=microsoft/azure-devops-mcp&type=Date)](https://star-history.com/#microsoft/azure-devops-mcp)
+
+## 🏆 Hall of Fame
+
+Thanks to all contributors who make this project awesome! ❤️
+
+[![Contributors](https://contrib.rocks/image?repo=microsoft/azure-devops-mcp)](https://github.com/microsoft/azure-devops-mcp/graphs/contributors)
+
+> Generated with [contrib.rocks](https://contrib.rocks)
+
 ## License
 
 Licensed under the [MIT License](./LICENSE.md).
