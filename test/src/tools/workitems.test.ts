@@ -785,8 +785,7 @@ describe("configureWorkItemTools", () => {
           {
             id: 1,
             linkToId: 2,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            type: "unknown_type" as any,
+            type: "unknown_type",
             comment: "Test comment",
           },
         ],
@@ -815,13 +814,13 @@ describe("configureWorkItemTools", () => {
       const params = {
         updates: [
           {
-            op: "replace" as const,
+            op: "replace",
             id: 1,
             path: "/fields/System.Title",
             value: "Updated Title",
           },
           {
-            op: "add" as const,
+            op: "add",
             id: 2,
             path: "/fields/System.Description",
             value: "New Description",
@@ -863,7 +862,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         updates: [
           {
-            op: "replace" as const,
+            op: "replace",
             id: 1,
             path: "/fields/System.Title",
             value: "Updated Title",
@@ -897,7 +896,7 @@ describe("configureWorkItemTools", () => {
           {
             id: 1,
             linkToId: 2,
-            type: "related" as const,
+            type: "related",
             comment: "Related work item",
           },
         ],
@@ -940,7 +939,7 @@ describe("configureWorkItemTools", () => {
           {
             id: 1,
             linkToId: 2,
-            type: "related" as const,
+            type: "related",
             comment: "Related work item",
           },
         ],
@@ -1165,7 +1164,7 @@ describe("configureWorkItemTools", () => {
           {
             id: 1,
             linkToId: 2,
-            type: "related" as const,
+            type: "related",
             // No comment provided, should default to empty string
           },
         ],
