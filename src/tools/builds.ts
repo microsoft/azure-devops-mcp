@@ -3,9 +3,11 @@
 
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { apiVersion } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
+import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
 const BUILD_TOOLS = {
   get_definitions: "build_get_definitions",
@@ -15,15 +17,11 @@ const BUILD_TOOLS = {
   get_log_by_id: "build_get_log_by_id",
   get_changes: "build_get_changes",
   run_build: "build_run_build",
-  get_status: "build_get_status"
+  get_status: "build_get_status",
+  update_build_stage: "build_update_build_stage",
 };
 
-function configureBuildTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
-  
+function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     BUILD_TOOLS.get_definitions,
     "Retrieves a list of build definitions for a given project.",
@@ -92,7 +90,7 @@ function configureBuildTools(
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_definition_revisions,
     "Retrieves a list of revisions for a specific build definition.",
@@ -110,7 +108,7 @@ function configureBuildTools(
       };
     }
   );
- 
+
   server.tool(
     BUILD_TOOLS.get_builds,
     "Retrieves a list of builds for a given project.",
@@ -191,7 +189,7 @@ function configureBuildTools(
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_log,
     "Retrieves the logs for a specific build.",
@@ -209,12 +207,12 @@ function configureBuildTools(
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_log_by_id,
     "Get a specific build log by log ID.",
     {
-      project: z.string().describe("Project ID or name to get the build log for"),  
+      project: z.string().describe("Project ID or name to get the build log for"),
       buildId: z.number().describe("ID of the build to get the log for"),
       logId: z.number().describe("ID of the log to retrieve"),
       startLine: z.number().optional().describe("Starting line number for the log content, defaults to 0"),
@@ -223,20 +221,14 @@ function configureBuildTools(
     async ({ project, buildId, logId, startLine, endLine }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const logLines = await buildApi.getBuildLogLines(
-        project,
-        buildId,
-        logId,
-        startLine,
-        endLine
-      );
+      const logLines = await buildApi.getBuildLogLines(project, buildId, logId, startLine, endLine);
 
       return {
         content: [{ type: "text", text: JSON.stringify(logLines, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_changes,
     "Get the changes associated with a specific build.",
@@ -250,13 +242,7 @@ function configureBuildTools(
     async ({ project, buildId, continuationToken, top, includeSourceChange }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
-      const changes = await buildApi.getBuildChanges(
-        project,
-        buildId,
-        continuationToken,
-        top,
-        includeSourceChange
-      );
+      const changes = await buildApi.getBuildChanges(project, buildId, continuationToken, top, includeSourceChange);
 
       return {
         content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
@@ -282,21 +268,14 @@ function configureBuildTools(
         resources: {
           repositories: {
             self: {
-              refName:
-                sourceBranch ||
-                definition.repository?.defaultBranch ||
-                "refs/heads/main",
+              refName: sourceBranch || definition.repository?.defaultBranch || "refs/heads/main",
             },
           },
         },
         templateParameters: parameters,
       };
-      
-      const pipelineRun = await pipelinesApi.runPipeline(
-        runRequest,
-        project,
-        definitionId
-      );
+
+      const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, definitionId);
       const queuedBuild = { id: pipelineRun.id };
       const buildId = queuedBuild.id;
       if (buildId === undefined) {
@@ -306,7 +285,7 @@ function configureBuildTools(
       const buildReport = await buildApi.getBuildReport(project, buildId);
       return {
         content: [{ type: "text", text: JSON.stringify(buildReport, null, 2) }],
-      };      
+      };
     }
   );
 
@@ -324,6 +303,49 @@ function configureBuildTools(
 
       return {
         content: [{ type: "text", text: JSON.stringify(build, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    BUILD_TOOLS.update_build_stage,
+    "Updates the stage of a specific build.",
+    {
+      project: z.string().describe("Project ID or name to update the build stage for"),
+      buildId: z.number().describe("ID of the build to update"),
+      stageName: z.string().describe("Name of the stage to update"),
+      status: z.nativeEnum(StageUpdateType).describe("New status for the stage"),
+      forceRetryAllJobs: z.boolean().default(false).describe("Whether to force retry all jobs in the stage."),
+    },
+    async ({ project, buildId, stageName, status, forceRetryAllJobs }) => {
+      const connection = await connectionProvider();
+      const orgUrl = connection.serverUrl;
+      const endpoint = `${orgUrl}/${project}/_apis/build/builds/${buildId}/stages/${stageName}?api-version=${apiVersion}`;
+      const token = await tokenProvider();
+
+      const body = {
+        forceRetryAllJobs: forceRetryAllJobs,
+        state: status.valueOf(),
+      };
+
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token.token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update build stage: ${response.status} ${errorText}`);
+      }
+
+      const updatedBuild = await response.text();
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }],
       };
     }
   );

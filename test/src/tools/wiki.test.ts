@@ -1,8 +1,8 @@
 import { AccessToken } from "@azure/identity";
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { configureWikiTools } from '../../../src/tools/wiki';
+import { configureWikiTools } from "../../../src/tools/wiki";
 
 type TokenProviderMock = () => Promise<AccessToken>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -38,16 +38,14 @@ describe("configureWikiTools", () => {
   describe("tool registration", () => {
     it("registers wiki tools on the server", () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      expect((server.tool as jest.Mock)).toHaveBeenCalled();
+      expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
   });
 
   describe("get_wiki tool", () => {
     it("should call getWiki with the correct parameters and return the expected result", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_wiki"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
       if (!call) throw new Error("wiki_get_wiki tool not registered");
       const [, , , handler] = call;
 
@@ -56,9 +54,9 @@ describe("configureWikiTools", () => {
 
       const params = {
         wikiIdentifier: "wiki1",
-        project: "proj1"
+        project: "proj1",
       };
-      
+
       const result = await handler(params);
 
       expect(mockWikiApi.getWiki).toHaveBeenCalledWith("wiki1", "proj1");
@@ -68,9 +66,7 @@ describe("configureWikiTools", () => {
 
     it("should handle API errors correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_wiki"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
       if (!call) throw new Error("wiki_get_wiki tool not registered");
       const [, , , handler] = call;
 
@@ -79,7 +75,7 @@ describe("configureWikiTools", () => {
 
       const params = {
         wikiIdentifier: "nonexistent",
-        project: "proj1"
+        project: "proj1",
       };
 
       const result = await handler(params);
@@ -91,9 +87,7 @@ describe("configureWikiTools", () => {
 
     it("should handle null API results correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_wiki"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
       if (!call) throw new Error("wiki_get_wiki tool not registered");
       const [, , , handler] = call;
 
@@ -101,7 +95,7 @@ describe("configureWikiTools", () => {
 
       const params = {
         wikiIdentifier: "wiki1",
-        project: "proj1"
+        project: "proj1",
       };
 
       const result = await handler(params);
@@ -115,19 +109,20 @@ describe("configureWikiTools", () => {
   describe("list_wikis tool", () => {
     it("should call getAllWikis with the correct parameters and return the expected result", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_list_wikis"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
       if (!call) throw new Error("wiki_list_wikis tool not registered");
       const [, , , handler] = call;
 
-      const mockWikis = [{ id: "wiki1", name: "Wiki 1" }, { id: "wiki2", name: "Wiki 2" }];
+      const mockWikis = [
+        { id: "wiki1", name: "Wiki 1" },
+        { id: "wiki2", name: "Wiki 2" },
+      ];
       mockWikiApi.getAllWikis.mockResolvedValue(mockWikis);
 
       const params = {
-        project: "proj1"
+        project: "proj1",
       };
-      
+
       const result = await handler(params);
 
       expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith("proj1");
@@ -137,9 +132,7 @@ describe("configureWikiTools", () => {
 
     it("should handle API errors correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_list_wikis"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
       if (!call) throw new Error("wiki_list_wikis tool not registered");
       const [, , , handler] = call;
 
@@ -147,7 +140,7 @@ describe("configureWikiTools", () => {
       mockWikiApi.getAllWikis.mockRejectedValue(testError);
 
       const params = {
-        project: "proj1"
+        project: "proj1",
       };
 
       const result = await handler(params);
@@ -159,16 +152,14 @@ describe("configureWikiTools", () => {
 
     it("should handle null API results correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_list_wikis"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
       if (!call) throw new Error("wiki_list_wikis tool not registered");
       const [, , , handler] = call;
 
       mockWikiApi.getAllWikis.mockResolvedValue(null);
 
       const params = {
-        project: "proj1"
+        project: "proj1",
       };
 
       const result = await handler(params);
@@ -182,9 +173,7 @@ describe("configureWikiTools", () => {
   describe("list_wiki_pages tool", () => {
     it("should call getPagesBatch with the correct parameters and return the expected result", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_list_pages"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
       const [, , , handler] = call;
       mockWikiApi.getPagesBatch.mockResolvedValue({ value: ["page1", "page2"] });
@@ -194,16 +183,16 @@ describe("configureWikiTools", () => {
         project: "proj2",
         top: 10,
         continuationToken: "token123",
-        pageViewsForDays: 7
+        pageViewsForDays: 7,
       };
       const result = await handler(params);
       const parsedResult = JSON.parse(result.content[0].text);
-      
+
       expect(mockWikiApi.getPagesBatch).toHaveBeenCalledWith(
         {
           top: 10,
           continuationToken: "token123",
-          pageViewsForDays: 7
+          pageViewsForDays: 7,
         },
         "proj2",
         "wiki2"
@@ -214,9 +203,7 @@ describe("configureWikiTools", () => {
 
     it("should handle API errors correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_list_pages"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
       const [, , , handler] = call;
 
@@ -226,7 +213,7 @@ describe("configureWikiTools", () => {
       const params = {
         wikiIdentifier: "wiki1",
         project: "proj1",
-        top: 10
+        top: 10,
       };
 
       const result = await handler(params);
@@ -238,9 +225,7 @@ describe("configureWikiTools", () => {
 
     it("should handle null API results correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_list_pages"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
       const [, , , handler] = call;
 
@@ -249,7 +234,7 @@ describe("configureWikiTools", () => {
       const params = {
         wikiIdentifier: "wiki1",
         project: "proj1",
-        top: 10
+        top: 10,
       };
 
       const result = await handler(params);
@@ -263,9 +248,7 @@ describe("configureWikiTools", () => {
   describe("get_page_content tool", () => {
     it("should call getPageText with the correct parameters and return the expected result", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_page_content"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
 
@@ -280,35 +263,26 @@ describe("configureWikiTools", () => {
             setImmediate(() => cb());
           }
           return this;
-        }
+        },
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
       const params = {
         wikiIdentifier: "wiki1",
         project: "proj1",
-        path: "/page1"
+        path: "/page1",
       };
-      
+
       const result = await handler(params);
 
-      expect(mockWikiApi.getPageText).toHaveBeenCalledWith(
-        "proj1",
-        "wiki1",
-        "/page1", 
-        undefined, 
-        undefined, 
-        true
-      );
-      expect(result.content[0].text).toBe("\"mock page text\"");
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("proj1", "wiki1", "/page1", undefined, undefined, true);
+      expect(result.content[0].text).toBe('"mock page text"');
       expect(result.isError).toBeUndefined();
     });
 
     it("should handle API errors correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_page_content"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
 
@@ -318,7 +292,7 @@ describe("configureWikiTools", () => {
       const params = {
         wikiIdentifier: "wiki1",
         project: "proj1",
-        path: "/nonexistent"
+        path: "/nonexistent",
       };
 
       const result = await handler(params);
@@ -330,9 +304,7 @@ describe("configureWikiTools", () => {
 
     it("should handle null API results correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_page_content"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
 
@@ -341,7 +313,7 @@ describe("configureWikiTools", () => {
       const params = {
         wikiIdentifier: "wiki1",
         project: "proj1",
-        path: "/page1"
+        path: "/page1",
       };
 
       const result = await handler(params);
@@ -353,9 +325,7 @@ describe("configureWikiTools", () => {
 
     it("should handle stream errors correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "wiki_get_page_content"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
 
@@ -367,14 +337,14 @@ describe("configureWikiTools", () => {
             setImmediate(() => cb(new Error("Stream read error")));
           }
           return this;
-        }
+        },
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
       const params = {
         wikiIdentifier: "wiki1",
         project: "proj1",
-        path: "/page1"
+        path: "/page1",
       };
 
       const result = await handler(params);

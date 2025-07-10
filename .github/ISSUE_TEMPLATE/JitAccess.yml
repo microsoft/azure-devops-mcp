@@ -4,7 +4,7 @@ title: "JIT Request"
 labels: ["jit"]
 assignees:
   - gimsvc_microsoft
-  - 
+  -
 body:
   - type: markdown
     attributes:

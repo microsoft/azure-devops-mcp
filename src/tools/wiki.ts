@@ -14,11 +14,7 @@ const WIKI_TOOLS = {
   get_wiki_page_content: "wiki_get_page_content",
 };
 
-function configureWikiTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
+function configureWikiTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     WIKI_TOOLS.get_wiki,
     "Get the wiki by wikiIdentifier",
@@ -40,11 +36,11 @@ function configureWikiTools(
           content: [{ type: "text", text: JSON.stringify(wiki, null, 2) }],
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        
-        return { 
-          content: [{ type: "text", text: `Error fetching wiki: ${errorMessage}` }], 
-          isError: true
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching wiki: ${errorMessage}` }],
+          isError: true,
         };
       }
     }
@@ -70,11 +66,11 @@ function configureWikiTools(
           content: [{ type: "text", text: JSON.stringify(wikis, null, 2) }],
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        
-        return { 
-          content: [{ type: "text", text: `Error fetching wikis: ${errorMessage}` }], 
-          isError: true
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching wikis: ${errorMessage}` }],
+          isError: true,
         };
       }
     }
@@ -90,13 +86,7 @@ function configureWikiTools(
       continuationToken: z.string().optional().describe("Token for pagination to retrieve the next set of pages."),
       pageViewsForDays: z.number().optional().describe("Number of days to retrieve page views for. If not specified, page views are not included."),
     },
-    async ({
-      wikiIdentifier,
-      project,
-      top = 20,
-      continuationToken,
-      pageViewsForDays,
-    }) => {
+    async ({ wikiIdentifier, project, top = 20, continuationToken, pageViewsForDays }) => {
       try {
         const connection = await connectionProvider();
         const wikiApi = await connection.getWikiApi();
@@ -107,11 +97,7 @@ function configureWikiTools(
           pageViewsForDays,
         };
 
-        const pages = await wikiApi.getPagesBatch(
-          pagesBatchRequest,
-          project,
-          wikiIdentifier
-        );
+        const pages = await wikiApi.getPagesBatch(pagesBatchRequest, project, wikiIdentifier);
 
         if (!pages) {
           return { content: [{ type: "text", text: "No wiki pages found" }], isError: true };
@@ -121,11 +107,11 @@ function configureWikiTools(
           content: [{ type: "text", text: JSON.stringify(pages, null, 2) }],
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        
-        return { 
-          content: [{ type: "text", text: `Error fetching wiki pages: ${errorMessage}` }], 
-          isError: true
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching wiki pages: ${errorMessage}` }],
+          isError: true,
         };
       }
     }
@@ -144,14 +130,7 @@ function configureWikiTools(
         const connection = await connectionProvider();
         const wikiApi = await connection.getWikiApi();
 
-        const stream = await wikiApi.getPageText(
-          project,
-          wikiIdentifier,
-          path,
-          undefined,
-          undefined,
-          true
-        );
+        const stream = await wikiApi.getPageText(project, wikiIdentifier, path, undefined, undefined, true);
 
         if (!stream) {
           return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
@@ -163,11 +142,11 @@ function configureWikiTools(
           content: [{ type: "text", text: JSON.stringify(content, null, 2) }],
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        
-        return { 
-          content: [{ type: "text", text: `Error fetching wiki page content: ${errorMessage}` }], 
-          isError: true
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching wiki page content: ${errorMessage}` }],
+          isError: true,
         };
       }
     }

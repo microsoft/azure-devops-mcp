@@ -20,16 +20,13 @@ const REPO_TOOLS = {
   get_repo_by_name_or_id: "repo_get_repo_by_name_or_id",
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
-  create_pull_request: "repo_create_pull_request",  
+  create_pull_request: "repo_create_pull_request",
   update_pull_request_status: "repo_update_pull_request_status",
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
 };
 
-function branchesFilterOutIrrelevantProperties(
-  branches: GitRef[],
-  top: number
-) {
+function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
   return branches
     ?.flatMap((branch) => (branch.name ? [branch.name] : []))
     ?.filter((branch) => branch.startsWith("refs/heads/"))
@@ -38,9 +35,7 @@ function branchesFilterOutIrrelevantProperties(
     .slice(0, top);
 }
 
-function pullRequestStatusStringToInt(
-  status: string)
-: number {
+function pullRequestStatusStringToInt(status: string): number {
   switch (status) {
     case "abandoned":
       return PullRequestStatus.Abandoned.valueOf();
@@ -57,24 +52,14 @@ function pullRequestStatusStringToInt(
   }
 }
 
-function filterReposByName(
-  repositories: GitRepository[],
-  repoNameFilter: string
-): GitRepository[] {
+function filterReposByName(repositories: GitRepository[], repoNameFilter: string): GitRepository[] {
   const lowerCaseFilter = repoNameFilter.toLowerCase();
-  const filteredByName = repositories?.filter((repo) =>
-    repo.name?.toLowerCase().includes(lowerCaseFilter)
-  );
+  const filteredByName = repositories?.filter((repo) => repo.name?.toLowerCase().includes(lowerCaseFilter));
 
   return filteredByName;
 }
 
-function configureRepoTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
-  
+function configureRepoTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     REPO_TOOLS.create_pull_request,
     "Create a new pull request.",
@@ -87,20 +72,10 @@ function configureRepoTools(
       isDraft: z.boolean().optional().default(false).describe("Indicates whether the pull request is a draft. Defaults to false."),
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
     },
-    async ({
-      repositoryId,
-      sourceRefName,
-      targetRefName,
-      title,
-      description,
-      isDraft,
-      workItems,
-    }) => {
+    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const workItemRefs = workItems
-        ? workItems.split(" ").map((id) => ({ id: id.trim() }))
-        : [];
+      const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
 
       const pullRequest = await gitApi.createPullRequest(
         {
@@ -133,46 +108,31 @@ function configureRepoTools(
       const gitApi = await connection.getGitApi();
       const statusValue = status === "active" ? 3 : 2;
 
-      const updatedPullRequest = await gitApi.updatePullRequest(
-        { status: statusValue },
-        repositoryId,
-        pullRequestId
-      );
+      const updatedPullRequest = await gitApi.updatePullRequest({ status: statusValue }, repositoryId, pullRequestId);
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(updatedPullRequest, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
       };
     }
-  ); 
- 
+  );
+
   server.tool(
     REPO_TOOLS.list_repos_by_project,
     "Retrieve a list of repositories for a given project",
-    { 
+    {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       top: z.number().default(100).describe("The maximum number of repositories to return."),
       skip: z.number().default(0).describe("The number of repositories to skip. Defaults to 0."),
-      repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."), 
+      repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."),
     },
     async ({ project, top, skip, repoNameFilter }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const repositories = await gitApi.getRepositories(
-        project,
-        false,
-        false,
-        false
-      );
+      const repositories = await gitApi.getRepositories(project, false, false, false);
 
-      const filteredRepositories = repoNameFilter
-        ? filterReposByName(repositories, repoNameFilter)
-        : repositories;
+      const filteredRepositories = repoNameFilter ? filterReposByName(repositories, repoNameFilter) : repositories;
 
-      const paginatedRepositories = filteredRepositories
-        ?.sort((a, b) => a.name?.localeCompare(b.name ?? "") ?? 0)
-        .slice(skip, skip + top);
+      const paginatedRepositories = filteredRepositories?.sort((a, b) => a.name?.localeCompare(b.name ?? "") ?? 0).slice(skip, skip + top);
 
       // Filter out the irrelevant properties
       const trimmedRepositories = paginatedRepositories?.map((repo) => ({
@@ -186,13 +146,11 @@ function configureRepoTools(
       }));
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(trimmedRepositories, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(trimmedRepositories, null, 2) }],
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.list_pull_requests_by_repo,
     "Retrieve a list of pull requests for a given repository.",
@@ -220,10 +178,7 @@ function configureRepoTools(
       };
 
       if (created_by_me || i_am_reviewer) {
-        const data = await getCurrentUserDetails(
-          tokenProvider,
-          connectionProvider
-        );
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider);
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
           searchCriteria.creatorId = userId;
@@ -257,13 +212,11 @@ function configureRepoTools(
       }));
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(filteredPullRequests, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.list_pull_requests_by_project,
     "Retrieve a list of pull requests for a given project Id or Name.",
@@ -289,10 +242,7 @@ function configureRepoTools(
       };
 
       if (created_by_me || i_am_reviewer) {
-        const data = await getCurrentUserDetails(
-          tokenProvider,
-          connectionProvider
-        );
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider);
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
           gitPullRequestSearchCriteria.creatorId = userId;
@@ -326,13 +276,11 @@ function configureRepoTools(
       }));
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(filteredPullRequests, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.list_pull_request_threads,
     "Retrieve a list of comment threads for a pull request.",
@@ -345,36 +293,20 @@ function configureRepoTools(
       top: z.number().default(100).describe("The maximum number of threads to return."),
       skip: z.number().default(0).describe("The number of threads to skip."),
     },
-    async ({
-      repositoryId,
-      pullRequestId,
-      project,
-      iteration,
-      baseIteration,
-      top,
-      skip
-    }) => {
+    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
-      const threads = await gitApi.getThreads(
-        repositoryId,
-        pullRequestId,
-        project,
-        iteration,
-        baseIteration
-      );
+      const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
 
-      const paginatedThreads = threads
-        ?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
-        .slice(skip, skip + top);
+      const paginatedThreads = threads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.list_pull_request_thread_comments,
     "Retrieve a list of comments in a pull request thread.",
@@ -391,23 +323,16 @@ function configureRepoTools(
       const gitApi = await connection.getGitApi();
 
       // Get thread comments - GitApi uses getComments for retrieving comments from a specific thread
-      const comments = await gitApi.getComments(
-        repositoryId,
-        pullRequestId,
-        threadId,
-        project
-      );
+      const comments = await gitApi.getComments(repositoryId, pullRequestId, threadId, project);
 
-      const paginatedComments = comments
-        ?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
-        .slice(skip, skip + top);
+      const paginatedComments = comments?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.list_branches_by_repo,
     "Retrieve a list of branches for a given repository.",
@@ -420,15 +345,10 @@ function configureRepoTools(
       const gitApi = await connection.getGitApi();
       const branches = await gitApi.getRefs(repositoryId, undefined);
 
-      const filteredBranches = branchesFilterOutIrrelevantProperties(
-        branches,
-        top
-      );
+      const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(filteredBranches, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
       };
     }
   );
@@ -443,19 +363,9 @@ function configureRepoTools(
     async ({ repositoryId, top }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const branches = await gitApi.getRefs(
-        repositoryId,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        true
-      );
+      const branches = await gitApi.getRefs(repositoryId, undefined, undefined, undefined, undefined, true);
 
-      const filteredBranches = branchesFilterOutIrrelevantProperties(
-        branches,
-        top
-      );
+      const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
       return {
         content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
@@ -476,11 +386,9 @@ function configureRepoTools(
       const repositories = await gitApi.getRepositories(project);
 
       const repository = repositories?.find((repo) => repo.name === repositoryNameOrId || repo.id === repositoryNameOrId);
-      
+
       if (!repository) {
-        throw new Error(
-          `Repository ${repositoryNameOrId} not found in project ${project}`
-        );
+        throw new Error(`Repository ${repositoryNameOrId} not found in project ${project}`);
       }
 
       return {
@@ -488,21 +396,19 @@ function configureRepoTools(
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.get_branch_by_name,
     "Get a branch by its name.",
-    { 
-      repositoryId: z.string().describe("The ID of the repository where the branch is located."), 
-      branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."), 
+    {
+      repositoryId: z.string().describe("The ID of the repository where the branch is located."),
+      branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
     },
     async ({ repositoryId, branchName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const branches = await gitApi.getRefs(repositoryId);
-      const branch = branches?.find(
-        (branch) => branch.name === `refs/heads/${branchName}`
-      );
+      const branch = branches?.find((branch) => branch.name === `refs/heads/${branchName}`);
       if (!branch) {
         return {
           content: [
@@ -518,21 +424,18 @@ function configureRepoTools(
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.get_pull_request_by_id,
     "Get a pull request by its ID.",
-    { 
-      repositoryId: z.string().describe("The ID of the repository where the pull request is located."), 
-      pullRequestId: z.number().describe("The ID of the pull request to retrieve."), 
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
     },
     async ({ repositoryId, pullRequestId }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const pullRequest = await gitApi.getPullRequest(
-        repositoryId,
-        pullRequestId
-      );
+      const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId);
       return {
         content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
       };
@@ -552,20 +455,14 @@ function configureRepoTools(
     async ({ repositoryId, pullRequestId, threadId, content, project }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const comment = await gitApi.createComment(
-        { content },
-        repositoryId,
-        pullRequestId,
-        threadId,
-        project
-      );
+      const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
 
       return {
         content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.resolve_comment,
     "Resolves a specific comment thread on a pull request.",
