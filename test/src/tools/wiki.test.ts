@@ -104,6 +104,26 @@ describe("configureWikiTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No wiki found");
     });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
+      if (!call) throw new Error("wiki_get_wiki tool not registered");
+      const [, , , handler] = call;
+
+      mockWikiApi.getWiki.mockRejectedValue("string error");
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.getWiki).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching wiki: Unknown error occurred");
+    });
   });
 
   describe("list_wikis tool", () => {
@@ -168,6 +188,25 @@ describe("configureWikiTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No wikis found");
     });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
+      if (!call) throw new Error("wiki_list_wikis tool not registered");
+      const [, , , handler] = call;
+
+      mockWikiApi.getAllWikis.mockRejectedValue("string error");
+
+      const params = {
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.getAllWikis).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching wikis: Unknown error occurred");
+    });
   });
 
   describe("list_wiki_pages tool", () => {
@@ -198,6 +237,31 @@ describe("configureWikiTools", () => {
         "wiki2"
       );
       expect(parsedResult.value).toEqual(["page1", "page2"]);
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should use default top parameter when not provided", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
+      if (!call) throw new Error("wiki_list_pages tool not registered");
+      const [, , , handler] = call;
+      mockWikiApi.getPagesBatch.mockResolvedValue({ value: ["page1", "page2"] });
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        project: "proj1",
+      };
+      const result = await handler(params);
+
+      expect(mockWikiApi.getPagesBatch).toHaveBeenCalledWith(
+        {
+          top: 20,
+          continuationToken: undefined,
+          pageViewsForDays: undefined,
+        },
+        "proj1",
+        "wiki1"
+      );
       expect(result.isError).toBeUndefined();
     });
 
@@ -242,6 +306,27 @@ describe("configureWikiTools", () => {
       expect(mockWikiApi.getPagesBatch).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No wiki pages found");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
+      if (!call) throw new Error("wiki_list_pages tool not registered");
+      const [, , , handler] = call;
+
+      mockWikiApi.getPagesBatch.mockRejectedValue("string error");
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        project: "proj1",
+        top: 10,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.getPagesBatch).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching wiki pages: Unknown error occurred");
     });
   });
 
@@ -352,6 +437,27 @@ describe("configureWikiTools", () => {
       expect(mockWikiApi.getPageText).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching wiki page content: Stream read error");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      mockWikiApi.getPageText.mockRejectedValue("string error");
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        project: "proj1",
+        path: "/page1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching wiki page content: Unknown error occurred");
     });
   });
 });
