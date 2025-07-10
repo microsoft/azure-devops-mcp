@@ -1,34 +1,36 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AccessToken } from "@azure/identity";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 
-import { configureCoreTools } from "./tools/core.js";
-import { configureWorkTools } from "./tools/work.js";
+import { configureAdvSecTools } from "./tools/advsec.js";
 import { configureBuildTools } from "./tools/builds.js";
-import { configureRepoTools } from "./tools/repos.js";
-import { configureWorkItemTools } from "./tools/workitems.js";
+import { configureCoreTools } from "./tools/core.js";
 import { configureReleaseTools } from "./tools/releases.js";
-import { configureWikiTools } from "./tools/wiki.js";
-import { configureTestPlanTools } from "./tools/testplans.js";
+import { configureRepoTools } from "./tools/repos.js";
 import { configureSearchTools } from "./tools/search.js";
+import { configureTestPlanTools } from "./tools/testplans.js";
+import { configureWikiTools } from "./tools/wiki.js";
+import { configureWorkTools } from "./tools/work.js";
+import { configureWorkItemTools } from "./tools/workitems.js";
 
 function configureAllTools(
   server: McpServer,
   tokenProvider: () => Promise<AccessToken>,
   connectionProvider: () => Promise<WebApi>
 ) {
-    configureCoreTools(server, tokenProvider, connectionProvider);
-    configureWorkTools(server, tokenProvider, connectionProvider);
-    configureBuildTools(server, tokenProvider, connectionProvider);
-    configureRepoTools(server, tokenProvider, connectionProvider);
-    configureWorkItemTools(server, tokenProvider, connectionProvider);
-    configureReleaseTools(server, tokenProvider, connectionProvider);
-    configureWikiTools(server, tokenProvider, connectionProvider);
-    configureTestPlanTools(server, tokenProvider, connectionProvider);
-    configureSearchTools(server, tokenProvider, connectionProvider);
+  configureCoreTools(server, tokenProvider, connectionProvider);
+  configureWorkTools(server, tokenProvider, connectionProvider);
+  configureBuildTools(server, tokenProvider, connectionProvider);
+  configureRepoTools(server, tokenProvider, connectionProvider);
+  configureWorkItemTools(server, tokenProvider, connectionProvider);
+  configureReleaseTools(server, tokenProvider, connectionProvider);
+  configureWikiTools(server, tokenProvider, connectionProvider);
+  configureTestPlanTools(server, tokenProvider, connectionProvider);
+  configureSearchTools(server, tokenProvider, connectionProvider);
+  configureAdvSecTools(server, tokenProvider, connectionProvider);
 }
 
 export { configureAllTools };
