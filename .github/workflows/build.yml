@@ -74,11 +74,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Check spelling mistakes
-        run: |
-          npm install -g git+https://github.com/streetsidesoftware/cspell-cli
-          cspell-cli .
-
       - name: Clean install dependencies
         run: npm ci
 
@@ -87,6 +82,9 @@ jobs:
 
       - name: Check code formatting
         run: npm run format-check
+
+      - name: Check spelling mistakes
+        run: npm run spell-check
 
       - name: Verify package version is synced
         run: |
