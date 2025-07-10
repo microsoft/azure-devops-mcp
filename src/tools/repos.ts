@@ -489,6 +489,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     }
   );
 
+  const gitVersionTypeStrings = Object.values(GitVersionType)
+    .filter((value): value is string => typeof value === "string");
+
   server.tool(
     REPO_TOOLS.search_commits,
     "Searches for commits in a repository",
@@ -498,7 +501,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       fromCommit: z.string().optional().describe("Starting commit ID"),
       toCommit: z.string().optional().describe("Ending commit ID"),
       version: z.string().optional().describe("The name of the branch, tag or commit to filter commits by"),
-      versionType: z.nativeEnum(GitVersionType).optional().default(GitVersionType.Branch).describe("The meaning of the version parameter, e.g., branch, tag or commit"),
+      versionType: z.enum(gitVersionTypeStrings as [string, ...string[]]).optional().default(GitVersionType[GitVersionType.Branch]).describe("The meaning of the version parameter, e.g., branch, tag or commit"),
       skip: z.number().optional().default(0).describe("Number of commits to skip"),
       top: z.number().optional().default(10).describe("Maximum number of commits to return"),
       includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
@@ -519,7 +522,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         if (version) {
           const itemVersion: GitVersionDescriptor = {
             version: version,
-            versionType: versionType,
+            versionType: GitVersionType[versionType as keyof typeof GitVersionType],
           };
           searchCriteria.itemVersion = itemVersion;
         }
@@ -549,6 +552,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     }
   );
 
+  const pullRequestQueryTypesStrings = Object.values(GitPullRequestQueryType)
+    .filter((value): value is string => typeof value === "string");
+
   server.tool(
     REPO_TOOLS.list_pull_requests_by_commits,
     "Lists pull requests by commit IDs to find which pull requests contain specific commits",
@@ -556,7 +562,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       project: z.string().describe("Project name or ID"),
       repository: z.string().describe("Repository name or ID"),
       commits: z.array(z.string()).describe("Array of commit IDs to query for"),
-      queryType: z.nativeEnum(GitPullRequestQueryType).optional().default(GitPullRequestQueryType.LastMergeCommit).describe("Type of query to perform"),
+      queryType: z.enum(pullRequestQueryTypesStrings as [string, ...string[]]).optional().default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit]).describe("Type of query to perform"),
     },
     async ({ project, repository, commits, queryType }) => {
       try {
@@ -567,7 +573,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           queries: [
             {
               items: commits,
-              type: queryType,
+              type: GitPullRequestQueryType[queryType as keyof typeof GitPullRequestQueryType],
             } as GitPullRequestQueryInput,
           ],
         };
