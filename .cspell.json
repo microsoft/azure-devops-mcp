@@ -1,0 +1,39 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.lock",
+    ".git",
+    "src/Bicep.LangServer/Generated/**/*"
+  ],
+  "dictionaries": ["en_us", "typescript", "html", "softwareterms", "filetypes", "companies", "computing-acronyms"],
+  "dictionaryDefinitions": [],
+  "words": [
+    "opensource",
+    "MSRC",
+    "upvote",
+    "fabrikam",
+    "contoso",
+    "azuredevops",
+    "modelcontextprotocol",
+    "pwsh",
+    "isformatted",
+    "workitem",
+    "workitems",
+    "testplan",
+    "testplans",
+    "planid",
+    "suiteid",
+    "buildid",
+    "wiql",
+    "azdev",
+    "assignedtome",
+    "myactivity",
+    "vsts",
+    "vstfs",
+    "tfvc"
+  ],
+  "enableFiletypes": [".ts", ".md", ".json"]
+}

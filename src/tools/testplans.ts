@@ -31,7 +31,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
-      const owner = ""; //making owner an empty string untill we can figure out how to get owner id
+      const owner = ""; //making owner an empty string until we can figure out how to get owner id
       const connection = await connectionProvider();
       const testPlanApi = await connection.getTestPlanApi();
 
