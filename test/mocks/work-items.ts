@@ -182,7 +182,7 @@ export const _mockWorkItem = {
     "System.Reason": "New",
     "System.CreatedDate": "2017-10-06T01:04:51.57Z",
     "System.CreatedBy": {
-      displayName: "Jamal Hartnett",
+      displayName: "Jamal Simpson",
       url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
       _links: {
         avatar: {
@@ -196,7 +196,7 @@ export const _mockWorkItem = {
     },
     "System.ChangedDate": "2017-10-06T01:04:51.57Z",
     "System.ChangedBy": {
-      displayName: "Jamal Hartnett",
+      displayName: "Jamal Simpson",
       url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
       _links: {
         avatar: {
@@ -244,7 +244,7 @@ export const _mockWorkItemComment = {
   version: 1,
   text: "Moving to the right area path",
   createdBy: {
-    displayName: "Jamal Hartnett",
+    displayName: "Jamal Simpson",
     url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     _links: {
       avatar: {
@@ -258,7 +258,7 @@ export const _mockWorkItemComment = {
   },
   createdDate: "2019-01-16T03:03:28.97Z",
   modifiedBy: {
-    displayName: "Jamal Hartnett",
+    displayName: "Jamal Simpson",
     url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     _links: {
       avatar: {
@@ -285,7 +285,7 @@ export const _mockWorkItemComments = {
       version: 1,
       text: "Johnnie is going to take this work over.",
       createdBy: {
-        displayName: "Jamal Hartnett",
+        displayName: "Jamal Simpson",
         url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         _links: {
           avatar: {
@@ -299,7 +299,7 @@ export const _mockWorkItemComments = {
       },
       createdDate: "2019-01-21T20:12:14.683Z",
       modifiedBy: {
-        displayName: "Jamal Hartnett",
+        displayName: "Jamal Simpson",
         url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         _links: {
           avatar: {
@@ -321,7 +321,7 @@ export const _mockWorkItemComments = {
       version: 1,
       text: "Moving to the right area path",
       createdBy: {
-        displayName: "Jamal Hartnett",
+        displayName: "Jamal Simpson",
         url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         _links: {
           avatar: {
@@ -335,7 +335,7 @@ export const _mockWorkItemComments = {
       },
       createdDate: "2019-01-20T23:26:33.383Z",
       modifiedBy: {
-        displayName: "Jamal Hartnett",
+        displayName: "Jamal Simpson",
         url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
         _links: {
           avatar: {
@@ -433,7 +433,7 @@ export const _mockQuery = {
   name: "Active Bugs",
   path: "My Queries/Website/Active Bugs",
   createdBy: {
-    displayName: "Jamal Hartnett",
+    displayName: "Jamal Simpson",
     url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     _links: {
       avatar: {
@@ -447,7 +447,7 @@ export const _mockQuery = {
   },
   createdDate: "2014-03-18T17:18:36.06Z",
   lastModifiedBy: {
-    displayName: "Jamal Hartnett",
+    displayName: "Jamal Simpson",
     url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     _links: {
       avatar: {
@@ -461,7 +461,7 @@ export const _mockQuery = {
   },
   lastModifiedDate: "2014-03-18T17:18:36.06Z",
   lastExecutedBy: {
-    displayName: "Jamal Hartnett",
+    displayName: "Jamal Simpson",
     url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
     _links: {
       avatar: {
