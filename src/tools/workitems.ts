@@ -7,7 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion, userAgent } from "../utils.js";
+import { batchApiVersion } from "../utils.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -55,7 +55,7 @@ function getLinkTypeFromName(name: string) {
   }
 }
 
-function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
     "Revieve a list of backlogs for a given project and team.",
@@ -523,7 +523,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
@@ -595,7 +595,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
@@ -654,7 +654,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
