@@ -1,36 +1,32 @@
 Before you get started, ensure you follow the steps in the `README.md` file. This will help you get up and running and connected to your Azure DevOps organization.
 
-## 🔧 Tool group configuration
+## 🔧 Tool configuration
 
 By default, the server registers **all** Azure DevOps tool groups (`core`, `work`, `builds`, `repos`, `workitems`, `releases`, `wiki`, `testplans`, `search`).
 
-If you only need a subset, you can disable unwanted groups to keep your tool list under the 40-tool limit shown in VS Code Agent Mode.
+If you only need a subset, you can include or exclude unwanted groups to keep your tool list under the 40-tool limit shown in VS Code Agent Mode.
 
-### Disabling tool groups
+### Including and excluding tool groups
 
-You can disable tool groups using either:
+You can filter tool groups using either:
 
 - **Group names**: `repos`, `builds`, `testplans`, etc.
 - **Tool prefixes**: `repo`, `build`, `testplan`, etc.
 
-Both approaches work identically. For example, `--disable=repo` and `--disable=repos` both disable all `repo_*` tools.
+Both approaches work identically. For example, `--exclude-tools=repo` and `--exclude-tools=repos` both disable all `repo_*` tools.
+
+If `include-tools` is provided, the server starts with only that set of tools. Otherwise, it starts with all tools. The `exclude-tools` flag is then applied, removing any specified tools. If both flags are used, `exclude-tools` takes precedence and acts only on tools specified in the `include-tools` flag.
 
 ### Configuration methods
 
 1. **Command-line flag**
 
    ```sh
-   # Using group names
-   mcp-server-azuredevops <org> --disable=testplans,search
+   # Using group names to include only workitems and repos
+   mcp-server-azuredevops <org> --include-tools=workitems,repos
 
-   # Using tool prefixes
-   mcp-server-azuredevops <org> --disable=testplan,search
-   ```
-
-2. **Environment variable**
-   ```sh
-   export AZURE_DEVOPS_MCP_DISABLE_GROUPS="testplans,search"
-   mcp-server-azuredevops <org>
+   # Using tool prefixes to exclude testplans and search
+   mcp-server-azuredevops <org> --exclude-tools=testplan,search
    ```
 
 ### Available identifiers
@@ -57,7 +53,7 @@ Both approaches work identically. For example, `--disable=repo` and `--disable=r
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "cityofottawa", "--disable=testplan,release,build"]
+      "args": ["-y", "@azure-devops/mcp", "cityofottawa", "--exclude-tools=testplan,release,build"]
     }
   }
 }
@@ -71,7 +67,7 @@ Both approaches work identically. For example, `--disable=repo` and `--disable=r
     "ado": {
       "type": "stdio",
       "command": "mcp-server-azuredevops",
-      "args": ["cityofottawa", "--disable=repo,wiki"]
+      "args": ["cityofottawa", "--include-tools=repo,wiki"]
     }
   }
 }

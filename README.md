@@ -237,9 +237,9 @@ This installation method is recommended for advanced users and contributors who 
 
 See [How To](./docs/HOWTO.md) section for details
 
-## 🔧 Tool group configuration
+## 🔧 Tool configuration
 
-You can disable specific tool groups to keep your tool list manageable. The server supports both group names (`repos`) and tool prefixes (`repo`).
+You can include or exclude specific tools or tool groups to customize the available tools.
 
 For detailed configuration options, see the [How-to Guide](./docs/HOWTO.md).
 

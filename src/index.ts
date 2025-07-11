@@ -11,30 +11,28 @@ import { configurePrompts } from "./prompts.js";
 import { configureAllTools, ToolGroup } from "./tools.js";
 import { userAgent } from "./utils.js";
 import { packageVersion } from "./version.js";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
-const rawArgs = process.argv.slice(2);
+const argv = await yargs(hideBin(process.argv))
+  .option("include-tools", {
+    type: "string",
+    description: "Comma-separated list of tools to include.",
+    alias: "i",
+  })
+  .option("exclude-tools", {
+    type: "string",
+    description: "Comma-separated list of tools to exclude.",
+    alias: "e",
+  })
+  .demandCommand(1, 1, "Organization name is required.")
+  .usage("Usage: $0 <organization-name> [options]")
+  .help()
+  .alias("h", "help").argv;
 
-if (rawArgs.length === 0) {
-  console.error("Usage: mcp-server-azuredevops <organization_name> [--disable=<group1,group2,...>]");
-  process.exit(1);
-}
-
-export const orgName = rawArgs[0];
-
-let disabledGroupNames: string[] = [];
-
-for (const arg of rawArgs.slice(1)) {
-  if (arg.startsWith("--disable=")) {
-    const list = arg.substring("--disable=".length);
-    disabledGroupNames.push(...list.split(","));
-  }
-}
-
-if (process.env.AZURE_DEVOPS_MCP_DISABLE_GROUPS) {
-  disabledGroupNames.push(...process.env.AZURE_DEVOPS_MCP_DISABLE_GROUPS.split(","));
-}
-
-const disabledGroups: Set<ToolGroup> = new Set(disabledGroupNames.map((g) => g.trim().toLowerCase() as ToolGroup).filter(Boolean));
+export const orgName = argv._[0] as string;
+const includeTools = argv["include-tools"]?.split(",").map((t: string) => t.trim()) ?? [];
+const excludeTools = argv["exclude-tools"]?.split(",").map((t: string) => t.trim()) ?? [];
 
 const orgUrl = "https://dev.azure.com/" + orgName;
 
@@ -64,7 +62,10 @@ async function main() {
 
   configurePrompts(server);
 
-  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient, disabledGroups);
+  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient, {
+    include: includeTools,
+    exclude: excludeTools,
+  });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

@@ -17,6 +17,11 @@ import { configureSearchTools } from "./tools/search.js";
 
 export type ToolGroup = "core" | "work" | "builds" | "repos" | "workitems" | "releases" | "wiki" | "testplans" | "search";
 
+export interface ToolFilter {
+  include: string[];
+  exclude: string[];
+}
+
 const TOOL_GROUPS: { group: ToolGroup; prefix: string; configure: Function }[] = [
   { group: "core", prefix: "core", configure: configureCoreTools },
   { group: "work", prefix: "work", configure: configureWorkTools },
@@ -30,15 +35,23 @@ const TOOL_GROUPS: { group: ToolGroup; prefix: string; configure: Function }[] =
 ];
 
 /**
- * Registers all tool groups, unless they have been explicitly disabled by the caller.
+ * Registers all tool groups, applying inclusion and exclusion filters.
  *
- * @param disabledGroups  A set of lowercase group identifiers or tool prefixes to skip (e.g. "testplans", "testplan", "search").
+ * @param filter An object with `include` and `exclude` arrays of tool group names or prefixes.
  */
-function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, disabledGroups: Set<string> = new Set()) {
-  for (const { group, prefix, configure } of TOOL_GROUPS) {
-    if (!disabledGroups.has(group) && !disabledGroups.has(prefix)) {
-      configure(server, tokenProvider, connectionProvider);
-    }
+function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, filter: ToolFilter = { include: [], exclude: [] }) {
+  let toolsToConfigure = TOOL_GROUPS;
+
+  if (filter.include.length > 0) {
+    toolsToConfigure = TOOL_GROUPS.filter(({ group, prefix }) => filter.include.includes(group) || filter.include.includes(prefix));
+  }
+
+  if (filter.exclude.length > 0) {
+    toolsToConfigure = toolsToConfigure.filter(({ group, prefix }) => !filter.exclude.includes(group) && !filter.exclude.includes(prefix));
+  }
+
+  for (const { configure } of toolsToConfigure) {
+    configure(server, tokenProvider, connectionProvider);
   }
 }
 
