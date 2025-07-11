@@ -9,7 +9,7 @@ import * as azdev from "azure-devops-node-api";
 import { AccessToken, DefaultAzureCredential } from "@azure/identity";
 import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
-import { userAgent } from "./utils.js";
+import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 const args = process.argv.slice(2);
 if (args.length === 0) {
@@ -27,15 +27,17 @@ async function getAzureDevOpsToken(): Promise<AccessToken> {
   return token;
 }
 
-async function getAzureDevOpsClient(): Promise<azdev.WebApi> {
-  const token = await getAzureDevOpsToken();
-  const authHandler = azdev.getBearerHandler(token.token);
-  const connection = new azdev.WebApi(orgUrl, authHandler, undefined, {
-    productName: "AzureDevOps.MCP",
-    productVersion: packageVersion,
-    userAgent: userAgent,
-  });
-  return connection;
+function getAzureDevOpsClient(userAgentComposer: UserAgentComposer): () => Promise<azdev.WebApi> {
+  return async () => {
+    const token = await getAzureDevOpsToken();
+    const authHandler = azdev.getBearerHandler(token.token);
+    const connection = new azdev.WebApi(orgUrl, authHandler, undefined, {
+      productName: "AzureDevOps.MCP",
+      productVersion: packageVersion,
+      userAgent: userAgentComposer.userAgent,
+    });
+    return connection;
+  };
 }
 
 async function main() {
@@ -44,9 +46,14 @@ async function main() {
     version: packageVersion,
   });
 
+  const userAgentComposer = new UserAgentComposer(packageVersion);
+  server.server.oninitialized = () => {
+    userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
+  };
+
   configurePrompts(server);
 
-  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient);
+  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient(userAgentComposer), () => userAgentComposer.userAgent);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
