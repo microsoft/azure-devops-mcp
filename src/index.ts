@@ -11,13 +11,29 @@ import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
-const args = process.argv.slice(2);
-if (args.length === 0) {
-  console.error("Usage: mcp-server-azuredevops <organization_name>");
-  process.exit(1);
-}
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
-export const orgName = args[0];
+const argv = await yargs(hideBin(process.argv))
+  .option("include-tools", {
+    type: "string",
+    description: "Comma-separated list of tools to include.",
+    alias: "i",
+  })
+  .option("exclude-tools", {
+    type: "string",
+    description: "Comma-separated list of tools to exclude.",
+    alias: "e",
+  })
+  .demandCommand(1, 1, "Organization name is required.")
+  .usage("Usage: $0 <organization-name> [options]")
+  .help()
+  .alias("h", "help").argv;
+
+export const orgName = argv._[0] as string;
+const includeTools = argv["include-tools"]?.split(",").map((t: string) => t.trim()) ?? [];
+const excludeTools = argv["exclude-tools"]?.split(",").map((t: string) => t.trim()) ?? [];
+
 const orgUrl = "https://dev.azure.com/" + orgName;
 
 async function getAzureDevOpsToken(): Promise<AccessToken> {
