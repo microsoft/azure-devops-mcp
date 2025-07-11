@@ -47,6 +47,7 @@ Interact with these Azure DevOps services:
 
 - **core_list_project_teams**: Retrieve a list of teams for the specified Azure DevOps project.
 - **core_list_projects**: Retrieve a list of projects in your Azure DevOps organization.
+- **core_get_identity_ids**: Retrieve Azure DevOps identity IDs for a list of unique names.
 
 ### ⚒️ Work
 
@@ -94,6 +95,7 @@ Interact with these Azure DevOps services:
 - **repo_get_pull_request_by_id**: Get a pull request by its ID.
 - **repo_create_pull_request**: Create a new pull request.
 - **repo_update_pull_request_status**: Update status of an existing pull request to active or abandoned.
+- **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
 - **repo_reply_to_comment**: Replies to a specific comment on a pull request.
 - **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
 - **repo_search_commits**: Searches for commits.
