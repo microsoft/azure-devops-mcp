@@ -306,7 +306,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           headers: {
             "Authorization": `Bearer ${accessToken.token}`,
             "Content-Type": "application/json",
-            "User-Agent": `${userAgent}`,
+            "User-Agent": userAgentProvider(),
           },
           body: JSON.stringify(body),
         });
