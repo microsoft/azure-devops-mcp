@@ -66,7 +66,7 @@ Interact with these Azure DevOps services:
 - **wit_list_work_item_comments**: Retrieves a list of comments for a work item by ID.
 - **wit_get_work_items_for_iteration**: Retrieves a list of work items for a specified iteration.
 - **wit_add_work_item_comment**: Add comment to a work item by ID.
-- **wit_add_child_work_item**: Create a child work item from a parent by ID.
+- **wit_add_child_work_items**: Create one or many child work items of a specific work item type for the given parent Id
 - **wit_link_work_item_to_pull_request**: Link a single work item to an existing pull request.
 - **wit_get_work_item_type**: Get a specific work item type.
 - **wit_get_query**: Get a query by its ID or path.
@@ -74,6 +74,10 @@ Interact with these Azure DevOps services:
 - **wit_update_work_items_batch**: Update work items in batch.
 - **wit_close_and_link_workitem_duplicates**: Close duplicate work items by id.
 - **wit_work_items_link**: Link work items together in batch.
+
+#### Deprecated tools
+
+- **wit_add_child_work_item**: Replaced by `wit_add_child_work_items` so that you can create one or many child items per call.
 
 ### 📁 Repositories
 

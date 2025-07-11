@@ -5,4 +5,3 @@ import { packageVersion } from "./version.js";
 
 export const apiVersion = "7.2-preview.1";
 export const batchApiVersion = "5.0";
-export const userAgent = `AzureDevOps.MCP/${packageVersion} (local)`;
