@@ -1131,24 +1131,26 @@ describe("configureWorkItemTools", () => {
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-      
+
       // Mock fetch for the batch API call
       const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] })
+        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] }),
       });
       global.fetch = mockFetch;
 
       const params = {
         parentId: 1,
-        project: "TestProject", 
+        project: "TestProject",
         workItemType: "Task",
-        items: [{
-          title: "Child Task",
-          description: "Child Description",
-          areaPath: "TestProject\\Area1",
-          iterationPath: "TestProject\\Sprint1",
-        }]
+        items: [
+          {
+            title: "Child Task",
+            description: "Child Description",
+            areaPath: "TestProject\\Area1",
+            iterationPath: "TestProject\\Sprint1",
+          },
+        ],
       };
 
       await handler(params);
@@ -1161,7 +1163,7 @@ describe("configureWorkItemTools", () => {
             "Authorization": "Bearer fake-token",
             "Content-Type": "application/json",
           }),
-          body: expect.stringContaining("TestProject\\\\Area1")
+          body: expect.stringContaining("TestProject\\\\Area1"),
         })
       );
     });
@@ -1175,11 +1177,11 @@ describe("configureWorkItemTools", () => {
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-      
+
       // Mock fetch for the batch API call
       const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] })
+        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] }),
       });
       global.fetch = mockFetch;
 
@@ -1187,28 +1189,30 @@ describe("configureWorkItemTools", () => {
         parentId: 1,
         project: "TestProject",
         workItemType: "Task",
-        items: [{
-          title: "Child Task",
-          description: "Child Description",
-          areaPath: "",
-          iterationPath: "   ", // whitespace only
-        }]
+        items: [
+          {
+            title: "Child Task",
+            description: "Child Description",
+            areaPath: "",
+            iterationPath: "   ", // whitespace only
+          },
+        ],
       };
 
       await handler(params);
 
-      // Should not include area or iteration path since they're empty/whitespace  
+      // Should not include area or iteration path since they're empty/whitespace
       expect(mockFetch).toHaveBeenCalledWith(
         "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
         expect.objectContaining({
-          body: expect.not.stringContaining("System.AreaPath")
+          body: expect.not.stringContaining("System.AreaPath"),
         })
       );
-      
+
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0", 
+        "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
         expect.objectContaining({
-          body: expect.not.stringContaining("System.IterationPath")
+          body: expect.not.stringContaining("System.IterationPath"),
         })
       );
     });
@@ -1233,7 +1237,7 @@ describe("configureWorkItemTools", () => {
         parentId: 1,
         project: "TestProject",
         workItemType: "Task",
-        items
+        items,
       };
 
       const result = await handler(params);
@@ -1251,11 +1255,11 @@ describe("configureWorkItemTools", () => {
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-      
+
       // Mock fetch for the batch API call
       const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] })
+        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] }),
       });
       global.fetch = mockFetch;
 
@@ -1263,11 +1267,13 @@ describe("configureWorkItemTools", () => {
         parentId: 1,
         project: "TestProject",
         workItemType: "Task",
-        items: [{
-          title: "Child Task",
-          description: "Child Description in **Markdown**",
-          format: "Markdown" as "Markdown" | "Html",
-        }]
+        items: [
+          {
+            title: "Child Task",
+            description: "Child Description in **Markdown**",
+            format: "Markdown" as "Markdown" | "Html",
+          },
+        ],
       };
 
       await handler(params);
@@ -1276,14 +1282,14 @@ describe("configureWorkItemTools", () => {
       expect(mockFetch).toHaveBeenCalledWith(
         "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
         expect.objectContaining({
-          body: expect.stringContaining("multilineFieldsFormat/System.Description")
+          body: expect.stringContaining("multilineFieldsFormat/System.Description"),
         })
       );
-      
+
       expect(mockFetch).toHaveBeenCalledWith(
         "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
         expect.objectContaining({
-          body: expect.stringContaining("multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps")
+          body: expect.stringContaining("multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps"),
         })
       );
     });
@@ -1297,11 +1303,11 @@ describe("configureWorkItemTools", () => {
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-      
+
       // Mock fetch for a failed response
       const mockFetch = jest.fn().mockResolvedValue({
         ok: false,
-        statusText: "Internal Server Error"
+        statusText: "Internal Server Error",
       });
       global.fetch = mockFetch;
 
@@ -1309,10 +1315,12 @@ describe("configureWorkItemTools", () => {
         parentId: 1,
         project: "TestProject",
         workItemType: "Task",
-        items: [{
-          title: "Child Task",
-          description: "Child Description",
-        }]
+        items: [
+          {
+            title: "Child Task",
+            description: "Child Description",
+          },
+        ],
       };
 
       const result = await handler(params);
@@ -1329,7 +1337,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      
+
       // Mock tokenProvider to throw a non-Error object
       (tokenProvider as jest.Mock).mockRejectedValue("String error");
 
@@ -1337,10 +1345,12 @@ describe("configureWorkItemTools", () => {
         parentId: 1,
         project: "TestProject",
         workItemType: "Task",
-        items: [{
-          title: "Child Task",
-          description: "Child Description",
-        }]
+        items: [
+          {
+            title: "Child Task",
+            description: "Child Description",
+          },
+        ],
       };
 
       const result = await handler(params);
