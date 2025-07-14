@@ -164,6 +164,118 @@ describe("configureCoreTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No projects found");
     });
+
+    it("should handle unknown error type correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
+
+      if (!call) throw new Error("core_list_projects tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        stateFilter: "wellFormed",
+        top: undefined,
+        skip: undefined,
+        continuationToken: undefined,
+      };
+
+      const result = await handler(params);
+
+      expect(mockCoreApi.getProjects).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching projects: Unknown error occurred");
+    });
+
+    it("should filter projects by name when projectNameFilter is provided", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
+
+      if (!call) throw new Error("core_list_projects tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
+        {
+          id: "eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+          name: "Fabrikam-Fiber-TFVC",
+          description: "Team Foundation Version Control projects.",
+          url: "https://dev.azure.com/fabrikam/_apis/projects/eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+          state: "wellFormed",
+        },
+        {
+          id: "6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c",
+          name: "Fabrikam-Fiber-Git",
+          description: "Git projects",
+          url: "https://dev.azure.com/fabrikam/_apis/projects/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c",
+          state: "wellFormed",
+        },
+        {
+          id: "281f9a5b-af0d-49b4-a1df-fe6f5e5f84d0",
+          name: "TestGit",
+          url: "https://dev.azure.com/fabrikam/_apis/projects/281f9a5b-af0d-49b4-a1df-fe6f5e5f84d0",
+          state: "wellFormed",
+        },
+      ]);
+
+      const params = {
+        stateFilter: "wellFormed",
+        top: undefined,
+        skip: undefined,
+        continuationToken: undefined,
+        projectNameFilter: "Git",
+      };
+
+      const result = await handler(params);
+
+      expect(mockCoreApi.getProjects).toHaveBeenCalledWith("wellFormed", undefined, undefined, undefined, false);
+
+      const filteredProjects = JSON.parse(result.content[0].text);
+      expect(filteredProjects).toHaveLength(2);
+      expect(filteredProjects[0].name).toBe("Fabrikam-Fiber-Git");
+      expect(filteredProjects[1].name).toBe("TestGit");
+    });
+
+    it("should handle case-insensitive filtering", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
+
+      if (!call) throw new Error("core_list_projects tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
+        {
+          id: "eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+          name: "Fabrikam-Fiber-TFVC",
+          description: "Team Foundation Version Control projects.",
+          url: "https://dev.azure.com/fabrikam/_apis/projects/eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+          state: "wellFormed",
+        },
+        {
+          id: "6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c",
+          name: "Fabrikam-Fiber-Git",
+          description: "Git projects",
+          url: "https://dev.azure.com/fabrikam/_apis/projects/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c",
+          state: "wellFormed",
+        },
+      ]);
+
+      const params = {
+        stateFilter: "wellFormed",
+        top: undefined,
+        skip: undefined,
+        continuationToken: undefined,
+        projectNameFilter: "fabrikam",
+      };
+
+      const result = await handler(params);
+
+      const filteredProjects = JSON.parse(result.content[0].text);
+      expect(filteredProjects).toHaveLength(2);
+    });
   });
 
   describe("list_project_teams tool", () => {
@@ -275,6 +387,30 @@ describe("configureCoreTools", () => {
       expect(mockCoreApi.getTeams).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No teams found");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
+
+      if (!call) throw new Error("core_list_project_teams tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getTeams as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+        mine: undefined,
+        top: undefined,
+        skip: undefined,
+      };
+
+      const result = await handler(params);
+
+      expect(mockCoreApi.getTeams).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching project teams: Unknown error occurred");
     });
   });
 });
