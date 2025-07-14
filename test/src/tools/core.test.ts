@@ -413,4 +413,230 @@ describe("configureCoreTools", () => {
       expect(result.content[0].text).toContain("Error fetching project teams: Unknown error occurred");
     });
   });
+
+  describe("get_identity_ids tool", () => {
+    beforeEach(() => {
+      // Mock fetch globally for these tests
+      global.fetch = jest.fn();
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it("should fetch identity IDs with correct parameters and return expected result", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
+      if (!call) throw new Error("core_get_identity_ids tool not registered");
+      const [, , , handler] = call;
+
+      // Mock token provider
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      // Mock connection with serverUrl
+      const mockConnectionWithUrl = {
+        ...mockConnection,
+        serverUrl: "https://dev.azure.com/test-org"
+      };
+      (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
+
+      // Mock fetch response
+      const mockIdentities = {
+        value: [
+          {
+            id: "user1-id",
+            providerDisplayName: "John Doe",
+            descriptor: "aad.user1-descriptor"
+          },
+          {
+            id: "user2-id", 
+            providerDisplayName: "Jane Smith",
+            descriptor: "aad.user2-descriptor"
+          }
+        ]
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(mockIdentities)
+      });
+
+      const params = { searchFilter: "john.doe@example.com" };
+      const result = await handler(params);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com",
+        {
+          headers: {
+            "Authorization": "Bearer fake-token",
+            "Content-Type": "application/json"
+          }
+        }
+      );
+
+      const expectedResult = [
+        {
+          id: "user1-id",
+          displayName: "John Doe", 
+          descriptor: "aad.user1-descriptor"
+        },
+        {
+          id: "user2-id",
+          displayName: "Jane Smith",
+          descriptor: "aad.user2-descriptor"
+        }
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should handle HTTP error responses correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
+      if (!call) throw new Error("core_get_identity_ids tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      const mockConnectionWithUrl = {
+        ...mockConnection,
+        serverUrl: "https://dev.azure.com/test-org"
+      };
+      (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
+
+      // Mock failed HTTP response
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: jest.fn().mockResolvedValue("Not Found")
+      });
+
+      const params = { searchFilter: "nonexistent@example.com" };
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error fetching identities: HTTP 404: Not Found");
+    });
+
+    it("should handle empty results correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
+      if (!call) throw new Error("core_get_identity_ids tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      const mockConnectionWithUrl = {
+        ...mockConnection,
+        serverUrl: "https://dev.azure.com/test-org"
+      };
+      (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
+
+      // Mock empty response
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ value: [] })
+      });
+
+      const params = { searchFilter: "nobody@example.com" };
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No identities found");
+    });
+
+    it("should handle null response correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
+      if (!call) throw new Error("core_get_identity_ids tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      const mockConnectionWithUrl = {
+        ...mockConnection,
+        serverUrl: "https://dev.azure.com/test-org"
+      };
+      (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
+
+      // Mock null response
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(null)
+      });
+
+      const params = { searchFilter: "test@example.com" };
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No identities found");
+    });
+
+    it("should handle network errors correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
+      if (!call) throw new Error("core_get_identity_ids tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      const mockConnectionWithUrl = {
+        ...mockConnection,
+        serverUrl: "https://dev.azure.com/test-org"
+      };
+      (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
+
+      // Mock network error
+      (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
+
+      const params = { searchFilter: "test@example.com" };
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error fetching identities: Network error");
+    });
+
+    it("should handle unknown error types correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
+      if (!call) throw new Error("core_get_identity_ids tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      const mockConnectionWithUrl = {
+        ...mockConnection,
+        serverUrl: "https://dev.azure.com/test-org"
+      };
+      (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
+
+      // Mock unknown error type (not an Error instance)
+      (global.fetch as jest.Mock).mockRejectedValue("string error");
+
+      const params = { searchFilter: "test@example.com" };
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error fetching identities: Unknown error occurred");
+    });
+
+    it("should handle token provider errors correctly", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
+      if (!call) throw new Error("core_get_identity_ids tool not registered");
+      const [, , , handler] = call;
+
+      // Mock token provider error
+      (tokenProvider as jest.Mock).mockRejectedValue(new Error("Token acquisition failed"));
+
+      const params = { searchFilter: "test@example.com" };
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error fetching identities: Token acquisition failed");
+    });
+  });
 });
