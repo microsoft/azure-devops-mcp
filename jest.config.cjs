@@ -1,9 +1,12 @@
 module.exports = {
-  // Use ts-jest preset for TypeScript support
-  preset: "ts-jest",
+  // Use ts-jest preset for TypeScript support with ES modules
+  preset: "ts-jest/presets/default-esm",
 
   // Specify the test environment (node for backend projects)
   testEnvironment: "node",
+
+  // Enable ES modules
+  extensionsToTreatAsEsm: [".ts"],
 
   // Root directory for test files
   roots: ["<rootDir>/test"],
@@ -36,13 +39,23 @@ module.exports = {
   // Module file extensions for importing
   moduleFileExtensions: ["ts", "js"],
 
-  // Transform settings for ts-jest
+  // Transform settings for ts-jest with ESM support
   transform: {
-    "^.+\\.(ts|tsx)$": "ts-jest",
+    "^.+\\.ts$": [
+      "ts-jest",
+      {
+        useESM: true,
+        tsconfig: {
+          module: "esnext",
+        },
+      },
+    ],
   },
 
+  // Module name mapping for .js imports to .ts files
   moduleNameMapper: {
     "^(.+)/version\\.js$": "$1/version.ts",
     "^(.+)/utils\\.js$": "$1/utils.ts",
+    "^(\\.{1,2}/.*)\\.js$": "$1"
   },
 };
