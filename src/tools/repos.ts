@@ -31,6 +31,7 @@ const REPO_TOOLS = {
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",
   update_pull_request_status: "repo_update_pull_request_status",
+  update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
@@ -124,6 +125,42 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       return {
         content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
       };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.update_pull_request_reviewers,
+    "Add or remove reviewers for an existing pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
+      pullRequestId: z.number().describe("The ID of the pull request to update."),
+      reviewerIds: z.array(z.string()).describe("List of reviewer ids to add or remove from the pull request."),
+      action: z.enum(["add", "remove"]).describe("Action to perform on the reviewers. Can be 'add' or 'remove'."),
+    },
+    async ({ repositoryId, pullRequestId, reviewerIds, action }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      let updatedPullRequest;
+      if (action === "add") {
+        updatedPullRequest = await gitApi.createPullRequestReviewers(
+          reviewerIds.map((id) => ({ id: id })),
+          repositoryId,
+          pullRequestId
+        );
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+        };
+      } else {
+        for (const reviewerId of reviewerIds) {
+          await gitApi.deletePullRequestReviewer(repositoryId, pullRequestId, reviewerId);
+        }
+
+        return {
+          content: [{ type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` }],
+        };
+      }
     }
   );
 
