@@ -4,18 +4,13 @@
       "id": "ado_org",
       "type": "promptString",
       "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    },
-    {
-      "id": "ado_tenant",
-      "type": "promptString",
-      "description": "Azure tenant ID (optional, e.g. '2b5901be-9f28-4fa4-b565-706cbbc699c5')"
     }
   ],
   "servers": {
     "ado": {
       "type": "stdio",
       "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "${input:ado_tenant}"]
+      "args": ["${input:ado_org}"]
     }
   }
 }
