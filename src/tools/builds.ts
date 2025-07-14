@@ -3,9 +3,11 @@
 
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { apiVersion } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
+import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
 const BUILD_TOOLS = {
   get_definitions: "build_get_definitions",
@@ -16,6 +18,7 @@ const BUILD_TOOLS = {
   get_changes: "build_get_changes",
   run_build: "build_run_build",
   get_status: "build_get_status",
+  update_build_stage: "build_update_build_stage",
 };
 
 function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
@@ -300,6 +303,49 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
 
       return {
         content: [{ type: "text", text: JSON.stringify(build, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    BUILD_TOOLS.update_build_stage,
+    "Updates the stage of a specific build.",
+    {
+      project: z.string().describe("Project ID or name to update the build stage for"),
+      buildId: z.number().describe("ID of the build to update"),
+      stageName: z.string().describe("Name of the stage to update"),
+      status: z.nativeEnum(StageUpdateType).describe("New status for the stage"),
+      forceRetryAllJobs: z.boolean().default(false).describe("Whether to force retry all jobs in the stage."),
+    },
+    async ({ project, buildId, stageName, status, forceRetryAllJobs }) => {
+      const connection = await connectionProvider();
+      const orgUrl = connection.serverUrl;
+      const endpoint = `${orgUrl}/${project}/_apis/build/builds/${buildId}/stages/${stageName}?api-version=${apiVersion}`;
+      const token = await tokenProvider();
+
+      const body = {
+        forceRetryAllJobs: forceRetryAllJobs,
+        state: status.valueOf(),
+      };
+
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token.token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update build stage: ${response.status} ${errorText}`);
+      }
+
+      const updatedBuild = await response.text();
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }],
       };
     }
   );

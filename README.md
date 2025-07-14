@@ -67,7 +67,7 @@ Interact with these Azure DevOps services:
 - **wit_list_work_item_comments**: Retrieves a list of comments for a work item by ID.
 - **wit_get_work_items_for_iteration**: Retrieves a list of work items for a specified iteration.
 - **wit_add_work_item_comment**: Add comment to a work item by ID.
-- **wit_add_child_work_item**: Create a child work item from a parent by ID.
+- **wit_add_child_work_items**: Create one or many child work items of a specific work item type for the given parent Id
 - **wit_link_work_item_to_pull_request**: Link a single work item to an existing pull request.
 - **wit_get_work_item_type**: Get a specific work item type.
 - **wit_get_query**: Get a query by its ID or path.
@@ -76,6 +76,10 @@ Interact with these Azure DevOps services:
 - **wit_close_and_link_workitem_duplicates**: Close duplicate work items by id.
 - **wit_work_items_link**: Link work items together in batch.
 
+#### Deprecated tools
+
+- **wit_add_child_work_item**: Replaced by `wit_add_child_work_items` so that you can create one or many child items per call.
+
 ### 📁 Repositories
 
 - **repo_list_repos_by_project**: Retrieve a list of repositories for a given project.
@@ -83,6 +87,7 @@ Interact with these Azure DevOps services:
 - **repo_list_pull_requests_by_project**: Retrieve a list of pull requests for a given project Id or Name.
 - **repo_list_branches_by_repo**: Retrieve a list of branches for a given repository.
 - **repo_list_my_branches_by_repo**: Retrieve a list of my branches for a given repository Id.
+- **repo_list_pull_requests_by_commits**: List pull requests associated with commits.
 - **repo_list_pull_request_threads**: Retrieve a list of comment threads for a pull request.
 - **repo_list_pull_request_thread_comments**: Retrieve a list of comments in a pull request thread.
 - **repo_get_repo_by_name_or_id**: Get the repository by project and repository name or ID.
@@ -93,6 +98,7 @@ Interact with these Azure DevOps services:
 - **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
 - **repo_reply_to_comment**: Replies to a specific comment on a pull request.
 - **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
+- **repo_search_commits**: Searches for commits.
 
 ### 🛰️ Builds
 
@@ -104,6 +110,7 @@ Interact with these Azure DevOps services:
 - **build_get_changes**: Get the changes associated with a specific build.
 - **build_run_build**: Triggers a new build for a specified definition.
 - **build_get_status**: Fetches the status of a specific build.
+- **build_update_build_stage**: Updates the stage of a specific build.
 
 ### 🚀 Releases
 
@@ -285,6 +292,18 @@ See our [Contributions Guide](./CONTRIBUTING.md) for:
 
 This project follows the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For questions, see the [FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [open@microsoft.com](mailto:open@microsoft.com).
+
+## 📈 Project Stats
+
+[![Star History Chart](https://api.star-history.com/svg?repos=microsoft/azure-devops-mcp&type=Date)](https://star-history.com/#microsoft/azure-devops-mcp)
+
+## 🏆 Hall of Fame
+
+Thanks to all contributors who make this project awesome! ❤️
+
+[![Contributors](https://contrib.rocks/image?repo=microsoft/azure-devops-mcp)](https://github.com/microsoft/azure-devops-mcp/graphs/contributors)
+
+> Generated with [contrib.rocks](https://contrib.rocks)
 
 ## License
 

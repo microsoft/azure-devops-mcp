@@ -148,3 +148,25 @@ Open work item 1234 in 'Contoso' project. Then look at the description and creat
 ```
 
 📽️ [Azure DevOps MCP Server: Creating Test Cases from Work Item](https://youtu.be/G7fnYjlSh_w)
+
+### Triage work
+
+Retrieve all work items in a backlog and triage them according to your own criteria. For example, you can fetch all bugs and user stories, identify security-related bugs, and assign them to the current team iteration. Similarly, you can select a few high-priority user stories and assign them to the most recent iteration.
+
+Retrieve the team's iterations and backlog levels to provide the LLM with the necessary context for accurate work item management.
+
+```plaintext
+list iterations for Contoso team
+```
+
+```plaintext
+list backlog levels for Contoso team
+```
+
+Retrieve the work items and their details, then instruct the LLM to identify security-related bugs and high-priority user stories. Assign the identified items to the current iteration and, if needed, to the next iteration.
+
+```plaintext
+List of work items for Stories backlog. But then go thru and find all the security related bugs. Assign the first 4 to the current iteration. If there are more than four, assign the rest to the next iteration. Then find 2-3 high priority user stories and assign them to the current iteration. Do it!
+```
+
+📽️ [Azure DevOps MCP Server: Triage Work](https://youtu.be/gCI_pPS76C8)
