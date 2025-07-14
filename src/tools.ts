@@ -16,11 +16,7 @@ import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/workitems.js";
 
-function configureAllTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
+function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   configureCoreTools(server, tokenProvider, connectionProvider);
   configureWorkTools(server, tokenProvider, connectionProvider);
   configureBuildTools(server, tokenProvider, connectionProvider);

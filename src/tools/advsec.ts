@@ -4,13 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import {
-  AlertType,
-  AlertValidityStatus,
-  Confidence,
-  Severity,
-  State,
-} from "azure-devops-node-api/interfaces/AlertInterfaces.js";
+import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
 
 const ADVSEC_TOOLS = {
@@ -18,11 +12,7 @@ const ADVSEC_TOOLS = {
   get_alert_details: "advsec_get_alert_details",
 };
 
-function configureAdvSecTools(
-  server: McpServer,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>
-) {
+function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   // Helper function to map string alert types to enum values
   const mapAlertType = (alertType?: string): AlertType | undefined => {
     if (!alertType) return undefined;
@@ -87,9 +77,7 @@ function configureAdvSecTools(
   };
 
   // Helper function to map string confidence levels to enum values
-  const mapConfidenceLevels = (
-    confidenceLevels?: string[]
-  ): Confidence[] | undefined => {
+  const mapConfidenceLevels = (confidenceLevels?: string[]): Confidence[] | undefined => {
     if (!confidenceLevels) return undefined;
     return confidenceLevels.map((level) => {
       switch (level.toLowerCase()) {
@@ -104,9 +92,7 @@ function configureAdvSecTools(
   };
 
   // Helper function to map string validity to enum values
-  const mapValidity = (
-    validity?: string[]
-  ): AlertValidityStatus[] | undefined => {
+  const mapValidity = (validity?: string[]): AlertValidityStatus[] | undefined => {
     if (!validity) return undefined;
     return validity.map((v) => {
       switch (v.toLowerCase()) {
@@ -128,103 +114,35 @@ function configureAdvSecTools(
     ADVSEC_TOOLS.get_alerts,
     "Retrieve Advanced Security alerts for a repository.",
     {
-      project: z
-        .string()
-        .describe("The name or ID of the Azure DevOps project."),
-      repository: z
-        .string()
-        .describe("The name or ID of the repository to get alerts for."),
-      alertType: z
-        .enum(["code", "dependency", "secret", "unknown"])
-        .optional()
-        .describe(
-          "Filter alerts by type. If not specified, returns all alert types."
-        ),
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      repository: z.string().describe("The name or ID of the repository to get alerts for."),
+      alertType: z.enum(["code", "dependency", "secret", "unknown"]).optional().describe("Filter alerts by type. If not specified, returns all alert types."),
       states: z
-        .array(
-          z.enum(["active", "dismissed", "fixed", "autoDismissed", "unknown"])
-        )
+        .array(z.enum(["active", "dismissed", "fixed", "autoDismissed", "unknown"]))
         .optional()
-        .describe(
-          "Filter alerts by state. If not specified, returns alerts in any state."
-        ),
+        .describe("Filter alerts by state. If not specified, returns alerts in any state."),
       severities: z
-        .array(
-          z.enum([
-            "critical",
-            "high",
-            "medium",
-            "low",
-            "note",
-            "error",
-            "warning",
-            "undefined",
-          ])
-        )
+        .array(z.enum(["critical", "high", "medium", "low", "note", "error", "warning", "undefined"]))
         .optional()
-        .describe(
-          "Filter alerts by severity level. If not specified, returns alerts at any severity."
-        ),
+        .describe("Filter alerts by severity level. If not specified, returns alerts at any severity."),
       ruleId: z.string().optional().describe("Filter alerts by rule ID."),
       ruleName: z.string().optional().describe("Filter alerts by rule name."),
       toolName: z.string().optional().describe("Filter alerts by tool name."),
-      ref: z
-        .string()
-        .optional()
-        .describe(
-          "Filter alerts by git reference (branch). If not provided and onlyDefaultBranch is true, only includes alerts from default branch."
-        ),
-      onlyDefaultBranch: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe(
-          "If true, only return alerts found on the default branch. Defaults to true."
-        ),
+      ref: z.string().optional().describe("Filter alerts by git reference (branch). If not provided and onlyDefaultBranch is true, only includes alerts from default branch."),
+      onlyDefaultBranch: z.boolean().optional().default(true).describe("If true, only return alerts found on the default branch. Defaults to true."),
       confidenceLevels: z
         .array(z.enum(["high", "other"]))
         .optional()
-        .describe(
-          "Filter alerts by confidence levels. Only applicable for secret alerts."
-        ),
+        .describe("Filter alerts by confidence levels. Only applicable for secret alerts."),
       validity: z
         .array(z.enum(["active", "inactive", "none", "unknown"]))
         .optional()
-        .describe(
-          "Filter alerts by validity status. Only applicable for secret alerts."
-        ),
-      top: z
-        .number()
-        .optional()
-        .default(100)
-        .describe("Maximum number of alerts to return. Defaults to 100."),
-      orderBy: z
-        .enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"])
-        .optional()
-        .default("id")
-        .describe("Order results by specified field. Defaults to 'id'."),
-      continuationToken: z
-        .string()
-        .optional()
-        .describe("Continuation token for pagination."),
+        .describe("Filter alerts by validity status. Only applicable for secret alerts."),
+      top: z.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
+      orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("id").describe("Order results by specified field. Defaults to 'id'."),
+      continuationToken: z.string().optional().describe("Continuation token for pagination."),
     },
-    async ({
-      project,
-      repository,
-      alertType,
-      states,
-      severities,
-      ruleId,
-      ruleName,
-      toolName,
-      ref,
-      onlyDefaultBranch,
-      confidenceLevels,
-      validity,
-      top,
-      orderBy,
-      continuationToken,
-    }) => {
+    async ({ project, repository, alertType, states, severities, ruleId, ruleName, toolName, ref, onlyDefaultBranch, confidenceLevels, validity, top, orderBy, continuationToken }) => {
       try {
         const connection = await connectionProvider();
         const alertApi = await connection.getAlertApi();
@@ -258,8 +176,7 @@ function configureAdvSecTools(
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred";
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
         return {
           content: [
@@ -278,19 +195,10 @@ function configureAdvSecTools(
     ADVSEC_TOOLS.get_alert_details,
     "Get detailed information about a specific Advanced Security alert.",
     {
-      project: z
-        .string()
-        .describe("The name or ID of the Azure DevOps project."),
-      repository: z
-        .string()
-        .describe("The name or ID of the repository containing the alert."),
-      alertId: z
-        .number()
-        .describe("The ID of the alert to retrieve details for."),
-      ref: z
-        .string()
-        .optional()
-        .describe("Git reference (branch) to filter the alert."),
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      repository: z.string().describe("The name or ID of the repository containing the alert."),
+      alertId: z.number().describe("The ID of the alert to retrieve details for."),
+      ref: z.string().optional().describe("Git reference (branch) to filter the alert."),
     },
     async ({ project, repository, alertId, ref }) => {
       try {
@@ -309,8 +217,7 @@ function configureAdvSecTools(
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred";
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
         return {
           content: [

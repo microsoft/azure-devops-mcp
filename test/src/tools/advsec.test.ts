@@ -2,11 +2,7 @@ import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import {
-  AlertType,
-  Severity,
-  State,
-} from "azure-devops-node-api/interfaces/AlertInterfaces";
+import { AlertType, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
 import { configureAdvSecTools } from "../../../src/tools/advsec";
 
 type TokenProviderMock = () => Promise<AccessToken>;
@@ -51,9 +47,7 @@ describe("configureAdvSecTools", () => {
     it("should call getAlerts API with correct parameters and return alerts", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "advsec_get_alerts"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
       const [, , , handler] = call;
 
@@ -109,9 +103,7 @@ describe("configureAdvSecTools", () => {
     it("should handle API errors gracefully", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "advsec_get_alerts"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
       const [, , , handler] = call;
 
@@ -127,17 +119,13 @@ describe("configureAdvSecTools", () => {
 
       expect(mockAlertApi.getAlerts).toHaveBeenCalled();
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        "Error fetching Advanced Security alerts: Failed to retrieve alerts"
-      );
+      expect(result.content[0].text).toContain("Error fetching Advanced Security alerts: Failed to retrieve alerts");
     });
 
     it("should handle null API results correctly", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "advsec_get_alerts"
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
       const [, , , handler] = call;
 
@@ -159,11 +147,8 @@ describe("configureAdvSecTools", () => {
     it("should fetch specific alert details", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "advsec_get_alert_details"
-      );
-      if (!call)
-        throw new Error("advsec_get_alert_details tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
+      if (!call) throw new Error("advsec_get_alert_details tool not registered");
       const [, , , handler] = call;
 
       const mockResult = {
@@ -208,11 +193,8 @@ describe("configureAdvSecTools", () => {
     it("should handle API errors correctly", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "advsec_get_alert_details"
-      );
-      if (!call)
-        throw new Error("advsec_get_alert_details tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
+      if (!call) throw new Error("advsec_get_alert_details tool not registered");
       const [, , , handler] = call;
 
       const testError = new Error("Alert not found");
@@ -228,19 +210,14 @@ describe("configureAdvSecTools", () => {
 
       expect(mockAlertApi.getAlert).toHaveBeenCalled();
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        "Error fetching alert details: Alert not found"
-      );
+      expect(result.content[0].text).toContain("Error fetching alert details: Alert not found");
     });
 
     it("should handle null API results correctly", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === "advsec_get_alert_details"
-      );
-      if (!call)
-        throw new Error("advsec_get_alert_details tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
+      if (!call) throw new Error("advsec_get_alert_details tool not registered");
       const [, , , handler] = call;
 
       (mockAlertApi.getAlert as jest.Mock).mockResolvedValue(null);
