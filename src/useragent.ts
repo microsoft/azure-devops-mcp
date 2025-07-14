@@ -24,4 +24,5 @@ class UserAgentComposer {
   }
 }
 
-export { UserAgentComposer, McpClientInfo };
+export { UserAgentComposer };
+export type { McpClientInfo };
