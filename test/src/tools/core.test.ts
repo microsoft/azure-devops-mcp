@@ -437,7 +437,7 @@ describe("configureCoreTools", () => {
       // Mock connection with serverUrl
       const mockConnectionWithUrl = {
         ...mockConnection,
-        serverUrl: "https://dev.azure.com/test-org"
+        serverUrl: "https://dev.azure.com/test-org",
       };
       (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
 
@@ -447,45 +447,42 @@ describe("configureCoreTools", () => {
           {
             id: "user1-id",
             providerDisplayName: "John Doe",
-            descriptor: "aad.user1-descriptor"
+            descriptor: "aad.user1-descriptor",
           },
           {
-            id: "user2-id", 
+            id: "user2-id",
             providerDisplayName: "Jane Smith",
-            descriptor: "aad.user2-descriptor"
-          }
-        ]
+            descriptor: "aad.user2-descriptor",
+          },
+        ],
       };
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue(mockIdentities)
+        json: jest.fn().mockResolvedValue(mockIdentities),
       });
 
       const params = { searchFilter: "john.doe@example.com" };
       const result = await handler(params);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        "https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com",
-        {
-          headers: {
-            "Authorization": "Bearer fake-token",
-            "Content-Type": "application/json"
-          }
-        }
-      );
+      expect(global.fetch).toHaveBeenCalledWith("https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com", {
+        headers: {
+          "Authorization": "Bearer fake-token",
+          "Content-Type": "application/json",
+        },
+      });
 
       const expectedResult = [
         {
           id: "user1-id",
-          displayName: "John Doe", 
-          descriptor: "aad.user1-descriptor"
+          displayName: "John Doe",
+          descriptor: "aad.user1-descriptor",
         },
         {
           id: "user2-id",
           displayName: "Jane Smith",
-          descriptor: "aad.user2-descriptor"
-        }
+          descriptor: "aad.user2-descriptor",
+        },
       ];
 
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
@@ -502,7 +499,7 @@ describe("configureCoreTools", () => {
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
       const mockConnectionWithUrl = {
         ...mockConnection,
-        serverUrl: "https://dev.azure.com/test-org"
+        serverUrl: "https://dev.azure.com/test-org",
       };
       (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
 
@@ -510,7 +507,7 @@ describe("configureCoreTools", () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
         status: 404,
-        text: jest.fn().mockResolvedValue("Not Found")
+        text: jest.fn().mockResolvedValue("Not Found"),
       });
 
       const params = { searchFilter: "nonexistent@example.com" };
@@ -530,14 +527,14 @@ describe("configureCoreTools", () => {
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
       const mockConnectionWithUrl = {
         ...mockConnection,
-        serverUrl: "https://dev.azure.com/test-org"
+        serverUrl: "https://dev.azure.com/test-org",
       };
       (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
 
       // Mock empty response
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue({ value: [] })
+        json: jest.fn().mockResolvedValue({ value: [] }),
       });
 
       const params = { searchFilter: "nobody@example.com" };
@@ -557,14 +554,14 @@ describe("configureCoreTools", () => {
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
       const mockConnectionWithUrl = {
         ...mockConnection,
-        serverUrl: "https://dev.azure.com/test-org"
+        serverUrl: "https://dev.azure.com/test-org",
       };
       (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
 
       // Mock null response
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue(null)
+        json: jest.fn().mockResolvedValue(null),
       });
 
       const params = { searchFilter: "test@example.com" };
@@ -584,7 +581,7 @@ describe("configureCoreTools", () => {
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
       const mockConnectionWithUrl = {
         ...mockConnection,
-        serverUrl: "https://dev.azure.com/test-org"
+        serverUrl: "https://dev.azure.com/test-org",
       };
       (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
 
@@ -608,7 +605,7 @@ describe("configureCoreTools", () => {
       (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
       const mockConnectionWithUrl = {
         ...mockConnection,
-        serverUrl: "https://dev.azure.com/test-org"
+        serverUrl: "https://dev.azure.com/test-org",
       };
       (connectionProvider as jest.Mock).mockResolvedValue(mockConnectionWithUrl);
 
