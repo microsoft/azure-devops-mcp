@@ -7,27 +7,53 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as azdev from "azure-devops-node-api";
 import { AccessToken, DefaultAzureCredential, AzureCliCredential, ChainedTokenCredential } from "@azure/identity";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { userAgent } from "./utils.js";
 import { packageVersion } from "./version.js";
-const args = process.argv.slice(2);
-if (args.length < 1) {
-  console.error("Usage: mcp-server-azuredevops <organization_name> [tenant_id]");
-  process.exit(1);
-}
 
-export const orgName = args[0];
-export const tenantId = args[1]; 
+// Parse command line arguments using yargs
+const argv = yargs(hideBin(process.argv))
+  .scriptName('mcp-server-azuredevops')
+  .usage('Usage: $0 <organization> [options]')
+  .version(packageVersion)
+  .command('$0 <organization>', 'Azure DevOps MCP Server', (yargs) => {
+    yargs.positional('organization', {
+      describe: 'Azure DevOps organization name',
+      type: 'string',
+    });
+  })
+  .option('tenant', {
+    alias: 't',
+    describe: 'Azure tenant ID (optional, required for multi-tenant scenarios)',
+    type: 'string',
+  })
+  .help()
+  .parseSync();
+
+export const orgName = argv.organization as string;
+export const tenantId = argv.tenant; 
 const orgUrl = "https://dev.azure.com/" + orgName;
 
-async function getAzureDevOpsToken(): Promise<AccessToken> {
-  const credentialOptions = tenantId ? { tenantId } : {};
+async function getAzureDevOpsToken(): Promise<AccessToken> {  
+  process.env.AZURE_TOKEN_CREDENTIALS = "dev";
 
-  const azureCliCredential = new AzureCliCredential(credentialOptions);
+  // Use Azure CLI credential if tenantId is provided for multi-tenant scenarios
+  if(tenantId){
+    const credentialOptions = tenantId ? { tenantId } : {};
 
-  const credential = new ChainedTokenCredential(azureCliCredential, new DefaultAzureCredential(credentialOptions));
+    const azureCliCredential = new AzureCliCredential(credentialOptions);
+    
+    const chainedCredential = new ChainedTokenCredential(azureCliCredential, new DefaultAzureCredential(credentialOptions));
+    
+    const token = await chainedCredential.getToken("499b84ac-1321-427f-aa17-267ca6975798/.default");
+    return token;
+  }
 
+  const credential = new DefaultAzureCredential(); // CodeQL [SM05138] resolved by explicitly setting AZURE_TOKEN_CREDENTIALS
+  
   const token = await credential.getToken("499b84ac-1321-427f-aa17-267ca6975798/.default");
   return token;
 }
