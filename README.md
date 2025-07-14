@@ -97,6 +97,7 @@ Interact with these Azure DevOps services:
 - **repo_reply_to_comment**: Replies to a specific comment on a pull request.
 - **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
 - **repo_search_commits**: Searches for commits.
+- **create_pull_request_thread**: Creates a new comment thread on a pull request.
 
 ### 🛰️ Builds
 
