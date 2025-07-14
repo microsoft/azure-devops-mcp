@@ -45,6 +45,30 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Display coverage summary
+        run: |
+          Write-Host "=== Code Coverage Summary ==="
+          if (Test-Path "coverage/lcov-report/index.html") {
+            Write-Host "Coverage report generated successfully"
+            if (Test-Path "coverage/coverage-summary.json") {
+              $coverage = Get-Content "coverage/coverage-summary.json" | ConvertFrom-Json
+              $total = $coverage.total
+              Write-Host "Lines: $($total.lines.pct)%"
+              Write-Host "Functions: $($total.functions.pct)%"
+              Write-Host "Branches: $($total.branches.pct)%"
+              Write-Host "Statements: $($total.statements.pct)%"
+            }
+          }
+        shell: pwsh
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: azure-devops-mcp-coverage
+          fail_ci_if_error: false
+
       - name: Validate server startup via npx
         shell: pwsh
         run: |
