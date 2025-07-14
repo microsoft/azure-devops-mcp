@@ -7,7 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion, userAgent } from "../utils.js";
+import { batchApiVersion } from "../utils.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -20,7 +20,7 @@ const WORKITEM_TOOLS = {
   list_work_item_comments: "wit_list_work_item_comments",
   get_work_items_for_iteration: "wit_get_work_items_for_iteration",
   add_work_item_comment: "wit_add_work_item_comment",
-  add_child_work_item: "wit_add_child_work_item",
+  add_child_work_items: "wit_add_child_work_items",
   link_work_item_to_pull_request: "wit_link_work_item_to_pull_request",
   get_work_item_type: "wit_get_work_item_type",
   get_query: "wit_get_query",
@@ -55,7 +55,7 @@ function getLinkTypeFromName(name: string) {
   }
 }
 
-function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
     "Revieve a list of backlogs for a given project and team.",
@@ -200,63 +200,134 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    WORKITEM_TOOLS.add_child_work_item,
-    "Create a child work item from a parent by ID.",
+    WORKITEM_TOOLS.add_child_work_items,
+    "Create one or many child work items from a parent by work item type and parent id.",
     {
       parentId: z.number().describe("The ID of the parent work item to create a child work item under."),
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The type of the child work item to create."),
-      title: z.string().describe("The title of the child work item."),
-      description: z.string().describe("The description of the child work item."),
-      areaPath: z.string().optional().describe("Optional area path for the child work item."),
-      iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
+      items: z.array(
+        z.object({
+          title: z.string().describe("The title of the child work item."),
+          description: z.string().describe("The description of the child work item."),
+          format: z.enum(["Markdown", "Html"]).default("Html").describe("Format for the description on the child work item, e.g., 'Markdown', 'Html'. Defaults to 'Html'."),
+          areaPath: z.string().optional().describe("Optional area path for the child work item."),
+          iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
+        })
+      ),
     },
-    async ({ parentId, project, workItemType, title, description, areaPath, iterationPath }) => {
-      const connection = await connectionProvider();
-      const workItemApi = await connection.getWorkItemTrackingApi();
+    async ({ parentId, project, workItemType, items }) => {
+      try {
+        const connection = await connectionProvider();
+        const orgUrl = connection.serverUrl;
+        const accessToken = await tokenProvider();
 
-      const document = [
-        {
-          op: "add",
-          path: "/fields/System.Title",
-          value: title,
-        },
-        {
-          op: "add",
-          path: "/fields/System.Description",
-          value: description,
-        },
-        {
-          op: "add",
-          path: "/relations/-",
-          value: {
-            rel: "System.LinkTypes.Hierarchy-Reverse",
-            url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${parentId}`,
+        if (items.length > 50) {
+          return {
+            content: [{ type: "text", text: `A maximum of 50 child work items can be created in a single call.` }],
+            isError: true,
+          };
+        }
+
+        const body = items.map((item, x) => {
+          const ops = [
+            {
+              op: "add",
+              path: "/id",
+              value: `-${x + 1}`,
+            },
+            {
+              op: "add",
+              path: "/fields/System.Title",
+              value: item.title,
+            },
+            {
+              op: "add",
+              path: "/fields/System.Description",
+              value: item.description,
+            },
+            {
+              op: "add",
+              path: "/fields/Microsoft.VSTS.TCM.ReproSteps",
+              value: item.description,
+            },
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "System.LinkTypes.Hierarchy-Reverse",
+                url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${parentId}`,
+              },
+            },
+          ];
+
+          if (item.areaPath && item.areaPath.trim().length > 0) {
+            ops.push({
+              op: "add",
+              path: "/fields/System.AreaPath",
+              value: item.areaPath,
+            });
+          }
+
+          if (item.format && item.format === "Markdown") {
+            ops.push({
+              op: "add",
+              path: "/multilineFieldsFormat/System.Description",
+              value: item.format,
+            });
+
+            ops.push({
+              op: "add",
+              path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps",
+              value: item.format,
+            });
+          }
+
+          if (item.iterationPath && item.iterationPath.trim().length > 0) {
+            ops.push({
+              op: "add",
+              path: "/fields/System.IterationPath",
+              value: item.iterationPath,
+            });
+          }
+
+          return {
+            method: "PATCH",
+            uri: `/${project}/_apis/wit/workitems/$${workItemType}?api-version=${batchApiVersion}`,
+            headers: {
+              "Content-Type": "application/json-patch+json",
+            },
+            body: ops,
+          };
+        });
+
+        const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
+          method: "PATCH",
+          headers: {
+            "Authorization": `Bearer ${accessToken.token}`,
+            "Content-Type": "application/json",
+            "User-Agent": userAgentProvider(),
           },
-        },
-      ];
-
-      if (areaPath && areaPath.trim().length > 0) {
-        document.push({
-          op: "add",
-          path: "/fields/System.AreaPath",
-          value: areaPath,
+          body: JSON.stringify(body),
         });
+
+        if (!response.ok) {
+          throw new Error(`Failed to update work items in batch: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error creating child work items: ${errorMessage}` }],
+          isError: true,
+        };
       }
-
-      if (iterationPath && iterationPath.trim().length > 0) {
-        document.push({
-          op: "add",
-          path: "/fields/System.IterationPath",
-          value: iterationPath,
-        });
-      }
-
-      const childWorkItem = await workItemApi.createWorkItem(null, document, project, workItemType);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(childWorkItem, null, 2) }],
-      };
     }
   );
 
@@ -523,7 +594,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
@@ -595,7 +666,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
@@ -654,7 +725,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });

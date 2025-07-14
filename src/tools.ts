@@ -15,43 +15,37 @@ import { configureWikiTools } from "./tools/wiki.js";
 import { configureTestPlanTools } from "./tools/testplans.js";
 import { configureSearchTools } from "./tools/search.js";
 
-export type ToolGroup = "core" | "work" | "builds" | "repos" | "workitems" | "releases" | "wiki" | "testplans" | "search";
+function configureAllTools(
+  server: McpServer,
+  tokenProvider: () => Promise<AccessToken>,
+  connectionProvider: () => Promise<WebApi>,
+  userAgentProvider: () => string,
+  includeTools: string[] = [],
+  excludeTools: string[] = []
+) {
+  // If includeTools is set, only register those groups/prefixes. Otherwise, register all except those in excludeTools.
+  const groupMap = [
+    { name: "core", fn: () => configureCoreTools(server, tokenProvider, connectionProvider) },
+    { name: "work", fn: () => configureWorkTools(server, tokenProvider, connectionProvider) },
+    { name: "build", fn: () => configureBuildTools(server, tokenProvider, connectionProvider) },
+    { name: "repo", fn: () => configureRepoTools(server, tokenProvider, connectionProvider) },
+    { name: "wit", fn: () => configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider) },
+    { name: "release", fn: () => configureReleaseTools(server, tokenProvider, connectionProvider) },
+    { name: "wiki", fn: () => configureWikiTools(server, tokenProvider, connectionProvider) },
+    { name: "testplan", fn: () => configureTestPlanTools(server, tokenProvider, connectionProvider) },
+    { name: "search", fn: () => configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider) },
+  ];
 
-export interface ToolFilter {
-  include: string[];
-  exclude: string[];
-}
-
-const TOOL_GROUPS: { group: ToolGroup; prefix: string; configure: Function }[] = [
-  { group: "core", prefix: "core", configure: configureCoreTools },
-  { group: "work", prefix: "work", configure: configureWorkTools },
-  { group: "builds", prefix: "build", configure: configureBuildTools },
-  { group: "repos", prefix: "repo", configure: configureRepoTools },
-  { group: "workitems", prefix: "wit", configure: configureWorkItemTools },
-  { group: "releases", prefix: "release", configure: configureReleaseTools },
-  { group: "wiki", prefix: "wiki", configure: configureWikiTools },
-  { group: "testplans", prefix: "testplan", configure: configureTestPlanTools },
-  { group: "search", prefix: "search", configure: configureSearchTools },
-];
-
-/**
- * Registers all tool groups, applying inclusion and exclusion filters.
- *
- * @param filter An object with `include` and `exclude` arrays of tool group names or prefixes.
- */
-function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, filter: ToolFilter = { include: [], exclude: [] }) {
-  let toolsToConfigure = TOOL_GROUPS;
-
-  if (filter.include.length > 0) {
-    toolsToConfigure = TOOL_GROUPS.filter(({ group, prefix }) => filter.include.includes(group) || filter.include.includes(prefix));
-  }
-
-  if (filter.exclude.length > 0) {
-    toolsToConfigure = toolsToConfigure.filter(({ group, prefix }) => !filter.exclude.includes(group) && !filter.exclude.includes(prefix));
-  }
-
-  for (const { configure } of toolsToConfigure) {
-    configure(server, tokenProvider, connectionProvider);
+  for (const group of groupMap) {
+    if (includeTools.length > 0) {
+      if (includeTools.includes(group.name)) {
+        group.fn();
+      }
+    } else {
+      if (!excludeTools.includes(group.name)) {
+        group.fn();
+      }
+    }
   }
 }
 
