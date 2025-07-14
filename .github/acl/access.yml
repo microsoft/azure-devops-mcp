@@ -26,3 +26,5 @@ configuration:
       role: Write
     - member: polatengin
       role: Write
+    - memeber: mkonjikovac12
+      role: Write
