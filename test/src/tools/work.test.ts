@@ -146,6 +146,28 @@ describe("configureWorkTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No iterations found");
     });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
+      if (!call) throw new Error("work_list_team_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTeamIterations as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "fabrikam",
+        team: "Fabrikam Team",
+        timeframe: undefined,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTeamIterations).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching team iterations: Unknown error occurred");
+    });
   });
 
   describe("assign_iterations", () => {
@@ -267,6 +289,34 @@ describe("configureWorkTools", () => {
       expect(mockWorkApi.postTeamIteration).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No iterations were assigned to the team");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_assign_iterations");
+
+      if (!call) throw new Error("work_assign_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.postTeamIteration as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "Fabrikam",
+        team: "Fabrikam Team",
+        iterations: [
+          {
+            identifier: "a589a806-bf11-4d4f-a031-c19813331553",
+            path: "Fabrikam-Fiber\\Release 1\\Sprint 2",
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.postTeamIteration).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error assigning iterations: Unknown error occurred");
     });
   });
 
@@ -404,6 +454,92 @@ describe("configureWorkTools", () => {
       expect(mockWorkItemTrackingApi.createOrUpdateClassificationNode).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No iterations were created");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_create_iterations");
+
+      if (!call) throw new Error("work_create_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createOrUpdateClassificationNode as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "Fabrikam",
+        iterations: [
+          {
+            iterationName: "Sprint 2",
+            startDate: "2025-06-02T00:00:00Z",
+            finishDate: "2025-06-13T00:00:00Z",
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.createOrUpdateClassificationNode).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating iterations: Unknown error occurred");
+    });
+
+    it("should handle iterations without start and finish dates", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_create_iterations");
+
+      if (!call) throw new Error("work_create_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createOrUpdateClassificationNode as jest.Mock).mockResolvedValue({
+        id: 126391,
+        identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
+        name: "Sprint 3",
+        structureType: "iteration",
+        hasChildren: false,
+        path: "\\fabrikam\\fiber\\tfvc\\iteration",
+      });
+
+      const params = {
+        project: "Fabrikam",
+        iterations: [
+          {
+            iterationName: "Sprint 3",
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.createOrUpdateClassificationNode).toHaveBeenCalledWith(
+        {
+          name: "Sprint 3",
+          attributes: {
+            startDate: undefined,
+            finishDate: undefined,
+          },
+        },
+        "Fabrikam",
+        TreeStructureGroup.Iterations
+      );
+
+      expect(result.content[0].text).toBe(
+        JSON.stringify(
+          [
+            {
+              id: 126391,
+              identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
+              name: "Sprint 3",
+              structureType: "iteration",
+              hasChildren: false,
+              path: "\\fabrikam\\fiber\\tfvc\\iteration",
+            },
+          ],
+          null,
+          2
+        )
+      );
     });
   });
 });

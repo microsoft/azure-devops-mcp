@@ -16,16 +16,16 @@ import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/workitems.js";
 
-function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   configureCoreTools(server, tokenProvider, connectionProvider);
   configureWorkTools(server, tokenProvider, connectionProvider);
   configureBuildTools(server, tokenProvider, connectionProvider);
   configureRepoTools(server, tokenProvider, connectionProvider);
-  configureWorkItemTools(server, tokenProvider, connectionProvider);
+  configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureReleaseTools(server, tokenProvider, connectionProvider);
   configureWikiTools(server, tokenProvider, connectionProvider);
   configureTestPlanTools(server, tokenProvider, connectionProvider);
-  configureSearchTools(server, tokenProvider, connectionProvider);
+  configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureAdvSecTools(server, tokenProvider, connectionProvider);
 }
 
