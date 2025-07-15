@@ -104,7 +104,7 @@ The model should automatically use the `wit_get_work_items_batch_by_ids` tool to
 You need project, team and backlog (Epics, Stories, Features) context in order to get a list of all the work items in a backlog.
 
 ```plaintext
-get backlogs for Contoso project and Fabrikam Team
+get backlogs for Contoso project and Fabrikam team
 ```
 
 Once you have the backlog levels, you can then get work items for that backlog.
@@ -139,7 +139,7 @@ Assign this work item to myemail@outlook.com and add a comment "I will own this 
 
 📽️ [Azure DevOps MCP Server: Work with Work Items](https://youtu.be/tT7wqSIPKdA)
 
-### Create and Link Test Cases
+### Create and link test cases
 
 Open a user story and automatically generate test cases with detailed steps based on the story's description. Link the generated test cases back to the original user story.
 
@@ -170,3 +170,19 @@ List of work items for Stories backlog. But then go thru and find all the securi
 ```
 
 📽️ [Azure DevOps MCP Server: Triage Work](https://youtu.be/gCI_pPS76C8)
+
+### Adding and updating work items using the `format` paramater
+
+You can use the `format` paramater to indicate markdown formatting for large text fields. It is now available on the following tools:
+
+- **wit_update_work_items_batch**
+- **wit_add_child_work_items**
+- **wit_create_work_item**
+
+> 🚩 HTML is the default unless `Markdown` is explicity set.
+
+```plaintext
+Update work item 12345 with a new description and use Markdown text. Use Markdown format param. Use bulk update.
+```
+
+📽️ [Azure DevOps MCP Server: Using Markdown format for create and update work items](https://youtu.be/OD4c2m7Fj9U)
