@@ -28,7 +28,7 @@
 ## Project-Specific Issues
 
 1. **npm Authentication Issues for Remote Access**
-   If you encounter authentication errors while accessing the internal Codex-Deps feed (if using remote package):
+   If you encounter authentication errors:
    - Ensure you are logged in to Azure DevOps using the `az` CLI:
      ```pwsh
      az login
@@ -37,16 +37,10 @@
      ```pwsh
      npm config get registry
      ```
-     It should point to:
-     - `https://pkgs.dev.azure.com/mseng/_packaging/Codex-Deps/npm/registry/` if remote.
-     - `https://registry.npmjs.org/` if running it locally.
+     It should point to: `https://registry.npmjs.org/`
 
 2. **Dependency Installation Errors**
    If `npm install` fails, verify that you are using Node.js version 20 or higher. You can check your Node.js version with:
-
    ```pwsh
    node -v
    ```
-
-3. **Internal Feed Access**
-   If you cannot access the internal Codex-Deps feed, confirm that you have the necessary permissions and that your Azure DevOps organization is correctly configured in `mcp.json`.

@@ -37,7 +37,11 @@ const excludeTools = argv["exclude-tools"]?.split(",").map((t: string) => t.trim
 const orgUrl = "https://dev.azure.com/" + orgName;
 
 async function getAzureDevOpsToken(): Promise<AccessToken> {
-  process.env.AZURE_TOKEN_CREDENTIALS = "dev";
+  if (process.env.ADO_MCP_AZURE_TOKEN_CREDENTIALS) {
+    process.env.AZURE_TOKEN_CREDENTIALS = process.env.ADO_MCP_AZURE_TOKEN_CREDENTIALS;
+  } else {
+    process.env.AZURE_TOKEN_CREDENTIALS = "dev";
+  }
   const credential = new DefaultAzureCredential(); // CodeQL [SM05138] resolved by explicitly setting AZURE_TOKEN_CREDENTIALS
   const token = await credential.getToken("499b84ac-1321-427f-aa17-267ca6975798/.default");
   return token;

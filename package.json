@@ -46,7 +46,7 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.15.0",
+    "@modelcontextprotocol/inspector": "^0.16.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^22",
     "@types/yargs": "^17.0.33",

@@ -269,6 +269,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             });
           }
 
+          if (item.iterationPath && item.iterationPath.trim().length > 0) {
+            ops.push({
+              op: "add",
+              path: "/fields/System.IterationPath",
+              value: item.iterationPath,
+            });
+          }
+
           if (item.format && item.format === "Markdown") {
             ops.push({
               op: "add",
@@ -280,14 +288,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               op: "add",
               path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps",
               value: item.format,
-            });
-          }
-
-          if (item.iterationPath && item.iterationPath.trim().length > 0) {
-            ops.push({
-              op: "add",
-              path: "/fields/System.IterationPath",
-              value: item.iterationPath,
             });
           }
 
@@ -472,19 +472,38 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The type of work item to create, e.g., 'Task', 'Bug', etc."),
       fields: z
-        .record(z.string(), z.string())
-        .describe("A record of field names and values to set on the new work item. Each key is a field name, and each value is the corresponding value to set for that field."),
+        .array(
+          z.object({
+            name: z.string().describe("The name of the field, e.g., 'System.Title'."),
+            value: z.string().describe("The value of the field."),
+            format: z.enum(["Html", "Markdown"]).optional().describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Html'."),
+          })
+        )
+        .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
     },
     async ({ project, workItemType, fields }) => {
       try {
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
 
-        const document = Object.entries(fields).map(([key, value]) => ({
+        const document = fields.map(({ name, value }) => ({
           op: "add",
-          path: `/fields/${key}`,
-          value,
+          path: `/fields/${name}`,
+          value: value,
         }));
+
+        // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
+        // this should only happen for large text fields, but since we dont't know by field name, lets assume if the users
+        // passes a value longer than 50 characters, then we can set the format to Markdown
+        fields.forEach(({ name, value, format }) => {
+          if (value.length > 50 && format === "Markdown") {
+            document.push({
+              op: "add",
+              path: `/multilineFieldsFormat/${name}`,
+              value: "Markdown",
+            });
+          }
+        });
 
         const newWorkItem = await workItemApi.createWorkItem(null, document, project, workItemType);
 
@@ -562,6 +581,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             id: z.number().describe("The ID of the work item to update."),
             path: z.string().describe("The path of the field to update, e.g., '/fields/System.Title'."),
             value: z.string().describe("The new value for the field. This is required for 'add' and 'replace' operations, and should be omitted for 'remove' operations."),
+            format: z.enum(["Html", "Markdown"]).optional().describe("The format of the field value. Only to be used for large text fields. e.g., 'Html', 'Markdown'. Optional, defaults to 'Html'."),
           })
         )
         .describe("An array of updates to apply to work items. Each update should include the operation (op), work item ID (id), field path (path), and new value (value)."),
@@ -574,20 +594,34 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       // Extract unique IDs from the updates array
       const uniqueIds = Array.from(new Set(updates.map((update) => update.id)));
 
-      const body = uniqueIds.map((id) => ({
-        method: "PATCH",
-        uri: `/_apis/wit/workitems/${id}?api-version=${batchApiVersion}`,
-        headers: {
-          "Content-Type": "application/json-patch+json",
-        },
-        body: updates
-          .filter((update) => update.id === id)
-          .map(({ op, path, value }) => ({
-            op: op,
-            path: path,
-            value: value,
-          })),
-      }));
+      const body = uniqueIds.map((id) => {
+        const workItemUpdates = updates.filter((update) => update.id === id);
+        const operations = workItemUpdates.map(({ op, path, value }) => ({
+          op: op,
+          path: path,
+          value: value,
+        }));
+
+        // Add format operations for Markdown fields
+        workItemUpdates.forEach(({ path, value, format }) => {
+          if (format === "Markdown" && value && value.length > 50) {
+            operations.push({
+              op: "add",
+              path: `/multilineFieldsFormat${path.replace("/fields", "")}`,
+              value: "Markdown",
+            });
+          }
+        });
+
+        return {
+          method: "PATCH",
+          uri: `/_apis/wit/workitems/${id}?api-version=${batchApiVersion}`,
+          headers: {
+            "Content-Type": "application/json-patch+json",
+          },
+          body: operations,
+        };
+      });
 
       const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
         method: "PATCH",
