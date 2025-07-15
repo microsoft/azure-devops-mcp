@@ -594,25 +594,129 @@ describe("configureWorkItemTools", () => {
       if (!call) throw new Error("wit_create_work_item tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
 
       const params = {
         project: "Contoso",
         workItemType: "Task",
-        fields: ["System.Title", "Hello World!", "System.Description", "This is a sample task", "System.AreaPath", "Contoso\\Development"],
+        fields: [
+          { name: "System.Title", value: "Hello World!" },
+          { name: "System.Description", value: "This is a sample task" },
+          { name: "System.AreaPath", value: "Contoso\\Development" },
+        ],
       };
 
-      const document = Object.entries(params.fields).map(([key, value]) => ({
-        op: "add",
-        path: `/fields/${key}`,
-        value,
-      }));
+      const expectedDocument = [
+        { op: "add", path: "/fields/System.Title", value: "Hello World!" },
+        { op: "add", path: "/fields/System.Description", value: "This is a sample task" },
+        { op: "add", path: "/fields/System.AreaPath", value: "Contoso\\Development" },
+      ];
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(null, document, params.project, params.workItemType);
+      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(null, expectedDocument, params.project, params.workItemType);
 
-      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
+
+    it("should handle Markdown format for long fields", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
+
+      if (!call) throw new Error("wit_create_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      const longDescription = "This is a very long description that is definitely more than 50 characters long and should trigger Markdown formatting";
+
+      const params = {
+        project: "Contoso",
+        workItemType: "Task",
+        fields: [
+          { name: "System.Title", value: "Hello World!" },
+          { name: "System.Description", value: longDescription, format: "Markdown" },
+        ],
+      };
+
+      const expectedDocument = [
+        { op: "add", path: "/fields/System.Title", value: "Hello World!" },
+        { op: "add", path: "/fields/System.Description", value: longDescription },
+        { op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown" },
+      ];
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(null, expectedDocument, params.project, params.workItemType);
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
+
+    it("should handle null response from createWorkItem", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
+
+      if (!call) throw new Error("wit_create_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "Contoso",
+        workItemType: "Task",
+        fields: [{ name: "System.Title", value: "Test" }],
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Work item was not created");
+    });
+
+    it("should handle errors from createWorkItem", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
+
+      if (!call) throw new Error("wit_create_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockRejectedValue(new Error("API failure"));
+
+      const params = {
+        project: "Contoso",
+        workItemType: "Task",
+        fields: [{ name: "System.Title", value: "Test" }],
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating work item: API failure");
+    });
+
+    it("should handle unknown error types", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
+
+      if (!call) throw new Error("wit_create_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockRejectedValue("String error");
+
+      const params = {
+        project: "Contoso",
+        workItemType: "Task",
+        fields: [{ name: "System.Title", value: "Test" }],
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating work item: Unknown error occurred");
     });
   });
 
@@ -983,10 +1087,10 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         workItemType: "Task",
-        fields: {
-          "System.Title": "Test Task",
-          "System.Description": "Test Description",
-        },
+        fields: [
+          { name: "System.Title", value: "Test Task" },
+          { name: "System.Description", value: "Test Description" },
+        ],
       };
 
       const result = await handler(params);
@@ -1007,9 +1111,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         workItemType: "Task",
-        fields: {
-          "System.Title": "Test Task",
-        },
+        fields: [{ name: "System.Title", value: "Test Task" }],
       };
 
       const result = await handler(params);
@@ -1075,9 +1177,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         workItemType: "Task",
-        fields: {
-          "System.Title": "Test Task",
-        },
+        fields: [{ name: "System.Title", value: "Test Task" }],
       };
 
       const result = await handler(params);
