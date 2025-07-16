@@ -346,7 +346,7 @@ describe("configureWorkItemTools", () => {
   });
 
   describe("add_work_item_comment tool", () => {
-    it("should call workItemApi.addComment API with the correct parameters and return the expected result", async () => {
+    it("should call Add Work Item Comments API with the correct parameters and return the expected result with no format specified", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
@@ -354,7 +354,15 @@ describe("configureWorkItemTools", () => {
       if (!call) throw new Error("wit_add_work_item_comment tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.addComment as jest.Mock).mockResolvedValue([_mockWorkItemComment]);
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      // Mock fetch for the API call
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)),
+      });
+      global.fetch = mockFetch;
 
       const params = {
         comment: "hello world!",
@@ -364,9 +372,59 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.addComment).toHaveBeenCalledWith({ text: params.comment }, params.project, params.workItemId);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/Contoso/_apis/wit/workItems/299/comments?format=1&api-version=7.2-preview.4",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "Content-Type": "application/json",
+          }),
+        })
+      );
 
-      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemComment], null, 2));
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemComment));
+    });
+
+    it("should call Add Work Item Comments API with the correct parameters and return the expected result with markdown format", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
+
+      if (!call) throw new Error("wit_add_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      // Mock fetch for the API call
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        comment: "hello world!",
+        project: "Contoso",
+        workItemId: 299,
+        format: "markdown",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/Contoso/_apis/wit/workItems/299/comments?format=0&api-version=7.2-preview.4",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "Content-Type": "application/json",
+          }),
+        })
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemComment));
     });
   });
 
