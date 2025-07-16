@@ -524,9 +524,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       project: z.string().optional().describe("Project ID or project name (optional)"),
       filePath: z.string().optional().describe("The path of the file where the comment thread will be created. (optional)"),
       rightFileStartLine: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. Starts at 1. (optional)"),
-      rightFileStartOffset: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. The character offset of a thread's position inside of a line. Starts at 0. (optional)"),
-      rightFileEndLine: z.number().optional().describe("Position of last character of the thread's span in right file. The line number of a thread's position. Starts at 1. (optional)"),
-      rightFileEndOffset: z.number().optional().describe("Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Starts at 0. (optional)"),
+      rightFileStartOffset: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. The character offset of a thread's position inside of a line. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"),
+      rightFileEndLine: z.number().optional().describe("Position of last character of the thread's span in right file. The line number of a thread's position. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"),
+      rightFileEndOffset: z.number().optional().describe("Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must only be set if rightFileEndLine is also specified. (optional)"),
     },
     async ({ repositoryId, pullRequestId, content, project, filePath, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
       const connection = await connectionProvider();
@@ -535,11 +535,39 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       const threadContext: CommentThreadContext = { filePath: filePath };
 
       if (rightFileStartLine !== undefined) {
-        threadContext.rightFileStart = { line: rightFileStartLine, offset: rightFileStartOffset };
+        if(rightFileStartLine < 1) {
+          throw new Error("rightFileStartLine must be greater than or equal to 1.");
+        }
+
+        threadContext.rightFileStart = { line: rightFileStartLine };
+
+        if(rightFileStartOffset !== undefined) {
+          if(rightFileStartOffset < 1) {
+            throw new Error("rightFileStartOffset must be greater than or equal to 1.");
+          }
+
+          threadContext.rightFileStart.offset = rightFileStartOffset;
+        }
       }
 
       if (rightFileEndLine !== undefined) {
-        threadContext.rightFileEnd = { line: rightFileEndLine, offset: rightFileEndOffset };
+        if(rightFileStartLine === undefined) {
+          throw new Error("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
+        }
+
+        if(rightFileEndLine < 1) {
+          throw new Error("rightFileEndLine must be greater than or equal to 1.");
+        }
+
+        threadContext.rightFileEnd = { line: rightFileEndLine };
+
+        if(rightFileEndOffset !== undefined) {
+          if(rightFileEndOffset < 1) {
+            throw new Error("rightFileEndOffset must be greater than or equal to 1.");
+          }
+
+          threadContext.rightFileEnd.offset = rightFileEndOffset;
+        }
       }
 
       const thread = await gitApi.createThread({ comments: [{ content: content }], threadContext: threadContext }, repositoryId, pullRequestId, project);
