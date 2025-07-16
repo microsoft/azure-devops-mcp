@@ -382,13 +382,13 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
 
       const params = {
-        project: "Contoso",
+        projectId: "6bfde89e-b22e-422e-814a-e8db432f5a58",
         repositoryId: 12345,
         pullRequestId: 67890,
         workItemId: 131489,
       };
 
-      const artifactPathValue = `${params.project}/${params.repositoryId}/${params.pullRequestId}`;
+      const artifactPathValue = `${params.projectId}/${params.repositoryId}/${params.pullRequestId}`;
       const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
 
       const document = [
@@ -407,7 +407,7 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.project);
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.projectId);
 
       expect(result.content[0].text).toBe(
         JSON.stringify(
@@ -432,7 +432,7 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockRejectedValue(new Error("API failure"));
 
       const params = {
-        project: "Contoso",
+        projectId: "6bfde89e-b22e-422e-814a-e8db432f5a58",
         repositoryId: 12345,
         pullRequestId: 67890,
         workItemId: 131489,
@@ -443,7 +443,7 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toContain("API failure");
     });
 
-    it("should encode special characters in project and repositoryId for vstfsUrl", async () => {
+    it("should encode special characters in projectId and repositoryId for vstfsUrl", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
@@ -452,12 +452,12 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
 
       const params = {
-        project: "Contoso Project",
+        projectId: "6bfde89e-b22e-422e-814a-e8db432f5a58",
         repositoryId: "repo/with/slash",
         pullRequestId: 67890,
         workItemId: 131489,
       };
-      const artifactPathValue = `${params.project}/${params.repositoryId}/${params.pullRequestId}`;
+      const artifactPathValue = `${params.projectId}/${params.repositoryId}/${params.pullRequestId}`;
       const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
       const document = [
         {
@@ -473,7 +473,7 @@ describe("configureWorkItemTools", () => {
         },
       ];
       await handler(params);
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.project);
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.projectId);
     });
 
     it("should handle link_work_item_to_pull_request unknown error type", async () => {
@@ -487,7 +487,7 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockRejectedValue("String error");
 
       const params = {
-        project: "TestProject",
+        projectId: "6bfde89e-b22e-422e-814a-e8db432f5a58",
         repositoryId: "repo-123",
         pullRequestId: 42,
         workItemId: 1,

@@ -335,19 +335,19 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.link_work_item_to_pull_request,
     "Link a single work item to an existing pull request.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      projectId: z.string().describe("The project ID of the Azure DevOps project (note: project name is not valid)."),
       repositoryId: z.string().describe("The ID of the repository containing the pull request. Do not use the repository name here, use the ID instead."),
       pullRequestId: z.number().describe("The ID of the pull request to link to."),
       workItemId: z.number().describe("The ID of the work item to link to the pull request."),
     },
-    async ({ project, repositoryId, pullRequestId, workItemId }) => {
+    async ({ projectId, repositoryId, pullRequestId, workItemId }) => {
       try {
         const connection = await connectionProvider();
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         // Create artifact link relation using vstfs format
         // Format: vstfs:///Git/PullRequestId/{project}/{repositoryId}/{pullRequestId}
-        const artifactPathValue = `${project}/${repositoryId}/${pullRequestId}`;
+        const artifactPathValue = `${projectId}/${repositoryId}/${pullRequestId}`;
         const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
 
         // Use the PATCH document format for adding a relation
@@ -366,7 +366,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         ];
 
         // Use the WorkItem API to update the work item with the new relation
-        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, project);
+        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, projectId);
 
         if (!workItem) {
           return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
