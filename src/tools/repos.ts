@@ -209,8 +209,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
       status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
+      targetRefName: z.string().optional().describe("Filter pull requests by target branch name, e.g., 'refs/heads/main'. If not provided")
     },
-    async ({ repositoryId, top, skip, created_by_me, i_am_reviewer, status }) => {
+    async ({ repositoryId, top, skip, created_by_me, i_am_reviewer, status, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -220,6 +221,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         repositoryId: string;
         creatorId?: string;
         reviewerId?: string;
+        targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
         repositoryId: repositoryId,
@@ -234,6 +236,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         if (i_am_reviewer) {
           searchCriteria.reviewerId = userId;
         }
+      }
+      if (targetRefName !== null) {
+        searchCriteria.targetRefName = targetRefName;
       }
 
       const pullRequests = await gitApi.getPullRequests(
