@@ -4,6 +4,8 @@
 
 Thank you for your interest in contributing to the Azure DevOps MCP Server! Your participation—whether through discussions, reporting issues, or suggesting improvements—helps us make the project better for everyone.
 
+> 🚨 If you would like to contribute, please carefully follow the guidelines below. Pull requests that do not adhere to this process will be closed without review.
+
 ## 🏆 Expectations
 
 As noted in the `README.md`, we aim to keep the tools in this MCP Server simple and focused on specific scenarios. If you wish to contribute or suggest new tools, please keep this in mind. We do not plan to introduce complex tools that require extensive logic. Our goal is to provide a straightforward abstraction layer over the REST API to accomplish targeted tasks.
