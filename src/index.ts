@@ -4,7 +4,7 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { initTransport } from "./transport/initTransport.js";
 import * as azdev from "azure-devops-node-api";
 import { AccessToken, AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
 import yargs from "yargs";
@@ -86,7 +86,7 @@ async function main() {
 
   configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient(userAgentComposer), () => userAgentComposer.userAgent);
 
-  const transport = new StdioServerTransport();
+  const transport = await initTransport();
   await server.connect(transport);
 }
 
