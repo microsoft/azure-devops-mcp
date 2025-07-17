@@ -72,8 +72,8 @@ jobs:
       - name: Validate server startup via npx
         shell: pwsh
         run: |
-          $result = & npx mcp-server-azuredevops 2>&1
-          if ($result -notmatch "Usage: mcp-server-azuredevops <organization_name>") {
+          $result = & npx mcp-server-azuredevops 2>&1 | Out-String
+          if ($result -notmatch "Usage: mcp-server-azuredevops <organization>") {
             Write-Host "Expected usage message not found in output:"
             Write-Host $result
             exit 1
