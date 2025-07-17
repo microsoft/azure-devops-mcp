@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/microsoft-azure-devops-mcp-badge.png)](https://mseep.ai/app/microsoft-azure-devops-mcp)
+
 # ⭐ Azure DevOps MCP Server
 
 Easily install the Azure DevOps MCP Server for VS Code or VS Code Insiders:
