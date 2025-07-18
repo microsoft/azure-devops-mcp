@@ -44,5 +44,6 @@ module.exports = {
   moduleNameMapper: {
     "^(.+)/version\\.js$": "$1/version.ts",
     "^(.+)/utils\\.js$": "$1/utils.ts",
+    "^(.+)/auth\\.js$": "$1/auth.ts",
   },
 };
