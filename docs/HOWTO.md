@@ -18,33 +18,6 @@ Here is an example modification you can add to your existing `.github/copilot-in
 When getting work items using MCP Server for Azure DevOps, always try to use batch tools for updates instead of many individual single updates. For updates, try and update up to 200 updates in a single batch. When getting work items, once you get the list of IDs, use the tool `get_work_items_batch_by_ids` to get the work item details. By default, show fields ID, Type, Title, State. Show work item results in a rendered markdown table.
 ```
 
-## Sequential Thinking
-
-The [Sequential Thinking](https://mcp.so/server/sequentialthinking) component helps break down complex problems into manageable steps, enabling the LLM to better understand your goals. If you encounter issues with the LLM's responses, consider adding the Sequential Thinking MCP Server to your `.vscode/mcp.json` file:
-
-```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}"]
-    },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-    }
-  }
-}
-```
-
 ## 🎯 Different Models
 
 Communicating with the LLM is both an art and a science. If the model does not respond well, switching to a different model may improve your results.
@@ -186,3 +159,15 @@ Update work item 12345 with a new description and use Markdown text. Use Markdow
 ```
 
 📽️ [Azure DevOps MCP Server: Using Markdown format for create and update work items](https://youtu.be/OD4c2m7Fj9U)
+
+## 🤖 Setup MCP Server with Claude Code
+
+See https://docs.anthropic.com/en/docs/claude-code/mcp for general guidance on adding MCP Server to Claude Code experience.
+
+For the Azure DevOps MCP Server, use the following command:
+
+```
+claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
+```
+
+Replace `Contoso` with your own organization name
