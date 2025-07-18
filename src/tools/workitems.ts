@@ -682,10 +682,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             id: z.number().describe("The ID of the work item to update."),
             linkToId: z.number().describe("The ID of the work item to link to."),
             type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "references"])
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
               .default("related")
               .describe(
-                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', 'referenced by', and 'references'. Defaults to 'related'."
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
               ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
