@@ -60,7 +60,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: StageUpdateType.Retry,
+        status: StageUpdateType.Retry.toString(),
         forceRetryAllJobs: true,
       };
 
@@ -103,7 +103,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 999,
         stageName: "NonExistentStage",
-        status: StageUpdateType.Retry,
+        status: StageUpdateType.Retry.toString(),
         forceRetryAllJobs: false,
       };
 
@@ -140,7 +140,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: StageUpdateType.Retry,
+        status: StageUpdateType.Retry.toString(),
         forceRetryAllJobs: false,
       };
 
@@ -173,7 +173,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: StageUpdateType.Retry,
+        status: StageUpdateType.Retry.toString(),
         forceRetryAllJobs: false,
       };
 
@@ -202,7 +202,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Deploy",
-        status: StageUpdateType.Cancel,
+        status: StageUpdateType.Cancel.toString(),
         forceRetryAllJobs: false,
       };
 

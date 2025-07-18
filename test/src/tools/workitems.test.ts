@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/workitems";
 import { WebApi } from "azure-devops-node-api";
+import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import {
   _mockBacklogs,
   _mockQuery,
@@ -792,7 +793,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "Contoso",
         query: "342f0f44-4069-46b1-a940-3d0468979ceb",
-        expand: "none",
+        expand: "None",
         depth: 1,
         includeDeleted: false,
         useIsoDateFormat: false,
@@ -800,7 +801,7 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(params.project, params.query, params.expand, params.depth, params.includeDeleted, params.useIsoDateFormat);
+      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(params.project, params.query, QueryExpand.None, params.depth, params.includeDeleted, params.useIsoDateFormat);
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockQuery], null, 2));
     });
