@@ -147,10 +147,10 @@ For the best experience, use Visual Studio Code and GitHub Copilot.
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
+3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) (Optional)
 4. Open VS Code in an empty folder
 
-### Azure Login
+### Azure Login (If using Azure CLI)
 
 Ensure you are logged in to Azure DevOps via the Azure CLI:
 
@@ -257,10 +257,10 @@ For the best experience, use Visual Studio Code and GitHub Copilot 👆.
 ### Prerequisites
 
 1. Install [VS Studio 2022 version 17.14](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history) or later
-2. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
+2. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) (Optional)
 3. Open a project in Visual Studio.
 
-### Azure Login
+### Azure Login (If using Azure CLI)
 
 Ensure you are logged in to Azure DevOps via the Azure CLI:
 
