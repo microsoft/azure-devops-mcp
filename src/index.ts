@@ -6,7 +6,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as azdev from "azure-devops-node-api";
-import { AccessToken, AzureCliCredential, DefaultAzureCredential, InteractiveBrowserCredential} from "@azure/identity";
+import { AccessToken, AzureCliCredential, DefaultAzureCredential, InteractiveBrowserCredential } from "@azure/identity";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -44,10 +44,10 @@ async function getAzureDevOpsToken(): Promise<AccessToken> {
   } else {
     process.env.AZURE_TOKEN_CREDENTIALS = "dev";
   }
-  
+
   const scope = "499b84ac-1321-427f-aa17-267ca6975798/.default";
   const errors: string[] = [];
-  
+
   // Try Azure CLI credential if tenantId is provided
   if (tenantId) {
     try {
@@ -71,12 +71,12 @@ async function getAzureDevOpsToken(): Promise<AccessToken> {
   } catch (error) {
     errors.push(`DefaultAzureCredential failed: ${error}`);
   }
-    
+
   // Try InteractiveBrowserCredential as final fallback
   try {
     const interactiveBrowserCredential = new InteractiveBrowserCredential({ tenantId });
     const token = await interactiveBrowserCredential.getToken(scope, {
-      requestOptions: { timeout: 60000 } // 1 minute timeout for interactive authentication
+      requestOptions: { timeout: 60000 }, // 1 minute timeout for interactive authentication
     });
     if (token) {
       return token;
@@ -86,7 +86,9 @@ async function getAzureDevOpsToken(): Promise<AccessToken> {
   }
 
   // If all credentials failed, throw an error with details
-  throw new Error(`Failed to obtain Azure DevOps token. All authentication methods failed:\n${errors.join('\n')}\n\nTroubleshooting steps:\n1. Install Azure CLI and run 'az login'\n2. Set environment variables for service principal authentication\n3. Ensure you have access to Azure DevOps with the specified tenant`);
+  throw new Error(
+    `Failed to obtain Azure DevOps token. All authentication methods failed:\n${errors.join("\n")}\n\nTroubleshooting steps:\n1. Install Azure CLI and run 'az login'\n2. Set environment variables for service principal authentication\n3. Ensure you have access to Azure DevOps with the specified tenant`
+  );
 }
 
 function getAzureDevOpsClient(userAgentComposer: UserAgentComposer): () => Promise<azdev.WebApi> {
