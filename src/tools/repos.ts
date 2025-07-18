@@ -13,10 +13,12 @@ import {
   GitPullRequestQuery,
   GitPullRequestQueryInput,
   GitPullRequestQueryType,
+  CommentThreadContext,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
+import { th } from "zod/v4/locales";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -33,6 +35,7 @@ const REPO_TOOLS = {
   update_pull_request_status: "repo_update_pull_request_status",
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
+  create_pull_request_thread: "repo_create_pull_request_thread",
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
@@ -507,6 +510,70 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
       return {
         content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.create_pull_request_thread,
+    "Creates a new comment thread on a pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
+      content: z.string().describe("The content of the comment to be added."),
+      project: z.string().optional().describe("Project ID or project name (optional)"),
+      filePath: z.string().optional().describe("The path of the file where the comment thread will be created. (optional)"),
+      rightFileStartLine: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. Starts at 1. (optional)"),
+      rightFileStartOffset: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. The character offset of a thread's position inside of a line. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"),
+      rightFileEndLine: z.number().optional().describe("Position of last character of the thread's span in right file. The line number of a thread's position. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"),
+      rightFileEndOffset: z.number().optional().describe("Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must only be set if rightFileEndLine is also specified. (optional)"),
+    },
+    async ({ repositoryId, pullRequestId, content, project, filePath, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      const threadContext: CommentThreadContext = { filePath: filePath };
+
+      if (rightFileStartLine !== undefined) {
+        if(rightFileStartLine < 1) {
+          throw new Error("rightFileStartLine must be greater than or equal to 1.");
+        }
+
+        threadContext.rightFileStart = { line: rightFileStartLine };
+
+        if(rightFileStartOffset !== undefined) {
+          if(rightFileStartOffset < 1) {
+            throw new Error("rightFileStartOffset must be greater than or equal to 1.");
+          }
+
+          threadContext.rightFileStart.offset = rightFileStartOffset;
+        }
+      }
+
+      if (rightFileEndLine !== undefined) {
+        if(rightFileStartLine === undefined) {
+          throw new Error("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
+        }
+
+        if(rightFileEndLine < 1) {
+          throw new Error("rightFileEndLine must be greater than or equal to 1.");
+        }
+
+        threadContext.rightFileEnd = { line: rightFileEndLine };
+
+        if(rightFileEndOffset !== undefined) {
+          if(rightFileEndOffset < 1) {
+            throw new Error("rightFileEndOffset must be greater than or equal to 1.");
+          }
+
+          threadContext.rightFileEnd.offset = rightFileEndOffset;
+        }
+      }
+
+      const thread = await gitApi.createThread({ comments: [{ content: content }], threadContext: threadContext }, repositoryId, pullRequestId, project);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
       };
     }
   );
