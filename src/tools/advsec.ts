@@ -139,7 +139,7 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<Ac
         .optional()
         .describe("Filter alerts by validity status. Only applicable for secret alerts."),
       top: z.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
-      orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("id").describe("Order results by specified field. Defaults to 'id'."),
+      orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("severity").describe("Order results by specified field. Defaults to 'severity'."),
       continuationToken: z.string().optional().describe("Continuation token for pagination."),
     },
     async ({ project, repository, alertType, states, severities, ruleId, ruleName, toolName, ref, onlyDefaultBranch, confidenceLevels, validity, top, orderBy, continuationToken }) => {
