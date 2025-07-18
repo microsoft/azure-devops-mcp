@@ -6,7 +6,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as azdev from "azure-devops-node-api";
-import { AccessToken, AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
+import { AccessToken, AzureCliCredential, DefaultAzureCredential, InteractiveBrowserCredential} from "@azure/identity";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -44,18 +44,49 @@ async function getAzureDevOpsToken(): Promise<AccessToken> {
   } else {
     process.env.AZURE_TOKEN_CREDENTIALS = "dev";
   }
-  let credential: TokenCredential = new DefaultAzureCredential(); // CodeQL [SM05138] resolved by explicitly setting AZURE_TOKEN_CREDENTIALS
+  
+  const scope = "499b84ac-1321-427f-aa17-267ca6975798/.default";
+  const errors: string[] = [];
+  
+  // Try Azure CLI credential if tenantId is provided
   if (tenantId) {
-    // Use Azure CLI credential if tenantId is provided for multi-tenant scenarios
-    const azureCliCredential = new AzureCliCredential({ tenantId });
-    credential = new ChainedTokenCredential(azureCliCredential, credential);
+    try {
+      const azureCliCredential = new AzureCliCredential({ tenantId });
+      const token = await azureCliCredential.getToken(scope);
+      if (token) {
+        return token;
+      }
+    } catch (error) {
+      errors.push(`AzureCliCredential failed: ${error}`);
+    }
   }
 
-  const token = await credential.getToken("499b84ac-1321-427f-aa17-267ca6975798/.default");
-  if (!token) {
-    throw new Error("Failed to obtain Azure DevOps token. Ensure you have Azure CLI logged in or another token source setup correctly.");
+  // Try DefaultAzureCredential first (includes managed identity, environment variables, etc.)
+  try {
+    const defaultCredential = new DefaultAzureCredential(); // CodeQL [SM05138] resolved by explicitly setting AZURE_TOKEN_CREDENTIALS
+    const token = await defaultCredential.getToken(scope);
+    if (token) {
+      return token;
+    }
+  } catch (error) {
+    errors.push(`DefaultAzureCredential failed: ${error}`);
   }
-  return token;
+    
+  // Try InteractiveBrowserCredential as final fallback
+  try {
+    const interactiveBrowserCredential = new InteractiveBrowserCredential({ tenantId });
+    const token = await interactiveBrowserCredential.getToken(scope, {
+      requestOptions: { timeout: 60000 } // 1 minute timeout for interactive authentication
+    });
+    if (token) {
+      return token;
+    }
+  } catch (error) {
+    errors.push(`InteractiveBrowserCredential failed: ${error}`);
+  }
+
+  // If all credentials failed, throw an error with details
+  throw new Error(`Failed to obtain Azure DevOps token. All authentication methods failed:\n${errors.join('\n')}\n\nTroubleshooting steps:\n1. Install Azure CLI and run 'az login'\n2. Set environment variables for service principal authentication\n3. Ensure you have access to Azure DevOps with the specified tenant`);
 }
 
 function getAzureDevOpsClient(userAgentComposer: UserAgentComposer): () => Promise<azdev.WebApi> {
