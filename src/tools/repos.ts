@@ -31,6 +31,7 @@ const REPO_TOOLS = {
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",
   update_pull_request_status: "repo_update_pull_request_status",
+  update_pull_request_description: "repo_update_pull_request_description",
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
@@ -121,6 +122,26 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       const statusValue = status === "active" ? 3 : 2;
 
       const updatedPullRequest = await gitApi.updatePullRequest({ status: statusValue }, repositoryId, pullRequestId);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.update_pull_request_description,
+    "Update the description of an existing pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
+      pullRequestId: z.number().describe("The ID of the pull request to update."),
+      description: z.string().describe("The new description for the pull request."),
+    },
+    async ({ repositoryId, pullRequestId, description }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      const updatedPullRequest = await gitApi.updatePullRequest({ description }, repositoryId, pullRequestId);
 
       return {
         content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
