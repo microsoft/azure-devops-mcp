@@ -26,7 +26,7 @@
     "build": "tsc && shx chmod +x dist/*.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
-    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "inspect": "ALLOWED_ORIGINS=http://127.0.0.1:6274 npx @modelcontextprotocol/inspector node dist/index.js",
     "start": "node -r tsconfig-paths/register dist/index.js",
     "eslint": "eslint",
     "eslint-fix": "eslint --fix",
