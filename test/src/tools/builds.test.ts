@@ -60,7 +60,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: "Retry" as keyof typeof StageUpdateType,
+        status: "Retry",
         forceRetryAllJobs: true,
       };
 
@@ -103,7 +103,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 999,
         stageName: "NonExistentStage",
-        status: "Retry" as keyof typeof StageUpdateType,
+        status: "Retry",
         forceRetryAllJobs: false,
       };
 
@@ -140,7 +140,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: "Retry" as keyof typeof StageUpdateType,
+        status: "Retry",
         forceRetryAllJobs: false,
       };
 
@@ -173,7 +173,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: "Retry" as keyof typeof StageUpdateType,
+        status: "Retry",
         forceRetryAllJobs: false,
       };
 
@@ -202,7 +202,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Deploy",
-        status: "Cancel" as keyof typeof StageUpdateType,
+        status: "Cancel",
         forceRetryAllJobs: false,
       };
 
