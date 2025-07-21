@@ -49,7 +49,7 @@
     "@modelcontextprotocol/inspector": "^0.16.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^22",
-    "eslint-config-prettier": "10.1.5",
+    "eslint-config-prettier": "10.1.8",
     "eslint-plugin-header": "^3.1.1",
     "jest": "^30.0.2",
     "jest-extended": "^6.0.0",
