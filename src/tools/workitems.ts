@@ -8,7 +8,7 @@ import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackin
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { Operation } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys } from "../utils.js";
+import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 
 /**
  * Converts Operation enum key to lowercase string for API usage
@@ -582,7 +582,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
 
-      const queryDetails = await workItemApi.getQuery(project, query, expand ? QueryExpand[expand as keyof typeof QueryExpand] : undefined, depth, includeDeleted, useIsoDateFormat);
+      const queryDetails = await workItemApi.getQuery(project, query, safeEnumConvert(QueryExpand, expand), depth, includeDeleted, useIsoDateFormat);
 
       return {
         content: [{ type: "text", text: JSON.stringify(queryDetails, null, 2) }],
