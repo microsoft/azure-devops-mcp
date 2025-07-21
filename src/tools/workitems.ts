@@ -36,7 +36,6 @@ const WORKITEM_TOOLS = {
   get_query: "wit_get_query",
   get_query_results_by_id: "wit_get_query_results_by_id",
   update_work_items_batch: "wit_update_work_items_batch",
-  close_and_link_workitem_duplicates: "wit_close_and_link_workitem_duplicates",
   work_items_link: "wit_work_items_link",
 };
 
@@ -742,65 +741,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       }));
 
       const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${accessToken.token}`,
-          "Content-Type": "application/json",
-          "User-Agent": userAgentProvider(),
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update work items in batch: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    }
-  );
-
-  server.tool(
-    WORKITEM_TOOLS.close_and_link_workitem_duplicates,
-    "Close duplicate work items by id.",
-    {
-      id: z.number().describe("The ID of the work item to close and link duplicates to."),
-      duplicateIds: z.array(z.number()).describe("An array of IDs of the duplicate work items to close and link to the specified work item."),
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      state: z.string().default("Removed").describe("The state to set for the duplicate work items. Defaults to 'Removed'."),
-    },
-    async ({ id, duplicateIds, project, state }) => {
-      const connection = await connectionProvider();
-
-      const body = duplicateIds.map((duplicateId) => ({
-        method: "PATCH",
-        uri: `/_apis/wit/workitems/${duplicateId}?api-version=${batchApiVersion}`,
-        headers: {
-          "Content-Type": "application/json-patch+json",
-        },
-        body: [
-          {
-            op: "add",
-            path: "/fields/System.State",
-            value: `${state}`,
-          },
-          {
-            op: "add",
-            path: "/relations/-",
-            value: {
-              rel: "System.LinkTypes.Duplicate-Reverse",
-              url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${id}`,
-            },
-          },
-        ],
-      }));
-
-      const accessToken = await tokenProvider();
-
-      const response = await fetch(`${connection.serverUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
