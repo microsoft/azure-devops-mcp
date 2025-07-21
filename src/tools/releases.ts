@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { ReleaseDefinitionExpands, ReleaseDefinitionQueryOrder, ReleaseExpands, ReleaseStatus, ReleaseQueryOrder } from "azure-devops-node-api/interfaces/ReleaseInterfaces.js";
 import { z } from "zod";
-import { getEnumKeys } from "../utils.js";
+import { getEnumKeys, safeEnumConvert } from "../utils.js";
 
 const RELEASE_TOOLS = {
   get_release_definitions: "release_get_definitions",
@@ -62,12 +62,12 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
       const releaseDefinitions = await releaseApi.getReleaseDefinitions(
         project,
         searchText,
-        expand ? ReleaseDefinitionExpands[expand as keyof typeof ReleaseDefinitionExpands] : undefined,
+        safeEnumConvert(ReleaseDefinitionExpands, expand),
         artifactType,
         artifactSourceId,
         top,
         continuationToken,
-        queryOrder ? ReleaseDefinitionQueryOrder[queryOrder as keyof typeof ReleaseDefinitionQueryOrder] : undefined,
+        safeEnumConvert(ReleaseDefinitionQueryOrder, queryOrder),
         path,
         isExactNameMatch,
         tagFilter,
@@ -166,14 +166,14 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
         definitionEnvironmentId,
         searchText,
         createdBy,
-        statusFilter ? ReleaseStatus[statusFilter as keyof typeof ReleaseStatus] : undefined,
+        safeEnumConvert(ReleaseStatus, statusFilter),
         environmentStatusFilter,
         minCreatedTime,
         maxCreatedTime,
-        queryOrder ? ReleaseQueryOrder[queryOrder as keyof typeof ReleaseQueryOrder] : undefined,
+        safeEnumConvert(ReleaseQueryOrder, queryOrder),
         top,
         continuationToken,
-        expand ? ReleaseExpands[expand as keyof typeof ReleaseExpands] : undefined,
+        safeEnumConvert(ReleaseExpands, expand),
         artifactTypeId,
         sourceId,
         artifactVersionId,

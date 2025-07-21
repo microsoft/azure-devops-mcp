@@ -60,7 +60,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: StageUpdateType.Retry.toString(),
+        status: "Retry" as keyof typeof StageUpdateType,
         forceRetryAllJobs: true,
       };
 
@@ -103,7 +103,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 999,
         stageName: "NonExistentStage",
-        status: StageUpdateType.Retry.toString(),
+        status: "Retry" as keyof typeof StageUpdateType,
         forceRetryAllJobs: false,
       };
 
@@ -140,7 +140,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: StageUpdateType.Retry.toString(),
+        status: "Retry" as keyof typeof StageUpdateType,
         forceRetryAllJobs: false,
       };
 
@@ -173,7 +173,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Build",
-        status: StageUpdateType.Retry.toString(),
+        status: "Retry" as keyof typeof StageUpdateType,
         forceRetryAllJobs: false,
       };
 
@@ -202,7 +202,7 @@ describe("configureBuildTools", () => {
         project: "test-project",
         buildId: 123,
         stageName: "Deploy",
-        status: StageUpdateType.Cancel.toString(),
+        status: "Cancel" as keyof typeof StageUpdateType,
         forceRetryAllJobs: false,
       };
 

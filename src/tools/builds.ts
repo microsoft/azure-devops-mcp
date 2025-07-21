@@ -3,7 +3,7 @@
 
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiVersion, getEnumKeys } from "../utils.js";
+import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
@@ -73,7 +73,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
         name,
         repositoryId,
         repositoryType,
-        queryOrder ? DefinitionQueryOrder[queryOrder as keyof typeof DefinitionQueryOrder] : undefined,
+        safeEnumConvert(DefinitionQueryOrder, queryOrder),
         top,
         continuationToken,
         minMetricsTime,
@@ -184,7 +184,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
         continuationToken,
         maxBuildsPerDefinition,
         deletedFilter,
-        queryOrder ? BuildQueryOrder[queryOrder as keyof typeof BuildQueryOrder] : undefined,
+        safeEnumConvert(BuildQueryOrder, queryOrder),
         branchName,
         buildIds,
         repositoryId,
@@ -332,7 +332,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
 
       const body = {
         forceRetryAllJobs: forceRetryAllJobs,
-        state: StageUpdateType[StageUpdateType[status as keyof typeof StageUpdateType] as unknown as keyof typeof StageUpdateType],
+        state: safeEnumConvert(StageUpdateType, status),
       };
 
       const response = await fetch(endpoint, {
