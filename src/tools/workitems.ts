@@ -60,6 +60,10 @@ function getLinkTypeFromName(name: string) {
       return "Microsoft.VSTS.Common.TestedBy-Forward";
     case "tests":
       return "Microsoft.VSTS.Common.TestedBy-Reverse";
+    case "affects":
+      return "Microsoft.VSTS.Common.Affects-Forward";
+    case "affected by":
+      return "Microsoft.VSTS.Common.Affects-Reverse";
     default:
       throw new Error(`Unknown link type: ${name}`);
   }
@@ -698,10 +702,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             id: z.number().describe("The ID of the work item to update."),
             linkToId: z.number().describe("The ID of the work item to link to."),
             type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests"])
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
               .default("related")
               .describe(
-                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'referenced by', and 'references'. Defaults to 'related'."
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
               ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
