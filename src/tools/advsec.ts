@@ -133,7 +133,8 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<Ac
       confidenceLevels: z
         .array(z.enum(["high", "other"]))
         .optional()
-        .describe("Filter alerts by confidence levels. Only applicable for secret alerts."),
+        .default(["high", "other"])
+        .describe("Filter alerts by confidence levels. Only applicable for secret alerts. Defaults to both 'high' and 'other'."),
       validity: z
         .array(z.enum(["active", "inactive", "none", "unknown"]))
         .optional()
