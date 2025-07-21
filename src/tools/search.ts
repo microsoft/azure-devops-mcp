@@ -28,10 +28,10 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
       path: z.array(z.string()).optional().describe("Filter by paths"),
       branch: z.array(z.string()).optional().describe("Filter by branches"),
       includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
-      $skip: z.number().default(0).describe("Number of results to skip"),
-      $top: z.number().default(5).describe("Maximum number of results to return"),
+      skip: z.number().default(0).describe("Number of results to skip"),
+      top: z.number().default(5).describe("Maximum number of results to return"),
     },
-    async ({ searchText, project, repository, path, branch, includeFacets, $skip, $top }) => {
+    async ({ searchText, project, repository, path, branch, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const connection = await connectionProvider();
       const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
@@ -39,8 +39,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
       const requestBody: Record<string, unknown> = {
         searchText,
         includeFacets,
-        $skip,
-        $top,
+        $skip: skip,
+        $top: top,
       };
 
       const filters: Record<string, string[]> = {};
@@ -87,18 +87,18 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
       project: z.array(z.string()).optional().describe("Filter by projects"),
       wiki: z.array(z.string()).optional().describe("Filter by wiki names"),
       includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
-      $skip: z.number().default(0).describe("Number of results to skip"),
-      $top: z.number().default(10).describe("Maximum number of results to return"),
+      skip: z.number().default(0).describe("Number of results to skip"),
+      top: z.number().default(10).describe("Maximum number of results to return"),
     },
-    async ({ searchText, project, wiki, includeFacets, $skip, $top }) => {
+    async ({ searchText, project, wiki, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/wikisearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
         includeFacets,
-        $skip,
-        $top,
+        $skip: skip,
+        $top: top,
       };
 
       const filters: Record<string, string[]> = {};
@@ -141,18 +141,18 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
       state: z.array(z.string()).optional().describe("Filter by work item states"),
       assignedTo: z.array(z.string()).optional().describe("Filter by assigned to users"),
       includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
-      $skip: z.number().default(0).describe("Number of results to skip for pagination"),
-      $top: z.number().default(10).describe("Number of results to return"),
+      skip: z.number().default(0).describe("Number of results to skip for pagination"),
+      top: z.number().default(10).describe("Number of results to return"),
     },
-    async ({ searchText, project, areaPath, workItemType, state, assignedTo, includeFacets, $skip, $top }) => {
+    async ({ searchText, project, areaPath, workItemType, state, assignedTo, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
         includeFacets,
-        $skip,
-        $top,
+        $skip: skip,
+        $top: top,
       };
 
       const filters: Record<string, unknown> = {};
