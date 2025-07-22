@@ -556,7 +556,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       );
 
       // Check if the thread was successfully resolved
-      if (!thread || !thread.id || thread.status !== 2) {
+      if (!thread) {
         return {
           content: [{ type: "text", text: `Error: Failed to resolve thread ${threadId}. The thread status was not updated successfully.` }],
           isError: true,
