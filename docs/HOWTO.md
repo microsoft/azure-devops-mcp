@@ -188,11 +188,7 @@ To integrate the Azure DevOps MCP Server with Cursor, create a `.cursor\mcp.json
   "mcpServers": {
     "ado": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "Contoso"
-      ]
+      "args": ["-y", "@azure-devops/mcp", "Contoso"]
     }
   }
 }
