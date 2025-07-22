@@ -516,6 +516,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       const gitApi = await connection.getGitApi();
       const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
 
+      // Check if the comment was successfully created
+      if (!comment || !comment.id || comment.isDeleted) {
+        return {
+          content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }],
+          isError: true,
+        };
+      }
+
       if (fullResponse) {
         return {
           content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
@@ -546,6 +554,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         pullRequestId,
         threadId
       );
+
+      // Check if the thread was successfully resolved
+      if (!thread || !thread.id || thread.status !== 2) {
+        return {
+          content: [{ type: "text", text: `Error: Failed to resolve thread ${threadId}. The thread status was not updated successfully.` }],
+          isError: true,
+        };
+      }
 
       if (fullResponse) {
         return {
