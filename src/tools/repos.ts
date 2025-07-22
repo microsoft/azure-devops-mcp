@@ -517,7 +517,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
 
       // Check if the comment was successfully created
-      if (!comment || !comment.id || comment.isDeleted) {
+      if (!comment) {
         return {
           content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }],
           isError: true,
