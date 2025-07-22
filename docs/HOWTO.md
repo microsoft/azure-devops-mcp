@@ -1,9 +1,9 @@
 Before you get started, ensure you follow the steps in the `README.md` file. This will help you get up and running and connected to your Azure DevOps organization.
 
 [🥇 How to make your experience better](#-how-to-make-your-experience-better)<br/>
-[🚗 Using MCP Server in Visual Studio Code](#-using-mcp-server-in-visual-studio-code)<br/>
-[🤖 Using MCP Server with Claude Code](#-setup-mcp-server-with-claude-code)<br/>
-[🍇 Using MCP Server in Cursor](#-using-mcp-server-in-cursor)<br/>
+[🚗 Using MCP Server with Visual Studio Code](#-using-mcp-server-with-visual-studio-code)<br/>
+[🤖 Using MCP Server with Claude Code](#-using-mcp-server-with-claude-code)<br/>
+[🍇 Using MCP Server with Cursor](#-using-mcp-server-with-cursor)<br/>
 
 # 🥇 How to make your experience better
 
@@ -29,7 +29,7 @@ When getting work items using MCP Server for Azure DevOps, always try to use bat
 
 Communicating with the LLM is both an art and a science. If the model does not respond well, switching to a different model may improve your results.
 
-# 🚗 Using MCP Server in Visual Studio Code
+# 🚗 Using MCP Server with Visual Studio Code
 
 ### Start the Azure DevOps MCP Server
 
@@ -167,7 +167,7 @@ Update work item 12345 with a new description and use Markdown text. Use Markdow
 
 📽️ [Azure DevOps MCP Server: Using Markdown format for create and update work items](https://youtu.be/OD4c2m7Fj9U)
 
-# 🤖 Setup MCP Server with Claude Code
+# 🤖 Using MCP Server with Claude Code
 
 See https://docs.anthropic.com/en/docs/claude-code/mcp for general guidance on adding MCP Server to Claude Code experience.
 
@@ -179,7 +179,7 @@ claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
 
 Replace `Contoso` with your own organization name
 
-# 🍇 Using MCP Server in Cursor
+# 🍇 Using MCP Server with Cursor
 
 To integrate the Azure DevOps MCP Server with Cursor, create a `.cursor\mcp.json` file and add your Azure DevOps organization to the `mcpServers` list.
 
