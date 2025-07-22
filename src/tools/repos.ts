@@ -17,6 +17,7 @@ import {
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
+import { getEnumKeys } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -31,6 +32,7 @@ const REPO_TOOLS = {
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",
   update_pull_request_status: "repo_update_pull_request_status",
+  update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
@@ -69,15 +71,15 @@ function trimComments(comments: any[] | undefined | null) {
 
 function pullRequestStatusStringToInt(status: string): number {
   switch (status) {
-    case "abandoned":
+    case "Abandoned":
       return PullRequestStatus.Abandoned.valueOf();
-    case "active":
+    case "Active":
       return PullRequestStatus.Active.valueOf();
-    case "all":
+    case "All":
       return PullRequestStatus.All.valueOf();
-    case "completed":
+    case "Completed":
       return PullRequestStatus.Completed.valueOf();
-    case "notSet":
+    case "NotSet":
       return PullRequestStatus.NotSet.valueOf();
     default:
       throw new Error(`Unknown pull request status: ${status}`);
@@ -133,18 +135,54 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
       pullRequestId: z.number().describe("The ID of the pull request to be published."),
-      status: z.enum(["active", "abandoned"]).describe("The new status of the pull request. Can be 'active' or 'abandoned'."),
+      status: z.enum(["Active", "Abandoned"]).describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
     },
     async ({ repositoryId, pullRequestId, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const statusValue = status === "active" ? 3 : 2;
+      const statusValue = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
 
       const updatedPullRequest = await gitApi.updatePullRequest({ status: statusValue }, repositoryId, pullRequestId);
 
       return {
         content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
       };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.update_pull_request_reviewers,
+    "Add or remove reviewers for an existing pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
+      pullRequestId: z.number().describe("The ID of the pull request to update."),
+      reviewerIds: z.array(z.string()).describe("List of reviewer ids to add or remove from the pull request."),
+      action: z.enum(["add", "remove"]).describe("Action to perform on the reviewers. Can be 'add' or 'remove'."),
+    },
+    async ({ repositoryId, pullRequestId, reviewerIds, action }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      let updatedPullRequest;
+      if (action === "add") {
+        updatedPullRequest = await gitApi.createPullRequestReviewers(
+          reviewerIds.map((id) => ({ id: id })),
+          repositoryId,
+          pullRequestId
+        );
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+        };
+      } else {
+        for (const reviewerId of reviewerIds) {
+          await gitApi.deletePullRequestReviewer(repositoryId, pullRequestId, reviewerId);
+        }
+
+        return {
+          content: [{ type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` }],
+        };
+      }
     }
   );
 
@@ -192,7 +230,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
+      status: z
+        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
+        .default("Active")
+        .describe("Filter pull requests by status. Defaults to 'Active'."),
     },
     async ({ repositoryId, top, skip, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
@@ -258,7 +299,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
+      status: z
+        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
+        .default("Active")
+        .describe("Filter pull requests by status. Defaults to 'Active'."),
     },
     async ({ project, top, skip, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();

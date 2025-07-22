@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { IGitApi } from "azure-devops-node-api/GitApi.js";
 import { z } from "zod";
-import { apiVersion, userAgent } from "../utils.js";
+import { apiVersion } from "../utils.js";
 import { orgName } from "../index.js";
 import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { GitItem } from "azure-devops-node-api/interfaces/GitInterfaces.js";
@@ -17,52 +17,50 @@ const SEARCH_TOOLS = {
   search_workitem: "search_workitem",
 };
 
-function configureSearchTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
-  /*
-    CODE SEARCH
-    Get the code search results for a given search text.
-  */
+function configureSearchTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     SEARCH_TOOLS.search_code,
-    "Get the code search results for a given search text.",
+    "Search Azure DevOps Repositories for a given search text",
     {
-      searchRequest: z
-        .object({
-          searchText: z.string().describe("Search text to find in code"),
-          $skip: z.number().default(0).describe("Number of results to skip (for pagination)"),
-          $top: z.number().default(5).describe("Number of results to return (for pagination)"),
-          filters: z
-            .object({
-              Project: z.array(z.string()).optional().describe("Filter in these projects"),
-              Repository: z.array(z.string()).optional().describe("Filter in these repositories"),
-              Path: z.array(z.string()).optional().describe("Filter in these paths"),
-              Branch: z.array(z.string()).optional().describe("Filter in these branches"),
-              CodeElement: z.array(z.string()).optional().describe("Filter for these code elements (e.g., classes, functions, symbols)"),
-              // Note: CodeElement is optional and can be used to filter results by specific code elements.
-              // It can be a string or an array of strings.
-              // If provided, the search will only return results that match the specified code elements.
-              // This is useful for narrowing down the search to specific classes, functions, definitions, or symbols.
-              // Example: CodeElement: ["MyClass", "MyFunction"]
-            })
-            .partial()
-            .optional(),
-          includeFacets: z.boolean().optional(),
-        })
-        .strict(),
+      searchText: z.string().describe("Keywords to search for in code repositories"),
+      project: z.array(z.string()).optional().describe("Filter by projects"),
+      repository: z.array(z.string()).optional().describe("Filter by repositories"),
+      path: z.array(z.string()).optional().describe("Filter by paths"),
+      branch: z.array(z.string()).optional().describe("Filter by branches"),
+      includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
+      skip: z.number().default(0).describe("Number of results to skip"),
+      top: z.number().default(5).describe("Maximum number of results to return"),
     },
-    async ({ searchRequest }) => {
+    async ({ searchText, project, repository, path, branch, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const connection = await connectionProvider();
       const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
+
+      const requestBody: Record<string, unknown> = {
+        searchText,
+        includeFacets,
+        $skip: skip,
+        $top: top,
+      };
+
+      const filters: Record<string, string[]> = {};
+      if (project && project.length > 0) filters.Project = project;
+      if (repository && repository.length > 0) filters.Repository = repository;
+      if (path && path.length > 0) filters.Path = path;
+      if (branch && branch.length > 0) filters.Branch = branch;
+
+      if (Object.keys(filters).length > 0) {
+        requestBody.filters = filters;
+      }
 
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${accessToken.token}`,
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
-        body: JSON.stringify(searchRequest),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -72,10 +70,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
       const resultText = await response.text();
       const resultJson = JSON.parse(resultText) as { results?: SearchResult[] };
 
-      const topResults: SearchResult[] = Array.isArray(resultJson.results) ? resultJson.results.slice(0, Math.min(searchRequest.$top, resultJson.results.length)) : [];
-
       const gitApi = await connection.getGitApi();
-      const combinedResults = await fetchCombinedResults(topResults, gitApi);
+      const combinedResults = await fetchCombinedResults(resultJson.results ?? [], gitApi);
 
       return {
         content: [{ type: "text", text: resultText + JSON.stringify(combinedResults) }],
@@ -83,43 +79,44 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
     }
   );
 
-  /*
-  WIKI SEARCH
-  Get wiki search results for a given search text.
-*/
   server.tool(
     SEARCH_TOOLS.search_wiki,
-    "Get wiki search results for a given search text.",
+    "Search Azure DevOps Wiki for a given search text",
     {
-      searchRequest: z
-        .object({
-          searchText: z.string().describe("Search text to find in wikis"),
-          $skip: z.number().default(0).describe("Number of results to skip (for pagination)"),
-          $top: z.number().default(10).describe("Number of results to return (for pagination)"),
-          filters: z
-            .object({
-              Project: z.array(z.string()).optional().describe("Filter in these projects"),
-              Wiki: z.array(z.string()).optional().describe("Filter in these wiki names"),
-            })
-            .partial()
-            .optional()
-            .describe("Filters to apply to the search text"),
-          includeFacets: z.boolean().optional(),
-        })
-        .strict(),
+      searchText: z.string().describe("Keywords to search for wiki pages"),
+      project: z.array(z.string()).optional().describe("Filter by projects"),
+      wiki: z.array(z.string()).optional().describe("Filter by wiki names"),
+      includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
+      skip: z.number().default(0).describe("Number of results to skip"),
+      top: z.number().default(10).describe("Maximum number of results to return"),
     },
-    async ({ searchRequest }) => {
+    async ({ searchText, project, wiki, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/wikisearchresults?api-version=${apiVersion}`;
+
+      const requestBody: Record<string, unknown> = {
+        searchText,
+        includeFacets,
+        $skip: skip,
+        $top: top,
+      };
+
+      const filters: Record<string, string[]> = {};
+      if (project && project.length > 0) filters.Project = project;
+      if (wiki && wiki.length > 0) filters.Wiki = wiki;
+
+      if (Object.keys(filters).length > 0) {
+        requestBody.filters = filters;
+      }
 
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${accessToken.token}`,
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
-        body: JSON.stringify(searchRequest),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -133,45 +130,50 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
     }
   );
 
-  /*
-  WORK ITEM SEARCH
-  Get work item search results for a given search text.
-*/
   server.tool(
     SEARCH_TOOLS.search_workitem,
-    "Get work item search results for a given search text.",
+    "Get Azure DevOps Work Item search results for a given search text",
     {
-      searchRequest: z
-        .object({
-          searchText: z.string().describe("Search text to find in work items"),
-          $skip: z.number().default(0).describe("Number of results to skip for pagination"),
-          $top: z.number().default(10).describe("Number of results to return"),
-          filters: z
-            .object({
-              "System.TeamProject": z.array(z.string()).optional().describe("Filter by team project"),
-              "System.AreaPath": z.array(z.string()).optional().describe("Filter by area path"),
-              "System.WorkItemType": z.array(z.string()).optional().describe("Filter by work item type like Bug, Task, User Story"),
-              "System.State": z.array(z.string()).optional().describe("Filter by state"),
-              "System.AssignedTo": z.array(z.string()).optional().describe("Filter by assigned to"),
-            })
-            .partial()
-            .optional(),
-          includeFacets: z.boolean().optional(),
-        })
-        .strict(),
+      searchText: z.string().describe("Search text to find in work items"),
+      project: z.array(z.string()).optional().describe("Filter by projects"),
+      areaPath: z.array(z.string()).optional().describe("Filter by area paths"),
+      workItemType: z.array(z.string()).optional().describe("Filter by work item types"),
+      state: z.array(z.string()).optional().describe("Filter by work item states"),
+      assignedTo: z.array(z.string()).optional().describe("Filter by assigned to users"),
+      includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
+      skip: z.number().default(0).describe("Number of results to skip for pagination"),
+      top: z.number().default(10).describe("Number of results to return"),
     },
-    async ({ searchRequest }) => {
+    async ({ searchText, project, areaPath, workItemType, state, assignedTo, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`;
+
+      const requestBody: Record<string, unknown> = {
+        searchText,
+        includeFacets,
+        $skip: skip,
+        $top: top,
+      };
+
+      const filters: Record<string, unknown> = {};
+      if (project && project.length > 0) filters["System.TeamProject"] = project;
+      if (areaPath && areaPath.length > 0) filters["System.AreaPath"] = areaPath;
+      if (workItemType && workItemType.length > 0) filters["System.WorkItemType"] = workItemType;
+      if (state && state.length > 0) filters["System.State"] = state;
+      if (assignedTo && assignedTo.length > 0) filters["System.AssignedTo"] = assignedTo;
+
+      if (Object.keys(filters).length > 0) {
+        requestBody.filters = filters;
+      }
 
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${accessToken.token}`,
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
-        body: JSON.stringify(searchRequest),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -185,10 +187,6 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
     }
   );
 }
-
-/*
-  Fetch git repo file content for top 5(default) search results.
-*/
 
 interface SearchResult {
   project?: { id?: string };

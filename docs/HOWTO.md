@@ -1,6 +1,13 @@
 Before you get started, ensure you follow the steps in the `README.md` file. This will help you get up and running and connected to your Azure DevOps organization.
 
-## ✏️ Modify Copilot Instructions
+[🥇 How to make your experience better](#-how-to-make-your-experience-better)<br/>
+[🚗 Using MCP Server with Visual Studio Code](#-using-mcp-server-with-visual-studio-code)<br/>
+[🤖 Using MCP Server with Claude Code](#-using-mcp-server-with-claude-code)<br/>
+[🍇 Using MCP Server with Cursor](#-using-mcp-server-with-cursor)<br/>
+
+# 🥇 How to make your experience better
+
+### Modify Copilot Instructions
 
 The `.github/copilot-instructions.md` file is a great way to customize the GitHub Copilot experience, especially when working with MCP Server for Azure DevOps.
 
@@ -18,40 +25,13 @@ Here is an example modification you can add to your existing `.github/copilot-in
 When getting work items using MCP Server for Azure DevOps, always try to use batch tools for updates instead of many individual single updates. For updates, try and update up to 200 updates in a single batch. When getting work items, once you get the list of IDs, use the tool `get_work_items_batch_by_ids` to get the work item details. By default, show fields ID, Type, Title, State. Show work item results in a rendered markdown table.
 ```
 
-## Sequential Thinking
-
-The [Sequential Thinking](https://mcp.so/server/sequentialthinking) component helps break down complex problems into manageable steps, enabling the LLM to better understand your goals. If you encounter issues with the LLM's responses, consider adding the Sequential Thinking MCP Server to your `.vscode/mcp.json` file:
-
-```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}"]
-    },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-    }
-  }
-}
-```
-
-## 🎯 Different Models
+### Use different models
 
 Communicating with the LLM is both an art and a science. If the model does not respond well, switching to a different model may improve your results.
 
-## 🚗 Using MCP Server in Visual Studio Code
+# 🚗 Using MCP Server with Visual Studio Code
 
-### Start the Azure DevOps MCP Server:
+### Start the Azure DevOps MCP Server
 
 To start the Azure DevOps MCP Server, open the `.vscode\mcp.json` file and click 'Start'
 
@@ -104,7 +84,7 @@ The model should automatically use the `wit_get_work_items_batch_by_ids` tool to
 You need project, team and backlog (Epics, Stories, Features) context in order to get a list of all the work items in a backlog.
 
 ```plaintext
-get backlogs for Contoso project and Fabrikam Team
+get backlogs for Contoso project and Fabrikam team
 ```
 
 Once you have the backlog levels, you can then get work items for that backlog.
@@ -139,7 +119,7 @@ Assign this work item to myemail@outlook.com and add a comment "I will own this 
 
 📽️ [Azure DevOps MCP Server: Work with Work Items](https://youtu.be/tT7wqSIPKdA)
 
-### Create and Link Test Cases
+### Create and link test cases
 
 Open a user story and automatically generate test cases with detailed steps based on the story's description. Link the generated test cases back to the original user story.
 
@@ -170,3 +150,66 @@ List of work items for Stories backlog. But then go thru and find all the securi
 ```
 
 📽️ [Azure DevOps MCP Server: Triage Work](https://youtu.be/gCI_pPS76C8)
+
+### Adding and updating work items using the `format` paramater
+
+You can use the `format` paramater to indicate markdown formatting for large text fields. It is now available on the following tools:
+
+- **wit_update_work_items_batch**
+- **wit_add_child_work_items**
+- **wit_create_work_item**
+
+> 🚩 HTML is the default unless `Markdown` is explicity set.
+
+```plaintext
+Update work item 12345 with a new description and use Markdown text. Use Markdown format param. Use bulk update.
+```
+
+📽️ [Azure DevOps MCP Server: Using Markdown format for create and update work items](https://youtu.be/OD4c2m7Fj9U)
+
+# 🤖 Using MCP Server with Claude Code
+
+See https://docs.anthropic.com/en/docs/claude-code/mcp for general guidance on adding MCP Server to Claude Code experience.
+
+For the Azure DevOps MCP Server, use the following command:
+
+```
+claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
+```
+
+Replace `Contoso` with your own organization name
+
+# 🍇 Using MCP Server with Cursor
+
+To integrate the Azure DevOps MCP Server with Cursor, create a `.cursor\mcp.json` file and add your Azure DevOps organization to the `mcpServers` list.
+
+```json
+{
+  "mcpServers": {
+    "ado": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "{Contoso}"]
+    }
+  }
+}
+```
+
+Replace `{Contoso}` with your actual Azure DevOps organization name.
+
+Save the file, and when Cursor detects the MCP Server, click **Enable**.
+
+<img src="./media/enable-mcp-server-from-cursor.png" alt="enable mcp server from cursor" width="500"/>
+
+### Start the Azure DevOps MCP Server
+
+Open the terminal and start the MCP Server with:
+
+```
+npx -y @azure-devops/mcp {Contoso}
+```
+
+Replace `Contoso` with your Azure DevOps organization.
+
+You can now use the Azure DevOps MCP Server tools directly in chat.
+
+📽️ [Azure DevOps MCP Server: Getting started with Cursor](https://youtu.be/550VPTnjYRg)

@@ -6,8 +6,18 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { Operation } from "azure-devops-node-api/interfaces/common/VSSInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion, userAgent } from "../utils.js";
+import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
+
+/**
+ * Converts Operation enum key to lowercase string for API usage
+ * @param operation The Operation enum key (e.g., "Add", "Replace", "Remove")
+ * @returns Lowercase string for API usage (e.g., "add", "replace", "remove")
+ */
+function operationToApiString(operation: string): string {
+  return operation.toLowerCase();
+}
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -20,13 +30,12 @@ const WORKITEM_TOOLS = {
   list_work_item_comments: "wit_list_work_item_comments",
   get_work_items_for_iteration: "wit_get_work_items_for_iteration",
   add_work_item_comment: "wit_add_work_item_comment",
-  add_child_work_item: "wit_add_child_work_item",
+  add_child_work_items: "wit_add_child_work_items",
   link_work_item_to_pull_request: "wit_link_work_item_to_pull_request",
   get_work_item_type: "wit_get_work_item_type",
   get_query: "wit_get_query",
   get_query_results_by_id: "wit_get_query_results_by_id",
   update_work_items_batch: "wit_update_work_items_batch",
-  close_and_link_workitem_duplicates: "wit_close_and_link_workitem_duplicates",
   work_items_link: "wit_work_items_link",
 };
 
@@ -50,12 +59,16 @@ function getLinkTypeFromName(name: string) {
       return "Microsoft.VSTS.Common.TestedBy-Forward";
     case "tests":
       return "Microsoft.VSTS.Common.TestedBy-Reverse";
+    case "affects":
+      return "Microsoft.VSTS.Common.Affects-Forward";
+    case "affected by":
+      return "Microsoft.VSTS.Common.Affects-Reverse";
     default:
       throw new Error(`Unknown link type: ${name}`);
   }
 }
 
-function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
     "Revieve a list of backlogs for a given project and team.",
@@ -186,77 +199,170 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemId: z.number().describe("The ID of the work item to add a comment to."),
       comment: z.string().describe("The text of the comment to add to the work item."),
+      format: z.enum(["markdown", "html"]).optional().default("html"),
     },
-    async ({ project, workItemId, comment }) => {
+    async ({ project, workItemId, comment, format }) => {
       const connection = await connectionProvider();
-      const workItemApi = await connection.getWorkItemTrackingApi();
-      const commentCreate = { text: comment };
-      const commentResponse = await workItemApi.addComment(commentCreate, project, workItemId);
+
+      const orgUrl = connection.serverUrl;
+      const accessToken = await tokenProvider();
+
+      const body = {
+        text: comment,
+      };
+
+      const formatParameter = format === "markdown" ? 0 : 1;
+      const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken.token}`,
+          "Content-Type": "application/json",
+          "User-Agent": userAgentProvider(),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add a work item comment: ${response.statusText}}`);
+      }
+
+      const comments = await response.text();
 
       return {
-        content: [{ type: "text", text: JSON.stringify(commentResponse, null, 2) }],
+        content: [{ type: "text", text: comments }],
       };
     }
   );
 
   server.tool(
-    WORKITEM_TOOLS.add_child_work_item,
-    "Create a child work item from a parent by ID.",
+    WORKITEM_TOOLS.add_child_work_items,
+    "Create one or many child work items from a parent by work item type and parent id.",
     {
       parentId: z.number().describe("The ID of the parent work item to create a child work item under."),
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The type of the child work item to create."),
-      title: z.string().describe("The title of the child work item."),
-      description: z.string().describe("The description of the child work item."),
-      areaPath: z.string().optional().describe("Optional area path for the child work item."),
-      iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
+      items: z.array(
+        z.object({
+          title: z.string().describe("The title of the child work item."),
+          description: z.string().describe("The description of the child work item."),
+          format: z.enum(["Markdown", "Html"]).default("Html").describe("Format for the description on the child work item, e.g., 'Markdown', 'Html'. Defaults to 'Html'."),
+          areaPath: z.string().optional().describe("Optional area path for the child work item."),
+          iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
+        })
+      ),
     },
-    async ({ parentId, project, workItemType, title, description, areaPath, iterationPath }) => {
-      const connection = await connectionProvider();
-      const workItemApi = await connection.getWorkItemTrackingApi();
+    async ({ parentId, project, workItemType, items }) => {
+      try {
+        const connection = await connectionProvider();
+        const orgUrl = connection.serverUrl;
+        const accessToken = await tokenProvider();
 
-      const document = [
-        {
-          op: "add",
-          path: "/fields/System.Title",
-          value: title,
-        },
-        {
-          op: "add",
-          path: "/fields/System.Description",
-          value: description,
-        },
-        {
-          op: "add",
-          path: "/relations/-",
-          value: {
-            rel: "System.LinkTypes.Hierarchy-Reverse",
-            url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${parentId}`,
+        if (items.length > 50) {
+          return {
+            content: [{ type: "text", text: `A maximum of 50 child work items can be created in a single call.` }],
+            isError: true,
+          };
+        }
+
+        const body = items.map((item, x) => {
+          const ops = [
+            {
+              op: "add",
+              path: "/id",
+              value: `-${x + 1}`,
+            },
+            {
+              op: "add",
+              path: "/fields/System.Title",
+              value: item.title,
+            },
+            {
+              op: "add",
+              path: "/fields/System.Description",
+              value: item.description,
+            },
+            {
+              op: "add",
+              path: "/fields/Microsoft.VSTS.TCM.ReproSteps",
+              value: item.description,
+            },
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "System.LinkTypes.Hierarchy-Reverse",
+                url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${parentId}`,
+              },
+            },
+          ];
+
+          if (item.areaPath && item.areaPath.trim().length > 0) {
+            ops.push({
+              op: "add",
+              path: "/fields/System.AreaPath",
+              value: item.areaPath,
+            });
+          }
+
+          if (item.iterationPath && item.iterationPath.trim().length > 0) {
+            ops.push({
+              op: "add",
+              path: "/fields/System.IterationPath",
+              value: item.iterationPath,
+            });
+          }
+
+          if (item.format && item.format === "Markdown") {
+            ops.push({
+              op: "add",
+              path: "/multilineFieldsFormat/System.Description",
+              value: item.format,
+            });
+
+            ops.push({
+              op: "add",
+              path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps",
+              value: item.format,
+            });
+          }
+
+          return {
+            method: "PATCH",
+            uri: `/${project}/_apis/wit/workitems/$${workItemType}?api-version=${batchApiVersion}`,
+            headers: {
+              "Content-Type": "application/json-patch+json",
+            },
+            body: ops,
+          };
+        });
+
+        const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
+          method: "PATCH",
+          headers: {
+            "Authorization": `Bearer ${accessToken.token}`,
+            "Content-Type": "application/json",
+            "User-Agent": userAgentProvider(),
           },
-        },
-      ];
-
-      if (areaPath && areaPath.trim().length > 0) {
-        document.push({
-          op: "add",
-          path: "/fields/System.AreaPath",
-          value: areaPath,
+          body: JSON.stringify(body),
         });
+
+        if (!response.ok) {
+          throw new Error(`Failed to update work items in batch: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error creating child work items: ${errorMessage}` }],
+          isError: true,
+        };
       }
-
-      if (iterationPath && iterationPath.trim().length > 0) {
-        document.push({
-          op: "add",
-          path: "/fields/System.IterationPath",
-          value: iterationPath,
-        });
-      }
-
-      const childWorkItem = await workItemApi.createWorkItem(null, document, project, workItemType);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(childWorkItem, null, 2) }],
-      };
     }
   );
 
@@ -264,19 +370,19 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.link_work_item_to_pull_request,
     "Link a single work item to an existing pull request.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      projectId: z.string().describe("The project ID of the Azure DevOps project (note: project name is not valid)."),
       repositoryId: z.string().describe("The ID of the repository containing the pull request. Do not use the repository name here, use the ID instead."),
       pullRequestId: z.number().describe("The ID of the pull request to link to."),
       workItemId: z.number().describe("The ID of the work item to link to the pull request."),
     },
-    async ({ project, repositoryId, pullRequestId, workItemId }) => {
+    async ({ projectId, repositoryId, pullRequestId, workItemId }) => {
       try {
         const connection = await connectionProvider();
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         // Create artifact link relation using vstfs format
         // Format: vstfs:///Git/PullRequestId/{project}/{repositoryId}/{pullRequestId}
-        const artifactPathValue = `${project}/${repositoryId}/${pullRequestId}`;
+        const artifactPathValue = `${projectId}/${repositoryId}/${pullRequestId}`;
         const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
 
         // Use the PATCH document format for adding a relation
@@ -295,7 +401,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         ];
 
         // Use the WorkItem API to update the work item with the new relation
-        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, project);
+        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, projectId);
 
         if (!workItem) {
           return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
@@ -357,9 +463,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       updates: z
         .array(
           z.object({
-            op: z.enum(["add", "replace", "remove"]).default("add").describe("The operation to perform on the field."),
+            op: z.enum(["Add", "Replace", "Remove"]).default("Add").describe("The operation to perform on the field."),
             path: z.string().describe("The path of the field to update, e.g., '/fields/System.Title'."),
-            value: z.string().describe("The new value for the field. This is required for 'add' and 'replace' operations, and should be omitted for 'remove' operations."),
+            value: z.string().describe("The new value for the field. This is required for 'Add' and 'Replace' operations, and should be omitted for 'Remove' operations."),
           })
         )
         .describe("An array of field updates to apply to the work item."),
@@ -367,7 +473,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ id, updates }) => {
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
-      const updatedWorkItem = await workItemApi.updateWorkItem(null, updates, id);
+
+      // Convert operation names to lowercase for API
+      const apiUpdates = updates.map((update) => ({
+        ...update,
+        op: operationToApiString(update.op),
+      }));
+
+      const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id);
 
       return {
         content: [{ type: "text", text: JSON.stringify(updatedWorkItem, null, 2) }],
@@ -401,19 +514,38 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The type of work item to create, e.g., 'Task', 'Bug', etc."),
       fields: z
-        .record(z.string(), z.string())
-        .describe("A record of field names and values to set on the new work item. Each key is a field name, and each value is the corresponding value to set for that field."),
+        .array(
+          z.object({
+            name: z.string().describe("The name of the field, e.g., 'System.Title'."),
+            value: z.string().describe("The value of the field."),
+            format: z.enum(["Html", "Markdown"]).optional().describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Html'."),
+          })
+        )
+        .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
     },
     async ({ project, workItemType, fields }) => {
       try {
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
 
-        const document = Object.entries(fields).map(([key, value]) => ({
+        const document = fields.map(({ name, value }) => ({
           op: "add",
-          path: `/fields/${key}`,
-          value,
+          path: `/fields/${name}`,
+          value: value,
         }));
+
+        // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
+        // this should only happen for large text fields, but since we dont't know by field name, lets assume if the users
+        // passes a value longer than 50 characters, then we can set the format to Markdown
+        fields.forEach(({ name, value, format }) => {
+          if (value.length > 50 && format === "Markdown") {
+            document.push({
+              op: "add",
+              path: `/multilineFieldsFormat/${name}`,
+              value: "Markdown",
+            });
+          }
+        });
 
         const newWorkItem = await workItemApi.createWorkItem(null, document, project, workItemType);
 
@@ -441,7 +573,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       query: z.string().describe("The ID or path of the query to retrieve."),
-      expand: z.enum(["all", "clauses", "minimal", "none", "wiql"]).optional().describe("Optional expand parameter to include additional details in the response. Defaults to 'none'."),
+      expand: z
+        .enum(getEnumKeys(QueryExpand) as [string, ...string[]])
+        .optional()
+        .describe("Optional expand parameter to include additional details in the response. Defaults to 'None'."),
       depth: z.number().default(0).describe("Optional depth parameter to specify how deep to expand the query. Defaults to 0."),
       includeDeleted: z.boolean().default(false).describe("Whether to include deleted items in the query results. Defaults to false."),
       useIsoDateFormat: z.boolean().default(false).describe("Whether to use ISO date format in the response. Defaults to false."),
@@ -450,7 +585,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
 
-      const queryDetails = await workItemApi.getQuery(project, query, expand as unknown as QueryExpand, depth, includeDeleted, useIsoDateFormat);
+      const queryDetails = await workItemApi.getQuery(project, query, safeEnumConvert(QueryExpand, expand), depth, includeDeleted, useIsoDateFormat);
 
       return {
         content: [{ type: "text", text: JSON.stringify(queryDetails, null, 2) }],
@@ -487,10 +622,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       updates: z
         .array(
           z.object({
-            op: z.enum(["add", "replace", "remove"]).default("add").describe("The operation to perform on the field."),
+            op: z.enum(["Add", "Replace", "Remove"]).default("Add").describe("The operation to perform on the field."),
             id: z.number().describe("The ID of the work item to update."),
             path: z.string().describe("The path of the field to update, e.g., '/fields/System.Title'."),
             value: z.string().describe("The new value for the field. This is required for 'add' and 'replace' operations, and should be omitted for 'remove' operations."),
+            format: z.enum(["Html", "Markdown"]).optional().describe("The format of the field value. Only to be used for large text fields. e.g., 'Html', 'Markdown'. Optional, defaults to 'Html'."),
           })
         )
         .describe("An array of updates to apply to work items. Each update should include the operation (op), work item ID (id), field path (path), and new value (value)."),
@@ -503,27 +639,41 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       // Extract unique IDs from the updates array
       const uniqueIds = Array.from(new Set(updates.map((update) => update.id)));
 
-      const body = uniqueIds.map((id) => ({
-        method: "PATCH",
-        uri: `/_apis/wit/workitems/${id}?api-version=${batchApiVersion}`,
-        headers: {
-          "Content-Type": "application/json-patch+json",
-        },
-        body: updates
-          .filter((update) => update.id === id)
-          .map(({ op, path, value }) => ({
-            op: op,
-            path: path,
-            value: value,
-          })),
-      }));
+      const body = uniqueIds.map((id) => {
+        const workItemUpdates = updates.filter((update) => update.id === id);
+        const operations = workItemUpdates.map(({ op, path, value }) => ({
+          op: op,
+          path: path,
+          value: value,
+        }));
+
+        // Add format operations for Markdown fields
+        workItemUpdates.forEach(({ path, value, format }) => {
+          if (format === "Markdown" && value && value.length > 50) {
+            operations.push({
+              op: "Add",
+              path: `/multilineFieldsFormat${path.replace("/fields", "")}`,
+              value: "Markdown",
+            });
+          }
+        });
+
+        return {
+          method: "PATCH",
+          uri: `/_apis/wit/workitems/${id}?api-version=${batchApiVersion}`,
+          headers: {
+            "Content-Type": "application/json-patch+json",
+          },
+          body: operations,
+        };
+      });
 
       const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
@@ -551,10 +701,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             id: z.number().describe("The ID of the work item to update."),
             linkToId: z.number().describe("The ID of the work item to link to."),
             type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests"])
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
               .default("related")
               .describe(
-                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'referenced by', and 'references'. Defaults to 'related'."
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
               ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
@@ -595,66 +745,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         headers: {
           "Authorization": `Bearer ${accessToken.token}`,
           "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update work items in batch: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    }
-  );
-
-  server.tool(
-    WORKITEM_TOOLS.close_and_link_workitem_duplicates,
-    "Close duplicate work items by id.",
-    {
-      id: z.number().describe("The ID of the work item to close and link duplicates to."),
-      duplicateIds: z.array(z.number()).describe("An array of IDs of the duplicate work items to close and link to the specified work item."),
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      state: z.string().default("Removed").describe("The state to set for the duplicate work items. Defaults to 'Removed'."),
-    },
-    async ({ id, duplicateIds, project, state }) => {
-      const connection = await connectionProvider();
-
-      const body = duplicateIds.map((duplicateId) => ({
-        method: "PATCH",
-        uri: `/_apis/wit/workitems/${duplicateId}?api-version=${batchApiVersion}`,
-        headers: {
-          "Content-Type": "application/json-patch+json",
-        },
-        body: [
-          {
-            op: "add",
-            path: "/fields/System.State",
-            value: `${state}`,
-          },
-          {
-            op: "add",
-            path: "/relations/-",
-            value: {
-              rel: "System.LinkTypes.Duplicate-Reverse",
-              url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${id}`,
-            },
-          },
-        ],
-      }));
-
-      const accessToken = await tokenProvider();
-
-      const response = await fetch(`${connection.serverUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${accessToken.token}`,
-          "Content-Type": "application/json",
-          "User-Agent": `${userAgent}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
