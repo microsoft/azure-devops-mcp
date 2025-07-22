@@ -1,9 +1,9 @@
 import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { configureWorkItemTools } from "../../../src/tools/workitems";
 import { WebApi } from "azure-devops-node-api";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { configureWorkItemTools } from "../../../src/tools/workitems";
 import {
   _mockBacklogs,
   _mockQuery,
@@ -285,7 +285,15 @@ describe("configureWorkItemTools", () => {
       expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(
         {
           ids: params.ids,
-          fields: ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags"],
+          fields: [
+            "System.Id",
+            "System.WorkItemType",
+            "System.Title",
+            "System.State",
+            "System.Parent",
+            "System.Tags",
+            "System.AssignedTo",
+          ],
         },
         params.project
       );
