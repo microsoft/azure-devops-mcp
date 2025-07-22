@@ -46,6 +46,27 @@ function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) 
     .slice(0, top);
 }
 
+/**
+ * Trims comment data to essential properties, filtering out deleted comments
+ * @param comments Array of comments to trim (can be undefined/null)
+ * @returns Array of trimmed comment objects with essential properties only
+ */
+function trimComments(comments: any[] | undefined | null) {
+  return comments
+    ?.filter((comment) => !comment.isDeleted) // Exclude deleted comments
+    ?.map((comment) => ({
+      id: comment.id,
+      author: {
+        displayName: comment.author?.displayName,
+        uniqueName: comment.author?.uniqueName,
+      },
+      content: comment.content,
+      publishedDate: comment.publishedDate,
+      lastUpdatedDate: comment.lastUpdatedDate,
+      lastContentUpdatedDate: comment.lastContentUpdatedDate,
+    }));
+}
+
 function pullRequestStatusStringToInt(status: string): number {
   switch (status) {
     case "abandoned":
@@ -325,19 +346,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         publishedDate: thread.publishedDate,
         lastUpdatedDate: thread.lastUpdatedDate,
         status: thread.status,
-        comments: thread.comments
-          ?.filter((comment) => !comment.isDeleted) // Exclude deleted comments
-          ?.map((comment) => ({
-            id: comment.id,
-            author: {
-              displayName: comment.author?.displayName,
-              uniqueName: comment.author?.uniqueName,
-            },
-            content: comment.content,
-            publishedDate: comment.publishedDate,
-            lastUpdatedDate: comment.lastUpdatedDate,
-            lastContentUpdatedDate: comment.lastContentUpdatedDate,
-          })),
+        comments: trimComments(thread.comments),
       }));
 
       return {
@@ -373,20 +382,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         };
       }
 
-      // Return trimmed comment data focusing on essential information  
-      const trimmedComments = paginatedComments
-        ?.filter((comment) => !comment.isDeleted) // Exclude deleted comments
-        ?.map((comment) => ({
-          id: comment.id,
-          author: {
-            displayName: comment.author?.displayName,
-            uniqueName: comment.author?.uniqueName,
-          },
-          content: comment.content,
-          publishedDate: comment.publishedDate,
-          lastUpdatedDate: comment.lastUpdatedDate,
-          lastContentUpdatedDate: comment.lastContentUpdatedDate,
-        }));
+      // Return trimmed comment data focusing on essential information
+      const trimmedComments = trimComments(paginatedComments);
 
       return {
         content: [{ type: "text", text: JSON.stringify(trimmedComments, null, 2) }],
