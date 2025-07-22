@@ -198,7 +198,7 @@ Replace `{Contoso}` with your actual Azure DevOps organization name.
 
 Save the file, and when Cursor detects the MCP Server, click **Enable**.
 
-<img src="./media/enable-mcp-server-from-cursor.png" alt="enable mcp server from cursor" width="300"/>
+<img src="./media/enable-mcp-server-from-cursor.png" alt="enable mcp server from cursor" width="500"/>
 
 ### Start the Azure DevOps MCP Server
 
