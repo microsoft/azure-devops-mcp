@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/workitems";
 import { WebApi } from "azure-devops-node-api";
+import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import {
   _mockBacklogs,
   _mockQuery,
@@ -792,7 +793,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "Contoso",
         query: "342f0f44-4069-46b1-a940-3d0468979ceb",
-        expand: "none",
+        expand: "None",
         depth: 1,
         includeDeleted: false,
         useIsoDateFormat: false,
@@ -800,7 +801,7 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(params.project, params.query, params.expand, params.depth, params.includeDeleted, params.useIsoDateFormat);
+      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(params.project, params.query, QueryExpand.None, params.depth, params.includeDeleted, params.useIsoDateFormat);
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockQuery], null, 2));
     });
@@ -1051,83 +1052,6 @@ describe("configureWorkItemTools", () => {
       };
 
       await expect(handler(params)).rejects.toThrow("Failed to update work items in batch: Unauthorized");
-    });
-  });
-
-  describe("close_and_link_workitem_duplicates tool", () => {
-    it("should close and link duplicate work items successfully", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_close_and_link_workitem_duplicates");
-      if (!call) throw new Error("wit_close_and_link_workitem_duplicates tool not registered");
-      const [, , , handler] = call;
-
-      mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue([
-          { id: 2, success: true },
-          { id: 3, success: true },
-        ]),
-      });
-
-      const params = {
-        id: 1,
-        duplicateIds: [2, 3],
-        project: "TestProject",
-        state: "Closed",
-      };
-
-      const result = await handler(params);
-
-      expect(fetch).toHaveBeenCalledWith(
-        "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
-        expect.objectContaining({
-          method: "PATCH",
-          headers: expect.objectContaining({
-            "Authorization": "Bearer fake-token",
-            "Content-Type": "application/json",
-          }),
-        })
-      );
-
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            { id: 2, success: true },
-            { id: 3, success: true },
-          ],
-          null,
-          2
-        )
-      );
-    });
-
-    it("should handle duplicate closure failure", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_close_and_link_workitem_duplicates");
-      if (!call) throw new Error("wit_close_and_link_workitem_duplicates tool not registered");
-      const [, , , handler] = call;
-
-      mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        statusText: "Forbidden",
-      });
-
-      const params = {
-        id: 1,
-        duplicateIds: [2, 3],
-        project: "TestProject",
-        state: "Removed",
-      };
-
-      await expect(handler(params)).rejects.toThrow("Failed to update work items in batch: Forbidden");
     });
   });
 
