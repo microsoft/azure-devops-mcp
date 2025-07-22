@@ -762,4 +762,3 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 }
 
 export { configureWorkItemTools, WORKITEM_TOOLS };
-
