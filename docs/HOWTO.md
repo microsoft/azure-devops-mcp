@@ -205,7 +205,7 @@ Save the file, and when Cursor detects the MCP Server, click **Enable**.
 Open the terminal and start the MCP Server with:
 
 ```
-npx -y @azure-devops/mcp Contoso
+npx -y @azure-devops/mcp {Contoso}
 ```
 
 Replace `Contoso` with your Azure DevOps organization.
