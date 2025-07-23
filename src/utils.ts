@@ -5,6 +5,7 @@ import { packageVersion } from "./version.js";
 
 export const apiVersion = "7.2-preview.1";
 export const batchApiVersion = "5.0";
+export const markdownCommentsApiVersion = "7.2-preview.4";
 
 export function createEnumMapping<T extends Record<string, string | number>>(enumObject: T, keyTransform?: (key: string) => string): Record<string, T[keyof T]> {
   const mapping: Record<string, T[keyof T]> = {};

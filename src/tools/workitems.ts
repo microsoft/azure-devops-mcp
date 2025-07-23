@@ -7,7 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion } from "../utils.js";
+import { batchApiVersion, markdownCommentsApiVersion } from "../utils.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -50,6 +50,10 @@ function getLinkTypeFromName(name: string) {
       return "Microsoft.VSTS.Common.TestedBy-Forward";
     case "tests":
       return "Microsoft.VSTS.Common.TestedBy-Reverse";
+    case "affects":
+      return "Microsoft.VSTS.Common.Affects-Forward";
+    case "affected by":
+      return "Microsoft.VSTS.Common.Affects-Reverse";
     default:
       throw new Error(`Unknown link type: ${name}`);
   }
@@ -186,15 +190,37 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemId: z.number().describe("The ID of the work item to add a comment to."),
       comment: z.string().describe("The text of the comment to add to the work item."),
+      format: z.enum(["markdown", "html"]).optional().default("html"),
     },
-    async ({ project, workItemId, comment }) => {
+    async ({ project, workItemId, comment, format }) => {
       const connection = await connectionProvider();
-      const workItemApi = await connection.getWorkItemTrackingApi();
-      const commentCreate = { text: comment };
-      const commentResponse = await workItemApi.addComment(commentCreate, project, workItemId);
+
+      const orgUrl = connection.serverUrl;
+      const accessToken = await tokenProvider();
+
+      const body = {
+        text: comment,
+      };
+
+      const formatParameter = format === "markdown" ? 0 : 1;
+      const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken.token}`,
+          "Content-Type": "application/json",
+          "User-Agent": userAgentProvider(),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add a work item comment: ${response.statusText}}`);
+      }
+
+      const comments = await response.text();
 
       return {
-        content: [{ type: "text", text: JSON.stringify(commentResponse, null, 2) }],
+        content: [{ type: "text", text: comments }],
       };
     }
   );
@@ -335,19 +361,19 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.link_work_item_to_pull_request,
     "Link a single work item to an existing pull request.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      projectId: z.string().describe("The project ID of the Azure DevOps project (note: project name is not valid)."),
       repositoryId: z.string().describe("The ID of the repository containing the pull request. Do not use the repository name here, use the ID instead."),
       pullRequestId: z.number().describe("The ID of the pull request to link to."),
       workItemId: z.number().describe("The ID of the work item to link to the pull request."),
     },
-    async ({ project, repositoryId, pullRequestId, workItemId }) => {
+    async ({ projectId, repositoryId, pullRequestId, workItemId }) => {
       try {
         const connection = await connectionProvider();
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         // Create artifact link relation using vstfs format
         // Format: vstfs:///Git/PullRequestId/{project}/{repositoryId}/{pullRequestId}
-        const artifactPathValue = `${project}/${repositoryId}/${pullRequestId}`;
+        const artifactPathValue = `${projectId}/${repositoryId}/${pullRequestId}`;
         const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
 
         // Use the PATCH document format for adding a relation
@@ -366,7 +392,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         ];
 
         // Use the WorkItem API to update the work item with the new relation
-        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, project);
+        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, projectId);
 
         if (!workItem) {
           return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
@@ -656,10 +682,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             id: z.number().describe("The ID of the work item to update."),
             linkToId: z.number().describe("The ID of the work item to link to."),
             type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests"])
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
               .default("related")
               .describe(
-                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'referenced by', and 'references'. Defaults to 'related'."
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
               ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
