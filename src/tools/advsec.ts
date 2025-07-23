@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
+import { createEnumMapping, mapStringToEnum } from "../utils.js";
 
 const ADVSEC_TOOLS = {
   get_alerts: "advsec_get_alerts",
@@ -13,103 +14,6 @@ const ADVSEC_TOOLS = {
 };
 
 function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
-  // Helper function to map string alert types to enum values
-  const mapAlertType = (alertType?: string): AlertType | undefined => {
-    if (!alertType) return undefined;
-    switch (alertType.toLowerCase()) {
-      case "code":
-        return AlertType.Code;
-      case "dependency":
-        return AlertType.Dependency;
-      case "secret":
-        return AlertType.Secret;
-      case "unknown":
-        return AlertType.Unknown;
-      default:
-        return undefined;
-    }
-  };
-
-  // Helper function to map string states to enum values
-  const mapStates = (states?: string[]): State[] | undefined => {
-    if (!states) return undefined;
-    return states.map((state) => {
-      switch (state.toLowerCase()) {
-        case "active":
-          return State.Active;
-        case "dismissed":
-          return State.Dismissed;
-        case "fixed":
-          return State.Fixed;
-        case "autodismissed":
-          return State.AutoDismissed;
-        default:
-          return State.Unknown;
-      }
-    });
-  };
-
-  // Helper function to map string severities to enum values
-  const mapSeverities = (severities?: string[]): Severity[] | undefined => {
-    if (!severities) return undefined;
-    return severities.map((severity) => {
-      switch (severity.toLowerCase()) {
-        case "critical":
-          return Severity.Critical;
-        case "high":
-          return Severity.High;
-        case "medium":
-          return Severity.Medium;
-        case "low":
-          return Severity.Low;
-        case "note":
-          return Severity.Note;
-        case "error":
-          return Severity.Error;
-        case "warning":
-          return Severity.Warning;
-        case "undefined":
-          return Severity.Undefined;
-        default:
-          return Severity.Undefined;
-      }
-    });
-  };
-
-  // Helper function to map string confidence levels to enum values
-  const mapConfidenceLevels = (confidenceLevels?: string[]): Confidence[] | undefined => {
-    if (!confidenceLevels) return undefined;
-    return confidenceLevels.map((level) => {
-      switch (level.toLowerCase()) {
-        case "high":
-          return Confidence.High;
-        case "other":
-          return Confidence.Other;
-        default:
-          return Confidence.Other;
-      }
-    });
-  };
-
-  // Helper function to map string validity to enum values
-  const mapValidity = (validity?: string[]): AlertValidityStatus[] | undefined => {
-    if (!validity) return undefined;
-    return validity.map((v) => {
-      switch (v.toLowerCase()) {
-        case "active":
-          return AlertValidityStatus.Active;
-        case "inactive":
-          return AlertValidityStatus.Inactive;
-        case "none":
-          return AlertValidityStatus.None;
-        case "unknown":
-          return AlertValidityStatus.Unknown;
-        default:
-          return AlertValidityStatus.Unknown;
-      }
-    });
-  };
-
   server.tool(
     ADVSEC_TOOLS.get_alerts,
     "Retrieve Advanced Security alerts for a repository.",
@@ -149,18 +53,16 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<Ac
         const alertApi = await connection.getAlertApi();
 
         const criteria = {
-          ...(alertType && { alertType: mapAlertType(alertType) }),
-          ...(states && { states: mapStates(states) }),
-          ...(severities && { severities: mapSeverities(severities) }),
+          ...(alertType && { alertType: mapStringToEnum(alertType, createEnumMapping(AlertType)) }),
+          ...(states && { states: states.map((state) => mapStringToEnum(state, createEnumMapping(State))).filter((s): s is State => s !== undefined) }),
+          ...(severities && { severities: severities.map((severity) => mapStringToEnum(severity, createEnumMapping(Severity))).filter((s): s is Severity => s !== undefined) }),
           ...(ruleId && { ruleId }),
           ...(ruleName && { ruleName }),
           ...(toolName && { toolName }),
           ...(ref && { ref }),
           ...(onlyDefaultBranch !== undefined && { onlyDefaultBranch }),
-          ...(confidenceLevels && {
-            confidenceLevels: mapConfidenceLevels(confidenceLevels),
-          }),
-          ...(validity && { validity: mapValidity(validity) }),
+          ...(confidenceLevels && { confidenceLevels: confidenceLevels.map((level) => mapStringToEnum(level, createEnumMapping(Confidence))).filter((c): c is Confidence => c !== undefined) }),
+          ...(validity && { validity: validity.map((v) => mapStringToEnum(v, createEnumMapping(AlertValidityStatus))).filter((v): v is AlertValidityStatus => v !== undefined) }),
         };
 
         const result = await alertApi.getAlerts(
