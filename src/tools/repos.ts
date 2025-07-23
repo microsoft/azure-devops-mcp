@@ -13,10 +13,12 @@ import {
   GitPullRequestQuery,
   GitPullRequestQueryInput,
   GitPullRequestQueryType,
+  CommentThreadContext,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
+import { getEnumKeys } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -33,6 +35,7 @@ const REPO_TOOLS = {
   update_pull_request_status: "repo_update_pull_request_status",
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
+  create_pull_request_thread: "repo_create_pull_request_thread",
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
@@ -47,17 +50,38 @@ function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) 
     .slice(0, top);
 }
 
+/**
+ * Trims comment data to essential properties, filtering out deleted comments
+ * @param comments Array of comments to trim (can be undefined/null)
+ * @returns Array of trimmed comment objects with essential properties only
+ */
+function trimComments(comments: any[] | undefined | null) {
+  return comments
+    ?.filter((comment) => !comment.isDeleted) // Exclude deleted comments
+    ?.map((comment) => ({
+      id: comment.id,
+      author: {
+        displayName: comment.author?.displayName,
+        uniqueName: comment.author?.uniqueName,
+      },
+      content: comment.content,
+      publishedDate: comment.publishedDate,
+      lastUpdatedDate: comment.lastUpdatedDate,
+      lastContentUpdatedDate: comment.lastContentUpdatedDate,
+    }));
+}
+
 function pullRequestStatusStringToInt(status: string): number {
   switch (status) {
-    case "abandoned":
+    case "Abandoned":
       return PullRequestStatus.Abandoned.valueOf();
-    case "active":
+    case "Active":
       return PullRequestStatus.Active.valueOf();
-    case "all":
+    case "All":
       return PullRequestStatus.All.valueOf();
-    case "completed":
+    case "Completed":
       return PullRequestStatus.Completed.valueOf();
-    case "notSet":
+    case "NotSet":
       return PullRequestStatus.NotSet.valueOf();
     default:
       throw new Error(`Unknown pull request status: ${status}`);
@@ -113,12 +137,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
       pullRequestId: z.number().describe("The ID of the pull request to be published."),
-      status: z.enum(["active", "abandoned"]).describe("The new status of the pull request. Can be 'active' or 'abandoned'."),
+      status: z.enum(["Active", "Abandoned"]).describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
     },
     async ({ repositoryId, pullRequestId, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const statusValue = status === "active" ? 3 : 2;
+      const statusValue = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
 
       const updatedPullRequest = await gitApi.updatePullRequest({ status: statusValue }, repositoryId, pullRequestId);
 
@@ -208,7 +232,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
+      status: z
+        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
+        .default("Active")
+        .describe("Filter pull requests by status. Defaults to 'Active'."),
     },
     async ({ repositoryId, top, skip, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
@@ -274,7 +301,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      status: z.enum(["abandoned", "active", "all", "completed", "notSet"]).default("active").describe("Filter pull requests by status. Defaults to 'active'."),
+      status: z
+        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
+        .default("Active")
+        .describe("Filter pull requests by status. Defaults to 'Active'."),
     },
     async ({ project, top, skip, created_by_me, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
@@ -340,8 +370,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       baseIteration: z.number().optional().describe("The base iteration ID for which to retrieve threads. Optional, defaults to the latest base iteration."),
       top: z.number().default(100).describe("The maximum number of threads to return."),
       skip: z.number().default(0).describe("The number of threads to skip."),
+      fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of trimmed data."),
     },
-    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip }) => {
+    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -349,8 +380,23 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
       const paginatedThreads = threads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
+      if (fullResponse) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
+        };
+      }
+
+      // Return trimmed thread data focusing on essential information
+      const trimmedThreads = paginatedThreads?.map((thread) => ({
+        id: thread.id,
+        publishedDate: thread.publishedDate,
+        lastUpdatedDate: thread.lastUpdatedDate,
+        status: thread.status,
+        comments: trimComments(thread.comments),
+      }));
+
       return {
-        content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
       };
     }
   );
@@ -365,8 +411,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       project: z.string().optional().describe("Project ID or project name (optional)"),
       top: z.number().default(100).describe("The maximum number of comments to return."),
       skip: z.number().default(0).describe("The number of comments to skip."),
+      fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of trimmed data."),
     },
-    async ({ repositoryId, pullRequestId, threadId, project, top, skip }) => {
+    async ({ repositoryId, pullRequestId, threadId, project, top, skip, fullResponse }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -375,8 +422,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
       const paginatedComments = comments?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
+      if (fullResponse) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
+        };
+      }
+
+      // Return trimmed comment data focusing on essential information
+      const trimmedComments = trimComments(paginatedComments);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedComments, null, 2) }],
       };
     }
   );
@@ -499,14 +555,108 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       threadId: z.number().describe("The ID of the thread to which the comment will be added."),
       content: z.string().describe("The content of the comment to be added."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
+      fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of a simple confirmation message."),
     },
-    async ({ repositoryId, pullRequestId, threadId, content, project }) => {
+    async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
 
+      // Check if the comment was successfully created
+      if (!comment) {
+        return {
+          content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }],
+          isError: true,
+        };
+      }
+
+      if (fullResponse) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
+        };
+      }
+
       return {
-        content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
+        content: [{ type: "text", text: `Comment successfully added to thread ${threadId}.` }],
+      };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.create_pull_request_thread,
+    "Creates a new comment thread on a pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
+      content: z.string().describe("The content of the comment to be added."),
+      project: z.string().optional().describe("Project ID or project name (optional)"),
+      filePath: z.string().optional().describe("The path of the file where the comment thread will be created. (optional)"),
+      rightFileStartLine: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. Starts at 1. (optional)"),
+      rightFileStartOffset: z
+        .number()
+        .optional()
+        .describe(
+          "Position of first character of the thread's span in right file. The line number of a thread's position. The character offset of a thread's position inside of a line. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"
+        ),
+      rightFileEndLine: z
+        .number()
+        .optional()
+        .describe(
+          "Position of last character of the thread's span in right file. The line number of a thread's position. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"
+        ),
+      rightFileEndOffset: z
+        .number()
+        .optional()
+        .describe(
+          "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must only be set if rightFileEndLine is also specified. (optional)"
+        ),
+    },
+    async ({ repositoryId, pullRequestId, content, project, filePath, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      const threadContext: CommentThreadContext = { filePath: filePath };
+
+      if (rightFileStartLine !== undefined) {
+        if (rightFileStartLine < 1) {
+          throw new Error("rightFileStartLine must be greater than or equal to 1.");
+        }
+
+        threadContext.rightFileStart = { line: rightFileStartLine };
+
+        if (rightFileStartOffset !== undefined) {
+          if (rightFileStartOffset < 1) {
+            throw new Error("rightFileStartOffset must be greater than or equal to 1.");
+          }
+
+          threadContext.rightFileStart.offset = rightFileStartOffset;
+        }
+      }
+
+      if (rightFileEndLine !== undefined) {
+        if (rightFileStartLine === undefined) {
+          throw new Error("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
+        }
+
+        if (rightFileEndLine < 1) {
+          throw new Error("rightFileEndLine must be greater than or equal to 1.");
+        }
+
+        threadContext.rightFileEnd = { line: rightFileEndLine };
+
+        if (rightFileEndOffset !== undefined) {
+          if (rightFileEndOffset < 1) {
+            throw new Error("rightFileEndOffset must be greater than or equal to 1.");
+          }
+
+          threadContext.rightFileEnd.offset = rightFileEndOffset;
+        }
+      }
+
+      const thread = await gitApi.createThread({ comments: [{ content: content }], threadContext: threadContext }, repositoryId, pullRequestId, project);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
       };
     }
   );
@@ -518,8 +668,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
       threadId: z.number().describe("The ID of the thread to be resolved."),
+      fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of a simple confirmation message."),
     },
-    async ({ repositoryId, pullRequestId, threadId }) => {
+    async ({ repositoryId, pullRequestId, threadId, fullResponse }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const thread = await gitApi.updateThread(
@@ -529,8 +680,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         threadId
       );
 
+      // Check if the thread was successfully resolved
+      if (!thread) {
+        return {
+          content: [{ type: "text", text: `Error: Failed to resolve thread ${threadId}. The thread status was not updated successfully.` }],
+          isError: true,
+        };
+      }
+
+      if (fullResponse) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
+        };
+      }
+
       return {
-        content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
+        content: [{ type: "text", text: `Thread ${threadId} was successfully resolved.` }],
       };
     }
   );

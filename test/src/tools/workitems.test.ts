@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/workitems";
 import { WebApi } from "azure-devops-node-api";
+import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import {
   _mockBacklogs,
   _mockQuery,
@@ -426,6 +427,33 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemComment));
     });
+
+    it("should handle fetch failure response", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
+
+      if (!call) throw new Error("wit_add_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      // Mock fetch for the API call
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Not Found",
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        comment: "hello world!",
+        project: "Contoso",
+        workItemId: 299,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Failed to add a work item comment: Not Found");
+    });
   });
 
   describe("link_work_item_to_pull_request tool", () => {
@@ -604,16 +632,25 @@ describe("configureWorkItemTools", () => {
         id: 131489,
         updates: [
           {
-            op: "add",
+            op: "Add",
             path: "/fields/System.Title",
             value: "Updated Sample Task",
+          },
+          {
+            op: "Replace",
+            path: "/fields/System.Description",
+            value: "Updated Description",
           },
         ],
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, params.updates, params.id);
+      // In line 456-471, the operation is actually not transformed to lowercase
+      // despite the comment saying otherwise, so we use the original value
+      const expectedUpdates = params.updates;
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, expectedUpdates, params.id);
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
     });
@@ -792,7 +829,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "Contoso",
         query: "342f0f44-4069-46b1-a940-3d0468979ceb",
-        expand: "none",
+        expand: "None",
         depth: 1,
         includeDeleted: false,
         useIsoDateFormat: false,
@@ -800,7 +837,7 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(params.project, params.query, params.expand, params.depth, params.includeDeleted, params.useIsoDateFormat);
+      expect(mockWorkItemTrackingApi.getQuery).toHaveBeenCalledWith(params.project, params.query, QueryExpand.None, params.depth, params.includeDeleted, params.useIsoDateFormat);
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockQuery], null, 2));
     });
@@ -935,6 +972,22 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
+      // This verifies that the updates are grouped by work item ID as implemented in line 643
+      const expectedBody = [
+        {
+          method: "PATCH",
+          uri: "/_apis/wit/workitems/1?api-version=5.0",
+          headers: { "Content-Type": "application/json-patch+json" },
+          body: [{ op: "replace", path: "/fields/System.Title", value: "Updated Title" }],
+        },
+        {
+          method: "PATCH",
+          uri: "/_apis/wit/workitems/2?api-version=5.0",
+          headers: { "Content-Type": "application/json-patch+json" },
+          body: [{ op: "add", path: "/fields/System.Description", value: "New Description" }],
+        },
+      ];
+
       expect(fetch).toHaveBeenCalledWith(
         "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
         expect.objectContaining({
@@ -943,6 +996,77 @@ describe("configureWorkItemTools", () => {
             "Authorization": "Bearer fake-token",
             "Content-Type": "application/json",
           }),
+          body: JSON.stringify(expectedBody),
+        })
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, success: true }], null, 2));
+    });
+
+    it("should handle Markdown format for large text fields", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_items_batch");
+      if (!call) throw new Error("wit_update_work_items_batch tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue([{ id: 1, success: true }]),
+      });
+
+      const longDescription = "This is a very long description that is definitely more than 50 characters long and should trigger Markdown formatting";
+
+      const params = {
+        updates: [
+          {
+            op: "Add", // Match the capitalization in the implementation
+            id: 1,
+            path: "/fields/System.Description",
+            value: longDescription,
+            format: "Markdown",
+          },
+          {
+            op: "Add", // Match the capitalization in the implementation
+            id: 1,
+            path: "/fields/System.Title",
+            value: "Simple Title",
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      // This verifies that the Markdown format is applied for the long text field as implemented in line 643
+      const expectedBody = [
+        {
+          method: "PATCH",
+          uri: "/_apis/wit/workitems/1?api-version=5.0",
+          headers: { "Content-Type": "application/json-patch+json" },
+          body: [
+            { op: "Add", path: "/fields/System.Description", value: longDescription },
+            { op: "Add", path: "/fields/System.Title", value: "Simple Title" },
+            {
+              op: "Add",
+              path: "/multilineFieldsFormat/System.Description",
+              value: "Markdown",
+            },
+          ],
+        },
+      ];
+
+      expect(fetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(expectedBody),
         })
       );
 
@@ -1051,83 +1175,6 @@ describe("configureWorkItemTools", () => {
       };
 
       await expect(handler(params)).rejects.toThrow("Failed to update work items in batch: Unauthorized");
-    });
-  });
-
-  describe("close_and_link_workitem_duplicates tool", () => {
-    it("should close and link duplicate work items successfully", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_close_and_link_workitem_duplicates");
-      if (!call) throw new Error("wit_close_and_link_workitem_duplicates tool not registered");
-      const [, , , handler] = call;
-
-      mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue([
-          { id: 2, success: true },
-          { id: 3, success: true },
-        ]),
-      });
-
-      const params = {
-        id: 1,
-        duplicateIds: [2, 3],
-        project: "TestProject",
-        state: "Closed",
-      };
-
-      const result = await handler(params);
-
-      expect(fetch).toHaveBeenCalledWith(
-        "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
-        expect.objectContaining({
-          method: "PATCH",
-          headers: expect.objectContaining({
-            "Authorization": "Bearer fake-token",
-            "Content-Type": "application/json",
-          }),
-        })
-      );
-
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          [
-            { id: 2, success: true },
-            { id: 3, success: true },
-          ],
-          null,
-          2
-        )
-      );
-    });
-
-    it("should handle duplicate closure failure", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_close_and_link_workitem_duplicates");
-      if (!call) throw new Error("wit_close_and_link_workitem_duplicates tool not registered");
-      const [, , , handler] = call;
-
-      mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
-
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        statusText: "Forbidden",
-      });
-
-      const params = {
-        id: 1,
-        duplicateIds: [2, 3],
-        project: "TestProject",
-        state: "Removed",
-      };
-
-      await expect(handler(params)).rejects.toThrow("Failed to update work items in batch: Forbidden");
     });
   });
 

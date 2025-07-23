@@ -3,7 +3,7 @@
 
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiVersion } from "../utils.js";
+import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
@@ -31,7 +31,10 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       repositoryType: z.enum(["TfsGit", "GitHub", "BitbucketCloud"]).optional().describe("Type of repository to filter build definitions"),
       name: z.string().optional().describe("Name of the build definition to filter"),
       path: z.string().optional().describe("Path of the build definition to filter"),
-      queryOrder: z.nativeEnum(DefinitionQueryOrder).optional().describe("Order in which build definitions are returned"),
+      queryOrder: z
+        .enum(getEnumKeys(DefinitionQueryOrder) as [string, ...string[]])
+        .optional()
+        .describe("Order in which build definitions are returned"),
       top: z.number().optional().describe("Maximum number of build definitions to return"),
       continuationToken: z.string().optional().describe("Token for continuing paged results"),
       minMetricsTime: z.coerce.date().optional().describe("Minimum metrics time to filter build definitions"),
@@ -70,7 +73,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
         name,
         repositoryId,
         repositoryType,
-        queryOrder,
+        safeEnumConvert(DefinitionQueryOrder, queryOrder),
         top,
         continuationToken,
         minMetricsTime,
@@ -129,7 +132,11 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       continuationToken: z.string().optional().describe("Token for continuing paged results"),
       maxBuildsPerDefinition: z.number().optional().describe("Maximum number of builds per definition"),
       deletedFilter: z.number().optional().describe("Filter for deleted builds (see QueryDeletedOption enum)"),
-      queryOrder: z.nativeEnum(BuildQueryOrder).default(BuildQueryOrder.QueueTimeDescending).optional().describe("Order in which builds are returned"),
+      queryOrder: z
+        .enum(getEnumKeys(BuildQueryOrder) as [string, ...string[]])
+        .default("QueueTimeDescending")
+        .optional()
+        .describe("Order in which builds are returned"),
       branchName: z.string().optional().describe("Branch name to filter builds"),
       buildIds: z.array(z.number()).optional().describe("Array of build IDs to retrieve"),
       repositoryId: z.string().optional().describe("Repository ID to filter builds"),
@@ -177,7 +184,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
         continuationToken,
         maxBuildsPerDefinition,
         deletedFilter,
-        queryOrder,
+        safeEnumConvert(BuildQueryOrder, queryOrder),
         branchName,
         buildIds,
         repositoryId,
@@ -314,7 +321,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       project: z.string().describe("Project ID or name to update the build stage for"),
       buildId: z.number().describe("ID of the build to update"),
       stageName: z.string().describe("Name of the stage to update"),
-      status: z.nativeEnum(StageUpdateType).describe("New status for the stage"),
+      status: z.enum(getEnumKeys(StageUpdateType) as [string, ...string[]]).describe("New status for the stage"),
       forceRetryAllJobs: z.boolean().default(false).describe("Whether to force retry all jobs in the stage."),
     },
     async ({ project, buildId, stageName, status, forceRetryAllJobs }) => {
@@ -325,7 +332,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
 
       const body = {
         forceRetryAllJobs: forceRetryAllJobs,
-        state: status.valueOf(),
+        state: safeEnumConvert(StageUpdateType, status),
       };
 
       const response = await fetch(endpoint, {

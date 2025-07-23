@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { ReleaseDefinitionExpands, ReleaseDefinitionQueryOrder, ReleaseExpands, ReleaseStatus, ReleaseQueryOrder } from "azure-devops-node-api/interfaces/ReleaseInterfaces.js";
 import { z } from "zod";
+import { getEnumKeys, safeEnumConvert } from "../utils.js";
 
 const RELEASE_TOOLS = {
   get_release_definitions: "release_get_definitions",
@@ -19,12 +20,18 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
     {
       project: z.string().describe("Project ID or name to get release definitions for"),
       searchText: z.string().optional().describe("Search text to filter release definitions"),
-      expand: z.nativeEnum(ReleaseDefinitionExpands).default(ReleaseDefinitionExpands.None).describe("Expand options for release definitions"),
+      expand: z
+        .enum(getEnumKeys(ReleaseDefinitionExpands) as [string, ...string[]])
+        .default("None")
+        .describe("Expand options for release definitions"),
       artifactType: z.string().optional().describe("Filter by artifact type"),
       artifactSourceId: z.string().optional().describe("Filter by artifact source ID"),
       top: z.number().optional().describe("Number of results to return (for pagination)"),
       continuationToken: z.string().optional().describe("Continuation token for pagination"),
-      queryOrder: z.nativeEnum(ReleaseDefinitionQueryOrder).default(ReleaseDefinitionQueryOrder.NameAscending).describe("Order of the results"),
+      queryOrder: z
+        .enum(getEnumKeys(ReleaseDefinitionQueryOrder) as [string, ...string[]])
+        .default("NameAscending")
+        .describe("Order of the results"),
       path: z.string().optional().describe("Path to filter release definitions"),
       isExactNameMatch: z.boolean().optional().default(false).describe("Whether to match the exact name of the release definition. Default is false."),
       tagFilter: z.array(z.string()).optional().describe("Filter by tags associated with the release definitions"),
@@ -55,12 +62,12 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
       const releaseDefinitions = await releaseApi.getReleaseDefinitions(
         project,
         searchText,
-        expand,
+        safeEnumConvert(ReleaseDefinitionExpands, expand),
         artifactType,
         artifactSourceId,
         top,
         continuationToken,
-        queryOrder,
+        safeEnumConvert(ReleaseDefinitionQueryOrder, queryOrder),
         path,
         isExactNameMatch,
         tagFilter,
@@ -85,7 +92,11 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
       definitionEnvironmentId: z.number().optional().describe("ID of the definition environment to filter releases"),
       searchText: z.string().optional().describe("Search text to filter releases"),
       createdBy: z.string().optional().describe("User ID or name who created the release"),
-      statusFilter: z.nativeEnum(ReleaseStatus).optional().default(ReleaseStatus.Active).describe("Status of the releases to filter (default: Active)"),
+      statusFilter: z
+        .enum(getEnumKeys(ReleaseStatus) as [string, ...string[]])
+        .optional()
+        .default("Active")
+        .describe("Status of the releases to filter (default: Active)"),
       environmentStatusFilter: z.number().optional().describe("Environment status to filter releases"),
       minCreatedTime: z.coerce
         .date()
@@ -101,10 +112,18 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
         .optional()
         .default(() => new Date())
         .describe("Maximum created time for releases (default: now)"),
-      queryOrder: z.nativeEnum(ReleaseQueryOrder).optional().default(ReleaseQueryOrder.Ascending).describe("Order in which to return releases (default: Ascending)"),
+      queryOrder: z
+        .enum(getEnumKeys(ReleaseQueryOrder) as [string, ...string[]])
+        .optional()
+        .default("Ascending")
+        .describe("Order in which to return releases (default: Ascending)"),
       top: z.number().optional().describe("Number of releases to return"),
       continuationToken: z.number().optional().describe("Continuation token for pagination"),
-      expand: z.nativeEnum(ReleaseExpands).optional().default(ReleaseExpands.None).describe("Expand options for releases"),
+      expand: z
+        .enum(getEnumKeys(ReleaseExpands) as [string, ...string[]])
+        .optional()
+        .default("None")
+        .describe("Expand options for releases"),
       artifactTypeId: z.string().optional().describe("Filter releases by artifact type ID"),
       sourceId: z.string().optional().describe("Filter releases by artifact source ID"),
       artifactVersionId: z.string().optional().describe("Filter releases by artifact version ID"),
@@ -147,14 +166,14 @@ function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<A
         definitionEnvironmentId,
         searchText,
         createdBy,
-        statusFilter,
+        safeEnumConvert(ReleaseStatus, statusFilter),
         environmentStatusFilter,
         minCreatedTime,
         maxCreatedTime,
-        queryOrder,
+        safeEnumConvert(ReleaseQueryOrder, queryOrder),
         top,
         continuationToken,
-        expand,
+        safeEnumConvert(ReleaseExpands, expand),
         artifactTypeId,
         sourceId,
         artifactVersionId,

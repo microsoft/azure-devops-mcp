@@ -73,12 +73,12 @@ Interact with these Azure DevOps services:
 - **wit_get_query**: Get a query by its ID or path.
 - **wit_get_query_results_by_id**: Retrieve the results of a work item query given the query ID.
 - **wit_update_work_items_batch**: Update work items in batch.
-- **wit_close_and_link_workitem_duplicates**: Close duplicate work items by ID.
 - **wit_work_items_link**: Link work items together in batch.
 
 #### Deprecated Tools
 
 - **wit_add_child_work_item**: Replaced by `wit_add_child_work_items` to allow creating one or more child items per call.
+- **wit_close_and_link_workitem_duplicates**: This tool is no longer needed. Finding and marking duplicates can be done with other tools.
 
 ### 📁 Repositories
 
@@ -96,9 +96,10 @@ Interact with these Azure DevOps services:
 - **repo_create_pull_request**: Create a new pull request.
 - **repo_update_pull_request_status**: Update the status of an existing pull request to active or abandoned.
 - **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
-- **repo_reply_to_comment**: Reply to a specific comment on a pull request.
-- **repo_resolve_comment**: Resolve a specific comment thread on a pull request.
-- **repo_search_commits**: Search for commits.
+- **repo_reply_to_comment**: Replies to a specific comment on a pull request.
+- **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
+- **repo_search_commits**: Searches for commits.
+- **repo_create_pull_request_thread**: Creates a new comment thread on a pull request.
 
 ### 🛰️ Builds
 
