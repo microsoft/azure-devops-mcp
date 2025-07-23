@@ -23,6 +23,7 @@
   "scripts": {
     "preinstall": "npm config set registry https://registry.npmjs.org/",
     "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write src/version.ts",
+    "validate-tools": "tsc --noEmit && node scripts/build-validate-tools.js",
     "build": "tsc && shx chmod +x dist/*.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
@@ -51,6 +52,7 @@
     "@types/node": "^22",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-header": "^3.1.1",
+    "glob": "^11.0.3",
     "jest": "^30.0.2",
     "jest-extended": "^6.0.0",
     "prettier": "3.6.2",
