@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { validateName } from '../dist/shared/tool-validation.js';
+import { validateName } from "../dist/shared/tool-validation.js";
 
 /**
  * Custom ESLint rule to validate Azure DevOps MCP tool names and parameter names
@@ -27,26 +27,14 @@ export default {
     return {
       // Check tool constant definitions like: toolName: "actual_tool_name"
       Property(node) {
-        if (
-          node.value &&
-          node.value.type === "Literal" &&
-          typeof node.value.value === "string" &&
-          node.parent &&
-          node.parent.type === "ObjectExpression"
-        ) {
+        if (node.value && node.value.type === "Literal" && typeof node.value.value === "string" && node.parent && node.parent.type === "ObjectExpression") {
           const parentObject = node.parent.parent;
-          
+
           // Check if this is a tool constants object (contains "_TOOLS")
-          if (
-            parentObject &&
-            parentObject.type === "VariableDeclarator" &&
-            parentObject.id &&
-            parentObject.id.name &&
-            parentObject.id.name.includes("_TOOLS")
-          ) {
+          if (parentObject && parentObject.type === "VariableDeclarator" && parentObject.id && parentObject.id.name && parentObject.id.name.includes("_TOOLS")) {
             const toolName = node.value.value;
             const validation = validateName(toolName);
-            
+
             if (!validation.isValid) {
               context.report({
                 node: node.value,
@@ -75,7 +63,7 @@ export default {
         ) {
           const paramName = node.parent.key.name;
           const validation = validateName(paramName);
-          
+
           if (!validation.isValid) {
             context.report({
               node: node.parent.key,

@@ -1,36 +1,36 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { validateToolName, validateParameterName, extractToolNames, extractParameterNames } from '../../src/shared/tool-validation';
+import { validateToolName, validateParameterName, extractToolNames, extractParameterNames } from "../../src/shared/tool-validation";
 
-describe('Tool Name Validation', () => {
-  describe('validateToolName', () => {
-    test('should accept valid tool names', () => {
+describe("Tool Name Validation", () => {
+  describe("validateToolName", () => {
+    test("should accept valid tool names", () => {
       const validNames = [
-        'repo_create_pull_request',
-        'build_get_status',
-        'tool.name',
-        'tool-name',
-        'tool_123',
-        'a',
-        'A' + 'a'.repeat(62) + 'Z', // exactly 64 characters
+        "repo_create_pull_request",
+        "build_get_status",
+        "tool.name",
+        "tool-name",
+        "tool_123",
+        "a",
+        "A" + "a".repeat(62) + "Z", // exactly 64 characters
       ];
 
-      validNames.forEach(name => {
+      validNames.forEach((name) => {
         const result = validateToolName(name);
         expect(result.isValid).toBe(true);
         expect(result.error).toBeUndefined();
       });
     });
 
-    test('should reject invalid tool names', () => {
+    test("should reject invalid tool names", () => {
       const invalidCases = [
-        { name: '', expectedError: 'Tool name cannot be empty' },
-        { name: 'tool name', expectedError: 'contains invalid characters' },
-        { name: 'tool/name', expectedError: 'contains invalid characters' },
-        { name: 'tool@name', expectedError: 'contains invalid characters' },
-        { name: 'tool name with spaces', expectedError: 'contains invalid characters' },
-        { name: 'A' + 'a'.repeat(63) + 'Z', expectedError: 'is 65 characters long, maximum allowed is 64' }, // 65 characters
+        { name: "", expectedError: "Tool name cannot be empty" },
+        { name: "tool name", expectedError: "contains invalid characters" },
+        { name: "tool/name", expectedError: "contains invalid characters" },
+        { name: "tool@name", expectedError: "contains invalid characters" },
+        { name: "tool name with spaces", expectedError: "contains invalid characters" },
+        { name: "A" + "a".repeat(63) + "Z", expectedError: "is 65 characters long, maximum allowed is 64" }, // 65 characters
       ];
 
       invalidCases.forEach(({ name, expectedError }) => {
@@ -41,29 +41,22 @@ describe('Tool Name Validation', () => {
     });
   });
 
-  describe('validateParameterName', () => {
-    test('should accept valid parameter names', () => {
-      const validNames = [
-        'project',
-        'repositoryId',
-        'includeDetails',
-        'param.name',
-        'param-name',
-        'param_123',
-      ];
+  describe("validateParameterName", () => {
+    test("should accept valid parameter names", () => {
+      const validNames = ["project", "repositoryId", "includeDetails", "param.name", "param-name", "param_123"];
 
-      validNames.forEach(name => {
+      validNames.forEach((name) => {
         const result = validateParameterName(name);
         expect(result.isValid).toBe(true);
         expect(result.error).toBeUndefined();
       });
     });
 
-    test('should reject invalid parameter names', () => {
+    test("should reject invalid parameter names", () => {
       const invalidCases = [
-        { name: '', expectedError: 'Parameter name cannot be empty' },
-        { name: 'param name', expectedError: 'contains invalid characters' },
-        { name: 'param/name', expectedError: 'contains invalid characters' },
+        { name: "", expectedError: "Parameter name cannot be empty" },
+        { name: "param name", expectedError: "contains invalid characters" },
+        { name: "param/name", expectedError: "contains invalid characters" },
       ];
 
       invalidCases.forEach(({ name, expectedError }) => {
@@ -74,37 +67,37 @@ describe('Tool Name Validation', () => {
     });
   });
 
-  describe('Character limits', () => {
-    test('should handle edge cases for 64 character limit', () => {
-      const exactly64 = 'a'.repeat(64);
-      const exactly65 = 'a'.repeat(65);
+  describe("Character limits", () => {
+    test("should handle edge cases for 64 character limit", () => {
+      const exactly64 = "a".repeat(64);
+      const exactly65 = "a".repeat(65);
 
       expect(validateToolName(exactly64).isValid).toBe(true);
       expect(validateToolName(exactly65).isValid).toBe(false);
     });
   });
 
-  describe('Valid character patterns', () => {
-    test('should allow all valid characters', () => {
+  describe("Valid character patterns", () => {
+    test("should allow all valid characters", () => {
       // Test a shorter string that includes all valid character types but stays under 64 chars
-      const validChars = 'abc_XYZ_123_.-test';
+      const validChars = "abc_XYZ_123_.-test";
       const result = validateToolName(validChars);
       expect(result.isValid).toBe(true);
     });
 
-    test('should reject invalid characters', () => {
-      const invalidChars = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '+', '=', '[', ']', '{', '}', '|', '\\', ':', ';', '"', "'", '<', '>', ',', '?', '/', ' '];
-      
-      invalidChars.forEach(char => {
+    test("should reject invalid characters", () => {
+      const invalidChars = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "+", "=", "[", "]", "{", "}", "|", "\\", ":", ";", '"', "'", "<", ">", ",", "?", "/", " "];
+
+      invalidChars.forEach((char) => {
         const result = validateToolName(`tool${char}name`);
         expect(result.isValid).toBe(false);
-        expect(result.error).toContain('contains invalid characters');
+        expect(result.error).toContain("contains invalid characters");
       });
     });
   });
 
-  describe('extractToolNames', () => {
-    test('should extract tool names from tool constants', () => {
+  describe("extractToolNames", () => {
+    test("should extract tool names from tool constants", () => {
       const fileContent = `
         const REPO_TOOLS = {
           getRepo: "repo_get_repo",
@@ -119,16 +112,10 @@ describe('Tool Name Validation', () => {
       `;
 
       const result = extractToolNames(fileContent);
-      expect(result).toEqual([
-        'repo_get_repo',
-        'repo_create_pull_request', 
-        'repo_list_branches',
-        'build_get_build',
-        'build_run_build'
-      ]);
+      expect(result).toEqual(["repo_get_repo", "repo_create_pull_request", "repo_list_branches", "build_get_build", "build_run_build"]);
     });
 
-    test('should handle different tool constant naming patterns', () => {
+    test("should handle different tool constant naming patterns", () => {
       const fileContent = `
         const WorkItemTools = {
           getWorkItem: "wit_get_work_item",
@@ -145,15 +132,10 @@ describe('Tool Name Validation', () => {
       `;
 
       const result = extractToolNames(fileContent);
-      expect(result).toEqual([
-        'wit_get_work_item',
-        'wit_update_work_item',
-        'testplan_create_test_plan',
-        'wiki_get_wiki'
-      ]);
+      expect(result).toEqual(["wit_get_work_item", "wit_update_work_item", "testplan_create_test_plan", "wiki_get_wiki"]);
     });
 
-    test('should return empty array when no tools found', () => {
+    test("should return empty array when no tools found", () => {
       const fileContent = `
         const someOtherConstant = {
           value: "not_a_tool",
@@ -168,7 +150,7 @@ describe('Tool Name Validation', () => {
       expect(result).toEqual([]);
     });
 
-    test('should handle malformed or incomplete tool definitions', () => {
+    test("should handle malformed or incomplete tool definitions", () => {
       const fileContent = `
         const PARTIAL_TOOLS = {
           validTool: "valid_tool_name",
@@ -179,15 +161,12 @@ describe('Tool Name Validation', () => {
       `;
 
       const result = extractToolNames(fileContent);
-      expect(result).toEqual([
-        'valid_tool_name',
-        'another_valid_tool'
-      ]);
+      expect(result).toEqual(["valid_tool_name", "another_valid_tool"]);
     });
   });
 
-  describe('extractParameterNames', () => {
-    test('should extract parameter names from Zod schemas', () => {
+  describe("extractParameterNames", () => {
+    test("should extract parameter names from Zod schemas", () => {
       const fileContent = `
         const schema = z.object({
           projectId: z.string(),
@@ -203,17 +182,10 @@ describe('Tool Name Validation', () => {
       `;
 
       const result = extractParameterNames(fileContent);
-      expect(result).toEqual([
-        'projectId',
-        'repositoryId',
-        'includeDetails',
-        'maxResults',
-        'buildId',
-        'status'
-      ]);
+      expect(result).toEqual(["projectId", "repositoryId", "includeDetails", "maxResults", "buildId", "status"]);
     });
 
-    test('should handle different Zod type definitions', () => {
+    test("should handle different Zod type definitions", () => {
       const fileContent = `
         const complexSchema = z.object({
           simpleString: z.string(),
@@ -226,17 +198,10 @@ describe('Tool Name Validation', () => {
       `;
 
       const result = extractParameterNames(fileContent);
-      expect(result).toEqual([
-        'simpleString',
-        'optionalNumber',
-        'arrayField',
-        'unionField',
-        'enumField',
-        'booleanField'
-      ]);
+      expect(result).toEqual(["simpleString", "optionalNumber", "arrayField", "unionField", "enumField", "booleanField"]);
     });
 
-    test('should return empty array when no parameters found', () => {
+    test("should return empty array when no parameters found", () => {
       const fileContent = `
         const nonZodObject = {
           regularProperty: "value",
@@ -252,7 +217,7 @@ describe('Tool Name Validation', () => {
       expect(result).toEqual([]);
     });
 
-    test('should handle mixed content with both schemas and other code', () => {
+    test("should handle mixed content with both schemas and other code", () => {
       const fileContent = `
         import { z } from 'zod';
         
@@ -276,12 +241,7 @@ describe('Tool Name Validation', () => {
       `;
 
       const result = extractParameterNames(fileContent);
-      expect(result).toEqual([
-        'repositoryId',
-        'includeMetadata',
-        'id',
-        'name'
-      ]);
+      expect(result).toEqual(["repositoryId", "includeMetadata", "id", "name"]);
     });
   });
 });

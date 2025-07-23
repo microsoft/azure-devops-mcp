@@ -14,7 +14,7 @@ Claude API has strict requirements for tool names and parameter names:
 Failing to comply results in errors like:
 
 ```json
-API Error: 400 
+API Error: 400
 {"type":"error","error":{"type":"invalid_request_error","message":"tools.127.custom.input_schema.properties: Property keys should match pattern '^[a-zA-Z0-9_.-]{1,64}$'"}}
 ```
 
@@ -77,6 +77,7 @@ npm run validate-tools
 **Location:** `src/shared/tool-validation.ts`
 
 **Functions:**
+
 - `validateToolName(toolName: string)`: Validates a single tool name
 - `validateParameterName(paramName: string)`: Validates a single parameter name
 - `validateName(name: string)`: Core validation function used by both tool and parameter validation
@@ -86,9 +87,9 @@ npm run validate-tools
 **Usage:**
 
 ```typescript
-import { validateToolName, validateParameterName } from './shared/tool-validation.js';
+import { validateToolName, validateParameterName } from "./shared/tool-validation.js";
 
-const validation = validateToolName('my_tool_name');
+const validation = validateToolName("my_tool_name");
 if (!validation.isValid) {
   console.error(validation.error);
 }
@@ -103,12 +104,13 @@ if (!validation.isValid) {
 **Test Categories:**
 
 - **Validation Functions**: Tests for `validateToolName` and `validateParameterName` with valid/invalid inputs
-- **Character Patterns**: Tests for all valid characters (a-z, A-Z, 0-9, _, ., -) and invalid characters
+- **Character Patterns**: Tests for all valid characters (a-z, A-Z, 0-9, \_, ., -) and invalid characters
 - **Length Limits**: Edge cases for 64-character maximum length
 - **Extraction Functions**: Tests for `extractToolNames` and `extractParameterNames` with real-world patterns
 - **Edge Cases**: Empty inputs, malformed content, mixed file content
 
 **Running Tests:**
+
 ```bash
 # Run all validation tests
 npm test test/src/tool-name-validation.test.ts

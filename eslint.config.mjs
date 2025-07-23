@@ -32,7 +32,7 @@ export default tseslint.config(
   {
     files: ["src/tools/*.ts"],
     plugins: {
-      "custom": {
+      custom: {
         rules: {
           "validate-tool-names": validateToolNamesRule,
         },
