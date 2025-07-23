@@ -364,15 +364,17 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       repositoryId: z.string().describe("The ID of the repository containing the pull request. Do not use the repository name here, use the ID instead."),
       pullRequestId: z.number().describe("The ID of the pull request to link to."),
       workItemId: z.number().describe("The ID of the work item to link to the pull request."),
+      pullRequestProjectId: z.string().optional().describe("The project ID containing the pull request. If not provided, defaults to the work item's project ID (for same-project linking)."),
     },
-    async ({ projectId, repositoryId, pullRequestId, workItemId }) => {
+    async ({ projectId, repositoryId, pullRequestId, workItemId, pullRequestProjectId }) => {
       try {
         const connection = await connectionProvider();
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         // Create artifact link relation using vstfs format
         // Format: vstfs:///Git/PullRequestId/{project}/{repositoryId}/{pullRequestId}
-        const artifactPathValue = `${projectId}/${repositoryId}/${pullRequestId}`;
+        const artifactProjectId = pullRequestProjectId && pullRequestProjectId.trim() !== "" ? pullRequestProjectId : projectId;
+        const artifactPathValue = `${artifactProjectId}/${repositoryId}/${pullRequestId}`;
         const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
 
         // Use the PATCH document format for adding a relation

@@ -562,6 +562,84 @@ describe("configureWorkItemTools", () => {
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.projectId);
     });
 
+    it("should use pullRequestProjectId instead of projectId when provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
+      if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
+
+      const [, , , handler] = call;
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+
+      const params = {
+        projectId: "work-item-project-id",
+        repositoryId: "repo-123",
+        pullRequestId: 67890,
+        workItemId: 131489,
+        pullRequestProjectId: "different-project-id",
+      };
+
+      // Should use pullRequestProjectId instead of projectId
+      const artifactPathValue = `${params.pullRequestProjectId}/${params.repositoryId}/${params.pullRequestId}`;
+      const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
+
+      const document = [
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "ArtifactLink",
+            url: vstfsUrl,
+            attributes: {
+              name: "Pull Request",
+            },
+          },
+        },
+      ];
+      await handler(params);
+
+      // Note: Work item should still be updated in the original project
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.projectId);
+    });
+
+    it("should fall back to projectId when pullRequestProjectId is empty", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
+      if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
+
+      const [, , , handler] = call;
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+
+      // Testing with empty string for pullRequestProjectId
+      const params = {
+        projectId: "work-item-project-id",
+        repositoryId: "repo-123",
+        pullRequestId: 67890,
+        workItemId: 131489,
+        pullRequestProjectId: "",
+      };
+
+      // Should use projectId since pullRequestProjectId is empty
+      const artifactPathValue = `${params.projectId}/${params.repositoryId}/${params.pullRequestId}`;
+      const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
+
+      const document = [
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "ArtifactLink",
+            url: vstfsUrl,
+            attributes: {
+              name: "Pull Request",
+            },
+          },
+        },
+      ];
+      await handler(params);
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.projectId);
+    });
+
     it("should handle link_work_item_to_pull_request unknown error type", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -577,6 +655,7 @@ describe("configureWorkItemTools", () => {
         repositoryId: "repo-123",
         pullRequestId: 42,
         workItemId: 1,
+        pullRequestProjectId: "other-project",
       };
 
       const result = await handler(params);
@@ -1235,10 +1314,11 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockRejectedValue(new Error("Linking failed"));
 
       const params = {
-        project: "TestProject",
+        projectId: "TestProject",
         repositoryId: "repo-123",
         pullRequestId: 42,
         workItemId: 1,
+        pullRequestProjectId: "OtherProject",
       };
 
       const result = await handler(params);
@@ -1257,10 +1337,11 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(null);
 
       const params = {
-        project: "TestProject",
+        projectId: "TestProject",
         repositoryId: "repo-123",
         pullRequestId: 42,
         workItemId: 1,
+        pullRequestProjectId: "OtherProject",
       };
 
       const result = await handler(params);
