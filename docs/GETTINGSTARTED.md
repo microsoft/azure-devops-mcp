@@ -88,7 +88,7 @@ Click "Select Tools" and choose the available tools.
 
 <img src="../docs/media/configure-mcp-server-tools.gif" alt="configure mcp server tools" width="300"/>
 
-We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
+>💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 
 ##### Start using it
 
@@ -144,7 +144,7 @@ Click "Select Tools" and choose the available tools.
 
 <img src="../docs/media/configure-mcp-server-tools.gif" alt="configure mcp server tools" width="300"/>
 
-We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will help you get the best experience using the Azure DevOps MCP Server in GitHub Copilot Chat.
+>💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will help you get the best experience using the Azure DevOps MCP Server in GitHub Copilot Chat.
 
 ### ➡️ Visual Studio 2022 & GitHub Copilot
 
@@ -191,7 +191,7 @@ Click the "Tools" icon and choose the available tools.
 
 <img src="../docs/media/set-tools-from-vs.png" alt="set tools to use in visual studio 2022" width="250"/>
 
-We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
+>💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 
 ##### Start using it
 
