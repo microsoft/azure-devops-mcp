@@ -15,11 +15,10 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 2. [🏆 Expectations](#-expectations)
 3. [⚙️ Supported Tools](#️-supported-tools)
 4. [🔌 Installation & Getting Started](#-installation--getting-started)
-5. [🔦 Usage](#-usage)
-6. [📝 Troubleshooting](#-troubleshooting)
-7. [🎩 Samples & Best Practices](#-samples--best-practices)
-8. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-9. [📌 Contributing](#-contributing)
+5. [📝 Troubleshooting](#-troubleshooting)
+6. [🎩 Examples & Best Practices](#-samples--best-practices)
+7. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+8. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -140,14 +139,7 @@ Interact with these Azure DevOps services:
 
 ## 🔌 Installation & Getting Started
 
-Clone the repository, install dependencies, and add it to your MCP client configuration.
-
-[VS Code and GitHub Copilot](#%EF%B8%8F-visual-studio-code--github-copilot)<br/>
-[Visual Studio 2022 and GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
-
-### ➡️ Visual Studio Code & GitHub Copilot
-
-For the best experience, use Visual Studio Code and GitHub Copilot.
+For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
 
 ### Prerequisites
 
@@ -181,7 +173,7 @@ This installation method is the easiest for all users of Visual Studio Code.
 
 ##### Steps
 
-1. In your project, add a `.vscode\mcp.json` file with the following content:
+In your project, add a `.vscode\mcp.json` file with the following content:
 
 ```json
 {
@@ -202,146 +194,31 @@ This installation method is the easiest for all users of Visual Studio Code.
 }
 ```
 
-2. Save the file, then click 'Start'.
+Save the file, then click 'Start'.
 
-  <img src="./docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
+<img src="./docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
 
-3. In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
-4. Click "Select Tools" and choose the available tools.
-5. We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](./.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
+In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
 
-#### 🛠️ Install from Source (Dev Mode)
+Click "Select Tools" and choose the available tools.
 
-This installation method is recommended for advanced users and contributors who want immediate access to the latest updates from the main branch. It is ideal if you are developing new tools, enhancing existing features, or maintaining a custom fork.
+<img src="./docs/media/configure-mcp-server-tools.gif" alt="configure mcp server tools" width="300"/>
 
-> **Note:** For most users, installing from the public feed is simpler and preferred. Use the source installation only if you need the latest changes or are actively contributing to the project.
+Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
 
-##### Steps
+> 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](./.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 
-1. Clone the repository.
-2. Install dependencies:
-
-```sh
-npm install
-```
-
-3. Edit or add `.vscode/mcp.json`:
-
-```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization's name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}"]
-    }
-  }
-}
-```
-
-4. Start the Azure DevOps MCP Server.
-
-  <img src="./docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
-
-5. In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
-6. Click "Select Tools" and choose the available tools.
-7. We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](./.github/copilot-instructions.md) file. This will help you get the best experience using the Azure DevOps MCP Server in GitHub Copilot Chat.
-
-See the [How To](./docs/HOWTO.md) section for details.
-
-### ➡️ Visual Studio 2022 & GitHub Copilot
-
-For the best experience, use Visual Studio Code and GitHub Copilot 👆.
-
-### Prerequisites
-
-1. Install [VS Studio 2022 version 17.14](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history) or later
-2. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-3. Open a project in Visual Studio.
-
-### Azure Login
-
-Ensure you are logged in to Azure DevOps via the Azure CLI:
-
-```sh
-az login
-```
-
-#### 🧨 Install from Public Feed (Recommended)
-
-This installation method is the easiest for all users of Visual Studio 2022.
-
-🎥 [Watch this quick start video to get up and running in under two minutes!](https://youtu.be/nz_Gn-WL7j0)
-
-##### Steps
-
-1. Add a `.mcp.json` file to the solution folder with the following content:
-
-```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
-    }
-  }
-}
-```
-
-2. Save the file.
-3. Add your organization name by clicking on the `input` option.
-
-   <img src="./docs/media/start-mcp-server-from-vs.png" alt="start mcp server from visual studio 2022" width="250"/>
-
-4. Open Copilot chat and switch to [Agent Mode](https://learn.microsoft.com/en-us/visualstudio/ide/copilot-agent-mode?view=vs-2022).
-5. Click the "Tools" icon and choose the available tools.
-
-   <img src="./docs/media/set-tools-from-vs.png" alt="set tools to use in visual studio 2022" width="250"/>
-
-6. We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](./.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
-
-## 🔦 Usage
-
-### Visual Studio Code + GitHub Copilot
-
-1. Open GitHub Copilot in VS Code and switch to Agent mode.
-2. Start the Azure DevOps MCP Server.
-3. The server appears in the tools list.
-4. Try prompts like "List ADO projects".
-
-### Visual Studio + GitHub Copilot
-
-> _Prerequisites:_ Visual Studio 2022 v17.14+, Agent mode enabled in Tools > Options > GitHub > Copilot > Copilot Chat.
-
-1. Switch to Agent mode in the Copilot Chat window.
-2. Enter your Azure DevOps organization name.
-3. Select desired `ado` tools.
-4. Try prompts like "List ADO projects".
-
-For more details, see [Visual Studio MCP Servers documentation](https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers?view=vs-2022) and the [Getting Started Video](https://www.youtube.com/watch?v=oPFecZHBCkg).
+See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
 
 ## 📝 Troubleshooting
 
 See the [Troubleshooting guide](./docs/TROUBLESHOOTING.md) for help with common issues and logging.
 
-## 🎩 Samples & Best Practices
+## 🎩 Examples & Best Practices
 
-Find sample prompts and best practices in our [How-to Guide](./docs/HOWTO.md).
+Explore example prompts in our [Examples documentation](./docs/EXAMPLES.md).
+
+For best practices and tips to enhance your experience with the MCP Server, refer to the [How-To guide](./docs/HOWTO.md).
 
 ## 🙋‍♀️ Frequently Asked Questions
 
