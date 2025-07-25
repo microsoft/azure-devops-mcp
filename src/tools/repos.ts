@@ -535,11 +535,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
+      includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
     },
-    async ({ repositoryId, pullRequestId }) => {
+    async ({ repositoryId, pullRequestId, includeWorkItemRefs }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId);
+      const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, undefined, undefined, undefined, undefined, undefined, includeWorkItemRefs);
       return {
         content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
       };
