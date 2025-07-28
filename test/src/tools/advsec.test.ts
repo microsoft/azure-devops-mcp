@@ -141,6 +141,166 @@ describe("configureAdvSecTools", () => {
       expect(returnedAlerts[2].title).toBe("Outdated dependency with known vulnerability");
     });
 
+    it("should handle pagination with continuation token", async () => {
+      configureAdvSecTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
+      if (!call) throw new Error("advsec_get_alerts tool not registered");
+      const [, , , handler] = call;
+
+      // First call - returns first page (simulating PagedList without continuation token in response)
+      const firstPageMockResult: PagedList<Alert> = [
+        {
+          alertId: 1,
+          state: State.Active,
+          severity: Severity.High,
+          alertType: AlertType.Secret,
+          title: "AWS access key in code",
+          physicalLocations: [
+            {
+              filePath: "src/aws-client.js",
+              region: {
+                lineStart: 5,
+                lineEnd: 5,
+              },
+            },
+          ],
+        },
+        {
+          alertId: 2,
+          state: State.Active,
+          severity: Severity.Medium,
+          alertType: AlertType.Secret,
+          title: "GitHub token exposed",
+          physicalLocations: [
+            {
+              filePath: "src/github-api.js",
+              region: {
+                lineStart: 12,
+                lineEnd: 12,
+              },
+            },
+          ],
+        },
+      ];
+      firstPageMockResult.continuationToken = "next-page-token-abc123";
+
+      (mockAlertApi.getAlerts as jest.Mock).mockResolvedValueOnce(firstPageMockResult);
+
+      const firstParams = {
+        project: "test-project",
+        repository: "test-repo",
+        alertType: "secret",
+        states: ["active"],
+        severities: ["medium", "high"],
+        top: 2,
+      };
+
+      const firstResult = await handler(firstParams);
+
+      // Verify first call
+      expect(mockAlertApi.getAlerts).toHaveBeenCalledWith(
+        "test-project",
+        "test-repo",
+        2, // top
+        undefined, // orderBy
+        {
+          alertType: AlertType.Secret,
+          states: [State.Active],
+          severities: [Severity.Medium, Severity.High],
+        },
+        undefined, // expand
+        undefined // continuationToken
+      );
+
+      // Second call
+      const secondPageMockResult: PagedList<Alert> = [
+        {
+          alertId: 3,
+          state: State.Active,
+          severity: Severity.High,
+          alertType: AlertType.Secret,
+          title: "Database password in plaintext",
+          physicalLocations: [
+            {
+              filePath: "src/database/connection.js",
+              region: {
+                lineStart: 8,
+                lineEnd: 8,
+              },
+            },
+          ],
+        },
+        {
+          alertId: 4,
+          state: State.Active,
+          severity: Severity.Medium,
+          alertType: AlertType.Secret,
+          title: "API key in configuration file",
+          physicalLocations: [
+            {
+              filePath: "config/production.json",
+              region: {
+                lineStart: 15,
+                lineEnd: 15,
+              },
+            },
+          ],
+        },
+      ];
+
+      (mockAlertApi.getAlerts as jest.Mock).mockResolvedValueOnce(secondPageMockResult);
+
+      const secondParams = {
+        project: "test-project",
+        repository: "test-repo",
+        alertType: "secret",
+        states: ["active"],
+        severities: ["medium", "high"],
+        top: 2,
+        continuationToken: "next-page-token-abc123",
+      };
+
+      const secondResult = await handler(secondParams);
+
+      // Verify second call with continuation token
+      expect(mockAlertApi.getAlerts).toHaveBeenLastCalledWith(
+        "test-project",
+        "test-repo",
+        2, // top
+        undefined, // orderBy
+        {
+          alertType: AlertType.Secret,
+          states: [State.Active],
+          severities: [Severity.Medium, Severity.High],
+        },
+        undefined, // expand
+        "next-page-token-abc123" // continuationToken
+      );
+
+      // Verify both results
+      expect(firstResult.isError).toBeUndefined();
+      expect(secondResult.isError).toBeUndefined();
+
+      const firstPageAlerts = JSON.parse(firstResult.content[0].text);
+      const secondPageAlerts = JSON.parse(secondResult.content[0].text);
+
+      // Verify we get different alerts for each page
+      expect(firstPageAlerts).toHaveLength(2);
+      expect(firstPageAlerts[0].alertId).toBe(1);
+      expect(firstPageAlerts[1].alertId).toBe(2);
+
+      expect(secondPageAlerts).toHaveLength(2);
+      expect(secondPageAlerts[0].alertId).toBe(3);
+      expect(secondPageAlerts[1].alertId).toBe(4);
+
+      // Verify both pages have secret alert types
+      expect(firstPageAlerts[0].alertType).toBe(AlertType.Secret);
+      expect(firstPageAlerts[1].alertType).toBe(AlertType.Secret);
+      expect(secondPageAlerts[0].alertType).toBe(AlertType.Secret);
+      expect(secondPageAlerts[1].alertType).toBe(AlertType.Secret);
+    });
+
     it("should handle API errors gracefully", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
