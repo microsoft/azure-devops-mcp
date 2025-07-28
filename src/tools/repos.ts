@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import {
   GitRef,
+  GitForkRef,
   PullRequestStatus,
   GitQueryCommitsCriteria,
   GitVersionType,
@@ -86,11 +87,20 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       description: z.string().optional().describe("The description of the pull request. Optional."),
       isDraft: z.boolean().optional().default(false).describe("Indicates whether the pull request is a draft. Defaults to false."),
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
+      forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
     },
-    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems }) => {
+    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
+
+      const forkSource: GitForkRef | undefined = forkSourceRepositoryId
+        ? {
+            repository: {
+              id: forkSourceRepositoryId,
+            },
+          }
+        : undefined;
 
       const pullRequest = await gitApi.createPullRequest(
         {
@@ -100,6 +110,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           description,
           isDraft,
           workItemRefs: workItemRefs,
+          forkSource,
         },
         repositoryId
       );
