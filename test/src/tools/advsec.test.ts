@@ -2,7 +2,8 @@ import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { AlertType, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
+import { Alert, AlertType, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
+import { PagedList } from "azure-devops-node-api/interfaces/common/VSSInterfaces";
 import { configureAdvSecTools } from "../../../src/tools/advsec";
 
 type TokenProviderMock = () => Promise<AccessToken>;
@@ -51,12 +52,12 @@ describe("configureAdvSecTools", () => {
       if (!call) throw new Error("advsec_get_alerts tool not registered");
       const [, , , handler] = call;
 
-      const mockResult = [
+      const mockResult: PagedList<Alert> = [
         {
           alertId: 1,
-          state: "active",
-          severity: "high",
-          alertType: "code",
+          state: State.Active,
+          severity: Severity.High,
+          alertType: AlertType.Code,
           title: "SQL Injection vulnerability",
           physicalLocations: [
             {
@@ -70,9 +71,9 @@ describe("configureAdvSecTools", () => {
         },
         {
           alertId: 2,
-          state: "active",
-          severity: "medium",
-          alertType: "code",
+          state: State.Active,
+          severity: Severity.Medium,
+          alertType: AlertType.Code,
           title: "Cross-site scripting (XSS) vulnerability",
           physicalLocations: [
             {
@@ -86,9 +87,9 @@ describe("configureAdvSecTools", () => {
         },
         {
           alertId: 3,
-          state: "active",
-          severity: "low",
-          alertType: "dependency",
+          state: State.Active,
+          severity: Severity.Low,
+          alertType: AlertType.Dependency,
           title: "Outdated dependency with known vulnerability",
           physicalLocations: [
             {
@@ -191,11 +192,11 @@ describe("configureAdvSecTools", () => {
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
       const [, , , handler] = call;
 
-      const mockResult = {
+      const mockResult: Alert = {
         alertId: 1,
-        state: "active",
-        severity: "high",
-        alertType: "code",
+        state: State.Active,
+        severity: Severity.High,
+        alertType: AlertType.Code,
         title: "Test security alert",
         physicalLocations: [
           {
