@@ -44,7 +44,7 @@ describe("configureAdvSecTools", () => {
   });
 
   describe("advsec_get_alerts tool", () => {
-    it("should call getAlerts API with correct parameters and return alerts", async () => {
+    it("should call getAlerts API with correct parameters and return multiple alerts", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
@@ -57,13 +57,45 @@ describe("configureAdvSecTools", () => {
           state: "active",
           severity: "high",
           alertType: "code",
-          title: "Test security alert",
+          title: "SQL Injection vulnerability",
           physicalLocations: [
             {
-              filePath: "src/test.js",
+              filePath: "src/database.js",
               region: {
-                lineStart: 10,
-                lineEnd: 12,
+                lineStart: 15,
+                lineEnd: 17,
+              },
+            },
+          ],
+        },
+        {
+          alertId: 2,
+          state: "active",
+          severity: "medium",
+          alertType: "code",
+          title: "Cross-site scripting (XSS) vulnerability",
+          physicalLocations: [
+            {
+              filePath: "src/ui/form.js",
+              region: {
+                lineStart: 42,
+                lineEnd: 45,
+              },
+            },
+          ],
+        },
+        {
+          alertId: 3,
+          state: "active",
+          severity: "low",
+          alertType: "dependency",
+          title: "Outdated dependency with known vulnerability",
+          physicalLocations: [
+            {
+              filePath: "package.json",
+              region: {
+                lineStart: 25,
+                lineEnd: 25,
               },
             },
           ],
@@ -96,8 +128,16 @@ describe("configureAdvSecTools", () => {
         undefined // continuationToken
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockResult, null, 2));
       expect(result.isError).toBeUndefined();
+      const returnedAlerts = JSON.parse(result.content[0].text);
+      expect(result.content[0].text).toBe(JSON.stringify(returnedAlerts, null, 2));
+      expect(returnedAlerts).toHaveLength(3);
+      expect(returnedAlerts[0].alertId).toBe(1);
+      expect(returnedAlerts[0].title).toBe("SQL Injection vulnerability");
+      expect(returnedAlerts[1].alertId).toBe(2);
+      expect(returnedAlerts[1].title).toBe("Cross-site scripting (XSS) vulnerability");
+      expect(returnedAlerts[2].alertId).toBe(3);
+      expect(returnedAlerts[2].title).toBe("Outdated dependency with known vulnerability");
     });
 
     it("should handle API errors gracefully", async () => {
