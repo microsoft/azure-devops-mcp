@@ -14,6 +14,7 @@ import {
   GitPullRequestQueryInput,
   GitPullRequestQueryType,
   CommentThreadContext,
+  CommentThreadStatus,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
@@ -583,6 +584,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     }
   );
 
+  const commentThreadStatusStrings = Object.values(CommentThreadStatus).filter((value): value is string => typeof value === "string");
+
   server.tool(
     REPO_TOOLS.create_pull_request_thread,
     "Creates a new comment thread on a pull request.",
@@ -592,6 +595,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       content: z.string().describe("The content of the comment to be added."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
       filePath: z.string().optional().describe("The path of the file where the comment thread will be created. (optional)"),
+      status: z
+        .enum(commentThreadStatusStrings as [string, ...string[]])
+        .optional()
+        .default(CommentThreadStatus[CommentThreadStatus.Active])
+        .describe("The status of the comment thread. Defaults to 'Active'."),
       rightFileStartLine: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. Starts at 1. (optional)"),
       rightFileStartOffset: z
         .number()
@@ -612,7 +620,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must only be set if rightFileEndLine is also specified. (optional)"
         ),
     },
-    async ({ repositoryId, pullRequestId, content, project, filePath, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
+    async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -654,7 +662,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         }
       }
 
-      const thread = await gitApi.createThread({ comments: [{ content: content }], threadContext: threadContext }, repositoryId, pullRequestId, project);
+      const thread = await gitApi.createThread(
+        { comments: [{ content: content }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
+        repositoryId,
+        pullRequestId,
+        project
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
