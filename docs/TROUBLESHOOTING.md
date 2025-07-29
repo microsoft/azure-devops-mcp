@@ -79,19 +79,19 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
        {
          "id": "ado_org",
          "type": "promptString",
-         "description": "Azure DevOps organization name (e.g. 'contoso')"
+         "description": "Azure DevOps organization name  (e.g. 'contoso')"
        },
        {
          "id": "ado_tenant",
          "type": "promptString",
          "description": "Azure tenant ID (required for multi-tenant scenarios)"
-       }
+        }
      ],
      "servers": {
        "ado": {
          "type": "stdio",
-         "command": "mcp-server-azuredevops",
-         "args": ["${input:ado_org}", "--tenant", "${input:ado_tenant}"]
+         "command": "npx",
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--tenant", "${input:ado_tenant}"]
        }
      }
    }
