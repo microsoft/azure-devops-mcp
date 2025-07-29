@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, mapStringToEnum } from "../../src/utils";
+import { createEnumMapping, mapStringArrayToEnum, mapStringToEnum } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -153,6 +153,152 @@ describe("utils", () => {
     });
   });
 
+  describe("mapStringArrayToEnum", () => {
+    describe("with AlertType enum", () => {
+      it("should map valid string array to enum array", () => {
+        const input = ["code", "secret", "dependency"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Code, AlertType.Secret, AlertType.Dependency]);
+      });
+
+      it("should be case insensitive", () => {
+        const input = ["CODE", "Secret", "dEpEnDeNcY"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Code, AlertType.Secret, AlertType.Dependency]);
+      });
+
+      it("should filter out invalid values", () => {
+        const input = ["code", "invalid", "secret", "nonexistent", "dependency"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Code, AlertType.Secret, AlertType.Dependency]);
+      });
+
+      it("should handle mixed valid and invalid values", () => {
+        const input = ["unknown", "invalidtype", "code", "", "secret"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Unknown, AlertType.Code, AlertType.Secret]);
+      });
+    });
+
+    describe("with State enum", () => {
+      it("should map valid states correctly", () => {
+        const input = ["active", "dismissed", "fixed"];
+        const result = mapStringArrayToEnum(input, State);
+
+        expect(result).toEqual([State.Active, State.Dismissed, State.Fixed]);
+      });
+
+      it("should handle all valid state values", () => {
+        const input = ["unknown", "active", "dismissed", "fixed", "autodismissed"];
+        const result = mapStringArrayToEnum(input, State);
+
+        expect(result).toEqual([State.Unknown, State.Active, State.Dismissed, State.Fixed, State.AutoDismissed]);
+      });
+    });
+
+    describe("with Severity enum", () => {
+      it("should map severity levels correctly", () => {
+        const input = ["critical", "high", "medium", "low"];
+        const result = mapStringArrayToEnum(input, Severity);
+
+        expect(result).toEqual([Severity.Critical, Severity.High, Severity.Medium, Severity.Low]);
+      });
+
+      it("should handle special severity values", () => {
+        const input = ["note", "warning", "error", "undefined"];
+        const result = mapStringArrayToEnum(input, Severity);
+
+        expect(result).toEqual([Severity.Note, Severity.Warning, Severity.Error, Severity.Undefined]);
+      });
+    });
+
+    describe("edge cases", () => {
+      it("should handle undefined input", () => {
+        const result = mapStringArrayToEnum(undefined, AlertType);
+
+        expect(result).toEqual([]);
+      });
+
+      it("should handle empty array", () => {
+        const result = mapStringArrayToEnum([], AlertType);
+
+        expect(result).toEqual([]);
+      });
+
+      it("should handle array with only invalid values", () => {
+        const input = ["invalid", "nonexistent", "badvalue"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([]);
+      });
+
+      it("should handle array with empty strings", () => {
+        const input = ["", "   ", "code", ""];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Code]);
+      });
+
+      it("should handle array with whitespace-only strings", () => {
+        const input = ["code", "   ", "\t", "\n", "secret"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Code, AlertType.Secret]);
+      });
+
+      it("should preserve order of valid values", () => {
+        const input = ["secret", "invalid", "code", "badvalue", "dependency"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Secret, AlertType.Code, AlertType.Dependency]);
+      });
+
+      it("should handle duplicate values", () => {
+        const input = ["code", "secret", "code", "dependency", "secret"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Code, AlertType.Secret, AlertType.Code, AlertType.Dependency, AlertType.Secret]);
+      });
+    });
+
+    describe("with different enum types", () => {
+      it("should work with Confidence enum", () => {
+        const input = ["high", "other"];
+        const result = mapStringArrayToEnum(input, Confidence);
+
+        expect(result).toEqual([Confidence.High, Confidence.Other]);
+      });
+
+      it("should work with AlertValidityStatus enum", () => {
+        const input = ["active", "inactive", "unknown", "none"];
+        const result = mapStringArrayToEnum(input, AlertValidityStatus);
+
+        expect(result).toEqual([AlertValidityStatus.Active, AlertValidityStatus.Inactive, AlertValidityStatus.Unknown, AlertValidityStatus.None]);
+      });
+    });
+
+    describe("performance and edge cases", () => {
+      it("should handle large arrays efficiently", () => {
+        const largeInput = Array(1000).fill("code");
+        const result = mapStringArrayToEnum(largeInput, AlertType);
+
+        expect(result).toHaveLength(1000);
+        expect(result.every((item) => item === AlertType.Code)).toBe(true);
+      });
+
+      it("should handle array with null and undefined-like strings", () => {
+        const input = ["null", "undefined", "code", "NaN"];
+        const result = mapStringArrayToEnum(input, AlertType);
+
+        expect(result).toEqual([AlertType.Code]);
+      });
+    });
+  });
+
   describe("integration tests", () => {
     it("should work together to map strings to enums", () => {
       // Create mapping and use it to map strings
@@ -184,6 +330,41 @@ describe("utils", () => {
         Severity.Low,
         Severity.Critical,
       ]);
+    });
+
+    it("should demonstrate mapStringArrayToEnum vs individual mapStringToEnum calls", () => {
+      const inputStates = ["active", "invalid", "dismissed", "badvalue", "fixed"];
+
+      // Using mapStringArrayToEnum (filters out invalid values)
+      const arrayResult = mapStringArrayToEnum(inputStates, State);
+
+      // Using individual mapStringToEnum calls with default (keeps all positions)
+      const stateMapping = createEnumMapping(State);
+      const individualResult = inputStates.map((state) => mapStringToEnum(state, stateMapping, State.Unknown));
+
+      expect(arrayResult).toEqual([State.Active, State.Dismissed, State.Fixed]);
+      expect(individualResult).toEqual([
+        State.Active,
+        State.Unknown, // invalid mapped to default
+        State.Dismissed,
+        State.Unknown, // badvalue mapped to default
+        State.Fixed,
+      ]);
+    });
+
+    it("should work with mapStringArrayToEnum for practical Azure DevOps scenarios", () => {
+      // Simulating API input that might have mixed case and invalid values
+      const alertTypes = ["CODE", "invalid", "Secret", "DEPENDENCY", "badtype"];
+      const severities = ["CRITICAL", "unknown_severity", "high", "MEDIUM"];
+      const states = ["Active", "dismissed", "FIXED", "invalid_state"];
+
+      const mappedAlertTypes = mapStringArrayToEnum(alertTypes, AlertType);
+      const mappedSeverities = mapStringArrayToEnum(severities, Severity);
+      const mappedStates = mapStringArrayToEnum(states, State);
+
+      expect(mappedAlertTypes).toEqual([AlertType.Code, AlertType.Secret, AlertType.Dependency]);
+      expect(mappedSeverities).toEqual([Severity.Critical, Severity.High, Severity.Medium]);
+      expect(mappedStates).toEqual([State.Active, State.Dismissed, State.Fixed]);
     });
   });
 });

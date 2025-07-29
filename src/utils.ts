@@ -23,6 +23,18 @@ export function mapStringToEnum<T>(value: string | undefined, enumMapping: Recor
 }
 
 /**
+ * Maps an array of strings to an array of enum values, filtering out invalid values.
+ * @param values Array of string values to map
+ * @param enumObject The enum object to map to
+ * @returns Array of valid enum values
+ */
+export function mapStringArrayToEnum<T extends Record<string, string | number>>(values: string[] | undefined, enumObject: T): Array<T[keyof T]> {
+  if (!values) return [];
+  const enumMapping = createEnumMapping(enumObject);
+  return values.map((value) => mapStringToEnum(value, enumMapping)).filter((v): v is T[keyof T] => v !== undefined);
+}
+
+/**
  * Converts a TypeScript numeric enum to an array of string keys for use with z.enum().
  * This ensures that enum schemas generate string values rather than numeric values.
  * @param enumObject The TypeScript enum object
