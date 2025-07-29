@@ -1,8 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { packageVersion } from "./version.js";
-
 export const apiVersion = "7.2-preview.1";
 export const batchApiVersion = "5.0";
 export const markdownCommentsApiVersion = "7.2-preview.4";
@@ -17,8 +15,9 @@ export function createEnumMapping<T extends Record<string, string | number>>(enu
   return mapping;
 }
 
-export function mapStringToEnum<T>(value: string | undefined, enumMapping: Record<string, T>, defaultValue?: T): T | undefined {
+export function mapStringToEnum<T extends Record<string, string | number>>(value: string | undefined, enumObject: T, defaultValue?: T[keyof T]): T[keyof T] | undefined {
   if (!value) return defaultValue;
+  const enumMapping = createEnumMapping(enumObject);
   return enumMapping[value.toLowerCase()] ?? defaultValue;
 }
 
@@ -30,8 +29,7 @@ export function mapStringToEnum<T>(value: string | undefined, enumMapping: Recor
  */
 export function mapStringArrayToEnum<T extends Record<string, string | number>>(values: string[] | undefined, enumObject: T): Array<T[keyof T]> {
   if (!values) return [];
-  const enumMapping = createEnumMapping(enumObject);
-  return values.map((value) => mapStringToEnum(value, enumMapping)).filter((v): v is T[keyof T] => v !== undefined);
+  return values.map((value) => mapStringToEnum(value, enumObject)).filter((v): v is T[keyof T] => v !== undefined);
 }
 
 /**

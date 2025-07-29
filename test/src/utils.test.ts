@@ -98,57 +98,51 @@ describe("utils", () => {
   });
 
   describe("mapStringToEnum", () => {
-    let alertTypeMapping: Record<string, AlertType>;
-
-    beforeEach(() => {
-      alertTypeMapping = createEnumMapping(AlertType);
-    });
-
     describe("with AlertType enum", () => {
       it("should map valid string to correct enum value", () => {
-        expect(mapStringToEnum("code", alertTypeMapping)).toBe(AlertType.Code);
-        expect(mapStringToEnum("secret", alertTypeMapping)).toBe(AlertType.Secret);
-        expect(mapStringToEnum("dependency", alertTypeMapping)).toBe(AlertType.Dependency);
-        expect(mapStringToEnum("unknown", alertTypeMapping)).toBe(AlertType.Unknown);
+        expect(mapStringToEnum("code", AlertType)).toBe(AlertType.Code);
+        expect(mapStringToEnum("secret", AlertType)).toBe(AlertType.Secret);
+        expect(mapStringToEnum("dependency", AlertType)).toBe(AlertType.Dependency);
+        expect(mapStringToEnum("unknown", AlertType)).toBe(AlertType.Unknown);
       });
 
       it("should be case insensitive", () => {
-        expect(mapStringToEnum("CODE", alertTypeMapping)).toBe(AlertType.Code);
-        expect(mapStringToEnum("Code", alertTypeMapping)).toBe(AlertType.Code);
-        expect(mapStringToEnum("cOdE", alertTypeMapping)).toBe(AlertType.Code);
+        expect(mapStringToEnum("CODE", AlertType)).toBe(AlertType.Code);
+        expect(mapStringToEnum("Code", AlertType)).toBe(AlertType.Code);
+        expect(mapStringToEnum("cOdE", AlertType)).toBe(AlertType.Code);
       });
 
       it("should return default value for invalid strings", () => {
-        expect(mapStringToEnum("invalid", alertTypeMapping, AlertType.Unknown)).toBe(AlertType.Unknown);
-        expect(mapStringToEnum("nonexistent", alertTypeMapping, AlertType.Code)).toBe(AlertType.Code);
+        expect(mapStringToEnum("invalid", AlertType, AlertType.Unknown)).toBe(AlertType.Unknown);
+        expect(mapStringToEnum("nonexistent", AlertType, AlertType.Code)).toBe(AlertType.Code);
       });
 
       it("should return undefined for invalid strings without default", () => {
-        expect(mapStringToEnum("invalid", alertTypeMapping)).toBeUndefined();
-        expect(mapStringToEnum("nonexistent", alertTypeMapping)).toBeUndefined();
+        expect(mapStringToEnum("invalid", AlertType)).toBeUndefined();
+        expect(mapStringToEnum("nonexistent", AlertType)).toBeUndefined();
       });
     });
 
     describe("edge cases", () => {
       it("should handle undefined input", () => {
-        expect(mapStringToEnum(undefined, alertTypeMapping)).toBeUndefined();
-        expect(mapStringToEnum(undefined, alertTypeMapping, AlertType.Unknown)).toBe(AlertType.Unknown);
+        expect(mapStringToEnum(undefined, AlertType)).toBeUndefined();
+        expect(mapStringToEnum(undefined, AlertType, AlertType.Unknown)).toBe(AlertType.Unknown);
       });
 
       it("should handle empty string", () => {
-        expect(mapStringToEnum("", alertTypeMapping)).toBeUndefined();
-        expect(mapStringToEnum("", alertTypeMapping, AlertType.Unknown)).toBe(AlertType.Unknown);
+        expect(mapStringToEnum("", AlertType)).toBeUndefined();
+        expect(mapStringToEnum("", AlertType, AlertType.Unknown)).toBe(AlertType.Unknown);
       });
 
       it("should handle whitespace strings", () => {
-        expect(mapStringToEnum("   ", alertTypeMapping)).toBeUndefined();
-        expect(mapStringToEnum("code ", alertTypeMapping)).toBeUndefined(); // Exact match required
+        expect(mapStringToEnum("   ", AlertType)).toBeUndefined();
+        expect(mapStringToEnum("code ", AlertType)).toBeUndefined(); // Exact match required
       });
 
-      it("should work with empty mapping", () => {
-        const emptyMapping: Record<string, AlertType> = {};
-        expect(mapStringToEnum("code", emptyMapping)).toBeUndefined();
-        expect(mapStringToEnum("code", emptyMapping, AlertType.Unknown)).toBe(AlertType.Unknown);
+      it("should work with empty enum object", () => {
+        const emptyEnum = {};
+        expect(mapStringToEnum("code", emptyEnum)).toBeUndefined();
+        expect(mapStringToEnum("code", emptyEnum, undefined)).toBeUndefined();
       });
     });
   });
@@ -301,28 +295,24 @@ describe("utils", () => {
 
   describe("integration tests", () => {
     it("should work together to map strings to enums", () => {
-      // Create mapping and use it to map strings
-      const confidenceMapping = createEnumMapping(Confidence);
-
-      expect(mapStringToEnum("high", confidenceMapping)).toBe(Confidence.High);
-      expect(mapStringToEnum("other", confidenceMapping)).toBe(Confidence.Other);
-      expect(mapStringToEnum("invalid", confidenceMapping, Confidence.Other)).toBe(Confidence.Other);
+      // Test using the new direct enum object API
+      expect(mapStringToEnum("high", Confidence)).toBe(Confidence.High);
+      expect(mapStringToEnum("other", Confidence)).toBe(Confidence.Other);
+      expect(mapStringToEnum("invalid", Confidence, Confidence.Other)).toBe(Confidence.Other);
     });
 
     it("should handle array of strings mapping to array of enums", () => {
-      const stateMapping = createEnumMapping(State);
       const inputStates = ["active", "dismissed", "unknown"];
 
-      const mappedStates = inputStates.map((state) => mapStringToEnum(state, stateMapping, State.Unknown));
+      const mappedStates = inputStates.map((state) => mapStringToEnum(state, State, State.Unknown));
 
       expect(mappedStates).toEqual([State.Active, State.Dismissed, State.Unknown]);
     });
 
     it("should handle mixed case and invalid values in array", () => {
-      const severityMapping = createEnumMapping(Severity);
       const inputSeverities = ["HIGH", "invalid", "low", "CRITICAL"];
 
-      const mappedSeverities = inputSeverities.map((severity) => mapStringToEnum(severity, severityMapping, Severity.Undefined));
+      const mappedSeverities = inputSeverities.map((severity) => mapStringToEnum(severity, Severity, Severity.Undefined));
 
       expect(mappedSeverities).toEqual([
         Severity.High,
@@ -339,8 +329,7 @@ describe("utils", () => {
       const arrayResult = mapStringArrayToEnum(inputStates, State);
 
       // Using individual mapStringToEnum calls with default (keeps all positions)
-      const stateMapping = createEnumMapping(State);
-      const individualResult = inputStates.map((state) => mapStringToEnum(state, stateMapping, State.Unknown));
+      const individualResult = inputStates.map((state) => mapStringToEnum(state, State, State.Unknown));
 
       expect(arrayResult).toEqual([State.Active, State.Dismissed, State.Fixed]);
       expect(individualResult).toEqual([
