@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
-import { createEnumMapping, getEnumKeys, mapStringToEnum } from "../utils.js";
+import { getEnumKeys, mapStringArrayToEnum, mapStringToEnum } from "../utils.js";
 
 const ADVSEC_TOOLS = {
   get_alerts: "advsec_get_alerts",
@@ -56,16 +56,16 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<Ac
         const alertApi = await connection.getAlertApi();
 
         const criteria = {
-          ...(alertType && { alertType: mapStringToEnum(alertType, createEnumMapping(AlertType)) }),
-          ...(states && { states: states.map((state) => mapStringToEnum(state, createEnumMapping(State))).filter((s): s is State => s !== undefined) }),
-          ...(severities && { severities: severities.map((severity) => mapStringToEnum(severity, createEnumMapping(Severity))).filter((s): s is Severity => s !== undefined) }),
+          ...(alertType && { alertType: mapStringToEnum(alertType, AlertType) }),
+          ...(states && { states: mapStringArrayToEnum(states, State) }),
+          ...(severities && { severities: mapStringArrayToEnum(severities, Severity) }),
           ...(ruleId && { ruleId }),
           ...(ruleName && { ruleName }),
           ...(toolName && { toolName }),
           ...(ref && { ref }),
           ...(onlyDefaultBranch !== undefined && { onlyDefaultBranch }),
-          ...(confidenceLevels && { confidenceLevels: confidenceLevels.map((level) => mapStringToEnum(level, createEnumMapping(Confidence))).filter((c): c is Confidence => c !== undefined) }),
-          ...(validity && { validity: validity.map((v) => mapStringToEnum(v, createEnumMapping(AlertValidityStatus))).filter((v): v is AlertValidityStatus => v !== undefined) }),
+          ...(confidenceLevels && { confidenceLevels: mapStringArrayToEnum(confidenceLevels, Confidence) }),
+          ...(validity && { validity: mapStringArrayToEnum(validity, AlertValidityStatus) }),
         };
 
         const result = await alertApi.getAlerts(
