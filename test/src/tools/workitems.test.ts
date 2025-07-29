@@ -416,7 +416,7 @@ describe("configureWorkItemTools", () => {
       const result = await handler(params);
 
       const resultData = JSON.parse(result.content[0].text);
-      expect(resultData[0].fields["System.AssignedTo"]).toBe(" <john.doe@example.com>");
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("<john.doe@example.com>");
     });
 
     it("should not transform System.AssignedTo if it's not an object", async () => {
