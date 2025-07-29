@@ -2,7 +2,7 @@ import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { Alert, AlertType, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
+import { Alert, AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
 import { PagedList } from "azure-devops-node-api/interfaces/common/VSSInterfaces";
 import { configureAdvSecTools } from "../../../src/tools/advsec";
 
@@ -341,6 +341,102 @@ describe("configureAdvSecTools", () => {
 
       expect(mockAlertApi.getAlerts).toHaveBeenCalled();
       expect(result.content[0].text).toBe("null");
+    });
+
+    it("should conditionally include confidenceLevels and validity only for secret alerts", async () => {
+      configureAdvSecTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
+      if (!call) throw new Error("advsec_get_alerts tool not registered");
+      const [, , , handler] = call;
+
+      const mockResult: PagedList<Alert> = [
+        {
+          alertId: 123,
+          alertType: AlertType.Secret,
+          state: State.Active,
+          severity: Severity.High,
+        },
+      ];
+
+      (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue(mockResult);
+
+      // Test 1: Secret alert type - should include confidenceLevels and validity
+      const secretParams = {
+        project: "test-project",
+        repository: "test-repo",
+        alertType: "secret",
+        confidenceLevels: ["high"],
+        validity: ["active"],
+      };
+
+      await handler(secretParams);
+
+      expect(mockAlertApi.getAlerts).toHaveBeenLastCalledWith(
+        "test-project",
+        "test-repo",
+        undefined, // top
+        undefined, // orderBy
+        expect.objectContaining({
+          alertType: AlertType.Secret,
+          confidenceLevels: [Confidence.High],
+          validity: [AlertValidityStatus.Active],
+        }),
+        undefined, // expand
+        undefined // continuationToken
+      );
+
+      // Test 2: Code alert type - should NOT include confidenceLevels and validity
+      const codeParams = {
+        project: "test-project",
+        repository: "test-repo",
+        alertType: "code",
+        confidenceLevels: ["high"],
+        validity: ["active"],
+      };
+
+      await handler(codeParams);
+
+      expect(mockAlertApi.getAlerts).toHaveBeenLastCalledWith(
+        "test-project",
+        "test-repo",
+        undefined, // top
+        undefined, // orderBy
+        expect.objectContaining({
+          alertType: AlertType.Code,
+        }),
+        undefined, // expand
+        undefined // continuationToken
+      );
+
+      // Verify that confidenceLevels and validity are NOT in the criteria for code alerts
+      const lastCall = (mockAlertApi.getAlerts as jest.Mock).mock.calls[1];
+      const criteriaForCodeAlert = lastCall[4];
+      expect(criteriaForCodeAlert).not.toHaveProperty("confidenceLevels");
+      expect(criteriaForCodeAlert).not.toHaveProperty("validity");
+
+      // Test 3: No alert type specified - should include confidenceLevels and validity (allowing all types including secrets)
+      const noTypeParams = {
+        project: "test-project",
+        repository: "test-repo",
+        confidenceLevels: ["high"],
+        validity: ["active"],
+      };
+
+      await handler(noTypeParams);
+
+      expect(mockAlertApi.getAlerts).toHaveBeenLastCalledWith(
+        "test-project",
+        "test-repo",
+        undefined, // top
+        undefined, // orderBy
+        expect.objectContaining({
+          confidenceLevels: [Confidence.High],
+          validity: [AlertValidityStatus.Active],
+        }),
+        undefined, // expand
+        undefined // continuationToken
+      );
     });
   });
 

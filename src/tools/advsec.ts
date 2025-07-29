@@ -55,6 +55,7 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<Ac
         const connection = await connectionProvider();
         const alertApi = await connection.getAlertApi();
 
+        const isSecretAlert = !alertType || alertType.toLowerCase() === "secret";
         const criteria = {
           ...(alertType && { alertType: mapStringToEnum(alertType, AlertType) }),
           ...(states && { states: mapStringArrayToEnum(states, State) }),
@@ -64,8 +65,8 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<Ac
           ...(toolName && { toolName }),
           ...(ref && { ref }),
           ...(onlyDefaultBranch !== undefined && { onlyDefaultBranch }),
-          ...(confidenceLevels && { confidenceLevels: mapStringArrayToEnum(confidenceLevels, Confidence) }),
-          ...(validity && { validity: mapStringArrayToEnum(validity, AlertValidityStatus) }),
+          ...(isSecretAlert && confidenceLevels && { confidenceLevels: mapStringArrayToEnum(confidenceLevels, Confidence) }),
+          ...(isSecretAlert && validity && { validity: mapStringArrayToEnum(validity, AlertValidityStatus) }),
         };
 
         const result = await alertApi.getAlerts(
