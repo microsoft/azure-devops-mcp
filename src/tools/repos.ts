@@ -584,8 +584,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     }
   );
 
-  const commentThreadStatusStrings = Object.values(CommentThreadStatus).filter((value): value is string => typeof value === "string");
-
   server.tool(
     REPO_TOOLS.create_pull_request_thread,
     "Creates a new comment thread on a pull request.",
@@ -596,7 +594,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       project: z.string().optional().describe("Project ID or project name (optional)"),
       filePath: z.string().optional().describe("The path of the file where the comment thread will be created. (optional)"),
       status: z
-        .enum(commentThreadStatusStrings as [string, ...string[]])
+        .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
         .default(CommentThreadStatus[CommentThreadStatus.Active])
         .describe("The status of the comment thread. Defaults to 'Active'."),
