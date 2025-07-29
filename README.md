@@ -73,6 +73,7 @@ Interact with these Azure DevOps services:
 - **wit_get_query_results_by_id**: Retrieve the results of a work item query given the query ID.
 - **wit_update_work_items_batch**: Update work items in batch.
 - **wit_work_items_link**: Link work items together in batch.
+- **wit_work_item_unlink**: Unlink one or many links from a work item.
 
 #### Deprecated Tools
 

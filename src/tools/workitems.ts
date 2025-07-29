@@ -4,7 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
@@ -27,6 +27,7 @@ const WORKITEM_TOOLS = {
   get_query_results_by_id: "wit_get_query_results_by_id",
   update_work_items_batch: "wit_update_work_items_batch",
   work_items_link: "wit_work_items_link",
+  work_item_unlink: "wit_work_item_unlink",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -53,6 +54,8 @@ function getLinkTypeFromName(name: string) {
       return "Microsoft.VSTS.Common.Affects-Forward";
     case "affected by":
       return "Microsoft.VSTS.Common.Affects-Reverse";
+    case "artifact":
+      return "ArtifactLink";
     default:
       throw new Error(`Unknown link type: ${name}`);
   }
@@ -756,6 +759,98 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.work_item_unlink,
+    "Remove one or many links from a single work item.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      id: z.number().describe("The ID of the work item to remove the links from."),
+      updates: z
+        .array(
+          z.object({
+            type: z
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
+              .default("related")
+              .describe(
+                "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
+              ),
+            url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
+          })
+        )
+        .describe("type and url of the link to remove. If url is not provided, all links of the specified type will be removed. You can remove more than one link at a time."),
+    },
+    async ({ project, id, updates }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const workItem = await workItemApi.getWorkItem(id, [], undefined, WorkItemExpand.Relations, project);
+        const relations: WorkItemRelation[] = workItem.relations ?? [];
+
+        const allRelationIndexes: number[] = [];
+        const removedRelations: WorkItemRelation[] = [];
+
+        // Process each update request
+        for (const update of updates) {
+          const linkType = getLinkTypeFromName(update.type);
+          let relationIndexes: number[] = [];
+
+          if (update.url && update.url.trim().length > 0) {
+            // If url is provided, find relations matching both rel type and url
+            relationIndexes = relations.map((relation, idx) => (relation.rel === linkType && relation.url === update.url ? idx : -1)).filter((idx) => idx !== -1);
+          } else {
+            // If url is not provided, find all relations matching rel type
+            relationIndexes = relations.map((relation, idx) => (relation.rel === linkType ? idx : -1)).filter((idx) => idx !== -1);
+          }
+
+          // Add to the list of indexes to remove (avoiding duplicates)
+          for (const idx of relationIndexes) {
+            if (!allRelationIndexes.includes(idx)) {
+              allRelationIndexes.push(idx);
+              removedRelations.push(relations[idx]);
+            }
+          }
+        }
+
+        if (allRelationIndexes.length === 0) {
+          return {
+            content: [{ type: "text", text: `No matching relations found for any of the specified updates.\n${JSON.stringify(relations, null, 2)}` }],
+            isError: true,
+          };
+        }
+
+        // Sort indexes in descending order to avoid index shifting when removing
+        allRelationIndexes.sort((a, b) => b - a);
+
+        const apiUpdates = allRelationIndexes.map((idx) => ({
+          op: "remove",
+          path: `/relations/${idx}`,
+        }));
+
+        const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Removed the following links:\n` + JSON.stringify(removedRelations, null, 2) + `\n\nUpdated work item result:\n` + JSON.stringify(updatedWorkItem, null, 2),
+            },
+          ],
+          isError: false,
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error unlinking work item: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
   );
 }
