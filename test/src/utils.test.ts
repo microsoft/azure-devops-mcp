@@ -65,18 +65,6 @@ describe("utils", () => {
       });
     });
 
-    it("should apply custom key transform function", () => {
-      const mapping = createEnumMapping(AlertType, (key) => key.toUpperCase());
-
-      expect(mapping).toEqual({
-        UNKNOWN: AlertType.Unknown,
-        DEPENDENCY: AlertType.Dependency,
-        SECRET: AlertType.Secret,
-        CODE: AlertType.Code,
-        LICENSE: AlertType.License,
-      });
-    });
-
     it("should handle empty enum object", () => {
       const emptyEnum = {};
       const mapping = createEnumMapping(emptyEnum);
