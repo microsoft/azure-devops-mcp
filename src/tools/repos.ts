@@ -187,7 +187,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         targetRefName?: string;
       } = {};
       if (title !== undefined) updateRequest.title = title;
-      if (description !== undefined) updateRequest.description = description;  
+      if (description !== undefined) updateRequest.description = description;
       if (isDraft !== undefined) updateRequest.isDraft = isDraft;
       if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
 

@@ -47,7 +47,7 @@ describe("repos tools", () => {
         pullRequestId: 123,
         title: "Updated Title",
         description: "Updated Description",
-        isDraft: true
+        isDraft: true,
       };
       mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
@@ -57,17 +57,21 @@ describe("repos tools", () => {
         title: "Updated Title",
         description: "Updated Description",
         isDraft: true,
-        targetRefName: "refs/heads/main"
+        targetRefName: "refs/heads/main",
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith({
-        title: "Updated Title",
-        description: "Updated Description",
-        isDraft: true,
-        targetRefName: "refs/heads/main"
-      }, "repo123", 123);
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          title: "Updated Title",
+          description: "Updated Description",
+          isDraft: true,
+          targetRefName: "refs/heads/main",
+        },
+        "repo123",
+        123
+      );
 
       expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
     });
@@ -86,14 +90,18 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
-        title: "New Title"
+        title: "New Title",
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith({
-        title: "New Title"
-      }, "repo123", 123);
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          title: "New Title",
+        },
+        "repo123",
+        123
+      );
 
       expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
     });
@@ -108,7 +116,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
-        pullRequestId: 123
+        pullRequestId: 123,
       };
 
       const result = await handler(params);
