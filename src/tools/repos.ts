@@ -144,7 +144,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
   server.tool(
     REPO_TOOLS.update_pull_request,
-    "Update various fields of an existing pull request (title, description, draft status, target branch, status).",
+    "Update a Pull Request by id with specified fields.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
       pullRequestId: z.number().describe("The ID of the pull request to update."),
