@@ -136,7 +136,7 @@ Update work item 12345 with a new description and use Markdown text. Use Markdow
 
 ### Remove One or More Links from a Work Item
 
-Use this tool to remove one, several, or all links from a work item. You can also remove links by a specified type.
+Use this tool to remove one or more links from a work item, either by specifying individual links or by link type.
 
 First, retrieve the work item whose links you want to remove:
 
@@ -144,10 +144,8 @@ First, retrieve the work item whose links you want to remove:
 Get work item 1234 in Contoso project and show me the relations
 ```
 
-Next, remove a specific link to a work item, pull request, etc., remove multiple links, or remove links by type (for example, "related"):
+Next, remove a specific link to a work item, pull request, etc. or remove links by type (for example, "related"):
 
 ```plaintext
-Remove link 5678 and 91011 from work item 1234. Also remove any related links and links to pull request #121314
+Remove link 5678 and 91011 from work item 1234. Also remove any related links and links to pull request 121314
 ```
-
-📽️ [Azure DevOps MCP Server: Removing links from a work item](https://youtu.be/ShhONjJhQCA)

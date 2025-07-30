@@ -1300,20 +1300,16 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "related",
-            url: "https://dev.azure.com/contoso/_apis/wit/workItems/2",
-          },
-        ],
+        type: "related",
+        url: "https://dev.azure.com/contoso/_apis/wit/workItems/2",
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, ["System.Id"], undefined, 1, "TestProject");
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1);
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, undefined, undefined, 1, "TestProject");
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1, "TestProject");
 
-      expect(result.content[0].text).toContain("Removed the following links:");
+      expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
       expect(result.content[0].text).toContain("System.LinkTypes.Related");
       expect(result.content[0].text).toContain("Updated work item result:");
     });
@@ -1365,26 +1361,23 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "related",
-          },
-        ],
+        type: "related",
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, ["System.Id"], undefined, 1, "TestProject");
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, undefined, undefined, 1, "TestProject");
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
         null,
         [
           { op: "remove", path: "/relations/1" },
           { op: "remove", path: "/relations/0" },
         ],
-        1
+        1,
+        "TestProject"
       );
 
-      expect(result.content[0].text).toContain("Removed the following links:");
+      expect(result.content[0].text).toContain("Removed 2 link(s) of type 'related':");
       expect(result.content[0].text).toContain("System.LinkTypes.Related");
     });
 
@@ -1429,19 +1422,15 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "artifact",
-            url: "vstfs:///Git/Ref/project%2Frepo%2Fbranch",
-          },
-        ],
+        type: "artifact",
+        url: "vstfs:///Git/Ref/project%2Frepo%2Fbranch",
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1);
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1, "TestProject");
 
-      expect(result.content[0].text).toContain("Removed the following links:");
+      expect(result.content[0].text).toContain("Removed 1 link(s) of type 'artifact':");
       expect(result.content[0].text).toContain("ArtifactLink");
     });
 
@@ -1468,18 +1457,14 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "related",
-            url: "https://dev.azure.com/contoso/_apis/wit/workItems/999",
-          },
-        ],
+        type: "related",
+        url: "https://dev.azure.com/contoso/_apis/wit/workItems/999",
       };
 
       const result = await handler(params);
 
       expect(mockWorkItemTrackingApi.updateWorkItem).not.toHaveBeenCalled();
-      expect(result.content[0].text).toContain("No matching relations found for any of the specified updates");
+      expect(result.content[0].text).toContain("No matching relations found for link type 'related' and URL 'https://dev.azure.com/contoso/_apis/wit/workItems/999'");
       expect(result.isError).toBe(true);
     });
 
@@ -1507,12 +1492,8 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "related",
-            url: "https://dev.azure.com/contoso/_apis/wit/workItems/2",
-          },
-        ],
+        type: "related",
+        url: "https://dev.azure.com/contoso/_apis/wit/workItems/2",
       };
 
       const result = await handler(params);
@@ -1533,11 +1514,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 999,
-        updates: [
-          {
-            type: "related",
-          },
-        ],
+        type: "related",
       };
 
       const result = await handler(params);
@@ -1563,20 +1540,16 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "related",
-          },
-        ],
+        type: "related",
       };
 
       const result = await handler(params);
 
-      expect(result.content[0].text).toContain("No matching relations found for any of the specified updates");
+      expect(result.content[0].text).toContain("No matching relations found for link type 'related'");
       expect(result.isError).toBe(true);
     });
 
-    it("should handle multiple updates with mixed results", async () => {
+    it("should handle specific URL matching correctly", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
@@ -1615,36 +1588,24 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "related",
-            url: "https://dev.azure.com/contoso/_apis/wit/workItems/2",
-          },
-          {
-            type: "artifact",
-            url: "vstfs:///Git/Ref/project%2Frepo%2Fbranch",
-          },
-          {
-            type: "duplicate", // This won't match any relations
-          },
-        ],
+        type: "related",
+        url: "https://dev.azure.com/contoso/_apis/wit/workItems/2",
       };
 
       const result = await handler(params);
 
-      // Should remove relations at indexes 2 and 0 (in descending order)
+      // Should remove only the matching relation at index 0
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
         null,
         [
-          { op: "remove", path: "/relations/2" },
           { op: "remove", path: "/relations/0" },
         ],
-        1
+        1,
+        "TestProject"
       );
 
-      expect(result.content[0].text).toContain("Removed the following links:");
+      expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
       expect(result.content[0].text).toContain("System.LinkTypes.Related");
-      expect(result.content[0].text).toContain("ArtifactLink");
     });
 
     it("should throw error for unknown link type in work_item_unlink", async () => {
@@ -1665,11 +1626,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "unknown_type",
-          },
-        ],
+        type: "unknown_type",
       };
 
       const result = await handler(params);
@@ -1691,11 +1648,7 @@ describe("configureWorkItemTools", () => {
       const params = {
         project: "TestProject",
         id: 1,
-        updates: [
-          {
-            type: "related",
-          },
-        ],
+        type: "related",
       };
 
       const result = await handler(params);

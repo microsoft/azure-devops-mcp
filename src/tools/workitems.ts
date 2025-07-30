@@ -764,78 +764,65 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.work_item_unlink,
-    "Remove one or many links from a single work item.",
+    "Remove one or many links from a single work item",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       id: z.number().describe("The ID of the work item to remove the links from."),
-      updates: z
-        .array(
-          z.object({
-            type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
-              .default("related")
-              .describe(
-                "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
-              ),
-            url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
-          })
-        )
-        .describe("type and url of the link to remove. If url is not provided, all links of the specified type will be removed. You can remove more than one link at a time."),
+      type: z
+        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
+        .default("related")
+        .describe(
+          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
+        ),
+      url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
     },
-    async ({ project, id, updates }) => {
+    async ({ project, id, type, url }) => {
       try {
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
-        const workItem = await workItemApi.getWorkItem(id, ["System.Id"], undefined, WorkItemExpand.Relations, project);
+        const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, project);
         const relations: WorkItemRelation[] = workItem.relations ?? [];
+        const linkType = getLinkTypeFromName(type);
 
-        const allRelationIndexes: number[] = [];
-        const removedRelations: WorkItemRelation[] = [];
+        let relationIndexes: number[] = [];
 
-        // Process each update request
-        for (const update of updates) {
-          const linkType = getLinkTypeFromName(update.type);
-          let relationIndexes: number[] = [];
-
-          if (update.url && update.url.trim().length > 0) {
-            // If url is provided, find relations matching both rel type and url
-            relationIndexes = relations.map((relation, idx) => (relation.rel === linkType && relation.url === update.url ? idx : -1)).filter((idx) => idx !== -1);
-          } else {
-            // If url is not provided, find all relations matching rel type
-            relationIndexes = relations.map((relation, idx) => (relation.rel === linkType ? idx : -1)).filter((idx) => idx !== -1);
-          }
-
-          // Add to the list of indexes to remove (avoiding duplicates)
-          for (const idx of relationIndexes) {
-            if (!allRelationIndexes.includes(idx)) {
-              allRelationIndexes.push(idx);
-              removedRelations.push(relations[idx]);
-            }
-          }
+        if (url && url.trim().length > 0) {
+          // If url is provided, find relations matching both rel type and url
+          relationIndexes = relations.map((relation, idx) => (relation.url === url ? idx : -1)).filter((idx) => idx !== -1);
+        } else {
+          // If url is not provided, find all relations matching rel type
+          relationIndexes = relations.map((relation, idx) => (relation.rel === linkType ? idx : -1)).filter((idx) => idx !== -1);
         }
 
-        if (allRelationIndexes.length === 0) {
+        if (relationIndexes.length === 0) {
           return {
-            content: [{ type: "text", text: `No matching relations found for any of the specified updates.\n${JSON.stringify(relations, null, 2)}` }],
+            content: [{ type: "text", text: `No matching relations found for link type '${type}'${url ? ` and URL '${url}'` : ""}.\n${JSON.stringify(relations, null, 2)}` }],
             isError: true,
           };
         }
 
-        // Sort indexes in descending order to avoid index shifting when removing
-        allRelationIndexes.sort((a, b) => b - a);
+        // Get the relations that will be removed for logging
+        const removedRelations = relationIndexes.map((idx) => relations[idx]);
 
-        const apiUpdates = allRelationIndexes.map((idx) => ({
+        // Sort indexes in descending order to avoid index shifting when removing
+        relationIndexes.sort((a, b) => b - a);
+
+        const apiUpdates = relationIndexes.map((idx) => ({
           op: "remove",
           path: `/relations/${idx}`,
         }));
 
-        const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id);
+        const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id, project);
 
         return {
           content: [
             {
               type: "text",
-              text: `Removed the following links:\n` + JSON.stringify(removedRelations, null, 2) + `\n\nUpdated work item result:\n` + JSON.stringify(updatedWorkItem, null, 2),
+              text:
+                `Removed ${removedRelations.length} link(s) of type '${type}':\n` +
+                JSON.stringify(removedRelations, null, 2) +
+                `\n\nUpdated work item result:\n` +
+                JSON.stringify(updatedWorkItem, null, 2),
             },
           ],
           isError: false,
