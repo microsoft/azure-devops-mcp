@@ -143,13 +143,37 @@ For the best experience, use Visual Studio Code and GitHub Copilot. See the [get
 3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 4. Open VS Code in an empty folder
 
-### Azure Login
+### Authentication
 
-Ensure you are logged in to Azure DevOps via the Azure CLI:
+Choose the authentication method that works best for your environment:
+
+#### 🎫 Option 1: Personal Access Token (PAT) - **Recommended**
+
+PAT authentication is the most reliable method and works in all environments.
+
+1. **Create a PAT**: Follow the [Azure DevOps documentation](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate) to create a Personal Access Token with appropriate permissions.
+
+2. **Use directly via command line argument**:
+
+   ```sh
+   npx @azure-devops/mcp your-org-name --pat YOUR_PAT_TOKEN
+   ```
+
+3. **Use via environment variable**:
+   ```sh
+   export AZURE_DEVOPS_EXT_PAT="YOUR_PAT_TOKEN"
+   npx @azure-devops/mcp your-org-name --use-pat-env
+   ```
+
+#### 🔐 Option 2: Azure CLI Authentication
+
+Use this method if you have Azure CLI configured and it works in your environment:
 
 ```sh
 az login
 ```
+
+> **Note**: If `az login` doesn't work for you, use the PAT method instead.
 
 ### Installation
 
@@ -168,7 +192,11 @@ This installation method is the easiest for all users of Visual Studio Code.
 
 ##### Steps
 
-In your project, add a `.vscode\mcp.json` file with the following content:
+In your project, add a `.vscode\mcp.json` file with one of the following configurations:
+
+##### 🎫 Configuration with PAT Authentication (Recommended)
+
+**Option A: Using environment variable**
 
 ```json
 {
@@ -176,7 +204,57 @@ In your project, add a `.vscode\mcp.json` file with the following content:
     {
       "id": "ado_org",
       "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+      "description": "Azure DevOps organization name (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--use-pat-env"],
+      "env": {
+        "AZURE_DEVOPS_EXT_PAT": "YOUR_PAT_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+**Option B: Using direct PAT argument**
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name (e.g. 'contoso')"
+    },
+    {
+      "id": "ado_pat",
+      "type": "promptString",
+      "description": "Azure DevOps Personal Access Token"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--pat", "${input:ado_pat}"]
+    }
+  }
+}
+```
+
+##### 🔐 Configuration with Azure CLI Authentication
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name (e.g. 'contoso')"
     }
   ],
   "servers": {

@@ -266,6 +266,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
       if (created_by_me || i_am_reviewer) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider);
+        if (!data.authenticatedUser?.id) {
+          throw new Error("Unable to get authenticated user details");
+        }
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
           searchCriteria.creatorId = userId;
@@ -333,6 +336,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
       if (created_by_me || i_am_reviewer) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider);
+        if (!data.authenticatedUser?.id) {
+          throw new Error("Unable to get authenticated user details");
+        }
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
           gitPullRequestSearchCriteria.creatorId = userId;

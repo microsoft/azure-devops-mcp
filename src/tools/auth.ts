@@ -4,22 +4,14 @@
 import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
 
-async function getCurrentUserDetails(tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+async function getCurrentUserDetails(_tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   const connection = await connectionProvider();
-  const url = `${connection.serverUrl}/_apis/connectionData`;
-  const token = (await tokenProvider()).token;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(`Error fetching user details: ${data.message}`);
-  }
-  return data;
+
+  // Use the connection's built-in connect() method which handles authentication automatically
+  // This works for both PAT and OAuth tokens since the WebApi was created with the proper auth handler
+  const connectionData = await connection.connect();
+
+  return connectionData;
 }
 
 export { getCurrentUserDetails };
