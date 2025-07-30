@@ -1310,7 +1310,7 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, [], undefined, 1, "TestProject");
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, ["System.Id"], undefined, 1, "TestProject");
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1);
 
       expect(result.content[0].text).toContain("Removed the following links:");
@@ -1374,6 +1374,7 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler(params);
 
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, ["System.Id"], undefined, 1, "TestProject");
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
         null,
         [
