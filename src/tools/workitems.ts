@@ -786,7 +786,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       try {
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
-        const workItem = await workItemApi.getWorkItem(id, [], undefined, WorkItemExpand.Relations, project);
+        const workItem = await workItemApi.getWorkItem(id, ["System.Id"], undefined, WorkItemExpand.Relations, project);
         const relations: WorkItemRelation[] = workItem.relations ?? [];
 
         const allRelationIndexes: number[] = [];
