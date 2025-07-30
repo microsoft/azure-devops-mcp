@@ -1595,14 +1595,7 @@ describe("configureWorkItemTools", () => {
       const result = await handler(params);
 
       // Should remove only the matching relation at index 0
-      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
-        null,
-        [
-          { op: "remove", path: "/relations/0" },
-        ],
-        1,
-        "TestProject"
-      );
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1, "TestProject");
 
       expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
       expect(result.content[0].text).toContain("System.LinkTypes.Related");
