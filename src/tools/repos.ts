@@ -33,7 +33,6 @@ const REPO_TOOLS = {
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",
-  update_pull_request_status: "repo_update_pull_request_status",
   update_pull_request: "repo_update_pull_request",
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
@@ -144,29 +143,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
   );
 
   server.tool(
-    REPO_TOOLS.update_pull_request_status,
-    "Update status of an existing pull request to active or abandoned.",
-    {
-      repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
-      pullRequestId: z.number().describe("The ID of the pull request to be published."),
-      status: z.enum(["Active", "Abandoned"]).describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
-    },
-    async ({ repositoryId, pullRequestId, status }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const statusValue = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
-
-      const updatedPullRequest = await gitApi.updatePullRequest({ status: statusValue }, repositoryId, pullRequestId);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
-      };
-    }
-  );
-
-  server.tool(
     REPO_TOOLS.update_pull_request,
-    "Update various fields of an existing pull request (title, description, draft status, target branch).",
+    "Update various fields of an existing pull request (title, description, draft status, target branch, status).",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
       pullRequestId: z.number().describe("The ID of the pull request to update."),
@@ -174,8 +152,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       description: z.string().optional().describe("The new description for the pull request."),
       isDraft: z.boolean().optional().describe("Whether the pull request should be a draft."),
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
+      status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -185,16 +164,20 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         description?: string;
         isDraft?: boolean;
         targetRefName?: string;
+        status?: number;
       } = {};
       if (title !== undefined) updateRequest.title = title;
       if (description !== undefined) updateRequest.description = description;
       if (isDraft !== undefined) updateRequest.isDraft = isDraft;
       if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
+      if (status !== undefined) {
+        updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
+      }
 
       // Validate that at least one field is provided for update
       if (Object.keys(updateRequest).length === 0) {
         return {
-          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, or targetRefName) must be provided for update." }],
+          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, or status) must be provided for update." }],
           isError: true,
         };
       }

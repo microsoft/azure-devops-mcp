@@ -106,6 +106,102 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
     });
 
+    it("should update pull request status to Active", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = { pullRequestId: 123, status: 1 }; // Active status
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        status: "Active" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          status: 1, // PullRequestStatus.Active
+        },
+        "repo123",
+        123
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+    });
+
+    it("should update pull request status to Abandoned", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = { pullRequestId: 123, status: 2 }; // Abandoned status
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        status: "Abandoned" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          status: 2, // PullRequestStatus.Abandoned
+        },
+        "repo123",
+        123
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+    });
+
+    it("should update pull request with status and other fields", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        title: "Updated Title",
+        status: 1,
+      };
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        title: "Updated Title",
+        status: "Active" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          title: "Updated Title",
+          status: 1, // PullRequestStatus.Active
+        },
+        "repo123",
+        123
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+    });
+
     it("should return error when no fields provided", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider);
 
@@ -123,7 +219,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.updatePullRequest).not.toHaveBeenCalled();
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("At least one field");
+      expect(result.content[0].text).toContain("At least one field (title, description, isDraft, targetRefName, or status) must be provided for update.");
     });
   });
 });
