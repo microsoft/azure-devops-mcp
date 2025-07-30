@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
@@ -16,7 +15,7 @@ const Test_Plan_Tools = {
   list_test_plans: "testplan_list_test_plans",
 };
 
-function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   /*
     LIST OF TEST PLANS
     get list of test plans by project

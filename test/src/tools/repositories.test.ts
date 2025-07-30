@@ -19,7 +19,7 @@ const mockGetUserIdFromEmail = getUserIdFromEmail as jest.MockedFunction<typeof 
 
 describe("repos tools", () => {
   let server: McpServer;
-  let tokenProvider: jest.MockedFunction<() => Promise<AccessToken>>;
+  let tokenProvider: jest.MockedFunction<() => Promise<string>>;
   let connectionProvider: jest.MockedFunction<() => Promise<WebApi>>;
   let userAgentProvider: () => string;
   let mockGitApi: {
