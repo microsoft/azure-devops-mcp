@@ -285,12 +285,223 @@ describe("configureWorkItemTools", () => {
       expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(
         {
           ids: params.ids,
-          fields: ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank"],
+          fields: ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"],
         },
         params.project
       );
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItems], null, 2));
+    });
+
+    it("should transform System.AssignedTo object to formatted string", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      // Mock work items with System.AssignedTo as objects
+      const mockWorkItemsWithAssignedTo = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+            "System.AssignedTo": {
+              displayName: "John Doe",
+              uniqueName: "john.doe@example.com",
+              id: "12345",
+            },
+          },
+        },
+        {
+          id: 298,
+          fields: {
+            "System.Id": 298,
+            "System.WorkItemType": "User Story",
+            "System.Title": "Test Story",
+            "System.AssignedTo": {
+              displayName: "Jane Smith",
+              uniqueName: "jane.smith@example.com",
+              id: "67890",
+            },
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithAssignedTo);
+
+      const params = {
+        ids: [297, 298],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      // Parse the returned JSON to verify transformation
+      const resultData = JSON.parse(result.content[0].text);
+
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("John Doe <john.doe@example.com>");
+      expect(resultData[1].fields["System.AssignedTo"]).toBe("Jane Smith <jane.smith@example.com>");
+    });
+
+    it("should handle System.AssignedTo with only displayName", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      const mockWorkItemsWithPartialAssignedTo = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+            "System.AssignedTo": {
+              displayName: "John Doe",
+              id: "12345",
+            },
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithPartialAssignedTo);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("John Doe <>");
+    });
+
+    it("should handle System.AssignedTo with only uniqueName", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      const mockWorkItemsWithPartialAssignedTo = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+            "System.AssignedTo": {
+              uniqueName: "john.doe@example.com",
+              id: "12345",
+            },
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithPartialAssignedTo);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("<john.doe@example.com>");
+    });
+
+    it("should not transform System.AssignedTo if it's not an object", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      const mockWorkItemsWithStringAssignedTo = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+            "System.AssignedTo": "Already a string",
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithStringAssignedTo);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("Already a string");
+    });
+
+    it("should handle work items without System.AssignedTo field", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      const mockWorkItemsWithoutAssignedTo = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithoutAssignedTo);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData[0].fields["System.AssignedTo"]).toBeUndefined();
+    });
+
+    it("should handle null or undefined workitems response", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      expect(result.content[0].text).toBe(JSON.stringify(null, null, 2));
     });
   });
 
