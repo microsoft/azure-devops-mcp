@@ -5,7 +5,7 @@ import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
-import { WikiPagesBatchRequest, WikiCreateParametersV2, WikiUpdateParameters, WikiV2, WikiType } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
+import { WikiPagesBatchRequest, WikiCreateParametersV2, WikiUpdateParameters, WikiType } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
 import { GitVersionDescriptor } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
 const WIKI_TOOLS = {
@@ -284,34 +284,108 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
       content: z.string().describe("The content of the wiki page in markdown format."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
       comment: z.string().optional().describe("Optional comment for the page update."),
-      version: z.string().optional().describe("Version/branch of the wiki. Defaults to the default branch for the wiki."),
+      etag: z.string().optional().describe("ETag for editing existing pages (optional, will be fetched if not provided)."),
     },
-    async ({ wikiIdentifier, path, content, project, comment, version }) => {
+    async ({ wikiIdentifier, path, content, project, comment, etag }) => {
       try {
         const connection = await connectionProvider();
-        const wikiApi = await connection.getWikiApi();
+        const accessToken = await tokenProvider();
 
-        // Prepare version descriptor if provided
-        const versionDescriptor: GitVersionDescriptor | undefined = version
-          ? {
-              version: version,
-            }
-          : undefined;
+        // Normalize the path
+        const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+        const encodedPath = encodeURIComponent(normalizedPath);
 
-        // Create/update the page by pushing content
-        const updatedPage = await wikiApi.createOrUpdatePageViewStats(project || "", wikiIdentifier, versionDescriptor || { version: "main" }, path);
+        // Build the URL for the wiki page API
+        const baseUrl = connection.serverUrl;
+        const projectParam = project || "";
+        const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&api-version=7.1`;
 
-        // Note: The Azure DevOps Node API doesn't have a direct method to create/update page content
-        // This would typically require using the Git API to commit the markdown content
-        // For now, we'll return a message indicating the limitation
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Page structure created/updated at path: ${path}. Note: To add content to wiki pages, you need to use the Git API to commit markdown files to the wiki repository. The Azure DevOps Wiki API primarily handles metadata and page structure, not content creation.`,
+        console.log(`[Wiki API] Attempting to create/update page at: ${url}`);
+
+        // First, try to create a new page (PUT without ETag)
+        try {
+          const createResponse = await fetch(url, {
+            method: "PUT",
+            headers: {
+              "Authorization": `Bearer ${accessToken.token}`,
+              "Content-Type": "application/json",
             },
-          ],
-        };
+            body: JSON.stringify({ content: content }),
+          });
+
+          if (createResponse.ok) {
+            const result = await createResponse.json();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Successfully created wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
+                },
+              ],
+            };
+          }
+
+          // If creation failed with 409 (Conflict) or 500 (Page exists), try to update it
+          if (createResponse.status === 409 || createResponse.status === 500) {
+            console.log(`[Wiki API] Page exists, attempting to update with ETag...`);
+
+            // Page exists, we need to get the ETag and update it
+            let currentEtag = etag;
+
+            if (!currentEtag) {
+              // Fetch current page to get ETag
+              const getResponse = await fetch(url, {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${accessToken.token}`,
+                },
+              });
+
+              if (getResponse.ok) {
+                currentEtag = getResponse.headers.get("etag") || getResponse.headers.get("ETag") || undefined;
+                if (!currentEtag) {
+                  const pageData = await getResponse.json();
+                  currentEtag = pageData.eTag;
+                }
+              }
+
+              if (!currentEtag) {
+                throw new Error("Could not retrieve ETag for existing page");
+              }
+            }
+
+            // Now update the existing page with ETag
+            const updateResponse = await fetch(url, {
+              method: "PUT",
+              headers: {
+                "Authorization": `Bearer ${accessToken.token}`,
+                "Content-Type": "application/json",
+                "If-Match": currentEtag,
+              },
+              body: JSON.stringify({ content: content }),
+            });
+
+            if (updateResponse.ok) {
+              const result = await updateResponse.json();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Successfully updated wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
+                  },
+                ],
+              };
+            } else {
+              const errorText = await updateResponse.text();
+              throw new Error(`Failed to update page (${updateResponse.status}): ${errorText}`);
+            }
+          } else {
+            const errorText = await createResponse.text();
+            throw new Error(`Failed to create page (${createResponse.status}): ${errorText}`);
+          }
+        } catch (fetchError) {
+          throw fetchError;
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
