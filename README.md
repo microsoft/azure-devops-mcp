@@ -33,6 +33,9 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 - "List iterations for project 'Contoso'"
 - "List my work items for project 'Contoso'"
 - "List work items in current iteration for 'Contoso' project and 'Contoso Team'"
+- "List all wikis in the 'Contoso' project"
+- "Create a new project wiki named 'Documentation' in the 'Contoso' project"
+- "Update the wiki named 'MyWiki' to add new branches"
 
 ## 🏆 Expectations
 
@@ -127,6 +130,16 @@ Interact with these Azure DevOps services:
 - **testplan_list_test_plans**: Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.
 - **testplan_list_test_cases**: Get a list of test cases in the test plan.
 - **testplan_show_test_results_from_build_id**: Get a list of test results for a given project and build ID.
+
+### 📖 Wiki
+
+- **wiki_list_wikis**: Retrieve a list of wikis for an organization or project.
+- **wiki_get_wiki**: Get the wiki by wikiIdentifier.
+- **wiki_list_pages**: Retrieve a list of wiki pages for a specific wiki and project.
+- **wiki_get_page_content**: Retrieve wiki page content by wikiIdentifier and path.
+- **wiki_create_wiki**: Create a new wiki in the specified project.
+- **wiki_update_wiki**: Update an existing wiki by ID or name.
+- **wiki_create_or_update_page**: Create or update a wiki page with content.
 
 ### 🔎 Search
 
