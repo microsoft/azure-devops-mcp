@@ -8,7 +8,7 @@ import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { ITestApi } from "azure-devops-node-api/TestApi";
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 describe("configureTestPlanTools", () => {

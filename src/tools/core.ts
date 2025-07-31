@@ -21,7 +21,7 @@ function filterProjectsByName(projects: ProjectInfo[], projectNameFilter: string
   return projects.filter((project) => project.name?.toLowerCase().includes(lowerCaseFilter));
 }
 
-function configureCoreTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureCoreTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     CORE_TOOLS.list_project_teams,
     "Retrieve a list of teams for the specified Azure DevOps project.",
@@ -112,7 +112,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<Acce
 
         const response = await fetch(`${baseUrl}?${params}`, {
           headers: {
-            "Authorization": `Bearer ${token.token}`,
+            "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         });

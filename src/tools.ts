@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
 
 import { configureCoreTools } from "./tools/core.js";
@@ -15,7 +14,7 @@ import { configureWikiTools } from "./tools/wiki.js";
 import { configureTestPlanTools } from "./tools/testplans.js";
 import { configureSearchTools } from "./tools/search.js";
 
-function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configureAllTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   configureCoreTools(server, tokenProvider, connectionProvider);
   configureWorkTools(server, tokenProvider, connectionProvider);
   configureBuildTools(server, tokenProvider, connectionProvider);

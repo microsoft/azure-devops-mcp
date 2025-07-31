@@ -10,7 +10,7 @@ import { mockUpdateBuildStageResponse } from "../../mocks/builds";
 // Mock fetch globally
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 describe("configureBuildTools", () => {
@@ -46,8 +46,7 @@ describe("configureBuildTools", () => {
       const [, , , handler] = call;
 
       // Mock the token provider
-      const mockToken = { token: "mock-token" };
-      (tokenProvider as jest.Mock).mockResolvedValue(mockToken);
+      (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
 
       // Mock successful fetch response
       const mockResponse = {
@@ -88,8 +87,7 @@ describe("configureBuildTools", () => {
       const [, , , handler] = call;
 
       // Mock the token provider
-      const mockToken = { token: "mock-token" };
-      (tokenProvider as jest.Mock).mockResolvedValue(mockToken);
+      (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
 
       // Mock failed fetch response
       const mockResponse = {
@@ -129,8 +127,7 @@ describe("configureBuildTools", () => {
       const [, , , handler] = call;
 
       // Mock the token provider
-      const mockToken = { token: "mock-token" };
-      (tokenProvider as jest.Mock).mockResolvedValue(mockToken);
+      (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
 
       // Mock network error
       const networkError = new Error("Network connection failed");
@@ -189,8 +186,7 @@ describe("configureBuildTools", () => {
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
 
-      const mockToken = { token: "mock-token" };
-      (tokenProvider as jest.Mock).mockResolvedValue(mockToken);
+      (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
 
       const mockResponse = {
         ok: true,

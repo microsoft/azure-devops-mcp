@@ -4,10 +4,10 @@
 import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
 
-async function getCurrentUserDetails(tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+async function getCurrentUserDetails(tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   const connection = await connectionProvider();
   const url = `${connection.serverUrl}/_apis/connectionData`;
-  const token = (await tokenProvider()).token;
+  const token = await tokenProvider();
   const response = await fetch(url, {
     method: "GET",
     headers: {

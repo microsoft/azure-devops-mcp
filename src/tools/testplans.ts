@@ -16,7 +16,7 @@ const Test_Plan_Tools = {
   list_test_plans: "testplan_list_test_plans",
 };
 
-function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   /*
     LIST OF TEST PLANS
     get list of test plans by project

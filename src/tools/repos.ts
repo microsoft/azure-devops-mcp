@@ -97,7 +97,7 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   return filteredByName;
 }
 
-function configureRepoTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     REPO_TOOLS.create_pull_request,
     "Create a new pull request.",

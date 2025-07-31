@@ -13,7 +13,7 @@ const RELEASE_TOOLS = {
   get_releases: "release_get_releases",
 };
 
-function configureReleaseTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureReleaseTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     RELEASE_TOOLS.get_release_definitions,
     "Retrieves list of release definitions for a given project.",

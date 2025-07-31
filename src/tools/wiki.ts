@@ -14,7 +14,7 @@ const WIKI_TOOLS = {
   get_wiki_page_content: "wiki_get_page_content",
 };
 
-function configureWikiTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureWikiTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     WIKI_TOOLS.get_wiki,
     "Get the wiki by wikiIdentifier",

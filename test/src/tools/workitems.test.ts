@@ -16,7 +16,7 @@ import {
   _mockWorkItemType,
 } from "../../mocks/work-items";
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 interface WorkApiMock {
@@ -567,7 +567,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for the API call
       const mockFetch = jest.fn().mockResolvedValue({
@@ -607,7 +607,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for the API call
       const mockFetch = jest.fn().mockResolvedValue({
@@ -648,7 +648,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for the API call
       const mockFetch = jest.fn().mockResolvedValue({
@@ -1172,7 +1172,7 @@ describe("configureWorkItemTools", () => {
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
 
       // Mock tokenProvider for this test
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for successful response
       global.fetch = jest.fn().mockResolvedValue({
@@ -1236,7 +1236,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -1301,7 +1301,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -1371,7 +1371,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
@@ -1402,7 +1402,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -1445,7 +1445,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
@@ -1985,7 +1985,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -2021,7 +2021,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for the batch API call
       const mockFetch = jest.fn().mockResolvedValue({
@@ -2067,7 +2067,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for the batch API call
       const mockFetch = jest.fn().mockResolvedValue({
@@ -2116,7 +2116,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Create 51 items to exceed the limit
       const items = Array.from({ length: 51 }, (_, i) => ({
@@ -2145,7 +2145,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for the batch API call
       const mockFetch = jest.fn().mockResolvedValue({
@@ -2193,7 +2193,7 @@ describe("configureWorkItemTools", () => {
       const [, , , handler] = call;
 
       mockConnection.serverUrl = "https://dev.azure.com/contoso";
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch for a failed response
       const mockFetch = jest.fn().mockResolvedValue({
