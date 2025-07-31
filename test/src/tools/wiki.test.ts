@@ -852,5 +852,134 @@ describe("configureWikiTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error creating/updating wiki page: Network error");
     });
+
+    it("should get ETag from response body when not in headers", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue(null), // No ETag in headers
+        },
+        json: jest.fn().mockResolvedValue({
+          eTag: "W/\"body-etag\"", // ETag in response body
+        }),
+      };
+
+      const mockUpdateResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Updated Welcome",
+        }),
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse) // GET to retrieve ETag from body
+        .mockResolvedValueOnce(mockUpdateResponse); // Second PUT succeeds with ETag
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result.content[0].text).toContain("Successfully updated wiki page at path: /Home");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should handle missing ETag error", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue(null), // No ETag in headers
+        },
+        json: jest.fn().mockResolvedValue({
+          // No eTag in response body either
+        }),
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse); // GET fails to retrieve ETag
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Could not retrieve ETag for existing page");
+    });
+
+    it("should handle update failure after getting ETag", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue('W/"test-etag"'),
+        },
+      };
+
+      const mockUpdateResponse = {
+        ok: false,
+        status: 412, // Precondition failed
+        text: jest.fn().mockResolvedValue("ETag mismatch"),
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse) // GET to retrieve ETag
+        .mockResolvedValueOnce(mockUpdateResponse); // Second PUT fails with 412
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Failed to update page (412): ETag mismatch");
+    });
   });
 });
