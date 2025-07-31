@@ -870,7 +870,7 @@ describe("configureWikiTools", () => {
           get: jest.fn().mockReturnValue(null), // No ETag in headers
         },
         json: jest.fn().mockResolvedValue({
-          eTag: "W/\"body-etag\"", // ETag in response body
+          eTag: 'W/"body-etag"', // ETag in response body
         }),
       };
 
