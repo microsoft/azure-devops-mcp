@@ -28,6 +28,7 @@ const WORKITEM_TOOLS = {
   update_work_items_batch: "wit_update_work_items_batch",
   work_items_link: "wit_work_items_link",
   work_item_unlink: "wit_work_item_unlink",
+  add_artifact_link: "wit_add_artifact_link",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -848,6 +849,73 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               text: `Error unlinking work item: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
             },
           ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.add_artifact_link,
+    "Add artifact links (repository, branch, commit) to work items.",
+    {
+      workItemId: z.number().describe("The ID of the work item to add the artifact link to."),
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      artifactUri: z.string().describe("The URI of the artifact to link (e.g., vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName} for branches)."),
+      linkType: z.string().default("Branch").describe("Type of artifact link, defaults to 'Branch'."),
+      comment: z.string().optional().describe("Comment to include with the artifact link."),
+    },
+    async ({ workItemId, project, artifactUri, linkType, comment }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+
+        // Create the patch document for adding an artifact link relation
+        const patchDocument = [
+          {
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "ArtifactLink",
+              url: artifactUri,
+              attributes: {
+                name: linkType,
+                ...(comment && { comment }),
+              },
+            },
+          },
+        ];
+
+        // Use the WorkItem API to update the work item with the new relation
+        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, project);
+
+        if (!workItem) {
+          return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  workItemId,
+                  artifactUri,
+                  linkType,
+                  comment: comment || null,
+                  success: true,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error adding artifact link to work item: ${errorMessage}` }],
           isError: true,
         };
       }
