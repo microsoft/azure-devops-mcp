@@ -293,6 +293,74 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItems], null, 2));
     });
 
+    it("should call workItemApi.getWorkItemsBatch API with custom fields when fields parameter is provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      const mockWorkItemsWithCustomFields = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.Title": "Test Work Item",
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithCustomFields);
+
+      const params = {
+        ids: [297, 299, 300],
+        project: "Contoso",
+        fields: ["System.Id", "System.Title"],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(
+        {
+          ids: params.ids,
+          fields: params.fields,
+        },
+        params.project
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockWorkItemsWithCustomFields, null, 2));
+    });
+
+    it("should use default fields when an empty fields array is provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue([_mockWorkItems]);
+
+      const params = {
+        ids: [297, 299, 300],
+        project: "Contoso",
+        fields: [], // Empty array should trigger default fields
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(
+        {
+          ids: params.ids,
+          fields: ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"],
+        },
+        params.project
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItems], null, 2));
+    });
+
     it("should transform System.AssignedTo object to formatted string", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
