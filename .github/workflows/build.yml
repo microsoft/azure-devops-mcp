@@ -110,6 +110,9 @@ jobs:
       - name: Check code formatting
         run: npm run format-check
 
+      - name: Build the project
+        run: npm run build
+
       - name: Verify package version is synced
         run: |
           git diff --exit-code ./src/version.ts
