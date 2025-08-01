@@ -33,10 +33,25 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 - "List iterations for project 'Contoso'"
 - "List my work items for project 'Contoso'"
 - "List work items in current iteration for 'Contoso' project and 'Contoso Team'"
+- "List all wikis in the 'Contoso' project"
+- "Create a new project wiki named 'Documentation' in the 'Contoso' project"
+- "Create a wiki page '/Architecture/Overview' with content about system design"
+- "Update the wiki page '/Getting Started' with new onboarding instructions"
+- "Get the content of the wiki page '/API/Authentication' from the Documentation wiki"
 
 ## 🏆 Expectations
 
 The Azure DevOps MCP Server is built from tools that are concise, simple, focused, and easy to use—each designed for a specific scenario. We intentionally avoid complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs, making data access straightforward and letting the language model handle complex reasoning.
+
+## ✨ Recent Enhancements
+
+### 📖 **Enhanced Wiki Support**
+
+- **Full Content Management**: Create and update wiki pages with complete content using the native Azure DevOps REST API
+- **Automatic ETag Handling**: Safe updates with built-in conflict resolution for concurrent edits
+- **Immediate Visibility**: Pages appear instantly in the Azure DevOps wiki interface
+- **Hierarchical Structure**: Support for organized page structures within existing folder hierarchies
+- **Robust Error Handling**: Comprehensive error management for various HTTP status codes and edge cases
 
 ## ⚙️ Supported Tools
 
@@ -132,6 +147,16 @@ Interact with these Azure DevOps services:
 - **testplan_list_test_plans**: Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.
 - **testplan_list_test_cases**: Get a list of test cases in the test plan.
 - **testplan_show_test_results_from_build_id**: Get a list of test results for a given project and build ID.
+
+### 📖 Wiki
+
+- **wiki_list_wikis**: Retrieve a list of wikis for an organization or project.
+- **wiki_get_wiki**: Get the wiki by wikiIdentifier.
+- **wiki_list_pages**: Retrieve a list of wiki pages for a specific wiki and project.
+- **wiki_get_page_content**: Retrieve wiki page content by wikiIdentifier and path.
+- **wiki_create_wiki**: Create a new wiki in the specified project.
+- **wiki_update_wiki**: Update an existing wiki by ID or name.
+- **wiki_create_or_update_page**: ✨ **Enhanced** - Create or update wiki pages with full content support using Azure DevOps REST API. Features automatic ETag handling for safe updates, immediate content visibility, and proper conflict resolution.
 
 ### 🔎 Search
 

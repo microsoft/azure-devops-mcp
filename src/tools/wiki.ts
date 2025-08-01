@@ -5,13 +5,17 @@ import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
-import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
+import { WikiPagesBatchRequest, WikiCreateParametersV2, WikiUpdateParameters, WikiType } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
+import { GitVersionDescriptor } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
 const WIKI_TOOLS = {
   list_wikis: "wiki_list_wikis",
   get_wiki: "wiki_get_wiki",
   list_wiki_pages: "wiki_list_pages",
   get_wiki_page_content: "wiki_get_page_content",
+  create_wiki: "wiki_create_wiki",
+  update_wiki: "wiki_update_wiki",
+  create_or_update_page: "wiki_create_or_update_page",
 };
 
 function configureWikiTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
@@ -146,6 +150,247 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
 
         return {
           content: [{ type: "text", text: `Error fetching wiki page content: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WIKI_TOOLS.create_wiki,
+    "Create a new wiki in the specified project.",
+    {
+      name: z.string().describe("The name of the wiki to create."),
+      project: z.string().optional().describe("The project name or ID where the wiki will be created. If not provided, the default project will be used."),
+      type: z.enum(["projectWiki", "codeWiki"]).default("projectWiki").describe("Type of the wiki. Can be 'projectWiki' or 'codeWiki'. Defaults to 'projectWiki'."),
+      repositoryId: z.string().optional().describe("ID of the git repository that backs up the wiki. Required for codeWiki type."),
+      mappedPath: z.string().optional().describe("Folder path inside repository which is shown as Wiki. Required for codeWiki type, e.g., '/docs'."),
+      version: z.string().optional().describe("Branch name for code wiki (e.g., 'main'). Required for codeWiki type."),
+    },
+    async ({ name, project, type = "projectWiki", repositoryId, mappedPath, version }) => {
+      try {
+        const connection = await connectionProvider();
+        const wikiApi = await connection.getWikiApi();
+
+        // Validate required parameters for codeWiki
+        if (type === "codeWiki") {
+          if (!repositoryId || !mappedPath || !version) {
+            return {
+              content: [{ type: "text", text: "For codeWiki type, repositoryId, mappedPath, and version are required." }],
+              isError: true,
+            };
+          }
+        }
+
+        const wikiCreateParams: WikiCreateParametersV2 = {
+          name,
+          type: type === "projectWiki" ? WikiType.ProjectWiki : WikiType.CodeWiki,
+          projectId: project,
+        };
+
+        // Add code wiki specific parameters
+        if (type === "codeWiki") {
+          wikiCreateParams.repositoryId = repositoryId;
+          wikiCreateParams.mappedPath = mappedPath;
+          wikiCreateParams.version = {
+            version: version!,
+          } as GitVersionDescriptor;
+        }
+
+        const wiki = await wikiApi.createWiki(wikiCreateParams, project);
+
+        if (!wiki) {
+          return { content: [{ type: "text", text: "Failed to create wiki" }], isError: true };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(wiki, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error creating wiki: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WIKI_TOOLS.update_wiki,
+    "Update an existing wiki by ID or name.",
+    {
+      wikiIdentifier: z.string().describe("The unique identifier or name of the wiki to update."),
+      name: z.string().optional().describe("New name for the wiki."),
+      project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
+      versions: z
+        .array(
+          z.object({
+            version: z.string().describe("Branch name or version"),
+            versionType: z.enum(["branch", "tag", "commit"]).optional().describe("Type of version (branch, tag, or commit)"),
+          })
+        )
+        .optional()
+        .describe("Array of versions/branches for the wiki."),
+    },
+    async ({ wikiIdentifier, name, project, versions }) => {
+      try {
+        const connection = await connectionProvider();
+        const wikiApi = await connection.getWikiApi();
+
+        const updateParams: WikiUpdateParameters = {};
+
+        if (name) {
+          updateParams.name = name;
+        }
+
+        if (versions) {
+          updateParams.versions = versions.map(
+            (v) =>
+              ({
+                version: v.version,
+                versionType: v.versionType ? (v.versionType === "branch" ? 0 : v.versionType === "tag" ? 1 : 2) : 0, // Default to branch
+              }) as GitVersionDescriptor
+          );
+        }
+
+        const updatedWiki = await wikiApi.updateWiki(updateParams, wikiIdentifier, project);
+
+        if (!updatedWiki) {
+          return { content: [{ type: "text", text: "Failed to update wiki" }], isError: true };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(updatedWiki, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error updating wiki: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WIKI_TOOLS.create_or_update_page,
+    "Create or update a wiki page with content.",
+    {
+      wikiIdentifier: z.string().describe("The unique identifier or name of the wiki."),
+      path: z.string().describe("The path of the wiki page (e.g., '/Home' or '/Documentation/Setup')."),
+      content: z.string().describe("The content of the wiki page in markdown format."),
+      project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
+      comment: z.string().optional().describe("Optional comment for the page update."),
+      etag: z.string().optional().describe("ETag for editing existing pages (optional, will be fetched if not provided)."),
+    },
+    async ({ wikiIdentifier, path, content, project, comment, etag }) => {
+      try {
+        const connection = await connectionProvider();
+        const accessToken = await tokenProvider();
+
+        // Normalize the path
+        const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+        const encodedPath = encodeURIComponent(normalizedPath);
+
+        // Build the URL for the wiki page API
+        const baseUrl = connection.serverUrl;
+        const projectParam = project || "";
+        const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&api-version=7.1`;
+
+        console.log(`[Wiki API] Attempting to create/update page at: ${url}`);
+
+        // First, try to create a new page (PUT without ETag)
+        try {
+          const createResponse = await fetch(url, {
+            method: "PUT",
+            headers: {
+              "Authorization": `Bearer ${accessToken.token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ content: content }),
+          });
+
+          if (createResponse.ok) {
+            const result = await createResponse.json();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Successfully created wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
+                },
+              ],
+            };
+          }
+
+          // If creation failed with 409 (Conflict) or 500 (Page exists), try to update it
+          if (createResponse.status === 409 || createResponse.status === 500) {
+            console.log(`[Wiki API] Page exists, attempting to update with ETag...`);
+
+            // Page exists, we need to get the ETag and update it
+            let currentEtag = etag;
+
+            if (!currentEtag) {
+              // Fetch current page to get ETag
+              const getResponse = await fetch(url, {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${accessToken.token}`,
+                },
+              });
+
+              if (getResponse.ok) {
+                currentEtag = getResponse.headers.get("etag") || getResponse.headers.get("ETag") || undefined;
+                if (!currentEtag) {
+                  const pageData = await getResponse.json();
+                  currentEtag = pageData.eTag;
+                }
+              }
+
+              if (!currentEtag) {
+                throw new Error("Could not retrieve ETag for existing page");
+              }
+            }
+
+            // Now update the existing page with ETag
+            const updateResponse = await fetch(url, {
+              method: "PUT",
+              headers: {
+                "Authorization": `Bearer ${accessToken.token}`,
+                "Content-Type": "application/json",
+                "If-Match": currentEtag,
+              },
+              body: JSON.stringify({ content: content }),
+            });
+
+            if (updateResponse.ok) {
+              const result = await updateResponse.json();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Successfully updated wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
+                  },
+                ],
+              };
+            } else {
+              const errorText = await updateResponse.text();
+              throw new Error(`Failed to update page (${updateResponse.status}): ${errorText}`);
+            }
+          } else {
+            const errorText = await createResponse.text();
+            throw new Error(`Failed to create page (${createResponse.status}): ${errorText}`);
+          }
+        } catch (fetchError) {
+          throw fetchError;
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error creating/updating wiki page: ${errorMessage}` }],
           isError: true,
         };
       }
