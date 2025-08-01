@@ -14,6 +14,7 @@ const WORKITEM_TOOLS = {
   list_backlogs: "wit_list_backlogs",
   list_backlog_work_items: "wit_list_backlog_work_items",
   get_work_item: "wit_get_work_item",
+  get_work_item_attachment: "wit_get_work_item_attachment",
   get_work_items_batch_by_ids: "wit_get_work_items_batch_by_ids",
   update_work_item: "wit_update_work_item",
   create_work_item: "wit_create_work_item",
@@ -175,6 +176,66 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       const workItem = await workItemApi.getWorkItem(id, fields, asOf, expand as unknown as WorkItemExpand, project);
       return {
         content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.get_work_item_attachment,
+    "Get a work item attachment for a attachment id and name.",
+    {
+      id: z.string().describe("The ID of the work item to attachment that comes from the relations attributs id field"),
+      name: z.string().describe("the name of the attachment to retrieve, e.g., 'screenshot.png'. This is the name of the file as it appears in Azure DevOps."),
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+    },
+    async ({ id, name, project }) => {
+      const connection = await connectionProvider();
+      const workItemApi = await connection.getWorkItemTrackingApi();
+      const attachmentStream = await workItemApi.getAttachmentContent(id, name, project);
+
+      // If you want to pass the stream to your LLM or download it, you can read the stream into a buffer or pipe it as needed.
+      // Example: Read the stream into a Buffer (Node.js)
+      const chunks: Buffer[] = [];
+      for await (const chunk of attachmentStream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+
+      const attachmentBuffer = Buffer.concat(chunks);
+
+      // Detect content type based on file extension
+      const getContentType = (fileName: string): string => {
+        const ext = fileName.toLowerCase().split(".").pop();
+        const mimeTypes: Record<string, string> = {
+          gif: "image/gif",
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          pdf: "application/pdf",
+          txt: "text/plain",
+          doc: "application/msword",
+          docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        };
+        return mimeTypes[ext || ""] || "application/octet-stream";
+      };
+
+      // Return the attachment as binary content with metadata
+      return {
+        content: [
+          {
+            type: "resource",
+            resource: {
+              uri: `data:${getContentType(name)};base64,${attachmentBuffer.toString("base64")}`,
+              mimeType: getContentType(name),
+              text: attachmentBuffer.toString("base64"),
+            },
+          },
+        ],
+        meta: {
+          attachmentName: name,
+          attachmentSize: attachmentBuffer.length,
+          contentType: getContentType(name),
+        },
       };
     }
   );
