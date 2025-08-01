@@ -73,6 +73,7 @@ Interact with these Azure DevOps services:
 - **wit_get_query_results_by_id**: Retrieve the results of a work item query given the query ID.
 - **wit_update_work_items_batch**: Update work items in batch.
 - **wit_work_items_link**: Link work items together in batch.
+- **wit_work_item_unlink**: Unlink one or many links from a work item.
 
 #### Deprecated Tools
 
@@ -94,6 +95,7 @@ Interact with these Azure DevOps services:
 - **repo_get_pull_request_by_id**: Get a pull request by its ID.
 - **repo_create_pull_request**: Create a new pull request.
 - **repo_update_pull_request_status**: Update the status of an existing pull request to active or abandoned.
+- **repo_update_pull_request**: Update various fields of an existing pull request (title, description, draft status, target branch).
 - **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
 - **repo_reply_to_comment**: Replies to a specific comment on a pull request.
 - **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
