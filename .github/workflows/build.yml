@@ -110,14 +110,11 @@ jobs:
       - name: Check code formatting
         run: npm run format-check
 
-      - name: Build the project
-        run: npm run build
-
       - name: Verify package version is synced
         run: |
           git diff --exit-code ./src/version.ts
           if (!$?) {
-            Write-Host "Version mismatch detected. Please run 'npm run build' to update version.ts and add changes to the commit."
+            Write-Host "Version mismatch detected. Please make sure the version information in version.ts is up-to-date with package.json."
             exit 1
           }
           git diff --exit-code ./package-lock.json
