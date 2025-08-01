@@ -129,12 +129,17 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       ids: z.array(z.number()).describe("The IDs of the work items to retrieve."),
+      fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
     },
-    async ({ project, ids }) => {
+    async ({ project, ids, fields }) => {
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
-      const fields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
-      const workitems = await workItemApi.getWorkItemsBatch({ ids, fields }, project);
+      const defaultFields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
+
+      // If no fields are provided, use the default set of fields
+      const fieldsToUse = !fields || fields.length === 0 ? defaultFields : fields;
+
+      const workitems = await workItemApi.getWorkItemsBatch({ ids, fields: fieldsToUse }, project);
 
       // Format the assignedTo field to include displayName and uniqueName
       // Removing the identity object as the response. It's too much and not needed
