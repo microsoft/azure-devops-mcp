@@ -10,6 +10,7 @@ This guide offers step-by-step examples for using the Azure DevOps MCP Server to
 [Create and Link Test Cases](#create-and-link-test-cases)<br/>
 [Triage Work](#triage-work)<br/>
 [Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)<br/>
+[Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
 
 ## 🙋‍♂️ Projects and Teams
 
@@ -132,3 +133,19 @@ Update work item 12345 with a new description and use Markdown text. Use Markdow
 ```
 
 📽️ [Azure DevOps MCP Server: Using Markdown format for create and update work items](https://youtu.be/OD4c2m7Fj9U)
+
+### Remove One or More Links from a Work Item
+
+Use this tool to remove one or more links from a work item, either by specifying individual links or by link type.
+
+First, retrieve the work item whose links you want to remove:
+
+```plaintext
+Get work item 1234 in Contoso project and show me the relations
+```
+
+Next, remove a specific link to a work item, pull request, etc. or remove links by type (for example, "related"):
+
+```plaintext
+Remove link 5678 and 91011 from work item 1234. Also remove any related links and links to pull request 121314
+```

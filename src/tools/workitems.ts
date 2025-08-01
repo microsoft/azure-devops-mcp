@@ -4,7 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
@@ -27,6 +27,7 @@ const WORKITEM_TOOLS = {
   get_query_results_by_id: "wit_get_query_results_by_id",
   update_work_items_batch: "wit_update_work_items_batch",
   work_items_link: "wit_work_items_link",
+  work_item_unlink: "wit_work_item_unlink",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -53,6 +54,8 @@ function getLinkTypeFromName(name: string) {
       return "Microsoft.VSTS.Common.Affects-Forward";
     case "affected by":
       return "Microsoft.VSTS.Common.Affects-Reverse";
+    case "artifact":
+      return "ArtifactLink";
     default:
       throw new Error(`Unknown link type: ${name}`);
   }
@@ -130,8 +133,21 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, ids }) => {
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
-      const fields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank"];
+      const fields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
       const workitems = await workItemApi.getWorkItemsBatch({ ids, fields }, project);
+
+      // Format the assignedTo field to include displayName and uniqueName
+      // Removing the identity object as the response. It's too much and not needed
+      if (workitems && Array.isArray(workitems)) {
+        workitems.forEach((item) => {
+          if (item.fields && item.fields["System.AssignedTo"] && typeof item.fields["System.AssignedTo"] === "object") {
+            const assignedTo = item.fields["System.AssignedTo"];
+            const name = assignedTo.displayName || "";
+            const email = assignedTo.uniqueName || "";
+            item.fields["System.AssignedTo"] = `${name} <${email}>`.trim();
+          }
+        });
+      }
 
       return {
         content: [{ type: "text", text: JSON.stringify(workitems, null, 2) }],
@@ -756,6 +772,85 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.work_item_unlink,
+    "Remove one or many links from a single work item",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      id: z.number().describe("The ID of the work item to remove the links from."),
+      type: z
+        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
+        .default("related")
+        .describe(
+          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
+        ),
+      url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
+    },
+    async ({ project, id, type, url }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, project);
+        const relations: WorkItemRelation[] = workItem.relations ?? [];
+        const linkType = getLinkTypeFromName(type);
+
+        let relationIndexes: number[] = [];
+
+        if (url && url.trim().length > 0) {
+          // If url is provided, find relations matching both rel type and url
+          relationIndexes = relations.map((relation, idx) => (relation.url === url ? idx : -1)).filter((idx) => idx !== -1);
+        } else {
+          // If url is not provided, find all relations matching rel type
+          relationIndexes = relations.map((relation, idx) => (relation.rel === linkType ? idx : -1)).filter((idx) => idx !== -1);
+        }
+
+        if (relationIndexes.length === 0) {
+          return {
+            content: [{ type: "text", text: `No matching relations found for link type '${type}'${url ? ` and URL '${url}'` : ""}.\n${JSON.stringify(relations, null, 2)}` }],
+            isError: true,
+          };
+        }
+
+        // Get the relations that will be removed for logging
+        const removedRelations = relationIndexes.map((idx) => relations[idx]);
+
+        // Sort indexes in descending order to avoid index shifting when removing
+        relationIndexes.sort((a, b) => b - a);
+
+        const apiUpdates = relationIndexes.map((idx) => ({
+          op: "remove",
+          path: `/relations/${idx}`,
+        }));
+
+        const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id, project);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                `Removed ${removedRelations.length} link(s) of type '${type}':\n` +
+                JSON.stringify(removedRelations, null, 2) +
+                `\n\nUpdated work item result:\n` +
+                JSON.stringify(updatedWorkItem, null, 2),
+            },
+          ],
+          isError: false,
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error unlinking work item: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
   );
 }
