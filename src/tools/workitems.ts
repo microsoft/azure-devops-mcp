@@ -133,7 +133,20 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, ids }) => {
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
-      const fields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
+      const fields = [
+        "System.Id",
+        "System.WorkItemType",
+        "System.Title",
+        "System.State",
+        "System.Parent",
+        "System.Tags",
+        "Microsoft.VSTS.Common.StackRank",
+        "System.AssignedTo",
+        "Microsoft.VSTS.Common.Priority",
+        "System.CreatedDate",
+        "System.ChangedDate",
+        "Microsoft.VSTS.Common.StateChangeDate",
+      ];
       const workitems = await workItemApi.getWorkItemsBatch({ ids, fields }, project);
 
       // Format the assignedTo field to include displayName and uniqueName

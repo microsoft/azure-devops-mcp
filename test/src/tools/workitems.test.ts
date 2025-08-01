@@ -285,7 +285,20 @@ describe("configureWorkItemTools", () => {
       expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(
         {
           ids: params.ids,
-          fields: ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"],
+          fields: [
+            "System.Id",
+            "System.WorkItemType",
+            "System.Title",
+            "System.State",
+            "System.Parent",
+            "System.Tags",
+            "Microsoft.VSTS.Common.StackRank",
+            "System.AssignedTo",
+            "Microsoft.VSTS.Common.Priority",
+            "System.CreatedDate",
+            "System.ChangedDate",
+            "Microsoft.VSTS.Common.StateChangeDate",
+          ],
         },
         params.project
       );
