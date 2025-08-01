@@ -1,11 +1,36 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { packageVersion } from "./version.js";
-
 export const apiVersion = "7.2-preview.1";
 export const batchApiVersion = "5.0";
 export const markdownCommentsApiVersion = "7.2-preview.4";
+
+export function createEnumMapping<T extends Record<string, string | number>>(enumObject: T): Record<string, T[keyof T]> {
+  const mapping: Record<string, T[keyof T]> = {};
+  for (const [key, value] of Object.entries(enumObject)) {
+    if (typeof key === "string" && typeof value === "number") {
+      mapping[key.toLowerCase()] = value as T[keyof T];
+    }
+  }
+  return mapping;
+}
+
+export function mapStringToEnum<T extends Record<string, string | number>>(value: string | undefined, enumObject: T, defaultValue?: T[keyof T]): T[keyof T] | undefined {
+  if (!value) return defaultValue;
+  const enumMapping = createEnumMapping(enumObject);
+  return enumMapping[value.toLowerCase()] ?? defaultValue;
+}
+
+/**
+ * Maps an array of strings to an array of enum values, filtering out invalid values.
+ * @param values Array of string values to map
+ * @param enumObject The enum object to map to
+ * @returns Array of valid enum values
+ */
+export function mapStringArrayToEnum<T extends Record<string, string | number>>(values: string[] | undefined, enumObject: T): Array<T[keyof T]> {
+  if (!values) return [];
+  return values.map((value) => mapStringToEnum(value, enumObject)).filter((v): v is T[keyof T] => v !== undefined);
+}
 
 /**
  * Converts a TypeScript numeric enum to an array of string keys for use with z.enum().
