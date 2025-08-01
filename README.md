@@ -119,6 +119,11 @@ Interact with these Azure DevOps services:
 - **release_get_definitions**: Retrieve a list of release definitions for a given project.
 - **release_get_releases**: Retrieve a list of releases for a given project.
 
+### 🔒 Advanced Security
+
+- **advsec_get_alerts**: Retrieve Advanced Security alerts for a repository.
+- **advsec_get_alert_details**: Get detailed information about a specific Advanced Security alert.
+
 ### 🧪 Test Plans
 
 - **testplan_create_test_plan**: Create a new test plan in the project.
