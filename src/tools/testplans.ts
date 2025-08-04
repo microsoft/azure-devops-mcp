@@ -115,7 +115,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       title: z.string().describe("The title of the test case."),
-      steps: z.string().optional().describe("The steps to reproduce the test case. Make sure to format each step as '1. Step one\\n2. Step two' etc."),
+      steps: z.string().optional().describe("The steps to reproduce the test case. Make sure to format each step as '1. Step one|Expected result one\n2. Step two|Expected result two"),
       priority: z.number().optional().describe("The priority of the test case."),
       areaPath: z.string().optional().describe("The area path for the test case."),
       iterationPath: z.string().optional().describe("The iteration path for the test case."),
@@ -227,6 +227,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
  * Helper function to convert steps text to XML format required
  */
 function convertStepsToXml(steps: string): string {
+  // Accepts steps in the format: '1. Step one|Expected result one\n2. Step two|Expected result two'
   const stepsLines = steps.split("\n").filter((line) => line.trim() !== "");
 
   let xmlSteps = `<steps id="0" last="${stepsLines.length}">`;
@@ -234,13 +235,16 @@ function convertStepsToXml(steps: string): string {
   for (let i = 0; i < stepsLines.length; i++) {
     const stepLine = stepsLines[i].trim();
     if (stepLine) {
-      const stepMatch = stepLine.match(/^(\d+)\.\s*(.+)$/);
-      const stepText = stepMatch ? stepMatch[2] : stepLine;
+      // Split step and expected result by '|', fallback to default if not provided
+      const [stepPart, expectedPart] = stepLine.split("|").map((s) => s.trim());
+      const stepMatch = stepPart.match(/^(\d+)\.\s*(.+)$/);
+      const stepText = stepMatch ? stepMatch[2] : stepPart;
+      const expectedText = expectedPart || "Verify step completes successfully";
 
       xmlSteps += `
                 <step id="${i + 1}" type="ActionStep">
                     <parameterizedString isformatted="true">${escapeXml(stepText)}</parameterizedString>
-                    <parameterizedString isformatted="true">Verify step completes successfully</parameterizedString>
+                    <parameterizedString isformatted="true">${escapeXml(expectedText)}</parameterizedString>
                 </step>`;
     }
   }

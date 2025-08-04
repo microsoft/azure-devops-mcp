@@ -194,6 +194,43 @@ describe("configureTestPlanTools", () => {
       );
     });
 
+    it("should create test case & expected result with proper parameters", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
+      if (!call) throw new Error("testplan_create_test_case tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.createWorkItem as jest.Mock).mockResolvedValue({
+        id: 1001,
+        fields: {
+          "System.Title": "New Test Case",
+          "System.WorkItemType": "Test Case",
+        },
+      });
+
+      const params = {
+        project: "proj1",
+        title: "New Test Case",
+        steps: "1. Test step 1 | Expected result 1\n2. Test step 2 | Expected result 2",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.createWorkItem).toHaveBeenCalledWith({}, expect.any(Array), "proj1", "Test Case");
+      expect(result.content[0].text).toBe(
+        JSON.stringify(
+          {
+            id: 1001,
+            fields: {
+              "System.Title": "New Test Case",
+              "System.WorkItemType": "Test Case",
+            },
+          },
+          null,
+          2
+        )
+      );
+    });
+
     it("should handle multiple steps in test case", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
