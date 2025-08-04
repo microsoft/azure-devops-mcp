@@ -867,7 +867,24 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemId: z.number().describe("The ID of the work item to add the artifact link to."),
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       artifactUri: z.string().describe("The URI of the artifact to link (e.g., vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName} for branches)."),
-      linkType: z.string().default("Branch").describe("Type of artifact link, defaults to 'Branch'."),
+      linkType: z.enum([
+          "Branch",
+          "Build",
+          "Fixed in Changeset",
+          "Fixed in Commit",
+          "Found in build",
+          "Integrated in build",
+          "Model Link",
+          "Pull Request",
+          "Related Workitem",
+          "Result Attachment",
+          "Source Code File",
+          "Tag",
+          "Test Result",
+          "Wiki",
+        ])
+        .default("Branch")
+        .describe("Type of artifact link, defaults to 'Branch'."),
       comment: z.string().optional().describe("Comment to include with the artifact link."),
     },
     async ({ workItemId, project, artifactUri, linkType, comment }) => {
