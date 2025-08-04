@@ -878,7 +878,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       pullRequestId: z.number().optional().describe("The pull request ID. Required when linkType is 'Pull Request'."),
       buildId: z.number().optional().describe("The build ID. Required when linkType is 'Build', 'Found in build', or 'Integrated in build'."),
 
-      linkType: z.enum([
+      linkType: z
+        .enum([
           "Branch",
           "Build",
           "Fixed in Changeset",
