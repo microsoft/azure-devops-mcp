@@ -300,8 +300,6 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
         const projectParam = project || "";
         const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&api-version=7.1`;
 
-        console.log(`[Wiki API] Attempting to create/update page at: ${url}`);
-
         // First, try to create a new page (PUT without ETag)
         try {
           const createResponse = await fetch(url, {
@@ -327,8 +325,6 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
 
           // If creation failed with 409 (Conflict) or 500 (Page exists), try to update it
           if (createResponse.status === 409 || createResponse.status === 500) {
-            console.log(`[Wiki API] Page exists, attempting to update with ETag...`);
-
             // Page exists, we need to get the ETag and update it
             let currentEtag = etag;
 
