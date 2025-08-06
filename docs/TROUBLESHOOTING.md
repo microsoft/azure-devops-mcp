@@ -93,13 +93,7 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": [
-           "-y",
-           "@azure-devops/mcp",
-           "${input:ado_org}",
-           "--tenant",
-           "${input:ado_tenant}"
-         ]
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--tenant", "${input:ado_tenant}"]
        }
      }
    }
