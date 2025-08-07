@@ -2318,4 +2318,120 @@ describe("configureWorkItemTools", () => {
       expect(result.isError).toBe(true);
     });
   });
+
+  describe("artifact link tools", () => {
+    describe("wit_add_artifact_link", () => {
+      it("should add artifact link to work item successfully", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain",
+          linkType: "Branch",
+          comment: "Linked to main branch",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain",
+                attributes: {
+                  name: "Branch",
+                  comment: "Linked to main branch",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.workItemId).toBe(1234);
+        expect(response.artifactUri).toBe("vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain");
+        expect(response.linkType).toBe("Branch");
+        expect(response.comment).toBe("Linked to main branch");
+        expect(response.success).toBe(true);
+      });
+
+      it("should add artifact link without comment", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: "vstfs:///Git/Commit/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2Fabc123",
+          linkType: "Commit",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Git/Commit/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2Fabc123",
+                attributes: {
+                  name: "Commit",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.comment).toBe(null);
+      });
+
+      it("should handle errors when adding artifact link", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        mockWorkItemTrackingApi.updateWorkItem.mockRejectedValue(new Error("API Error"));
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: "vstfs:///Git/Ref/invalid",
+          linkType: "Branch",
+        };
+
+        const result = await handler(params);
+
+        expect(result.content[0].text).toBe("Error adding artifact link to work item: API Error");
+        expect(result.isError).toBe(true);
+      });
+    });
+  });
 });
