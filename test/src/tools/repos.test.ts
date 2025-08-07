@@ -4,12 +4,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
-import {
-  PullRequestStatus,
-  GitVersionType,
-  GitPullRequestQueryType,
-  CommentThreadStatus
-} from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { PullRequestStatus, GitVersionType, GitPullRequestQueryType, CommentThreadStatus } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { configureRepoTools, REPO_TOOLS } from "../../../src/tools/repos";
 import { getCurrentUserDetails } from "../../../src/tools/auth";
 
@@ -371,11 +366,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.createPullRequestReviewers).toHaveBeenCalledWith(
-        [{ id: "reviewer1" }, { id: "reviewer2" }],
-        "repo123",
-        456
-      );
+      expect(mockGitApi.createPullRequestReviewers).toHaveBeenCalledWith([{ id: "reviewer1" }, { id: "reviewer2" }], "repo123", 456);
 
       expect(result.content[0].text).toBe(JSON.stringify(mockReviewers, null, 2));
     });
@@ -446,7 +437,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.getRepositories).toHaveBeenCalledWith("test-project", false, false, false);
 
-      const expectedTrimmedRepos = mockRepos.map(repo => ({
+      const expectedTrimmedRepos = mockRepos.map((repo) => ({
         id: repo.id,
         name: repo.name,
         isDisabled: repo.isDisabled,
@@ -520,14 +511,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
-        "repo123",
-        { status: PullRequestStatus.Active, repositoryId: "repo123" },
-        undefined,
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", { status: PullRequestStatus.Active, repositoryId: "repo123" }, undefined, undefined, 0, 100);
 
       expect(result.content[0].text).toBe(JSON.stringify(mockPRs, null, 2));
     });
@@ -552,14 +536,7 @@ describe("repos tools", () => {
       await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalled();
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
-        "repo123",
-        { status: PullRequestStatus.Active, repositoryId: "repo123", creatorId: "user123" },
-        undefined,
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", { status: PullRequestStatus.Active, repositoryId: "repo123", creatorId: "user123" }, undefined, undefined, 0, 100);
     });
   });
 
@@ -594,24 +571,20 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
-        "test-project",
-        { status: PullRequestStatus.Active },
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active }, undefined, 0, 100);
 
-      const expectedResult = [{
-        pullRequestId: 123,
-        codeReviewId: 456,
-        repository: "test-repo",
-        status: PullRequestStatus.Active,
-        createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
-        creationDate: "2023-01-01T00:00:00Z",
-        title: "Feature PR",
-        isDraft: false,
-      }];
+      const expectedResult = [
+        {
+          pullRequestId: 123,
+          codeReviewId: 456,
+          repository: "test-repo",
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
+          creationDate: "2023-01-01T00:00:00Z",
+          title: "Feature PR",
+          isDraft: false,
+        },
+      ];
 
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
     });
@@ -796,10 +769,7 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_list_my_branches_by_repo tool not registered");
       const [, , , handler] = call;
 
-      const mockBranches = [
-        { name: "refs/heads/main" },
-        { name: "refs/heads/my-feature" },
-      ];
+      const mockBranches = [{ name: "refs/heads/main" }, { name: "refs/heads/my-feature" }];
       mockGitApi.getRefs.mockResolvedValue(mockBranches);
 
       const params = {
