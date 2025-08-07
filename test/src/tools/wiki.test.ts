@@ -11,6 +11,8 @@ interface WikiApiMock {
   getAllWikis: jest.Mock;
   getPagesBatch: jest.Mock;
   getPageText: jest.Mock;
+  createWiki: jest.Mock;
+  updateWiki: jest.Mock;
 }
 
 describe("configureWikiTools", () => {
@@ -28,6 +30,8 @@ describe("configureWikiTools", () => {
       getAllWikis: jest.fn(),
       getPagesBatch: jest.fn(),
       getPageText: jest.fn(),
+      createWiki: jest.fn(),
+      updateWiki: jest.fn(),
     };
     mockConnection = {
       getWikiApi: jest.fn().mockResolvedValue(mockWikiApi),
@@ -458,6 +462,639 @@ describe("configureWikiTools", () => {
       expect(mockWikiApi.getPageText).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching wiki page content: Unknown error occurred");
+    });
+  });
+
+  describe("create_wiki tool", () => {
+    it("should create a project wiki with correct parameters", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_wiki");
+      if (!call) throw new Error("wiki_create_wiki tool not registered");
+      const [, , , handler] = call;
+
+      const mockWiki = { id: "wiki1", name: "Test Wiki", type: "projectWiki" };
+      mockWikiApi.createWiki.mockResolvedValue(mockWiki);
+
+      const params = {
+        name: "Test Wiki",
+        project: "proj1",
+        type: "projectWiki",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.createWiki).toHaveBeenCalledWith(
+        {
+          name: "Test Wiki",
+          type: 0, // WikiType.ProjectWiki
+          projectId: "proj1",
+        },
+        "proj1"
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(mockWiki, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should create a code wiki with all required parameters", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_wiki");
+      if (!call) throw new Error("wiki_create_wiki tool not registered");
+      const [, , , handler] = call;
+
+      const mockWiki = { id: "wiki2", name: "Code Wiki", type: "codeWiki" };
+      mockWikiApi.createWiki.mockResolvedValue(mockWiki);
+
+      const params = {
+        name: "Code Wiki",
+        project: "proj1",
+        type: "codeWiki",
+        repositoryId: "repo123",
+        mappedPath: "/docs",
+        version: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.createWiki).toHaveBeenCalledWith(
+        {
+          name: "Code Wiki",
+          type: 1, // WikiType.CodeWiki
+          projectId: "proj1",
+          repositoryId: "repo123",
+          mappedPath: "/docs",
+          version: { version: "main" },
+        },
+        "proj1"
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(mockWiki, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should validate required parameters for code wiki", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_wiki");
+      if (!call) throw new Error("wiki_create_wiki tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        name: "Code Wiki",
+        project: "proj1",
+        type: "codeWiki",
+        // Missing repositoryId, mappedPath, and version
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("For codeWiki type, repositoryId, mappedPath, and version are required.");
+      expect(mockWikiApi.createWiki).not.toHaveBeenCalled();
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_wiki");
+      if (!call) throw new Error("wiki_create_wiki tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Failed to create wiki");
+      mockWikiApi.createWiki.mockRejectedValue(testError);
+
+      const params = {
+        name: "Test Wiki",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.createWiki).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating wiki: Failed to create wiki");
+    });
+
+    it("should handle null API results correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_wiki");
+      if (!call) throw new Error("wiki_create_wiki tool not registered");
+      const [, , , handler] = call;
+
+      mockWikiApi.createWiki.mockResolvedValue(null);
+
+      const params = {
+        name: "Test Wiki",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.createWiki).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Failed to create wiki");
+    });
+  });
+
+  describe("update_wiki tool", () => {
+    it("should update wiki name with correct parameters", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_update_wiki");
+      if (!call) throw new Error("wiki_update_wiki tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedWiki = { id: "wiki1", name: "Updated Wiki Name" };
+      mockWikiApi.updateWiki.mockResolvedValue(mockUpdatedWiki);
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        name: "Updated Wiki Name",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.updateWiki).toHaveBeenCalledWith({ name: "Updated Wiki Name" }, "wiki1", "proj1");
+      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedWiki, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should update wiki versions with correct parameters", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_update_wiki");
+      if (!call) throw new Error("wiki_update_wiki tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedWiki = { id: "wiki1", name: "Test Wiki", versions: [{ version: "main" }, { version: "develop" }] };
+      mockWikiApi.updateWiki.mockResolvedValue(mockUpdatedWiki);
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        project: "proj1",
+        versions: [
+          { version: "main", versionType: "branch" },
+          { version: "develop", versionType: "branch" },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.updateWiki).toHaveBeenCalledWith(
+        {
+          versions: [
+            { version: "main", versionType: 0 }, // branch
+            { version: "develop", versionType: 0 }, // branch
+          ],
+        },
+        "wiki1",
+        "proj1"
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedWiki, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_update_wiki");
+      if (!call) throw new Error("wiki_update_wiki tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Wiki not found");
+      mockWikiApi.updateWiki.mockRejectedValue(testError);
+
+      const params = {
+        wikiIdentifier: "nonexistent",
+        name: "New Name",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.updateWiki).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error updating wiki: Wiki not found");
+    });
+
+    it("should handle null API results correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_update_wiki");
+      if (!call) throw new Error("wiki_update_wiki tool not registered");
+      const [, , , handler] = call;
+
+      mockWikiApi.updateWiki.mockResolvedValue(null);
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        name: "New Name",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWikiApi.updateWiki).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Failed to update wiki");
+    });
+  });
+
+  describe("create_or_update_page tool", () => {
+    let mockFetch: jest.Mock;
+    let mockAccessToken: AccessToken;
+    let mockConnection: { getWikiApi: jest.Mock; serverUrl: string };
+
+    beforeEach(() => {
+      // Mock fetch for REST API calls
+      mockFetch = jest.fn();
+      global.fetch = mockFetch;
+
+      mockAccessToken = {
+        token: "test-token",
+        expiresOnTimestamp: Date.now() + 3600000,
+      };
+      tokenProvider = jest.fn().mockResolvedValue(mockAccessToken);
+
+      mockConnection = {
+        getWikiApi: jest.fn().mockResolvedValue(mockWikiApi),
+        serverUrl: "https://dev.azure.com/testorg",
+      };
+      connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it("should create a new wiki page successfully", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockResponse = {
+        path: "/Home",
+        id: 123,
+        content: "# Welcome\nThis is the home page.",
+        url: "https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages/%2FHome",
+        remoteUrl: "https://dev.azure.com/testorg/proj1/_wiki/wikis/wiki1?pagePath=%2FHome",
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue(mockResponse),
+      });
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Welcome\nThis is the home page.",
+        project: "proj1",
+        comment: "Initial page creation",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&api-version=7.1", {
+        method: "PUT",
+        headers: {
+          "Authorization": "Bearer test-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content: "# Welcome\nThis is the home page." }),
+      });
+      expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should update an existing wiki page with ETag", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue('W/"test-etag"'),
+        },
+      };
+
+      const mockUpdateResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Updated Welcome\nThis is the updated home page.",
+        }),
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse) // GET to retrieve ETag
+        .mockResolvedValueOnce(mockUpdateResponse); // Second PUT succeeds with ETag
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome\nThis is the updated home page.",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result.content[0].text).toContain("Successfully updated wiki page at path: /Home");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: jest.fn().mockResolvedValue("Wiki not found"),
+      });
+
+      const params = {
+        wikiIdentifier: "nonexistent",
+        path: "/Home",
+        content: "# Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Failed to create page (404): Wiki not found");
+    });
+
+    it("should handle fetch errors correctly", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      mockFetch.mockRejectedValue(new Error("Network error"));
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Network error");
+    });
+
+    it("should get ETag from response body when not in headers", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue(null), // No ETag in headers
+        },
+        json: jest.fn().mockResolvedValue({
+          eTag: 'W/"body-etag"', // ETag in response body
+        }),
+      };
+
+      const mockUpdateResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Updated Welcome",
+        }),
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse) // GET to retrieve ETag from body
+        .mockResolvedValueOnce(mockUpdateResponse); // Second PUT succeeds with ETag
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result.content[0].text).toContain("Successfully updated wiki page at path: /Home");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should handle missing ETag error", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue(null), // No ETag in headers
+        },
+        json: jest.fn().mockResolvedValue({
+          // No eTag in response body either
+        }),
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse); // GET fails to retrieve ETag
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Could not retrieve ETag for existing page");
+    });
+
+    it("should handle update failure after getting ETag", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue('W/"test-etag"'),
+        },
+      };
+
+      const mockUpdateResponse = {
+        ok: false,
+        status: 412, // Precondition failed
+        text: jest.fn().mockResolvedValue("ETag mismatch"),
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse) // GET to retrieve ETag
+        .mockResolvedValueOnce(mockUpdateResponse); // Second PUT fails with 412
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Failed to update page (412): ETag mismatch");
+    });
+
+    it("should handle non-Error exceptions", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      // Throw a non-Error object
+      mockFetch.mockRejectedValue("String error message");
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Unknown error occurred");
+    });
+
+    it("should handle path without leading slash", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Welcome",
+        }),
+      };
+
+      mockFetch.mockResolvedValueOnce(mockResponse);
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "Home", // No leading slash
+        content: "# Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&api-version=7.1", expect.any(Object));
+      expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
+    });
+
+    it("should handle missing project parameter", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Welcome",
+        }),
+      };
+
+      mockFetch.mockResolvedValueOnce(mockResponse);
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Welcome",
+        // project parameter omitted
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg//_apis/wiki/wikis/wiki1/pages?path=%2FHome&api-version=7.1", expect.any(Object));
+      expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
+    });
+
+    it("should handle failed GET request for ETag", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreateResponse = {
+        ok: false,
+        status: 409, // Conflict - page exists
+      };
+
+      const mockGetResponse = {
+        ok: false, // GET fails
+        status: 404,
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(mockCreateResponse) // First PUT fails with 409
+        .mockResolvedValueOnce(mockGetResponse); // GET fails
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Updated Welcome",
+        project: "proj1",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Could not retrieve ETag for existing page");
     });
   });
 });
