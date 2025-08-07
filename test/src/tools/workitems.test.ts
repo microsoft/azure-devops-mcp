@@ -571,6 +571,83 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe(JSON.stringify(null, null, 2));
     });
+
+    it("should transform all user fields to formatted strings", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      // Mock work items with all user fields as objects
+      const mockWorkItemsWithUserFields = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+            "System.AssignedTo": {
+              displayName: "John Doe",
+              uniqueName: "john.doe@example.com",
+              id: "12345",
+            },
+            "System.CreatedBy": {
+              displayName: "Jane Smith",
+              uniqueName: "jane.smith@example.com",
+              id: "67890",
+            },
+            "System.ChangedBy": {
+              displayName: "Bob Johnson",
+              uniqueName: "bob.johnson@example.com",
+              id: "11111",
+            },
+            "System.AuthorizedAs": {
+              displayName: "Alice Brown",
+              uniqueName: "alice.brown@example.com",
+              id: "22222",
+            },
+            "Microsoft.VSTS.Common.ActivatedBy": {
+              displayName: "Charlie Wilson",
+              uniqueName: "charlie.wilson@example.com",
+              id: "33333",
+            },
+            "Microsoft.VSTS.Common.ResolvedBy": {
+              displayName: "Diana Clark",
+              uniqueName: "diana.clark@example.com",
+              id: "44444",
+            },
+            "Microsoft.VSTS.Common.ClosedBy": {
+              displayName: "Edward Davis",
+              uniqueName: "edward.davis@example.com",
+              id: "55555",
+            },
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithUserFields);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      // Parse the returned JSON to verify transformation
+      const resultData = JSON.parse(result.content[0].text);
+
+      // Verify that all user fields are transformed to formatted strings
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("John Doe <john.doe@example.com>");
+      expect(resultData[0].fields["System.CreatedBy"]).toBe("Jane Smith <jane.smith@example.com>");
+      expect(resultData[0].fields["System.ChangedBy"]).toBe("Bob Johnson <bob.johnson@example.com>");
+      expect(resultData[0].fields["System.AuthorizedAs"]).toBe("Alice Brown <alice.brown@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ActivatedBy"]).toBe("Charlie Wilson <charlie.wilson@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ResolvedBy"]).toBe("Diana Clark <diana.clark@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ClosedBy"]).toBe("Edward Davis <edward.davis@example.com>");
+    });
   });
 
   describe("get_work_item tool", () => {

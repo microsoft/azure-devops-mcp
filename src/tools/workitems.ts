@@ -141,15 +141,30 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
       const workitems = await workItemApi.getWorkItemsBatch({ ids, fields: fieldsToUse }, project);
 
-      // Format the assignedTo field to include displayName and uniqueName
+      // List of identity fields that need to be transformed from objects to formatted strings
+      const identityFields = [
+        "System.AssignedTo",
+        "System.CreatedBy",
+        "System.ChangedBy",
+        "System.AuthorizedAs",
+        "Microsoft.VSTS.Common.ActivatedBy",
+        "Microsoft.VSTS.Common.ResolvedBy",
+        "Microsoft.VSTS.Common.ClosedBy",
+      ];
+
+      // Format identity fields to include displayName and uniqueName
       // Removing the identity object as the response. It's too much and not needed
       if (workitems && Array.isArray(workitems)) {
         workitems.forEach((item) => {
-          if (item.fields && item.fields["System.AssignedTo"] && typeof item.fields["System.AssignedTo"] === "object") {
-            const assignedTo = item.fields["System.AssignedTo"];
-            const name = assignedTo.displayName || "";
-            const email = assignedTo.uniqueName || "";
-            item.fields["System.AssignedTo"] = `${name} <${email}>`.trim();
+          if (item.fields) {
+            identityFields.forEach((fieldName) => {
+              if (item.fields && item.fields[fieldName] && typeof item.fields[fieldName] === "object") {
+                const identityField = item.fields[fieldName];
+                const name = identityField.displayName || "";
+                const email = identityField.uniqueName || "";
+                item.fields[fieldName] = `${name} <${email}>`.trim();
+              }
+            });
           }
         });
       }
