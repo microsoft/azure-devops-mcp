@@ -9,7 +9,7 @@
       "id": "target_domains",
       "type": "pickManyString",
       "description": "Azure DevOps target domain(s) intended to enable, only you select any, only those will be enalbed. This will help you reduce number of tools enabled",
-      "options": ["advsec", "builds", "core", "releases", "repos", "search", "testplans", "wiki", "work", "workitems", "all"],
+      "options": ["advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items", "all"],
       "default": ["all"]
     }
   ],

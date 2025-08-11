@@ -6,16 +6,16 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 
 import { Domain } from "./domains.js";
-import { configureAdvSecTools } from "./tools/advsec.js";
+import { configureAdvSecTools } from "./tools/advanced-security.js";
 import { configureBuildTools } from "./tools/builds.js";
 import { configureCoreTools } from "./tools/core.js";
 import { configureReleaseTools } from "./tools/releases.js";
-import { configureRepoTools } from "./tools/repos.js";
+import { configureRepoTools } from "./tools/repositories.js";
 import { configureSearchTools } from "./tools/search.js";
-import { configureTestPlanTools } from "./tools/testplans.js";
+import { configureTestPlanTools } from "./tools/test-plans.js";
 import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
-import { configureWorkItemTools } from "./tools/workitems.js";
+import { configureWorkItemTools } from "./tools/work-items.js";
 
 function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, enabledDomains: Set<string>) {
   const configureIfDomainEnabled = (domain: string, configureFn: () => void) => {
@@ -27,13 +27,13 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<Acces
   configureIfDomainEnabled(Domain.CORE, () => configureCoreTools(server, tokenProvider, connectionProvider));
   configureIfDomainEnabled(Domain.WORK, () => configureWorkTools(server, tokenProvider, connectionProvider));
   configureIfDomainEnabled(Domain.BUILDS, () => configureBuildTools(server, tokenProvider, connectionProvider));
-  configureIfDomainEnabled(Domain.REPOS, () => configureRepoTools(server, tokenProvider, connectionProvider));
-  configureIfDomainEnabled(Domain.WORKITEMS, () => configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider));
+  configureIfDomainEnabled(Domain.REPOSITORIES, () => configureRepoTools(server, tokenProvider, connectionProvider));
+  configureIfDomainEnabled(Domain.WORK_ITEMS, () => configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider));
   configureIfDomainEnabled(Domain.RELEASES, () => configureReleaseTools(server, tokenProvider, connectionProvider));
   configureIfDomainEnabled(Domain.WIKI, () => configureWikiTools(server, tokenProvider, connectionProvider));
-  configureIfDomainEnabled(Domain.TESTPLANS, () => configureTestPlanTools(server, tokenProvider, connectionProvider));
+  configureIfDomainEnabled(Domain.TEST_PLANS, () => configureTestPlanTools(server, tokenProvider, connectionProvider));
   configureIfDomainEnabled(Domain.SEARCH, () => configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider));
-  configureIfDomainEnabled(Domain.ADVSEC, () => configureAdvSecTools(server, tokenProvider, connectionProvider));
+  configureIfDomainEnabled(Domain.ADVANCED_SECURITY, () => configureAdvSecTools(server, tokenProvider, connectionProvider));
 }
 
 export { configureAllTools };

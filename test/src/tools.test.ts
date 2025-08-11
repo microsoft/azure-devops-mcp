@@ -9,43 +9,43 @@ import { Domain } from "../../src/domains";
 import { configureAllTools } from "../../src/tools";
 
 // Mock all the tool configuration functions
-jest.mock("../../src/tools/advanced-security.js", () => ({
+jest.mock("../../src/tools/advanced-security.ts", () => ({
   configureAdvSecTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/builds.js", () => ({
+jest.mock("../../src/tools/builds.ts", () => ({
   configureBuildTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/core.js", () => ({
+jest.mock("../../src/tools/core.ts", () => ({
   configureCoreTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/releases.js", () => ({
+jest.mock("../../src/tools/releases.ts", () => ({
   configureReleaseTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/repositories.js", () => ({
+jest.mock("../../src/tools/repositories.ts", () => ({
   configureRepoTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/search.js", () => ({
+jest.mock("../../src/tools/search.ts", () => ({
   configureSearchTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/test-plans.js", () => ({
+jest.mock("../../src/tools/test-plans.ts", () => ({
   configureTestPlanTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/wiki.js", () => ({
+jest.mock("../../src/tools/wiki.ts", () => ({
   configureWikiTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/work.js", () => ({
+jest.mock("../../src/tools/work.ts", () => ({
   configureWorkTools: jest.fn(),
 }));
 
-jest.mock("../../src/tools/work-items.js", () => ({
+jest.mock("../../src/tools/work-items.ts", () => ({
   configureWorkItemTools: jest.fn(),
 }));
 
@@ -104,7 +104,7 @@ describe("configureAllTools", () => {
     });
 
     it("should configure only repositories and builds tools when those domains are enabled", () => {
-      const enabledDomains = new Set([Domain.REPOS, Domain.BUILDS]);
+      const enabledDomains = new Set([Domain.REPOSITORIES, Domain.BUILDS]);
 
       configureAllTools(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider, enabledDomains);
 
@@ -161,7 +161,7 @@ describe("configureAllTools", () => {
 
   describe("specific domain configurations", () => {
     it("should configure work items tools with userAgentProvider when work-items domain is enabled", () => {
-      const enabledDomains = new Set([Domain.WORKITEMS]);
+      const enabledDomains = new Set([Domain.WORK_ITEMS]);
 
       configureAllTools(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider, enabledDomains);
 
@@ -185,7 +185,7 @@ describe("configureAllTools", () => {
     });
 
     it("should configure test plan tools when test-plans domain is enabled", () => {
-      const enabledDomains = new Set([Domain.TESTPLANS]);
+      const enabledDomains = new Set([Domain.TEST_PLANS]);
 
       configureAllTools(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider, enabledDomains);
 
@@ -193,7 +193,7 @@ describe("configureAllTools", () => {
     });
 
     it("should configure advanced security tools when advanced-security domain is enabled", () => {
-      const enabledDomains = new Set([Domain.ADVSEC]);
+      const enabledDomains = new Set([Domain.ADVANCED_SECURITY]);
 
       configureAllTools(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider, enabledDomains);
 
@@ -219,7 +219,7 @@ describe("configureAllTools", () => {
 
   describe("mixed domain configurations", () => {
     it("should configure multiple tools when multiple domains are enabled", () => {
-      const enabledDomains = new Set([Domain.CORE, Domain.REPOS, Domain.WORKITEMS]);
+      const enabledDomains = new Set([Domain.CORE, Domain.REPOSITORIES, Domain.WORK_ITEMS]);
 
       configureAllTools(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider, enabledDomains);
 
@@ -250,7 +250,7 @@ describe("configureAllTools", () => {
 
   describe("function call parameters", () => {
     it("should pass correct parameters to all configuration functions", () => {
-      const enabledDomains = new Set([Domain.CORE, Domain.WORKITEMS, Domain.SEARCH]);
+      const enabledDomains = new Set([Domain.CORE, Domain.WORK_ITEMS, Domain.SEARCH]);
 
       configureAllTools(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider, enabledDomains);
 

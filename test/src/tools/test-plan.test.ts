@@ -2,7 +2,7 @@ import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { configureTestPlanTools } from "../../../src/tools/testplans";
+import { configureTestPlanTools } from "../../../src/tools/test-plans";
 import { ITestPlanApi } from "azure-devops-node-api/TestPlanApi";
 import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";

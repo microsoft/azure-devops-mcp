@@ -29,7 +29,7 @@ const argv = yargs(hideBin(process.argv))
         demandOption: true,
       })
       .positional("domains", {
-        describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repos builds work'. Defaults to 'all'.",
+        describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
         type: "string",
         array: true,
         default: ["all"],

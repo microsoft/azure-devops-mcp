@@ -1,7 +1,7 @@
 import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { configureWorkItemTools } from "../../../src/tools/workitems";
+import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import {

@@ -5,16 +5,16 @@
  * Available Azure DevOps MCP domains
  */
 export enum Domain {
-  ADVSEC = "advsec",
+  ADVANCED_SECURITY = "advanced-security",
   BUILDS = "builds",
   CORE = "core",
   RELEASES = "releases",
-  REPOS = "repos",
+  REPOSITORIES = "repositories",
   SEARCH = "search",
-  TESTPLANS = "testplans",
+  TEST_PLANS = "test-plans",
   WIKI = "wiki",
   WORK = "work",
-  WORKITEMS = "workitems",
+  WORK_ITEMS = "work-items",
 }
 
 /**

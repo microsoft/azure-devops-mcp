@@ -4,7 +4,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CORE_TOOLS } from "./tools/core.js";
-import { WORKITEM_TOOLS } from "./tools/workitems.js";
+import { WORKITEM_TOOLS } from "./tools/work-items.js";
 
 function configurePrompts(server: McpServer) {
   server.prompt("listProjects", "Lists all projects in the Azure DevOps organization.", {}, () => ({
