@@ -43,10 +43,7 @@ describe("DomainsManager backward compatibility", () => {
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(10);
-            expect(Array.from(enabledDomains).sort()).toEqual([
-        "advanced-security", "builds", "core", "releases", "repositories",
-        "search", "test-plans", "wiki", "work", "work-items"
-      ]);
+      expect(Array.from(enabledDomains).sort()).toEqual(["advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items"]);
     });
 
     it("should enable all domains when null is passed", () => {
@@ -89,7 +86,9 @@ describe("DomainsManager backward compatibility", () => {
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(10);
-      expect(warnSpy).toHaveBeenCalledWith("Warning: Unknown domain 'invalid-domain'. Available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items");
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Warning: Unknown domain 'invalid-domain'. Available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items"
+      );
       expect(consoleSpy).toHaveBeenCalledWith("No valid domains specified, enabling all domains by default");
     });
   });
@@ -130,7 +129,9 @@ describe("DomainsManager backward compatibility", () => {
       expect(enabledDomains.size).toBe(2);
       expect(enabledDomains.has("repositories")).toBe(true);
       expect(enabledDomains.has("builds")).toBe(true);
-      expect(warnSpy).toHaveBeenCalledWith("Warning: Unknown domain 'invalid-domain'. Available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items");
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Warning: Unknown domain 'invalid-domain'. Available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items"
+      );
     });
 
     it("should handle case insensitive domain names in arrays", () => {

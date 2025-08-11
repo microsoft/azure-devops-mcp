@@ -6,9 +6,9 @@
       "description": "Azure DevOps organization name (e.g. 'contoso')"
     },
     {
-      "id": "target_domains",
+      "id": "domains",
       "type": "pickManyString",
-      "description": "Azure DevOps target domain(s) intended to enable, only you select any, only those will be enalbed. This will help you reduce number of tools enabled",
+      "description": "Select Azure DevOps domains to enable. Choose specific domains to reduce the number of available tools, or select 'all' to enable everything.",
       "options": ["advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items", "all"],
       "default": ["all"]
     }
@@ -17,7 +17,7 @@
     "ado": {
       "type": "stdio",
       "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "${input:only_picked_domains}"]
+      "args": ["${input:ado_org}", "${input:domains}"]
     }
   }
 }

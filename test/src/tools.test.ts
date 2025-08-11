@@ -110,7 +110,7 @@ describe("configureAllTools", () => {
 
       expect(configureRepoTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
       expect(configureBuildTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
-      
+
       // Verify other tools are not configured
       expect(configureCoreTools).not.toHaveBeenCalled();
       expect(configureAdvSecTools).not.toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe("configureAllTools", () => {
       expect(configureWikiTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
       expect(configureTestPlanTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
       expect(configureAdvSecTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
-      
+
       // These tools require userAgentProvider
       expect(configureWorkItemTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider);
       expect(configureSearchTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider);
@@ -226,7 +226,7 @@ describe("configureAllTools", () => {
       expect(configureCoreTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
       expect(configureRepoTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
       expect(configureWorkItemTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider);
-      
+
       // Verify other tools are not configured
       expect(configureAdvSecTools).not.toHaveBeenCalled();
       expect(configureBuildTools).not.toHaveBeenCalled();
@@ -256,7 +256,7 @@ describe("configureAllTools", () => {
 
       // Verify functions without userAgentProvider get correct parameters
       expect(configureCoreTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider);
-      
+
       // Verify functions with userAgentProvider get correct parameters
       expect(configureWorkItemTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider);
       expect(configureSearchTools).toHaveBeenCalledWith(mockServer, mockTokenProvider, mockConnectionProvider, mockUserAgentProvider);
