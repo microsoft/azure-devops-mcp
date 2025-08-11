@@ -1,16 +1,18 @@
+# Azure DevOps MCP Server: Example Usage
+
 This guide offers step-by-step examples for using the Azure DevOps MCP Server to interact with your Azure DevOps organization. For additional tips and best practices, see the [How To guide](./HOWTO.md).
 
 > 📝 These examples have been tested and validated only in English. If you encounter issues when using a different language, please open an issue in the repository so we can investigate.
 
-[Get List of Projects](#get-list-of-projects)<br/>
-[Get List of Teams](#get-list-of-teams)<br/>
-[Get My Work Items](#get-my-work-items)<br/>
-[Get Work Items in a Backlog](#get-all-work-items-in-a-backlog)<br/>
-[Retrieve and Edit Work Items](#retrieve-and-edit-work-items)<br/>
-[Create and Link Test Cases](#create-and-link-test-cases)<br/>
-[Triage Work](#triage-work)<br/>
-[Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)<br/>
-[Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
+- [Get List of Projects](#get-list-of-projects)
+- [Get List of Teams](#get-list-of-teams)
+- [Get My Work Items](#get-my-work-items)
+- [Get Work Items in a Backlog](#get-all-work-items-in-a-backlog)
+- [Retrieve and Edit Work Items](#retrieve-and-edit-work-items)
+- [Create and Link Test Cases](#create-and-link-test-cases)
+- [Triage Work](#triage-work)
+- [Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)
+- [Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
 
 ## 🙋‍♂️ Projects and Teams
 
