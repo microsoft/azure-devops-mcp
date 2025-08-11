@@ -1,7 +1,7 @@
 name: Update Package Version
 
 permissions:
-  contents: read
+  contents: write # Changed from 'read' to 'write' to allow pushing commits
   pull-requests: write
   packages: write
 
@@ -27,7 +27,9 @@ jobs:
       - name: Determine version type
         id: version_type
         run: |
-          if ($env:GITHUB_EVENT_PULL_REQUEST_LABELS -contains "minor") {
+          if ($env:GITHUB_EVENT_PULL_REQUEST_LABELS -contains "major") {
+            $env:VERSION_TYPE = "major"
+          } elseif ($env:GITHUB_EVENT_PULL_REQUEST_LABELS -contains "minor") {
             $env:VERSION_TYPE = "minor"
           } elseif ($env:GITHUB_EVENT_PULL_REQUEST_LABELS -contains "patch") {
             $env:VERSION_TYPE = "patch"
@@ -37,25 +39,54 @@ jobs:
         shell: pwsh
 
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Added token for push permissions
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+        shell: pwsh
 
       - name: Update package version and push tag
         if: env.VERSION_TYPE != ''
         run: |
+          # Get current version from package.json
+          $packageJson = Get-Content "package.json" | ConvertFrom-Json
+          $currentVersion = $packageJson.version
+          Write-Host "Current version: $currentVersion"
+
+          # Update package.json version and create git tag
           $newVersion = npm version $env:VERSION_TYPE
-          git tag "v$newVersion"
-          git push origin "v$newVersion"
+          $newVersionString = $newVersion.TrimStart('v')
+          Write-Host "New version: $newVersionString"
+
+          # Update version.ts file
+          $versionTs = Get-Content "src/version.ts"
+          $updatedVersionTs = $versionTs -replace 'export const packageVersion = ".*"', "export const packageVersion = `"$newVersionString`""
+          $updatedVersionTs | Set-Content "src/version.ts"
+          Write-Host "Updated version.ts"
+
+          # Show git status for debugging
+          git status
+
+          # Add version.ts to the commit
+          git add src/version.ts
+          git commit --amend --no-edit
+          Write-Host "Updated commit with version.ts"
+
         shell: pwsh
+        env:
+          VERSION_TYPE: ${{ env.VERSION_TYPE }}
 
       - name: Push changes
         if: env.VERSION_TYPE != ''
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git push origin HEAD:main
         shell: pwsh

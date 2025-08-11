@@ -97,7 +97,7 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   return filteredByName;
 }
 
-function configureRepoTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureRepoTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     REPO_TOOLS.create_pull_request,
     "Create a new pull request.",
@@ -292,7 +292,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       };
 
       if (created_by_me || i_am_reviewer) {
-        const data = await getCurrentUserDetails(tokenProvider, connectionProvider);
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
           searchCriteria.creatorId = userId;
@@ -359,7 +359,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       };
 
       if (created_by_me || i_am_reviewer) {
-        const data = await getCurrentUserDetails(tokenProvider, connectionProvider);
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
           gitPullRequestSearchCriteria.creatorId = userId;

@@ -17,10 +17,10 @@ import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/workitems.js";
 
 function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
-  configureCoreTools(server, tokenProvider, connectionProvider);
+  configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureWorkTools(server, tokenProvider, connectionProvider);
-  configureBuildTools(server, tokenProvider, connectionProvider);
-  configureRepoTools(server, tokenProvider, connectionProvider);
+  configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+  configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureReleaseTools(server, tokenProvider, connectionProvider);
   configureWikiTools(server, tokenProvider, connectionProvider);
