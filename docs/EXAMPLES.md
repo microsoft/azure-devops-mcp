@@ -157,9 +157,11 @@ Remove link 5678 and 91011 from work item 1234. Also remove any related links an
 
 ### Add Artifact Links to Work Items
 
-Use this tool to link work items to repository artifacts like branches, commits, and pull requests.
+Use this tool to associate work items with repository artifacts such as branches, commits, and pull requests.
 
-You can do this in two ways. First is provide the full proper `vstfs` URI format for your artifact. For example:
+You have two options for linking artifacts:
+
+Supply the complete artifact `vstfs` URI in the required format. For example:
 
 **Branch**:
 `vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName}`
@@ -174,7 +176,9 @@ You can do this in two ways. First is provide the full proper `vstfs` URI format
 Add a branch artifact link to work item 1234 in project "Contoso" with URI "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain" and link type "Branch" with comment "Linked to main branch for GitHub Copilot integration"
 ```
 
-An easier way to provide the specific identifiers for the branch, commmit, pull request, or build. For example:
+Alternatively, you can simply provide the branch, commit, pull request, or build identifiers directly, and the tool will automatically construct the required artifact URI for you.
+
+For example:
 
 ```plaintext
 
