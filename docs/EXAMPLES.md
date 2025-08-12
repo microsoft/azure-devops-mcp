@@ -172,7 +172,7 @@ Supply the complete artifact `vstfs` URI in the required format. For example:
 **Pull Request**:
 `vstfs:///Git/PullRequestId/{projectId}%2F{repositoryId}%2F{pullRequestId}`
 
-```plaintext
+```text
 Add a branch artifact link to work item 1234 in project "Contoso" with URI "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain" and link type "Branch" with comment "Linked to main branch for GitHub Copilot integration"
 ```
 
@@ -180,8 +180,7 @@ Alternatively, you can simply provide the branch, commit, pull request, or build
 
 For example:
 
-```plaintext
-
+```text
 Get me the list of pull requests for Constoso project and Frabrikam repo. Then link the first pull request to work item 12345.
 ```
 
