@@ -16,7 +16,7 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 3. [⚙️ Supported Tools](#️-supported-tools)
 4. [🔌 Installation & Getting Started](#-installation--getting-started)
 5. [📝 Troubleshooting](#-troubleshooting)
-6. [🎩 Examples & Best Practices](#-samples--best-practices)
+6. [🎩 Examples & Best Practices](#-examples--best-practices)
 7. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
 8. [📌 Contributing](#-contributing)
 
@@ -223,13 +223,13 @@ In your project, add a `.vscode\mcp.json` file with the following content:
 
 Save the file, then click 'Start'.
 
-<img src="./docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
+![start mcp server](./docs/media/start-mcp-server.gif)
 
 In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
 
 Click "Select Tools" and choose the available tools.
 
-<img src="./docs/media/configure-mcp-server-tools.gif" alt="configure mcp server tools" width="300"/>
+![configure mcp server tools](./docs/media/configure-mcp-server-tools.gif)
 
 Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
 

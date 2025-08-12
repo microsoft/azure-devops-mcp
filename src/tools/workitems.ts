@@ -28,6 +28,7 @@ const WORKITEM_TOOLS = {
   update_work_items_batch: "wit_update_work_items_batch",
   work_items_link: "wit_work_items_link",
   work_item_unlink: "wit_work_item_unlink",
+  add_artifact_link: "wit_add_artifact_link",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -853,6 +854,160 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               text: `Error unlinking work item: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
             },
           ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.add_artifact_link,
+    "Add artifact links (repository, branch, commit, builds) to work items. You can either provide the full vstfs URI or the individual components to build it automatically.",
+    {
+      workItemId: z.number().describe("The ID of the work item to add the artifact link to."),
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+
+      // Option 1: Provide full URI directly
+      artifactUri: z.string().optional().describe("The complete VSTFS URI of the artifact to link. If provided, individual component parameters are ignored."),
+
+      // Option 2: Provide individual components to build URI automatically based on linkType
+      projectId: z.string().optional().describe("The project ID (GUID) containing the artifact. Required for Git artifacts when artifactUri is not provided."),
+      repositoryId: z.string().optional().describe("The repository ID (GUID) containing the artifact. Required for Git artifacts when artifactUri is not provided."),
+      branchName: z.string().optional().describe("The branch name (e.g., 'main'). Required when linkType is 'Branch'."),
+      commitId: z.string().optional().describe("The commit SHA hash. Required when linkType is 'Fixed in Commit'."),
+      pullRequestId: z.number().optional().describe("The pull request ID. Required when linkType is 'Pull Request'."),
+      buildId: z.number().optional().describe("The build ID. Required when linkType is 'Build', 'Found in build', or 'Integrated in build'."),
+
+      linkType: z
+        .enum([
+          "Branch",
+          "Build",
+          "Fixed in Changeset",
+          "Fixed in Commit",
+          "Found in build",
+          "Integrated in build",
+          "Model Link",
+          "Pull Request",
+          "Related Workitem",
+          "Result Attachment",
+          "Source Code File",
+          "Tag",
+          "Test Result",
+          "Wiki",
+        ])
+        .default("Branch")
+        .describe("Type of artifact link, defaults to 'Branch'. This determines both the link type and how to build the VSTFS URI from individual components."),
+      comment: z.string().optional().describe("Comment to include with the artifact link."),
+    },
+    async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, linkType, comment }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+
+        let finalArtifactUri: string;
+
+        if (artifactUri) {
+          // Use the provided full URI
+          finalArtifactUri = artifactUri;
+        } else {
+          // Build the URI from individual components based on linkType
+          switch (linkType) {
+            case "Branch":
+              if (!projectId || !repositoryId || !branchName) {
+                return {
+                  content: [{ type: "text", text: "For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required." }],
+                  isError: true,
+                };
+              }
+              finalArtifactUri = `vstfs:///Git/Ref/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2FGB${encodeURIComponent(branchName)}`;
+              break;
+
+            case "Fixed in Commit":
+              if (!projectId || !repositoryId || !commitId) {
+                return {
+                  content: [{ type: "text", text: "For 'Fixed in Commit' links, 'projectId', 'repositoryId', and 'commitId' are required." }],
+                  isError: true,
+                };
+              }
+              finalArtifactUri = `vstfs:///Git/Commit/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(commitId)}`;
+              break;
+
+            case "Pull Request":
+              if (!projectId || !repositoryId || pullRequestId === undefined) {
+                return {
+                  content: [{ type: "text", text: "For 'Pull Request' links, 'projectId', 'repositoryId', and 'pullRequestId' are required." }],
+                  isError: true,
+                };
+              }
+              finalArtifactUri = `vstfs:///Git/PullRequestId/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(pullRequestId.toString())}`;
+              break;
+
+            case "Build":
+            case "Found in build":
+            case "Integrated in build":
+              if (buildId === undefined) {
+                return {
+                  content: [{ type: "text", text: `For '${linkType}' links, 'buildId' is required.` }],
+                  isError: true,
+                };
+              }
+              finalArtifactUri = `vstfs:///Build/Build/${encodeURIComponent(buildId.toString())}`;
+              break;
+
+            default:
+              return {
+                content: [{ type: "text", text: `URI building from components is not supported for link type '${linkType}'. Please provide the full 'artifactUri' instead.` }],
+                isError: true,
+              };
+          }
+        }
+
+        // Create the patch document for adding an artifact link relation
+        const patchDocument = [
+          {
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "ArtifactLink",
+              url: finalArtifactUri,
+              attributes: {
+                name: linkType,
+                ...(comment && { comment }),
+              },
+            },
+          },
+        ];
+
+        // Use the WorkItem API to update the work item with the new relation
+        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, project);
+
+        if (!workItem) {
+          return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  workItemId,
+                  artifactUri: finalArtifactUri,
+                  linkType,
+                  comment: comment || null,
+                  success: true,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error adding artifact link to work item: ${errorMessage}` }],
           isError: true,
         };
       }
