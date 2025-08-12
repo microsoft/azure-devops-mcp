@@ -4,7 +4,7 @@
 import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
 
-async function getCurrentUserDetails(tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+async function getCurrentUserDetails(tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   const connection = await connectionProvider();
   const url = `${connection.serverUrl}/_apis/connectionData`;
   const token = (await tokenProvider()).token;
@@ -13,6 +13,7 @@ async function getCurrentUserDetails(tokenProvider: () => Promise<AccessToken>, 
     headers: {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
+      "User-Agent": userAgentProvider(),
     },
   });
   const data = await response.json();

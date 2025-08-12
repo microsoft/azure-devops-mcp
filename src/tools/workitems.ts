@@ -173,7 +173,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .enum(["all", "fields", "links", "none", "relations"])
         .describe("Optional expand parameter to include additional details in the response.")
         .optional()
-        .describe("Expand options include 'all', 'fields', 'links', 'none', and 'relations'. Defaults to 'none'."),
+        .describe("Expand options include 'all', 'fields', 'links', 'none', and 'relations'. Relations can be used to get child workitems. Defaults to 'none'."),
     },
     async ({ id, project, fields, asOf, expand }) => {
       const connection = await connectionProvider();
