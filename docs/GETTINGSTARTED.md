@@ -2,12 +2,12 @@
 
 This guide will help you get started with the Azure DevOps MCP Server in different environments.
 
-[Prerequisites](#prerequisites)<br/>
-[Getting started with Visual Studio Code & GitHub Copilot](#-visual-studio-code--github-copilot)<br/>
-[Getting started with Visual Studio 2022 & GitHub Copilot](#-visual-studio-2022--github-copilot)<br/>
-[Getting started with Claude Code](#-using-mcp-server-with-claude-code)<br/>
-[Getting started with Cursor](#-using-mcp-server-with-cursor)<br/>
-[Optimizing Your Experience](#-optimizing-your-experience)<br/>
+- [Prerequisites](#-prerequisites)
+- [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
+- [Getting started with Visual Studio 2022 & GitHub Copilot](#-visual-studio-2022--github-copilot-1)
+- [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
+- [Getting started with Cursor](#-using-mcp-server-with-cursor)
+- [Optimizing Your Experience](#-optimizing-your-experience)
 
 ## 🕐 Prerequisites
 
@@ -80,13 +80,13 @@ In your project, add a `.vscode\mcp.json` file with the following content:
 
 Save the file, then click 'Start'.
 
-<img src="../docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
+![start mcp server](../docs/media/start-mcp-server.gif)
 
 In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
 
 Click "Select Tools" and choose the available tools.
 
-<img src="../docs/media/configure-mcp-server-tools.gif" alt="configure mcp server tools" width="300"/>
+![configure mcp server tools](../docs/media/configure-mcp-server-tools.gif)
 
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 
@@ -136,13 +136,13 @@ Edit or add `.vscode/mcp.json`:
 
 Start the Azure DevOps MCP Server.
 
-<img src="../docs/media/start-mcp-server.gif" alt="start mcp server" width="250"/>
+![start mcp server](../docs/media/start-mcp-server.gif)
 
 In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
 
 Click "Select Tools" and choose the available tools.
 
-<img src="../docs/media/configure-mcp-server-tools.gif" alt="configure mcp server tools" width="300"/>
+![configure mcp server tools](../docs/media/configure-mcp-server-tools.gif)
 
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will help you get the best experience using the Azure DevOps MCP Server in GitHub Copilot Chat.
 
@@ -183,13 +183,13 @@ Save the file.
 
 Add your organization name by clicking on the `input` option.
 
-<img src="../docs/media/start-mcp-server-from-vs.png" alt="start mcp server from visual studio 2022" width="250"/>
+![start mcp server from visual studio 2022](../docs/media/start-mcp-server-from-vs.png)
 
 Open Copilot chat and switch to [Agent Mode](https://learn.microsoft.com/en-us/visualstudio/ide/copilot-agent-mode?view=vs-2022).
 
 Click the "Tools" icon and choose the available tools.
 
-<img src="../docs/media/set-tools-from-vs.png" alt="set tools to use in visual studio 2022" width="250"/>
+![set tools to use in visual studio 2022](../docs/media/set-tools-from-vs.png)
 
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 
@@ -210,7 +210,7 @@ See https://docs.anthropic.com/en/docs/claude-code/mcp for general guidance on a
 
 For the Azure DevOps MCP Server, use the following command:
 
-```
+```bash
 claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
 ```
 
@@ -235,13 +235,13 @@ Replace `{Contoso}` with your actual Azure DevOps organization name.
 
 Save the file, and when Cursor detects the MCP Server, click **Enable**.
 
-<img src="../docs/media/enable-mcp-server-from-cursor.png" alt="enable mcp server from cursor" width="500"/>
+![enable mcp server from cursor](../docs/media/enable-mcp-server-from-cursor.png)
 
 #### Start the Azure DevOps MCP Server
 
 Open the terminal and start the MCP Server with:
 
-```
+```bash
 npx -y @azure-devops/mcp {Contoso}
 ```
 

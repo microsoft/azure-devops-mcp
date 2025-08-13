@@ -30,17 +30,22 @@
 1. **npm Authentication Issues for Remote Access**
    If you encounter authentication errors:
    - Ensure you are logged in to Azure DevOps using the `az` CLI:
+
      ```pwsh
      az login
      ```
+
    - Verify your npm configuration:
+
      ```pwsh
      npm config get registry
      ```
+
      It should point to: `https://registry.npmjs.org/`
 
 2. **Dependency Installation Errors**
    If `npm install` fails, verify that you are using Node.js version 20 or higher. You can check your Node.js version with:
+
    ```pwsh
    node -v
    ```
@@ -135,14 +140,14 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
 
 If the tenant configuration solution above doesn't resolve your authentication issues, and you're working in a **Dev Container** or **WSL (Windows Subsystem for Linux)** environment, the root cause may be different.
 
-#### Symptoms
+#### Dev Container/WSL Symptoms
 
 - Same authorization errors as above (`TF400813: The user 'xxx' is not authorized to access this resource`)
 - Tenant ID configuration didn't resolve the issue
 - You're using VS Code with Dev Containers or WSL
 - MCP server is configured in User Settings (global) rather than workspace settings
 
-#### Root Cause
+#### Dev Container/WSL Root Cause
 
 When MCP servers are configured in **User Settings** (global configuration), they inherit the environment context from the **host machine**, including `az login` authentication settings. In Dev Container or WSL scenarios, this means:
 
@@ -150,7 +155,7 @@ When MCP servers are configured in **User Settings** (global configuration), the
 - Any `az login` performed inside the Dev Container or WSL environment is ignored
 - There may be a mismatch between the authentication context the MCP server expects and your development environment
 
-#### Solution
+#### Dev Container/WSL Solution
 
 1. **Verify your MCP configuration location**:
    - Check if your MCP server is configured in User Settings (global) vs Workspace Settings

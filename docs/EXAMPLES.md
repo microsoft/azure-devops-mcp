@@ -1,16 +1,19 @@
+# Azure DevOps MCP Server: Example Usage
+
 This guide offers step-by-step examples for using the Azure DevOps MCP Server to interact with your Azure DevOps organization. For additional tips and best practices, see the [How To guide](./HOWTO.md).
 
 > 📝 These examples have been tested and validated only in English. If you encounter issues when using a different language, please open an issue in the repository so we can investigate.
 
-[Get List of Projects](#get-list-of-projects)<br/>
-[Get List of Teams](#get-list-of-teams)<br/>
-[Get My Work Items](#get-my-work-items)<br/>
-[Get Work Items in a Backlog](#get-all-work-items-in-a-backlog)<br/>
-[Retrieve and Edit Work Items](#retrieve-and-edit-work-items)<br/>
-[Create and Link Test Cases](#create-and-link-test-cases)<br/>
-[Triage Work](#triage-work)<br/>
-[Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)<br/>
-[Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
+- [Get List of Projects](#get-list-of-projects)
+- [Get List of Teams](#get-list-of-teams)
+- [Get My Work Items](#get-my-work-items)
+- [Get Work Items in a Backlog](#get-all-work-items-in-a-backlog)
+- [Retrieve and Edit Work Items](#retrieve-and-edit-work-items)
+- [Create and Link Test Cases](#create-and-link-test-cases)
+- [Triage Work](#triage-work)
+- [Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)
+- [Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
+- [Adding Artifact Links](#adding-artifact-links)
 
 ## 🙋‍♂️ Projects and Teams
 
@@ -149,3 +152,36 @@ Next, remove a specific link to a work item, pull request, etc. or remove links 
 ```plaintext
 Remove link 5678 and 91011 from work item 1234. Also remove any related links and links to pull request 121314
 ```
+
+## 🔗 Adding Artifact Links
+
+### Add Artifact Links to Work Items
+
+Use this tool to associate work items with repository artifacts such as branches, commits, and pull requests.
+
+You have two options for linking artifacts:
+
+Supply the complete artifact `vstfs` URI in the required format. For example:
+
+**Branch**:
+`vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName}`
+
+**Commit**:
+`vstfs:///Git/Commit/{projectId}%2F{repositoryId}%2F{commitId}`
+
+**Pull Request**:
+`vstfs:///Git/PullRequestId/{projectId}%2F{repositoryId}%2F{pullRequestId}`
+
+```text
+Add a branch artifact link to work item 1234 in project "Contoso" with URI "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain" and link type "Branch" with comment "Linked to main branch for GitHub Copilot integration"
+```
+
+Alternatively, you can simply provide the branch, commit, pull request, or build identifiers directly, and the tool will automatically construct the required artifact URI for you.
+
+For example:
+
+```text
+Get me the list of pull requests for Constoso project and Frabrikam repo. Then link the first pull request to work item 12345.
+```
+
+📽️ [Azure Devops MCP Server: Adding artifact links](https://youtu.be/t8HqEt8cZtY)

@@ -571,6 +571,83 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe(JSON.stringify(null, null, 2));
     });
+
+    it("should transform all user fields to formatted strings", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      // Mock work items with all user fields as objects
+      const mockWorkItemsWithUserFields = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+            "System.AssignedTo": {
+              displayName: "John Doe",
+              uniqueName: "john.doe@example.com",
+              id: "12345",
+            },
+            "System.CreatedBy": {
+              displayName: "Jane Smith",
+              uniqueName: "jane.smith@example.com",
+              id: "67890",
+            },
+            "System.ChangedBy": {
+              displayName: "Bob Johnson",
+              uniqueName: "bob.johnson@example.com",
+              id: "11111",
+            },
+            "System.AuthorizedAs": {
+              displayName: "Alice Brown",
+              uniqueName: "alice.brown@example.com",
+              id: "22222",
+            },
+            "Microsoft.VSTS.Common.ActivatedBy": {
+              displayName: "Charlie Wilson",
+              uniqueName: "charlie.wilson@example.com",
+              id: "33333",
+            },
+            "Microsoft.VSTS.Common.ResolvedBy": {
+              displayName: "Diana Clark",
+              uniqueName: "diana.clark@example.com",
+              id: "44444",
+            },
+            "Microsoft.VSTS.Common.ClosedBy": {
+              displayName: "Edward Davis",
+              uniqueName: "edward.davis@example.com",
+              id: "55555",
+            },
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithUserFields);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      // Parse the returned JSON to verify transformation
+      const resultData = JSON.parse(result.content[0].text);
+
+      // Verify that all user fields are transformed to formatted strings
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("John Doe <john.doe@example.com>");
+      expect(resultData[0].fields["System.CreatedBy"]).toBe("Jane Smith <jane.smith@example.com>");
+      expect(resultData[0].fields["System.ChangedBy"]).toBe("Bob Johnson <bob.johnson@example.com>");
+      expect(resultData[0].fields["System.AuthorizedAs"]).toBe("Alice Brown <alice.brown@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ActivatedBy"]).toBe("Charlie Wilson <charlie.wilson@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ResolvedBy"]).toBe("Diana Clark <diana.clark@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ClosedBy"]).toBe("Edward Davis <edward.davis@example.com>");
+    });
   });
 
   describe("get_work_item tool", () => {
@@ -2316,6 +2393,122 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe("Error creating child work items: Unknown error occurred");
       expect(result.isError).toBe(true);
+    });
+  });
+
+  describe("artifact link tools", () => {
+    describe("wit_add_artifact_link", () => {
+      it("should add artifact link to work item successfully", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain",
+          linkType: "Branch",
+          comment: "Linked to main branch",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain",
+                attributes: {
+                  name: "Branch",
+                  comment: "Linked to main branch",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.workItemId).toBe(1234);
+        expect(response.artifactUri).toBe("vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain");
+        expect(response.linkType).toBe("Branch");
+        expect(response.comment).toBe("Linked to main branch");
+        expect(response.success).toBe(true);
+      });
+
+      it("should add artifact link without comment", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: "vstfs:///Git/Commit/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2Fabc123",
+          linkType: "Commit",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Git/Commit/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2Fabc123",
+                attributes: {
+                  name: "Commit",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.comment).toBe(null);
+      });
+
+      it("should handle errors when adding artifact link", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        mockWorkItemTrackingApi.updateWorkItem.mockRejectedValue(new Error("API Error"));
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: "vstfs:///Git/Ref/invalid",
+          linkType: "Branch",
+        };
+
+        const result = await handler(params);
+
+        expect(result.content[0].text).toBe("Error adding artifact link to work item: API Error");
+        expect(result.isError).toBe(true);
+      });
     });
   });
 });
