@@ -1,0 +1,44 @@
+name: Nightly Pre-release
+
+permissions:
+  contents: read
+  id-token: write # Required for OIDC
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # Runs every day at 22:00 UTC (midnight CEST during daylight saving time)
+  workflow_dispatch:
+
+jobs:
+  pre-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      # npm 11.5.1 or later is required for OIDC integration
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the project
+        run: npm run build --if-present
+
+      - name: Run tests
+        run: npm test
+
+      - name: Publish to npm with nightly version
+        run: |
+          DATE_STRING=$(date +%Y%m%d)
+          CURRENT_VERSION=$(npm pkg get version | tr -d '"')
+          npm version "$CURRENT_VERSION-nightly.$DATE_STRING" --no-git-tag-version
+          npm publish --access public --tag nightly --tag pre-release --provenance

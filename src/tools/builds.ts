@@ -21,7 +21,7 @@ const BUILD_TOOLS = {
   update_build_stage: "build_update_build_stage",
 };
 
-function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     BUILD_TOOLS.get_definitions,
     "Retrieves a list of build definitions for a given project.",
@@ -340,6 +340,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token.token}`,
+          "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
       });
