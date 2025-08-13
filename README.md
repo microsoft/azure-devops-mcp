@@ -34,7 +34,6 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 - "List my work items for project 'Contoso'"
 - "List work items in current iteration for 'Contoso' project and 'Contoso Team'"
 - "List all wikis in the 'Contoso' project"
-- "Create a new project wiki named 'Documentation' in the 'Contoso' project"
 - "Create a wiki page '/Architecture/Overview' with content about system design"
 - "Update the wiki page '/Getting Started' with new onboarding instructions"
 - "Get the content of the wiki page '/API/Authentication' from the Documentation wiki"
@@ -154,8 +153,6 @@ Interact with these Azure DevOps services:
 - **wiki_get_wiki**: Get the wiki by wikiIdentifier.
 - **wiki_list_pages**: Retrieve a list of wiki pages for a specific wiki and project.
 - **wiki_get_page_content**: Retrieve wiki page content by wikiIdentifier and path.
-- **wiki_create_wiki**: Create a new wiki in the specified project.
-- **wiki_update_wiki**: Update an existing wiki by ID or name.
 - **wiki_create_or_update_page**: ✨ **Enhanced** - Create or update wiki pages with full content support using Azure DevOps REST API. Features automatic ETag handling for safe updates, immediate content visibility, and proper conflict resolution.
 
 ### 🔎 Search
