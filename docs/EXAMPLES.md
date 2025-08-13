@@ -157,16 +157,31 @@ Remove link 5678 and 91011 from work item 1234. Also remove any related links an
 
 ### Add Artifact Links to Work Items
 
-Use this tool to link work items to repository artifacts like branches, commits, and pull requests. This is particularly useful for GitHub Copilot integration, which requires artifact links to understand repository context.
+Use this tool to associate work items with repository artifacts such as branches, commits, and pull requests.
 
-First, you'll need the proper vstfs URI format for your artifact:
+You have two options for linking artifacts:
 
-- **Branch**: `vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName}`
-- **Commit**: `vstfs:///Git/Commit/{projectId}%2F{repositoryId}%2F{commitId}`
-- **Pull Request**: `vstfs:///Git/PullRequestId/{projectId}%2F{repositoryId}%2F{pullRequestId}`
+Supply the complete artifact `vstfs` URI in the required format. For example:
 
-```plaintext
+**Branch**:
+`vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName}`
+
+**Commit**:
+`vstfs:///Git/Commit/{projectId}%2F{repositoryId}%2F{commitId}`
+
+**Pull Request**:
+`vstfs:///Git/PullRequestId/{projectId}%2F{repositoryId}%2F{pullRequestId}`
+
+```text
 Add a branch artifact link to work item 1234 in project "Contoso" with URI "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain" and link type "Branch" with comment "Linked to main branch for GitHub Copilot integration"
 ```
 
-📽️ [Adding artifact links enables automation of work item creation and GitHub Copilot integration]()
+Alternatively, you can simply provide the branch, commit, pull request, or build identifiers directly, and the tool will automatically construct the required artifact URI for you.
+
+For example:
+
+```text
+Get me the list of pull requests for Constoso project and Frabrikam repo. Then link the first pull request to work item 12345.
+```
+
+📽️ [Azure Devops MCP Server: Adding artifact links](https://youtu.be/t8HqEt8cZtY)
