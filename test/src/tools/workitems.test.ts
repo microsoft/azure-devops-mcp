@@ -571,6 +571,83 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe(JSON.stringify(null, null, 2));
     });
+
+    it("should transform all user fields to formatted strings", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
+
+      if (!call) throw new Error("wit_get_work_items_batch_by_ids tool not registered");
+      const [, , , handler] = call;
+
+      // Mock work items with all user fields as objects
+      const mockWorkItemsWithUserFields = [
+        {
+          id: 297,
+          fields: {
+            "System.Id": 297,
+            "System.WorkItemType": "Bug",
+            "System.Title": "Test Bug",
+            "System.AssignedTo": {
+              displayName: "John Doe",
+              uniqueName: "john.doe@example.com",
+              id: "12345",
+            },
+            "System.CreatedBy": {
+              displayName: "Jane Smith",
+              uniqueName: "jane.smith@example.com",
+              id: "67890",
+            },
+            "System.ChangedBy": {
+              displayName: "Bob Johnson",
+              uniqueName: "bob.johnson@example.com",
+              id: "11111",
+            },
+            "System.AuthorizedAs": {
+              displayName: "Alice Brown",
+              uniqueName: "alice.brown@example.com",
+              id: "22222",
+            },
+            "Microsoft.VSTS.Common.ActivatedBy": {
+              displayName: "Charlie Wilson",
+              uniqueName: "charlie.wilson@example.com",
+              id: "33333",
+            },
+            "Microsoft.VSTS.Common.ResolvedBy": {
+              displayName: "Diana Clark",
+              uniqueName: "diana.clark@example.com",
+              id: "44444",
+            },
+            "Microsoft.VSTS.Common.ClosedBy": {
+              displayName: "Edward Davis",
+              uniqueName: "edward.davis@example.com",
+              id: "55555",
+            },
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue(mockWorkItemsWithUserFields);
+
+      const params = {
+        ids: [297],
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      // Parse the returned JSON to verify transformation
+      const resultData = JSON.parse(result.content[0].text);
+
+      // Verify that all user fields are transformed to formatted strings
+      expect(resultData[0].fields["System.AssignedTo"]).toBe("John Doe <john.doe@example.com>");
+      expect(resultData[0].fields["System.CreatedBy"]).toBe("Jane Smith <jane.smith@example.com>");
+      expect(resultData[0].fields["System.ChangedBy"]).toBe("Bob Johnson <bob.johnson@example.com>");
+      expect(resultData[0].fields["System.AuthorizedAs"]).toBe("Alice Brown <alice.brown@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ActivatedBy"]).toBe("Charlie Wilson <charlie.wilson@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ResolvedBy"]).toBe("Diana Clark <diana.clark@example.com>");
+      expect(resultData[0].fields["Microsoft.VSTS.Common.ClosedBy"]).toBe("Edward Davis <edward.davis@example.com>");
+    });
   });
 
   describe("get_work_item tool", () => {
@@ -2431,6 +2508,393 @@ describe("configureWorkItemTools", () => {
 
         expect(result.content[0].text).toBe("Error adding artifact link to work item: API Error");
         expect(result.isError).toBe(true);
+      });
+
+      // Tests to cover lines 929-973: URI building switch statement logic
+      it("should build Branch URI from components", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Branch",
+          projectId: "project-guid",
+          repositoryId: "repo-guid",
+          branchName: "feature/test-branch",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Git/Ref/project-guid%2Frepo-guid%2FGBfeature%2Ftest-branch",
+                attributes: {
+                  name: "Branch",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+      });
+
+      it("should return error for Branch link missing required parameters", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Branch",
+          projectId: "project-guid",
+          // Missing repositoryId and branchName
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe("For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required.");
+      });
+
+      it("should build Fixed in Commit URI from components", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Fixed in Commit",
+          projectId: "project-guid",
+          repositoryId: "repo-guid",
+          commitId: "abc123def456",
+          comment: "Fixed in this commit",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Git/Commit/project-guid%2Frepo-guid%2Fabc123def456",
+                attributes: {
+                  name: "Fixed in Commit",
+                  comment: "Fixed in this commit",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+      });
+
+      it("should return error for Fixed in Commit link missing required parameters", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Fixed in Commit",
+          projectId: "project-guid",
+          // Missing repositoryId and commitId
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe("For 'Fixed in Commit' links, 'projectId', 'repositoryId', and 'commitId' are required.");
+      });
+
+      it("should build Pull Request URI from components", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Pull Request",
+          projectId: "project-guid",
+          repositoryId: "repo-guid",
+          pullRequestId: 42,
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Git/PullRequestId/project-guid%2Frepo-guid%2F42",
+                attributes: {
+                  name: "Pull Request",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+      });
+
+      it("should return error for Pull Request link missing required parameters", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Pull Request",
+          projectId: "project-guid",
+          repositoryId: "repo-guid",
+          // Missing pullRequestId
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe("For 'Pull Request' links, 'projectId', 'repositoryId', and 'pullRequestId' are required.");
+      });
+
+      it("should build Build URI from components", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Build",
+          buildId: 123,
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Build/Build/123",
+                attributes: {
+                  name: "Build",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+      });
+
+      it("should build Found in build URI from components", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Found in build",
+          buildId: 456,
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Build/Build/456",
+                attributes: {
+                  name: "Found in build",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+      });
+
+      it("should build Integrated in build URI from components", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Integrated in build",
+          buildId: 789,
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Build/Build/789",
+                attributes: {
+                  name: "Integrated in build",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+      });
+
+      it("should return error for build link types missing buildId", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Build",
+          // Missing buildId
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe("For 'Build' links, 'buildId' is required.");
+      });
+
+      it("should return error for unsupported link type in URI building", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Model Link", // Unsupported link type for URI building
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe("URI building from components is not supported for link type 'Model Link'. Please provide the full 'artifactUri' instead.");
+      });
+
+      it("should handle null response from updateWorkItem (line 1000 coverage)", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        // Mock updateWorkItem to return null
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(null);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain",
+          linkType: "Branch",
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe("Work item update failed");
       });
     });
   });
