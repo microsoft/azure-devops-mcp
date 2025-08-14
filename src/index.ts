@@ -21,19 +21,20 @@ const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
   .usage("Usage: $0 <organization> [domains...] [options]")
   .version(packageVersion)
-  .command("$0 <organization> [domains...]", "Azure DevOps MCP Server", (yargs) => {
+  .command("$0 <organization> [domains...] [options]", "Azure DevOps MCP Server", (yargs) => {
     yargs
       .positional("organization", {
         describe: "Azure DevOps organization name",
         type: "string",
         demandOption: true,
       })
-      .positional("domains", {
+  })
+  .option("domains", {
+        alias: "d",
         describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
         type: "string",
         array: true,
-        default: ["all"],
-      });
+        default: "all",
   })
   .option("tenant", {
     alias: "t",
@@ -43,13 +44,12 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .parseSync();
 
-export const orgName = argv.organization as string;
-const domainsInput = (argv.domains as string[]) || ["all"]; // Fallback for backward compatibility
 const tenantId = argv.tenant;
+
+export const orgName = argv.organization as string;
 const orgUrl = "https://dev.azure.com/" + orgName;
 
-// Initialize domains manager - defaults to "all" if no domains specified
-const domainsManager = new DomainsManager(domainsInput);
+const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
 
 async function getAzureDevOpsToken(): Promise<AccessToken> {

@@ -7,10 +7,9 @@
     },
     {
       "id": "domains",
-      "type": "pickManyString",
-      "description": "Select Azure DevOps domains to enable. Choose specific domains to reduce the number of available tools, or select 'all' to enable everything.",
-      "options": ["advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items", "all"],
-      "default": ["all"]
+      "type": "promptString",
+      "description": "Enter one or more Azure DevOps domains separated by commas. Available options: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items, all. (e.g. 'core,work-items,builds' or 'all')",
+      "default": "all"
     }
   ],
   "servers": {

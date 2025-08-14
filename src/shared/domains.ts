@@ -27,7 +27,8 @@ export class DomainsManager {
 
   constructor(domainsInput?: string | string[]) {
     this.enabledDomains = new Set();
-    this.parseDomains(domainsInput);
+    const normalizedInput = DomainsManager.parseDomainsInput(domainsInput);
+    this.parseDomains(normalizedInput);
   }
 
   /**
@@ -117,5 +118,22 @@ export class DomainsManager {
    */
   public static getAvailableDomains(): string[] {
     return Object.values(Domain);
+  }
+
+  /**
+   * Parse domains input from string or array to a normalized array of strings
+   * @param domainsInput - Domains input to parse
+   * @returns Normalized array of domain strings
+   */
+  public static parseDomainsInput(domainsInput?: string | string[]): string[] {
+    if (!domainsInput) {
+      return [];
+    }
+
+    if (typeof domainsInput === "string") {
+      return domainsInput.split(",").map((d) => d.trim().toLowerCase());
+    }
+
+    return domainsInput.map((d) => d.trim().toLowerCase());
   }
 }
