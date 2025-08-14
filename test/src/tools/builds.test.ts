@@ -17,11 +17,13 @@ describe("configureBuildTools", () => {
   let server: McpServer;
   let tokenProvider: TokenProviderMock;
   let connectionProvider: ConnectionProviderMock;
+  let userAgentProvider: () => string;
   let mockConnection: { getBuildApi: jest.Mock; getPipelinesApi: jest.Mock; serverUrl: string };
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
     tokenProvider = jest.fn();
+    userAgentProvider = () => "Jest";
     mockConnection = {
       getBuildApi: jest.fn(),
       getPipelinesApi: jest.fn(),
@@ -33,14 +35,14 @@ describe("configureBuildTools", () => {
 
   describe("tool registration", () => {
     it("registers build tools on the server", () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
   });
 
   describe("update_build_stage tool", () => {
     it("should update build stage with correct parameters and return the expected result", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
@@ -71,6 +73,7 @@ describe("configureBuildTools", () => {
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer mock-token",
+          "User-Agent": "Jest",
         },
         body: JSON.stringify({
           forceRetryAllJobs: true,
@@ -82,7 +85,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle HTTP errors correctly", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
@@ -114,6 +117,7 @@ describe("configureBuildTools", () => {
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer mock-token",
+          "User-Agent": "Jest",
         },
         body: JSON.stringify({
           forceRetryAllJobs: false,
@@ -123,7 +127,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle network errors correctly", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
@@ -151,6 +155,7 @@ describe("configureBuildTools", () => {
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer mock-token",
+          "User-Agent": "Jest",
         },
         body: JSON.stringify({
           forceRetryAllJobs: false,
@@ -160,7 +165,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle token provider errors correctly", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
@@ -184,7 +189,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle different StageUpdateType values correctly", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
       if (!call) throw new Error("build_update_build_stage tool not registered");
       const [, , , handler] = call;
@@ -222,7 +227,7 @@ describe("configureBuildTools", () => {
 
   describe("get_definitions tool", () => {
     it("should call getDefinitions with correct parameters and return expected result", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definitions");
       if (!call) throw new Error("build_get_definitions tool not registered");
       const [, , , handler] = call;
@@ -278,7 +283,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for get_definitions", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definitions");
       if (!call) throw new Error("build_get_definitions tool not registered");
       const [, , , handler] = call;
@@ -296,7 +301,7 @@ describe("configureBuildTools", () => {
 
   describe("get_definition_revisions tool", () => {
     it("should call getDefinitionRevisions with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definition_revisions");
       if (!call) throw new Error("build_get_definition_revisions tool not registered");
       const [, , , handler] = call;
@@ -330,7 +335,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for get_definition_revisions", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definition_revisions");
       if (!call) throw new Error("build_get_definition_revisions tool not registered");
       const [, , , handler] = call;
@@ -351,7 +356,7 @@ describe("configureBuildTools", () => {
 
   describe("get_builds tool", () => {
     it("should call getBuilds with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_builds");
       if (!call) throw new Error("build_get_builds tool not registered");
       const [, , , handler] = call;
@@ -410,7 +415,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for get_builds", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_builds");
       if (!call) throw new Error("build_get_builds tool not registered");
       const [, , , handler] = call;
@@ -428,7 +433,7 @@ describe("configureBuildTools", () => {
 
   describe("get_log tool", () => {
     it("should call getBuildLogs with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log");
       if (!call) throw new Error("build_get_log tool not registered");
       const [, , , handler] = call;
@@ -462,7 +467,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for get_log", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log");
       if (!call) throw new Error("build_get_log tool not registered");
       const [, , , handler] = call;
@@ -483,7 +488,7 @@ describe("configureBuildTools", () => {
 
   describe("get_log_by_id tool", () => {
     it("should call getBuildLogLines with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log_by_id");
       if (!call) throw new Error("build_get_log_by_id tool not registered");
       const [, , , handler] = call;
@@ -508,7 +513,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for get_log_by_id", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log_by_id");
       if (!call) throw new Error("build_get_log_by_id tool not registered");
       const [, , , handler] = call;
@@ -530,7 +535,7 @@ describe("configureBuildTools", () => {
 
   describe("get_changes tool", () => {
     it("should call getBuildChanges with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_changes");
       if (!call) throw new Error("build_get_changes tool not registered");
       const [, , , handler] = call;
@@ -567,7 +572,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should use default top value when not provided", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_changes");
       if (!call) throw new Error("build_get_changes tool not registered");
       const [, , , handler] = call;
@@ -588,7 +593,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for get_changes", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_changes");
       if (!call) throw new Error("build_get_changes tool not registered");
       const [, , , handler] = call;
@@ -609,7 +614,7 @@ describe("configureBuildTools", () => {
 
   describe("run_build tool", () => {
     it("should trigger build with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
       if (!call) throw new Error("build_run_build tool not registered");
       const [, , , handler] = call;
@@ -673,7 +678,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should use default branch when sourceBranch not provided", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
       if (!call) throw new Error("build_run_build tool not registered");
       const [, , , handler] = call;
@@ -718,7 +723,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should use fallback branch when no repository default branch", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
       if (!call) throw new Error("build_run_build tool not registered");
       const [, , , handler] = call;
@@ -761,7 +766,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle missing build ID from pipeline run", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
       if (!call) throw new Error("build_run_build tool not registered");
       const [, , , handler] = call;
@@ -790,7 +795,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for run_build", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
       if (!call) throw new Error("build_run_build tool not registered");
       const [, , , handler] = call;
@@ -812,7 +817,7 @@ describe("configureBuildTools", () => {
 
   describe("get_status tool", () => {
     it("should call getBuildReport with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_status");
       if (!call) throw new Error("build_get_status tool not registered");
       const [, , , handler] = call;
@@ -848,7 +853,7 @@ describe("configureBuildTools", () => {
     });
 
     it("should handle API errors for get_status", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider);
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_status");
       if (!call) throw new Error("build_get_status tool not registered");
       const [, , , handler] = call;

@@ -1,0 +1,75 @@
+trigger: none
+
+schedules:
+  - cron: "0 22 * * *" # Runs every day at 22:00 UTC
+    displayName: Nightly Pre-release
+    branches:
+      include:
+        - main
+
+variables:
+  - group: npm-credentials
+  - name: nightlyVersion
+    value: $[counter(format('{0:yyyy}{0:MM}{0:dd}', pipeline.startTime), 1)]
+
+jobs:
+  - job: PreReleaseNightly
+    pool:
+      vmImage: "windows-latest"
+
+    steps:
+      - task: UseNode@1
+        inputs:
+          version: "20"
+          checkLatest: false
+          retryCountOnDownloadFails: 2
+
+      - task: npmAuthenticate@0
+        inputs:
+          workingFile: .npmrc
+          customEndpoint: "npmjs-service-connection"
+        displayName: Authenticate with npm registry
+
+      - task: PowerShell@2
+        displayName: Create .npmrc with auth token
+        inputs:
+          targetType: "inline"
+          script: |
+            "//registry.npmjs.org/:_authToken=$(NPM_TOKEN)" | Out-File -FilePath ".npmrc" -Encoding utf8
+            "@azure-devops:registry=https://registry.npmjs.org/" | Add-Content -Path ".npmrc"
+
+      - task: Npm@1
+        inputs:
+          command: "ci"
+        displayName: Install clean dependencies
+
+      - task: PowerShell@2
+        displayName: Update package version for nightly release
+        inputs:
+          targetType: "inline"
+          script: |
+            # Read version.ts to get base version
+            $versionTs = Get-Content "src/version.ts"
+            $baseVersionLine = $versionTs | Where-Object { $_ -match 'export const packageVersion = "(.+)"' }
+            $baseVersion = $Matches[1]
+
+            # Generate date suffix (YYYYMMDD format)
+            $dateString = Get-Date -Format "yyyyMMdd"
+
+            $packageJson = Get-Content "package.json" | ConvertFrom-Json
+            $nightlyVersion = "$baseVersion-nightly.$dateString"
+            $packageJson.version = $nightlyVersion
+            $packageJson | ConvertTo-Json -Depth 100 | Set-Content "package.json"
+            Write-Host "Updated version to: $nightlyVersion"
+
+      - task: Npm@1
+        inputs:
+          command: "custom"
+          customCommand: "run build"
+        displayName: Build the project
+
+      - task: Npm@1
+        inputs:
+          command: "custom"
+          customCommand: "publish --access public --registry=https://registry.npmjs.org/ --tag nightly --tag pre-release"
+        displayName: Publish nightly package to npmjs under @azure-devops org scope

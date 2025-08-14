@@ -115,7 +115,12 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       title: z.string().describe("The title of the test case."),
-      steps: z.string().optional().describe("The steps to reproduce the test case. Make sure to format each step as '1. Step one|Expected result one\n2. Step two|Expected result two"),
+      steps: z
+        .string()
+        .optional()
+        .describe(
+          "The steps to reproduce the test case. Make sure to format each step as '1. Step one|Expected result one\n2. Step two|Expected result two. USE '|' as the delimiter between step and expected result. DO NOT use '|' in the description of the step or expected result."
+        ),
       priority: z.number().optional().describe("The priority of the test case."),
       areaPath: z.string().optional().describe("The area path for the test case."),
       iterationPath: z.string().optional().describe("The iteration path for the test case."),
