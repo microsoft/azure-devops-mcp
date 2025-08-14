@@ -14,7 +14,7 @@ import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
-import { DomainsManager } from "./domains.js";
+import { DomainsManager } from "./shared/domains.js";
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))

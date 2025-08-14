@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { DomainsManager } from "../../src/domains";
+import { DomainsManager } from "../../src/shared/domains";
 
 describe("DomainsManager backward compatibility", () => {
   // Mock console.log and console.warn to avoid test output noise

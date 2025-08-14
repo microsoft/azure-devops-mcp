@@ -5,7 +5,7 @@ import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 
-import { Domain } from "./domains.js";
+import { Domain } from "./shared/domains.js";
 import { configureAdvSecTools } from "./tools/advanced-security.js";
 import { configureBuildTools } from "./tools/builds.js";
 import { configureCoreTools } from "./tools/core.js";
