@@ -14,6 +14,7 @@ This guide offers step-by-step examples for using the Azure DevOps MCP Server to
 - [Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)
 - [Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
 - [Adding Artifact Links](#adding-artifact-links)
+- [Reading, Creating, and Updating Wiki Page Content](#reading-creating-and-updating-wiki-page-content)
 
 ## 🙋‍♂️ Projects and Teams
 
