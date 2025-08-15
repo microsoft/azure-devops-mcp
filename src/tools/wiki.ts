@@ -161,7 +161,6 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
       path: z.string().describe("The path of the wiki page (e.g., '/Home' or '/Documentation/Setup')."),
       content: z.string().describe("The content of the wiki page in markdown format."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
-      comment: z.string().optional().describe("Optional comment for the page update."),
       etag: z.string().optional().describe("ETag for editing existing pages (optional, will be fetched if not provided)."),
     },
     async ({ wikiIdentifier, path, content, project, etag }) => {

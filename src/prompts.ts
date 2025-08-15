@@ -7,7 +7,7 @@ import { CORE_TOOLS } from "./tools/core.js";
 import { WORKITEM_TOOLS } from "./tools/workitems.js";
 
 function configurePrompts(server: McpServer) {
-  server.prompt("listProjects", "Lists all projects in the Azure DevOps organization.", {}, () => ({
+  server.prompt("Projects", "Lists all projects in the Azure DevOps organization.", {}, () => ({
     messages: [
       {
         role: "user",
@@ -15,14 +15,14 @@ function configurePrompts(server: McpServer) {
           type: "text",
           text: String.raw`
 # Task
-Use the '${CORE_TOOLS.list_projects}' tool to retrieve all projects in the current Azure DevOps organization.
-Present the results in a table with the following columns: Project ID, Name, and Description.`,
+Use the '${CORE_TOOLS.list_projects}' tool to retrieve all 'wellFormed' projects in the current Azure DevOps organization.
+Present the results in alphabetical order in a table with the following columns: Name and ID.`,
         },
       },
     ],
   }));
 
-  server.prompt("listTeams", "Retrieves all teams for a given Azure DevOps project.", { project: z.string() }, ({ project }) => ({
+  server.prompt("Teams", "Retrieves all teams for a given Azure DevOps project.", { project: z.string() }, ({ project }) => ({
     messages: [
       {
         role: "user",
@@ -31,7 +31,7 @@ Present the results in a table with the following columns: Project ID, Name, and
           text: String.raw`
   # Task
   Use the '${CORE_TOOLS.list_project_teams}' tool to retrieve all teams for the project '${project}'.
-  Present the results in a table with the following columns: Team ID, and Name`,
+  Present the results in alphabetical order in a table with the following columns: Name and Id`,
         },
       },
     ],

@@ -88,11 +88,7 @@ Interact with these Azure DevOps services:
 - **wit_update_work_items_batch**: Update work items in batch.
 - **wit_work_items_link**: Link work items together in batch.
 - **wit_work_item_unlink**: Unlink one or many links from a work item.
-
-#### Deprecated Tools
-
-- **wit_add_child_work_item**: Replaced by `wit_add_child_work_items` to allow creating one or more child items per call.
-- **wit_close_and_link_workitem_duplicates**: This tool is no longer needed. Finding and marking duplicates can be done with other tools.
+- **wit_add_artifact_link**: Link to artifacts like branch, pull request, commit, and build.
 
 ### 📁 Repositories
 
@@ -153,7 +149,7 @@ Interact with these Azure DevOps services:
 - **wiki_get_wiki**: Get the wiki by wikiIdentifier.
 - **wiki_list_pages**: Retrieve a list of wiki pages for a specific wiki and project.
 - **wiki_get_page_content**: Retrieve wiki page content by wikiIdentifier and path.
-- **wiki_create_or_update_page**: ✨ **Enhanced** - Create or update wiki pages with full content support using Azure DevOps REST API. Features automatic ETag handling for safe updates, immediate content visibility, and proper conflict resolution.
+- **wiki_create_or_update_page**: Create or update wiki pages with full content support.
 
 ### 🔎 Search
 
