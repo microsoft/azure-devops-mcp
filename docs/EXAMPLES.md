@@ -14,6 +14,7 @@ This guide offers step-by-step examples for using the Azure DevOps MCP Server to
 - [Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)
 - [Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
 - [Adding Artifact Links](#adding-artifact-links)
+- [Reading, Creating, and Updating Wiki Page Content](#reading-creating-and-updating-wiki-page-content)
 
 ## 🙋‍♂️ Projects and Teams
 
@@ -21,7 +22,7 @@ This guide offers step-by-step examples for using the Azure DevOps MCP Server to
 
 Most work item tools require project context. You can retrieve the list of projects and specify the desired project:
 
-```plaintext
+```text
 get list of ado projects
 ```
 
@@ -29,7 +30,7 @@ get list of ado projects
 
 This command returns all Azure DevOps projects for the organization defined in the `mcp.json` file. Similarly, you can retrieve the team context:
 
-```plaintext
+```text
 get list of teams for project contoso
 ```
 
@@ -41,7 +42,7 @@ get list of teams for project contoso
 
 Retrieve a list of work items assigned to you. This tool requires project context:
 
-```plaintext
+```text
 get my work items for project contoso
 ```
 
@@ -53,13 +54,13 @@ The model should automatically use the `wit_get_work_items_batch_by_ids` tool to
 
 You need project, team and backlog (Epics, Stories, Features) context in order to get a list of all the work items in a backlog.
 
-```plaintext
+```text
 get backlogs for Contoso project and Fabrikam team
 ```
 
 Once you have the backlog levels, you can then get work items for that backlog.
 
-```plaintext
+```text
 get list of work items for Features backlog
 ```
 
@@ -71,19 +72,19 @@ The model should automatically use the `wit_get_work_items_batch_by_ids` tool to
 
 Get a work item, get the work item comments, update the work item fields, and add a new comment.
 
-```plaintext
+```text
 Get work item 12345 and show me fields ID, Type, State, Repro Steps, Story Points, and Priority. Get all comments for the work item and summarize them for me.
 ```
 
 The model now has context of the work item. You can then update specific fields. In this case, we want the LLM to generate a better set of Repro Steps and then update the work item with those new steps. Along with updating the Story Points and State fields.
 
-```plaintext
+```text
 Polish the Repro Steps with more information and details. Then take that value and update the work item. Also update StoryPoints = 5 and State = Active.
 ```
 
 Assign the work item to me and add a new comment.
 
-```plaintext
+```text
 Assign this work item to myemail@outlook.com and add a comment "I will own this Bug and get it fixed"
 ```
 
@@ -93,7 +94,7 @@ Assign this work item to myemail@outlook.com and add a comment "I will own this 
 
 Open a user story and automatically generate test cases with detailed steps based on the story's description. Link the generated test cases back to the original user story.
 
-```plaintext
+```text
 Open work item 1234 in 'Contoso' project. Then look at the description and create 1-3 Test Cases with test steps. But show me a preview first before creating the Test Case in Azure DevOps. Be sure to link the new Test Case to the User Story 1234 when you do.
 ```
 
@@ -105,17 +106,17 @@ Retrieve all work items in a backlog and triage them according to your own crite
 
 Retrieve the team's iterations and backlog levels to provide the LLM with the necessary context for accurate work item management.
 
-```plaintext
+```text
 list iterations for Contoso team
 ```
 
-```plaintext
+```text
 list backlog levels for Contoso team
 ```
 
 Retrieve the work items and their details, then instruct the LLM to identify security-related bugs and high-priority user stories. Assign the identified items to the current iteration and, if needed, to the next iteration.
 
-```plaintext
+```text
 List of work items for Stories backlog. But then go thru and find all the security related bugs. Assign the first 4 to the current iteration. If there are more than four, assign the rest to the next iteration. Then find 2-3 high priority user stories and assign them to the current iteration. Do it!
 ```
 
@@ -131,7 +132,7 @@ You can use the `format` paramater to indicate markdown formatting for large tex
 
 > 🚩 HTML is the default unless `Markdown` is explicity set.
 
-```plaintext
+```text
 Update work item 12345 with a new description and use Markdown text. Use Markdown format param. Use bulk update.
 ```
 
@@ -143,17 +144,17 @@ Use this tool to remove one or more links from a work item, either by specifying
 
 First, retrieve the work item whose links you want to remove:
 
-```plaintext
+```text
 Get work item 1234 in Contoso project and show me the relations
 ```
 
 Next, remove a specific link to a work item, pull request, etc. or remove links by type (for example, "related"):
 
-```plaintext
+```text
 Remove link 5678 and 91011 from work item 1234. Also remove any related links and links to pull request 121314
 ```
 
-## 🔗 Adding Artifact Links
+### 🔗 Adding Artifact Links
 
 ### Add Artifact Links to Work Items
 
@@ -185,3 +186,34 @@ Get me the list of pull requests for Constoso project and Frabrikam repo. Then l
 ```
 
 📽️ [Azure Devops MCP Server: Adding artifact links](https://youtu.be/t8HqEt8cZtY)
+
+## 📖 Wiki
+
+### Reading, Creating, and Updating Wiki Page Content
+
+You can read, create, and update wiki pages in Azure DevOps. Follow these steps:
+
+1. Retrieve the list of wikis in your project.
+2. Get the pages available in a specific wiki.
+3. Read the content of an existing wiki page.
+4. Update the content of a wiki page or create a new page.
+
+```text
+Get list of wikis in project Contoso.
+```
+
+```text
+Get list of pages for Fabrikam wiki.
+```
+
+```text
+Get wiki page 'sample-page-name' content. Review and suggest improvements, then update the page with the revised content.
+```
+
+```text
+Create new wiki page called 'how to bake a cake' and add the following content:
+
+<content>
+```
+
+📽️ [Azure Devops MCP Server: Reading, creating, and updating wiki pages](https://youtu.be/z_WQ_QefpGU)
