@@ -35,7 +35,7 @@ describe("DomainsManager backward compatibility", () => {
       expect(enabledDomains.has("work")).toBe(true);
       expect(enabledDomains.has("work-items")).toBe(true);
 
-      expect(consoleSpy).toHaveBeenCalledWith("No domains specified, enabling all domains for backward compatibility");
+      expect(consoleSpy).toHaveBeenCalledWith("No valid domains specified, enabling all domains by default");
     });
 
     it("should enable all domains when undefined is passed", () => {
