@@ -208,15 +208,12 @@ In your project, add a `.vscode\mcp.json` file with the following content:
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "${input:ado_org}"
-      ]
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
     }
   }
 }
 ```
+
 🔥 To stay up to date with the latest features, you can use our nightly builds. Simply update your `mcp.json` configuration to use `@azure-devops/mcp@next`. Here is an updated example:
 
 ```json
@@ -232,11 +229,7 @@ In your project, add a `.vscode\mcp.json` file with the following content:
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp@next",
-        "${input:ado_org}"
-      ]
+      "args": ["-y", "@azure-devops/mcp@next", "${input:ado_org}"]
     }
   }
 }
