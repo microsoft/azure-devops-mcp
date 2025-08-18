@@ -323,6 +323,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         creationDate: pr.creationDate,
         title: pr.title,
         isDraft: pr.isDraft,
+        sourceRefName: pr.sourceRefName,
+        targetRefName: pr.targetRefName,
       }));
 
       return {
@@ -390,6 +392,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         creationDate: pr.creationDate,
         title: pr.title,
         isDraft: pr.isDraft,
+        sourceRefName: pr.sourceRefName,
+        targetRefName: pr.targetRefName,
       }));
 
       return {

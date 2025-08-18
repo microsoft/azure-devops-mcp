@@ -499,6 +499,8 @@ describe("repos tools", () => {
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
           isDraft: false,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
         },
       ];
       mockGitApi.getPullRequests.mockResolvedValue(mockPRs);
@@ -561,6 +563,8 @@ describe("repos tools", () => {
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
           isDraft: false,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
         },
       ];
       mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
@@ -586,6 +590,8 @@ describe("repos tools", () => {
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
           isDraft: false,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
         },
       ];
 
