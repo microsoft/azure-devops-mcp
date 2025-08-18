@@ -22,19 +22,18 @@ const argv = yargs(hideBin(process.argv))
   .usage("Usage: $0 <organization> [domains...] [options]")
   .version(packageVersion)
   .command("$0 <organization> [domains...] [options]", "Azure DevOps MCP Server", (yargs) => {
-    yargs
-      .positional("organization", {
-        describe: "Azure DevOps organization name",
-        type: "string",
-        demandOption: true,
-      })
+    yargs.positional("organization", {
+      describe: "Azure DevOps organization name",
+      type: "string",
+      demandOption: true,
+    });
   })
   .option("domains", {
-        alias: "d",
-        describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
-        type: "string",
-        array: true,
-        default: "all",
+    alias: "d",
+    describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
+    type: "string",
+    array: true,
+    default: "all",
   })
   .option("tenant", {
     alias: "t",
