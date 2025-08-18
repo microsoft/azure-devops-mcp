@@ -208,7 +208,35 @@ In your project, add a `.vscode\mcp.json` file with the following content:
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "${input:ado_org}"
+      ]
+    }
+  }
+}
+```
+🔥 To stay up to date with the latest features, you can use our nightly builds. Simply update your `mcp.json` configuration to use `@azure-devops/mcp@next`. Here is an updated example:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp@next",
+        "${input:ado_org}"
+      ]
     }
   }
 }
