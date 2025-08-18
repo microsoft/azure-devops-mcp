@@ -73,9 +73,7 @@ describe("auth functions", () => {
         json: jest.fn().mockResolvedValue(errorData),
       });
 
-      await expect(getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow(
-        "Error fetching user details: Unauthorized"
-      );
+      await expect(getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow("Error fetching user details: Unauthorized");
     });
 
     it("should handle network errors correctly", async () => {
@@ -115,16 +113,13 @@ describe("auth functions", () => {
 
       const result = await searchIdentities("john.doe@example.com", tokenProvider, connectionProvider, userAgentProvider);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        "https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com",
-        {
-          headers: {
-            "Authorization": "Bearer fake-token",
-            "Content-Type": "application/json",
-            "User-Agent": "Jest",
-          },
-        }
-      );
+      expect(global.fetch).toHaveBeenCalledWith("https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com", {
+        headers: {
+          "Authorization": "Bearer fake-token",
+          "Content-Type": "application/json",
+          "User-Agent": "Jest",
+        },
+      });
 
       expect(result).toEqual(mockIdentities);
     });
@@ -139,9 +134,7 @@ describe("auth functions", () => {
         text: jest.fn().mockResolvedValue("Not Found"),
       });
 
-      await expect(searchIdentities("nonexistent@example.com", tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow(
-        "HTTP 404: Not Found"
-      );
+      await expect(searchIdentities("nonexistent@example.com", tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow("HTTP 404: Not Found");
     });
 
     it("should handle network errors correctly", async () => {
@@ -192,16 +185,13 @@ describe("auth functions", () => {
 
       const result = await getUserIdFromEmail("john.doe@example.com", tokenProvider, connectionProvider, userAgentProvider);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        "https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com",
-        {
-          headers: {
-            "Authorization": "Bearer fake-token",
-            "Content-Type": "application/json",
-            "User-Agent": "Jest",
-          },
-        }
-      );
+      expect(global.fetch).toHaveBeenCalledWith("https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com", {
+        headers: {
+          "Authorization": "Bearer fake-token",
+          "Content-Type": "application/json",
+          "User-Agent": "Jest",
+        },
+      });
 
       expect(result).toBe("user1-id");
     });
@@ -243,9 +233,7 @@ describe("auth functions", () => {
         json: jest.fn().mockResolvedValue({ value: [] }),
       });
 
-      await expect(getUserIdFromEmail("nobody@example.com", tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow(
-        "No user found with email/unique name: nobody@example.com"
-      );
+      await expect(getUserIdFromEmail("nobody@example.com", tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow("No user found with email/unique name: nobody@example.com");
     });
 
     it("should throw error when null response", async () => {
@@ -257,9 +245,7 @@ describe("auth functions", () => {
         json: jest.fn().mockResolvedValue(null),
       });
 
-      await expect(getUserIdFromEmail("test@example.com", tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow(
-        "No user found with email/unique name: test@example.com"
-      );
+      await expect(getUserIdFromEmail("test@example.com", tokenProvider, connectionProvider, userAgentProvider)).rejects.toThrow("No user found with email/unique name: test@example.com");
     });
 
     it("should throw error when user has no ID", async () => {
@@ -327,10 +313,7 @@ describe("auth functions", () => {
 
       const result = await getUserIdFromEmail("john.doe", tokenProvider, connectionProvider, userAgentProvider);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        "https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe",
-        expect.any(Object)
-      );
+      expect(global.fetch).toHaveBeenCalledWith("https://vssps.dev.azure.com/test-org/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe", expect.any(Object));
 
       expect(result).toBe("user1-id");
     });

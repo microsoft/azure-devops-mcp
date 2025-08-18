@@ -68,12 +68,7 @@ async function searchIdentities(
 /**
  * Gets the user ID from email or unique name using Azure DevOps Identity API
  */
-async function getUserIdFromEmail(
-  userEmail: string,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>,
-  userAgentProvider: () => string
-): Promise<string> {
+async function getUserIdFromEmail(userEmail: string, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): Promise<string> {
   const identities = await searchIdentities(userEmail, tokenProvider, connectionProvider, userAgentProvider);
 
   if (!identities || identities.value?.length === 0) {
