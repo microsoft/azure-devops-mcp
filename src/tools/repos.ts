@@ -18,7 +18,7 @@ import {
   CommentThreadStatus,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
-import { getCurrentUserDetails } from "./auth.js";
+import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { getEnumKeys } from "../utils.js";
 
@@ -270,13 +270,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       top: z.number().default(100).describe("The maximum number of pull requests to return."),
       skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
+      created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
     },
-    async ({ repositoryId, top, skip, created_by_me, i_am_reviewer, status }) => {
+    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -291,7 +292,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         repositoryId: repositoryId,
       };
 
-      if (created_by_me || i_am_reviewer) {
+      if (created_by_user) {
+        try {
+          const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
+          searchCriteria.creatorId = userId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error finding user with email ${created_by_user}: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } else if (created_by_me || i_am_reviewer) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
@@ -341,13 +357,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       top: z.number().default(100).describe("The maximum number of pull requests to return."),
       skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
+      created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
     },
-    async ({ project, top, skip, created_by_me, i_am_reviewer, status }) => {
+    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, status }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -360,7 +377,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         status: pullRequestStatusStringToInt(status),
       };
 
-      if (created_by_me || i_am_reviewer) {
+      if (created_by_user) {
+        try {
+          const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
+          gitPullRequestSearchCriteria.creatorId = userId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error finding user with email ${created_by_user}: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } else if (created_by_me || i_am_reviewer) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
         if (created_by_me) {
