@@ -165,8 +165,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
               let accessToken: AccessToken | undefined;
               try {
                 accessToken = await tokenProvider();
-              } catch {
-              }
+              } catch {}
               const baseUrl = connection.serverUrl.replace(/\/$/, "");
               const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages/${parsed.pageId}?includeContent=true&api-version=7.1`;
               const resp = await fetch(restUrl, {
@@ -182,8 +181,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
               } else if (resp.status === 404) {
                 return { content: [{ type: "text", text: `Error fetching wiki page content: Page with id ${parsed.pageId} not found` }], isError: true };
               }
-            } catch {
-            }
+            } catch {}
           }
         }
 
