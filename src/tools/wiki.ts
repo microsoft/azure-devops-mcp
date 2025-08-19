@@ -120,28 +120,85 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
 
   server.tool(
     WIKI_TOOLS.get_wiki_page_content,
-    "Retrieve wiki page content by wikiIdentifier and path.",
+    "Retrieve wiki page content. Provide either a 'url' parameter OR the combination of 'wikiIdentifier' and 'project' parameters.",
     {
-      wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
-      project: z.string().describe("The project name or ID where the wiki is located."),
-      path: z.string().describe("The path of the wiki page to retrieve content for."),
+      url: z
+        .string()
+        .optional()
+        .describe(
+          "The full URL of the wiki page to retrieve content for. If provided, wikiIdentifier, project, and path are ignored. Supported patterns: https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiIdentifier}?pagePath=%2FMy%20Page and https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiIdentifier}/{pageId}/Page-Title"
+        ),
+      wikiIdentifier: z.string().optional().describe("The unique identifier of the wiki. Required if url is not provided."),
+      project: z.string().optional().describe("The project name or ID where the wiki is located. Required if url is not provided."),
+      path: z.string().optional().describe("The path of the wiki page to retrieve content for. Optional, defaults to root page if not provided."),
     },
-    async ({ wikiIdentifier, project, path }) => {
+    async ({ url, wikiIdentifier, project, path }: { url?: string; wikiIdentifier?: string; project?: string; path?: string }) => {
       try {
+        const hasUrl = !!url;
+        const hasPair = !!wikiIdentifier && !!project;
+        if (hasUrl && hasPair) {
+          return { content: [{ type: "text", text: "Error fetching wiki page content: Provide either 'url' OR 'wikiIdentifier' with 'project', not both." }], isError: true };
+        }
+        if (!hasUrl && !hasPair) {
+          return { content: [{ type: "text", text: "Error fetching wiki page content: You must provide either 'url' OR both 'wikiIdentifier' and 'project'." }], isError: true };
+        }
         const connection = await connectionProvider();
         const wikiApi = await connection.getWikiApi();
+        let resolvedProject = project;
+        let resolvedWiki = wikiIdentifier;
+        let resolvedPath: string | undefined = path;
+        let pageContent: string | undefined;
 
-        const stream = await wikiApi.getPageText(project, wikiIdentifier, path, undefined, undefined, true);
+        if (url) {
+          const parsed = parseWikiUrl(url);
+          if ("error" in parsed) {
+            return { content: [{ type: "text", text: `Error fetching wiki page content: ${parsed.error}` }], isError: true };
+          }
+          resolvedProject = parsed.project;
+          resolvedWiki = parsed.wikiIdentifier;
+          if (parsed.pagePath) {
+            resolvedPath = parsed.pagePath;
+          }
 
-        if (!stream) {
-          return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
+          if (parsed.pageId) {
+            try {
+              let accessToken: AccessToken | undefined;
+              try {
+                accessToken = await tokenProvider();
+              } catch {
+              }
+              const baseUrl = connection.serverUrl.replace(/\/$/, "");
+              const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages/${parsed.pageId}?includeContent=true&api-version=7.1`;
+              const resp = await fetch(restUrl, {
+                headers: accessToken?.token ? { Authorization: `Bearer ${accessToken.token}` } : {},
+              });
+              if (resp.ok) {
+                const json = await resp.json();
+                if (json && typeof json.content === "string") {
+                  pageContent = json.content;
+                } else if (json && json.path) {
+                  resolvedPath = json.path;
+                }
+              } else if (resp.status === 404) {
+                return { content: [{ type: "text", text: `Error fetching wiki page content: Page with id ${parsed.pageId} not found` }], isError: true };
+              }
+            } catch {
+            }
+          }
         }
 
-        const content = await streamToString(stream);
+        if (!pageContent) {
+          if (!resolvedPath) {
+            resolvedPath = "/";
+          }
+          const stream = await wikiApi.getPageText(resolvedProject!, resolvedWiki!, resolvedPath, undefined, undefined, true);
+          if (!stream) {
+            return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
+          }
+          pageContent = await streamToString(stream);
+        }
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(content, null, 2) }],
-        };
+        return { content: [{ type: "text", text: JSON.stringify(pageContent, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
@@ -279,6 +336,51 @@ function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
     stream.on("end", () => resolve(data));
     stream.on("error", reject);
   });
+}
+
+// Helper to parse Azure DevOps wiki page URLs.
+// Supported examples:
+//  - https://dev.azure.com/org/project/_wiki/wikis/wikiIdentifier?wikiVersion=GBmain&pagePath=%2FHome
+//  - https://dev.azure.com/org/project/_wiki/wikis/wikiIdentifier/123/Title-Of-Page
+// Returns either a structured object OR an error message inside { error }.
+function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; pagePath?: string; pageId?: number; error?: undefined } | { error: string } {
+  try {
+    const u = new URL(url);
+    // Path segments after host
+    // Expect pattern: /{project}/_wiki/wikis/{wikiIdentifier}[/{pageId}/...]
+    const segments = u.pathname.split("/").filter(Boolean); // remove empty
+    const idx = segments.findIndex((s) => s === "_wiki");
+    if (idx < 1 || segments[idx + 1] !== "wikis") {
+      return { error: "URL does not match expected wiki pattern (missing /_wiki/wikis/ segment)." };
+    }
+    const project = segments[idx - 1];
+    const wikiIdentifier = segments[idx + 2];
+    if (!project || !wikiIdentifier) {
+      return { error: "Could not extract project or wikiIdentifier from URL." };
+    }
+
+    // Query form with pagePath
+    const pagePathParam = u.searchParams.get("pagePath");
+    if (pagePathParam) {
+      let decoded = decodeURIComponent(pagePathParam);
+      if (!decoded.startsWith("/")) decoded = "/" + decoded;
+      return { project, wikiIdentifier, pagePath: decoded };
+    }
+
+    // Path ID form: .../wikis/{wikiIdentifier}/{pageId}/...
+    const afterWiki = segments.slice(idx + 3); // elements after wikiIdentifier
+    if (afterWiki.length >= 1) {
+      const maybeId = parseInt(afterWiki[0], 10);
+      if (!isNaN(maybeId)) {
+        return { project, wikiIdentifier, pageId: maybeId };
+      }
+    }
+
+    // If nothing else specified, treat as root page
+    return { project, wikiIdentifier, pagePath: "/" };
+  } catch (e) {
+    return { error: "Invalid URL format." };
+  }
 }
 
 export { WIKI_TOOLS, configureWikiTools };
