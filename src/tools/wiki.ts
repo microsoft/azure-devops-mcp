@@ -189,7 +189,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
           if (!resolvedPath) {
             resolvedPath = "/";
           }
-          const stream = await wikiApi.getPageText(resolvedProject!, resolvedWiki!, resolvedPath, undefined, undefined, true);
+          if (!resolvedProject || !resolvedWiki) {
+            return { content: [{ type: "text", text: "Project and wikiIdentifier must be defined to fetch wiki page content." }], isError: true };
+          }
+          const stream = await wikiApi.getPageText(resolvedProject, resolvedWiki, resolvedPath, undefined, undefined, true);
           if (!stream) {
             return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
           }
@@ -376,7 +379,7 @@ function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; p
 
     // If nothing else specified, treat as root page
     return { project, wikiIdentifier, pagePath: "/" };
-  } catch (e) {
+  } catch {
     return { error: "Invalid URL format." };
   }
 }
