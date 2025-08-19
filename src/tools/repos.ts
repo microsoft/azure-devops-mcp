@@ -486,11 +486,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     {
       repositoryId: z.string().describe("The ID of the repository where the branches are located."),
       top: z.number().default(100).describe("The maximum number of branches to return. Defaults to 100."),
+      filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
-    async ({ repositoryId, top }) => {
+    async ({ repositoryId, top, filterContains }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const branches = await gitApi.getRefs(repositoryId, undefined);
+      const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, undefined, undefined, undefined, filterContains);
 
       const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
@@ -506,11 +507,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     {
       repositoryId: z.string().describe("The ID of the repository where the branches are located."),
       top: z.number().default(100).describe("The maximum number of branches to return."),
+      filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
-    async ({ repositoryId, top }) => {
+    async ({ repositoryId, top, filterContains }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const branches = await gitApi.getRefs(repositoryId, undefined, undefined, undefined, undefined, true);
+      const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, true, undefined, undefined, filterContains);
 
       const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
@@ -554,8 +556,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     async ({ repositoryId, branchName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const branches = await gitApi.getRefs(repositoryId);
-      const branch = branches?.find((branch) => branch.name === `refs/heads/${branchName}`);
+      const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, branchName);
+      const branch = branches.find((branch) => branch.name === `refs/heads/${branchName}` || branch.name === branchName);
       if (!branch) {
         return {
           content: [
@@ -564,6 +566,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
               text: `Branch ${branchName} not found in repository ${repositoryId}`,
             },
           ],
+          isError: true,
         };
       }
       return {
