@@ -871,4 +871,104 @@ describe("configureBuildTools", () => {
       await expect(handler(params)).rejects.toThrow("Build not found");
     });
   });
+
+  describe("get_timeline tool", () => {
+    it("should retrieve the timeline for a build", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockTimeline = {
+        id: "timeline-123",
+        records: [
+          {
+            id: "record-1",
+            name: "Initialize job",
+            type: "Task",
+            startTime: "2024-08-19T10:00:00.000Z",
+            finishTime: "2024-08-19T10:01:00.000Z",
+            state: "Completed",
+            result: "Succeeded"
+          },
+          {
+            id: "record-2",
+            name: "Checkout",
+            type: "Task",
+            startTime: "2024-08-19T10:01:00.000Z",
+            finishTime: "2024-08-19T10:02:00.000Z",
+            state: "Completed",
+            result: "Succeeded"
+          }
+        ]
+      };
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockResolvedValue(mockTimeline),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 123,
+        timelineId: "timeline-123",
+        changeId: 456,
+        planId: "plan-789"
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getBuildTimeline).toHaveBeenCalledWith("test-project", 123, "timeline-123", 456, "plan-789");
+      expect(result.content[0].text).toBe(JSON.stringify(mockTimeline, null, 2));
+    });
+
+    it("should handle minimal parameters for get_timeline", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockTimeline = {
+        id: "timeline-123",
+        records: [
+          { id: "record-1", name: "Task 1", state: "Completed" },
+          { id: "record-2", name: "Task 2", state: "Completed" }
+        ]
+      };
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockResolvedValue(mockTimeline),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 123
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getBuildTimeline).toHaveBeenCalledWith("test-project", 123, undefined, undefined, undefined);
+      expect(result.content[0].text).toBe(JSON.stringify(mockTimeline, null, 2));
+    });
+
+    it("should handle API errors for get_timeline", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockRejectedValue(new Error("Timeline not found")),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 999,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Timeline not found");
+    });
+  });
 });
