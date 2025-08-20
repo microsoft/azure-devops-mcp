@@ -92,7 +92,8 @@ Interact with these Azure DevOps services:
 
 ### 📁 Repositories
 
-- **repo_list_repos_by_project**: Retrieve a list of repositories for a given project.
+-- **repo_list_repos_by_project**: Retrieve a list of repositories for a given project.
+-- **get_repository_items**: Gets a file content from a repository.
 - **repo_list_pull_requests_by_repo**: Retrieve a list of pull requests for a given repository.
 - **repo_list_pull_requests_by_project**: Retrieve a list of pull requests for a given project ID or name.
 - **repo_list_branches_by_repo**: Retrieve a list of branches for a given repository.

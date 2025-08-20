@@ -5,7 +5,7 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
-import { GitRecursionType, GitVersionOptions, GitVersionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { VersionControlRecursionType , GitVersionOptions, GitVersionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
 /**
  * Registers the get_repository_items tool for reading file/folder content from Azure DevOps repos.
@@ -16,16 +16,14 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
     "get_repository_items",
     "Gets a file or folder content from a repository in Azure DevOps. Exposes all API parameters.",
     {
-      organization: z.string().describe("The name of the Azure DevOps organization."),
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repositoryId: z.string().describe("The ID or name of the repository."),
-      path: z.string().optional().describe("The path to the item. Example: /README.md"),
+      path: z.string().describe("The path to the item. Example: /README.md"),
       scopePath: z.string().optional().describe("The path scope. Used to limit the items returned."),
       recursionLevel: z.enum(["none", "oneLevel", "full"]).optional().describe("The recursion level of the search."),
-      includeContentMetadata: z.boolean().optional().describe("Include content metadata."),
+      includeContentMetadata: z.boolean().describe("Include content metadata."),
       latestProcessedChange: z.boolean().optional().describe("Return only the latest change."),
       download: z.boolean().optional().describe("Set to true to download the file."),
-      $format: z.string().optional().describe("The format of the response."),
       versionDescriptor_version: z.string().optional().describe("A string identifying the version."),
       versionDescriptor_versionOptions: z.string().optional().describe("Version options."),
       versionDescriptor_versionType: z.string().optional().describe("Version type."),
@@ -36,7 +34,6 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
     },
     async (input) => {
       const {
-        organization,
         project,
         repositoryId,
         path,
@@ -45,40 +42,56 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
         includeContentMetadata,
         latestProcessedChange,
         download,
-        $format,
         versionDescriptor_version,
         versionDescriptor_versionOptions,
         versionDescriptor_versionType,
         includeContent,
         resolveLfs,
         sanitize,
-        apiVersion,
+        apiVersion
       } = input;
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      const versionDescriptor =
-        versionDescriptor_version || versionDescriptor_versionOptions || versionDescriptor_versionType
-          ? {
-              version: versionDescriptor_version,
-              versionOptions: versionDescriptor_versionOptions as GitVersionOptions,
-              versionType: versionDescriptor_versionType as GitVersionType,
-            }
-          : undefined;
-      const items = await gitApi.getItems(
+      const versionDescriptor = (versionDescriptor_version || versionDescriptor_versionOptions || versionDescriptor_versionType)
+        ? {
+            version: versionDescriptor_version,
+            versionOptions: versionDescriptor_versionOptions
+              ? GitVersionOptions[versionDescriptor_versionOptions as keyof typeof GitVersionOptions]
+              : undefined,
+            versionType: versionDescriptor_versionType
+              ? GitVersionType[versionDescriptor_versionType as keyof typeof GitVersionType]
+              : undefined
+          }
+        : undefined;
+      // Map string recursionLevel to VersionControlRecursionType enum
+      let recursionLevelEnum: VersionControlRecursionType | undefined = undefined;
+      if (recursionLevel !== undefined) {
+        switch (recursionLevel) {
+          case "none":
+            recursionLevelEnum = VersionControlRecursionType.None;
+            break;
+          case "oneLevel":
+            recursionLevelEnum = VersionControlRecursionType.OneLevel;
+            break;
+          case "full":
+            recursionLevelEnum = VersionControlRecursionType.Full;
+            break;
+        }
+      }
+
+      const items = await gitApi.getItem(
         repositoryId,
         path,
         project,
-        recursionLevel as GitRecursionType,
+        scopePath,
+        recursionLevelEnum,
         includeContentMetadata,
         latestProcessedChange,
         download,
-        $format,
         versionDescriptor,
-        scopePath,
         includeContent,
         resolveLfs,
-        sanitize,
-        apiVersion || "7.2-preview.1"
+        sanitize
       );
       return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] };
     }
