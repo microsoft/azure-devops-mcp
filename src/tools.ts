@@ -16,6 +16,8 @@ import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/workitems.js";
 
+import { configureRepositoryItemsTool } from "./tools/repository-items.js";
+
 function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureWorkTools(server, tokenProvider, connectionProvider);
@@ -27,6 +29,7 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<Acces
   configureTestPlanTools(server, tokenProvider, connectionProvider);
   configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureAdvSecTools(server, tokenProvider, connectionProvider);
+  configureRepositoryItemsTool(server, tokenProvider, connectionProvider);
 }
 
 export { configureAllTools };
