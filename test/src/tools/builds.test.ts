@@ -889,7 +889,7 @@ describe("configureBuildTools", () => {
             startTime: "2024-08-19T10:00:00.000Z",
             finishTime: "2024-08-19T10:01:00.000Z",
             state: "Completed",
-            result: "Succeeded"
+            result: "Succeeded",
           },
           {
             id: "record-2",
@@ -898,9 +898,9 @@ describe("configureBuildTools", () => {
             startTime: "2024-08-19T10:01:00.000Z",
             finishTime: "2024-08-19T10:02:00.000Z",
             state: "Completed",
-            result: "Succeeded"
-          }
-        ]
+            result: "Succeeded",
+          },
+        ],
       };
 
       const mockBuildApi = {
@@ -913,7 +913,7 @@ describe("configureBuildTools", () => {
         buildId: 123,
         timelineId: "timeline-123",
         changeId: 456,
-        planId: "plan-789"
+        planId: "plan-789",
       };
 
       const result = await handler(params);
@@ -932,8 +932,8 @@ describe("configureBuildTools", () => {
         id: "timeline-123",
         records: [
           { id: "record-1", name: "Task 1", state: "Completed" },
-          { id: "record-2", name: "Task 2", state: "Completed" }
-        ]
+          { id: "record-2", name: "Task 2", state: "Completed" },
+        ],
       };
 
       const mockBuildApi = {
@@ -943,7 +943,7 @@ describe("configureBuildTools", () => {
 
       const params = {
         project: "test-project",
-        buildId: 123
+        buildId: 123,
       };
 
       const result = await handler(params);
