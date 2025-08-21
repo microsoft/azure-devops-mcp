@@ -23,14 +23,9 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
       recursionLevel: z.enum(["none", "oneLevel", "full"]).optional().describe("The recursion level of the search."),
       includeContentMetadata: z.boolean().describe("Include content metadata."),
       latestProcessedChange: z.boolean().optional().describe("Return only the latest change."),
-      download: z.boolean().optional().describe("Set to true to download the file."),
       versionDescriptor_version: z.string().optional().describe("A string identifying the version."),
       versionDescriptor_versionOptions: z.string().optional().describe("Version options."),
-      versionDescriptor_versionType: z.string().optional().describe("Version type."),
-      includeContent: z.boolean().optional().describe("Include file content in the response."),
-      resolveLfs: z.boolean().optional().describe("Resolve LFS objects."),
-      sanitize: z.boolean().optional().describe("Sanitize the response."),
-      apiVersion: z.string().optional().describe("The API version to use. Default: 7.2-preview.1"),
+      versionDescriptor_versionType: z.string().optional().describe("Version type.")
     },
     async (input) => {
       const {
@@ -40,15 +35,9 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
         scopePath,
         recursionLevel,
         includeContentMetadata,
-        latestProcessedChange,
-        download,
         versionDescriptor_version,
         versionDescriptor_versionOptions,
-        versionDescriptor_versionType,
-        includeContent,
-        resolveLfs,
-        sanitize,
-        apiVersion
+        versionDescriptor_versionType
       } = input;
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
@@ -79,21 +68,46 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
         }
       }
 
-      const items = await gitApi.getItem(
-        repositoryId,
-        path,
-        project,
-        scopePath,
-        recursionLevelEnum,
-        includeContentMetadata,
-        latestProcessedChange,
-        download,
-        versionDescriptor,
-        includeContent,
-        resolveLfs,
-        sanitize
-      );
-      return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] };
+      try {
+        const items = await gitApi.getItem(
+          repositoryId,
+          path,
+          project,
+          scopePath,
+          recursionLevelEnum,
+          includeContentMetadata,
+          input.latestProcessedChange ?? false,
+          false,
+          versionDescriptor,
+          true,
+          false,
+          false
+        );
+        return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] };
+        /*
+        const items = await gitApi.getItem(
+          repositoryId,
+          path,
+          project,
+          scopePath,
+          recursionLevelEnum,
+          includeContentMetadata,
+          latestProcessedChange,
+          download,
+          versionDescriptor,
+          includeContent,
+          resolveLfs,
+          sanitize
+        );
+        return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] };
+         */
+      } catch (error) {
+        return {
+          content: [
+            { type: "text", text: `Failed to get repository items: ${error}` }
+          ]
+        };
+      }
     }
   );
 }
