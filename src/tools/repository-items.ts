@@ -5,11 +5,10 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
-import { VersionControlRecursionType, GitVersionOptions, GitVersionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
 /**
- * Registers the get_repository_items tool for reading file/folder content from Azure DevOps repos.
- * Exposes all API parameters.
+ * Registers the get_repository_items tool for reading file content from Azure DevOps repos.
  */
 export function configureRepositoryItemsTool(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
@@ -19,7 +18,7 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repositoryId: z.string().describe("The ID or name of the repository."),
       path: z.string().describe("The path to the item. Example: /README.md"),
-      versionDescriptor_version: z.string().optional().describe("A string identifying the version."),
+      versionDescriptor_version: z.string().optional().describe("A string identifying the version via commit hash."),
     },
     async (input) => {
       const { project, repositoryId, path, versionDescriptor_version } = input;
@@ -47,7 +46,7 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
         return { content: [{ type: "text", text: JSON.stringify(item.content, null, 2) }] };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Failed to get repository items: ${error}` }],
+          content: [{ type: "text", text: `Failed to get repository item: ${error}` }],
         };
       }
     }
