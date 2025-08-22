@@ -79,6 +79,7 @@ export class DomainsManager {
   private validateAndAddDomains(domains: string[]): void {
     domains.forEach((domain) => {
       if ((Object.values(Domain) as string[]).includes(domain)) {
+        console.log(`Adding domain: ${domain}`);
         this.enabledDomains.add(domain);
       } else {
         console.warn(`Warning: Unknown domain '${domain}'. Available domains: ${Object.values(Domain).join(", ")}`);

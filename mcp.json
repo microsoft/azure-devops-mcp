@@ -1,16 +1,12 @@
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "--domains ${input:domains}"]
-    }
-  }
+	"servers": {
+		"ado": {
+			"type": "stdio",
+			"command": "mcp-server-azuredevops",
+			"args": [
+				"mseng",
+				"--domains wiki repositories"
+			]
+		},
+	}
 }

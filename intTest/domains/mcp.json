@@ -1,4 +1,13 @@
 {
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "mcp-server-azuredevops",
+      "args": [
+        "${input:ado_org}",
+        "-d ${input:domains}"]
+    }
+  },
   "inputs": [
     {
       "id": "ado_org",
@@ -11,12 +20,5 @@
       "description": "Enter one or more Azure DevOps domains separated by commas. Available options: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items, all. (e.g. 'core,work-items,builds' or 'all')",
       "default": "all"
     }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "--domains ${input:domains}"]
-    }
-  }
+  ]
 }

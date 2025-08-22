@@ -18,8 +18,10 @@ import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/work-items.js";
 
 function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, enabledDomains: Set<string>) {
+  console.log(`Domain list: ${Array.from(enabledDomains).join(", ")}`);
   const configureIfDomainEnabled = (domain: string, configureFn: () => void) => {
     if (enabledDomains.has(domain)) {
+      console.log(`Enabling: ${domain}`);
       configureFn();
     }
   };
