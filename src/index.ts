@@ -21,7 +21,7 @@ const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
   .usage("Usage: $0 <organization> [domains...] [options]")
   .version(packageVersion)
-  .command("$0 <organization> [domains...] [options]", "Azure DevOps MCP Server", (yargs) => {
+  .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
     yargs.positional("organization", {
       describe: "Azure DevOps organization name",
       type: "string",
