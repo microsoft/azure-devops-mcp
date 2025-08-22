@@ -42,16 +42,6 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 
 The Azure DevOps MCP Server is built from tools that are concise, simple, focused, and easy to use—each designed for a specific scenario. We intentionally avoid complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs, making data access straightforward and letting the language model handle complex reasoning.
 
-## ✨ Recent Enhancements
-
-### 📖 **Enhanced Wiki Support**
-
-- **Full Content Management**: Create and update wiki pages with complete content using the native Azure DevOps REST API
-- **Automatic ETag Handling**: Safe updates with built-in conflict resolution for concurrent edits
-- **Immediate Visibility**: Pages appear instantly in the Azure DevOps wiki interface
-- **Hierarchical Structure**: Support for organized page structures within existing folder hierarchies
-- **Robust Error Handling**: Comprehensive error management for various HTTP status codes and edge cases
-
 ## ⚙️ Supported Tools
 
 Interact with these Azure DevOps services:
