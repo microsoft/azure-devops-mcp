@@ -32,12 +32,7 @@ async function getCurrentUserDetails(tokenProvider: () => Promise<AccessToken>, 
 /**
  * Searches for identities using Azure DevOps Identity API
  */
-async function searchIdentities(
-  searchFilter: string,
-  tokenProvider: () => Promise<AccessToken>,
-  connectionProvider: () => Promise<WebApi>,
-  userAgentProvider: () => string
-): Promise<IdentitiesResponse> {
+async function searchIdentities(identity: string, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): Promise<IdentitiesResponse> {
   const token = await tokenProvider();
   const connection = await connectionProvider();
   const orgName = connection.serverUrl.split("/")[3];
@@ -46,7 +41,7 @@ async function searchIdentities(
   const params = new URLSearchParams({
     "api-version": apiVersion,
     "searchFilter": "General",
-    "filterValue": searchFilter,
+    "filterValue": identity,
   });
 
   const response = await fetch(`${baseUrl}?${params}`, {
