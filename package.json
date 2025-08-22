@@ -12,7 +12,7 @@
   },
   "type": "module",
   "bin": {
-    "mcp-server-azuredevops-with-domains": "dist/index.js"
+    "mcp-server-azuredevops": "dist/index.js"
   },
   "files": [
     "dist"
