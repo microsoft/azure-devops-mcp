@@ -76,7 +76,7 @@ describe("repos tools", () => {
   });
 
   describe("repo_update_pull_request", () => {
-     it("should update pull request with autoCompleteSetBy", async () => {
+    it("should update pull request with autoCompleteSetBy and completion options", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
@@ -86,6 +86,11 @@ describe("repos tools", () => {
       const mockUpdatedPR = {
         pullRequestId: 123,
         autoCompleteSetBy: { id: "user-abc" },
+        completionOptions: {
+          deleteSourceBranch: true,
+          mergeCommitMessage: "Auto merge message",
+          squashMerge: true,
+        },
       };
       mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
@@ -93,6 +98,9 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 123,
         autoCompleteSetBy: "user-abc",
+        completionOptions_deleteSourceBranch: true,
+        completionOptions_mergeCommitMessage: "Auto merge message",
+        completionOptions_squashMerge: true,
       };
 
       const result = await handler(params);
@@ -100,6 +108,11 @@ describe("repos tools", () => {
       expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
         {
           autoCompleteSetBy: { id: "user-abc" },
+          completionOptions: {
+            deleteSourceBranch: true,
+            mergeCommitMessage: "Auto merge message",
+            squashMerge: true,
+          },
         },
         "repo123",
         123

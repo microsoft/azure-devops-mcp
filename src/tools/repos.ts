@@ -157,8 +157,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
       status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
       autoCompleteSetBy: z.string().optional().describe("The ID of the user who set the auto complete state."),
+      completionOptions_deleteSourceBranch: z.boolean().optional().describe("Whether to delete the source branch after the pull request is completed."),
+      completionOptions_mergeCommitMessage: z.string().optional().describe("The merge commit message to use when the pull request is completed."),
+      completionOptions_squashMerge: z.boolean().optional().describe("Whether to squash the commits when merging. Defaults to false."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoCompleteSetBy }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoCompleteSetBy, completionOptions_deleteSourceBranch, completionOptions_mergeCommitMessage, completionOptions_squashMerge }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -170,8 +173,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         targetRefName?: string;
         status?: number;
         autoCompleteSetBy?: { id: string };
+        completionOptions?: { deleteSourceBranch?: boolean, mergeCommitMessage?: string, squashMerge?: boolean };
       } = {};
       if (autoCompleteSetBy !== undefined) updateRequest.autoCompleteSetBy = { id: autoCompleteSetBy };
+      if (completionOptions_deleteSourceBranch !== undefined) updateRequest.completionOptions = { deleteSourceBranch: completionOptions_deleteSourceBranch, mergeCommitMessage: updateRequest.completionOptions?.mergeCommitMessage, squashMerge: updateRequest.completionOptions?.squashMerge };
+      if (completionOptions_mergeCommitMessage !== undefined) updateRequest.completionOptions = { deleteSourceBranch: updateRequest.completionOptions?.deleteSourceBranch, mergeCommitMessage: completionOptions_mergeCommitMessage, squashMerge: updateRequest.completionOptions?.squashMerge };
+      if (completionOptions_squashMerge !== undefined) updateRequest.completionOptions = { deleteSourceBranch: updateRequest.completionOptions?.deleteSourceBranch, mergeCommitMessage: updateRequest.completionOptions?.mergeCommitMessage, squashMerge: completionOptions_squashMerge};
       if (title !== undefined) updateRequest.title = title;
       if (description !== undefined) updateRequest.description = description;
       if (isDraft !== undefined) updateRequest.isDraft = isDraft;
