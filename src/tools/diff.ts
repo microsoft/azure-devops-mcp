@@ -72,10 +72,7 @@ export function configureDiffTools(
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error("Error in repo_get_diff:", error);
         return {
-          isError: true,
           content: [{ type: "text", text: `Error getting commit diff: ${error instanceof Error ? error.message : String(error)}` }],
         };
       }
