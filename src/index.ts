@@ -19,7 +19,7 @@ import { DomainsManager } from "./shared/domains.js";
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
-  .usage("Usage: $0 <organization> [domains...] [options]")
+  .usage("Usage: $0 <organization> [options]")
   .version(packageVersion)
   .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
     yargs.positional("organization", {
