@@ -91,7 +91,7 @@ async function main() {
   console.log("Parsed arguments:", {
     organization: argv.organization,
     domains: argv.domains,
-    tenant: argv.tenant
+    tenant: argv.tenant,
   });
   const server = new McpServer({
     name: "Azure DevOps MCP Server",
