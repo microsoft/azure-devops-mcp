@@ -42,7 +42,9 @@ export function configureRepositoryItemsTool(server: McpServer, tokenProvider: (
           true, // resolveLfs
           true // sanitize
         );
-
+        if (item == null) {
+          return { content: [{ type: "text", text: "Item not found or no content available. Try including the version." }] };
+        }
         return { content: [{ type: "text", text: JSON.stringify(item.content, null, 2) }] };
       } catch (error) {
         return {

@@ -5,7 +5,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureRepositoryItemsTool } from "../../../src/tools/repository-items";
 import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
-
 describe("repository-items tool", () => {
   let server: McpServer;
   let tokenProvider: jest.Mock;
@@ -50,20 +49,7 @@ describe("repository-items tool", () => {
       mockGitApi.getItem.mockResolvedValue({ content: fakeContent });
       const input = { project: "proj", repositoryId: "repo", path: "/README.md" };
       const result = await handler(input);
-      expect(mockGitApi.getItem).toHaveBeenCalledWith(
-        "repo",
-        "/README.md",
-        "proj",
-        undefined,
-        VersionControlRecursionType.None,
-        true,
-        false,
-        false,
-        undefined,
-        true,
-        true,
-        true
-      );
+      expect(mockGitApi.getItem).toHaveBeenCalledWith("repo", "/README.md", "proj", undefined, VersionControlRecursionType.None, true, false, false, undefined, true, true, true);
       expect(result.content[0].text).toContain(fakeContent);
     });
 
