@@ -9,7 +9,7 @@ import {
   GitVersionType,
   GitVersionOptions,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
-import { getEnumKeys } from "../utils.js";
+import { getEnumKeys, mapStringToEnum } from "../utils.js";
 
 export function configureDiffTools(
   server: McpServer,
@@ -36,34 +36,47 @@ export function configureDiffTools(
       targetVersionOptions: z.enum(gitVersionOptionsStrings as [string, ...string[]]).optional().describe("Options for target version."),
     },
     async ({ project, repositoryId, diffCommonCommit, top, skip, baseVersion, baseVersionType, baseVersionOptions, targetVersion, targetVersionType, targetVersionOptions }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const baseVersionDescriptor = baseVersion
-        ? {
-            version: baseVersion,
-            versionType: baseVersionType ? GitVersionType[baseVersionType as keyof typeof GitVersionType] : undefined,
-            versionOptions: baseVersionOptions ? GitVersionOptions[baseVersionOptions as keyof typeof GitVersionOptions] : undefined,
-          }
-        : undefined;
-      const targetVersionDescriptor = targetVersion
-        ? {
-            version: targetVersion,
-            versionType: targetVersionType ? GitVersionType[targetVersionType as keyof typeof GitVersionType] : undefined,
-            versionOptions: targetVersionOptions ? GitVersionOptions[targetVersionOptions as keyof typeof GitVersionOptions] : undefined,
-          }
-        : undefined;
-      const result = await gitApi.getCommitDiffs(
-        repositoryId,
-        project,
-        diffCommonCommit,
-        top,
-        skip,
-        baseVersionDescriptor,
-        targetVersionDescriptor
-      );
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        // Map string to GitVersionType enum if needed
+        const baseVersionTypeEnum = typeof baseVersionType === "string" ? (GitVersionType as any)[baseVersionType] : baseVersionType;
+        const targetVersionTypeEnum = typeof targetVersionType === "string" ? (GitVersionType as any)[targetVersionType] : targetVersionType;
+        // Build base and target version descriptors from parameters
+        const baseVersionDescriptor = baseVersion
+          ? {
+              version: baseVersion,
+              versionType: baseVersionTypeEnum, // Default to Commit
+              versionOptions:  0,
+            }
+          : undefined;
+        const targetVersionDescriptor = targetVersion
+          ? {
+              version: targetVersion,
+              versionType: targetVersionTypeEnum, // Default to Commit
+              versionOptions: 0,
+            }
+          : undefined;
+        const result = await gitApi.getCommitDiffs(
+          repositoryId,
+          project,
+          diffCommonCommit,
+          top,
+          skip,
+          baseVersionDescriptor,
+          targetVersionDescriptor
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error in repo_get_diff:", error);
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Error getting commit diff: ${error instanceof Error ? error.message : String(error)}` }],
+        };
+      }
     }
   );
 }
