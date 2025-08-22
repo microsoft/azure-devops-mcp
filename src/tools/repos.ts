@@ -21,6 +21,7 @@ import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { getEnumKeys } from "../utils.js";
+import { log } from "console";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -35,6 +36,7 @@ const REPO_TOOLS = {
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",
   update_pull_request: "repo_update_pull_request",
+  set_pull_request_autocomplete: "repo_set_pull_request_autocomplete",
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
   create_pull_request_thread: "repo_create_pull_request_thread",
@@ -57,6 +59,7 @@ function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) 
  * @param comments Array of comments to trim (can be undefined/null)
  * @returns Array of trimmed comment objects with essential properties only
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function trimComments(comments: any[] | undefined | null) {
   return comments
     ?.filter((comment) => !comment.isDeleted) // Exclude deleted comments
@@ -154,8 +157,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       isDraft: z.boolean().optional().describe("Whether the pull request should be a draft."),
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
       status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
+      autoCompleteSetBy: z.string().optional().describe("The ID of the user who set the auto complete state."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoCompleteSetBy }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -166,7 +170,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         isDraft?: boolean;
         targetRefName?: string;
         status?: number;
+        autoCompleteSetBy?: { id: string };
       } = {};
+      if (autoCompleteSetBy !== undefined) updateRequest.autoCompleteSetBy = { id: autoCompleteSetBy };
       if (title !== undefined) updateRequest.title = title;
       if (description !== undefined) updateRequest.description = description;
       if (isDraft !== undefined) updateRequest.isDraft = isDraft;
@@ -174,7 +180,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       if (status !== undefined) {
         updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
       }
-
+      log("Update Request:", updateRequest);
       // Validate that at least one field is provided for update
       if (Object.keys(updateRequest).length === 0) {
         return {
@@ -182,12 +188,16 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           isError: true,
         };
       }
-
-      const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
-      };
+      try {
+        const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(error, null, 2) }],
+        };
+      }
     }
   );
 
