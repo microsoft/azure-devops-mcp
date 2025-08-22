@@ -47,7 +47,7 @@ describe("repo_get_diff tool", () => {
       baseVersionOptions: "None",
       targetVersion: "def",
       targetVersionType: "Commit",
-      targetVersionOptions: "None"
+      targetVersionOptions: "None",
     };
     const fakeResult = { changes: [1, 2, 3] };
     mockGitApi.getCommitDiffs.mockResolvedValue(fakeResult);
