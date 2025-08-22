@@ -90,6 +90,7 @@ Interact with these Azure DevOps services:
 - **wit_work_item_unlink**: Unlink one or many links from a work item.
 - **wit_add_artifact_link**: Link to artifacts like branch, pull request, commit, and build.
 
+
 ### 📁 Repositories
 
 - **repo_list_repos_by_project**: Retrieve a list of repositories for a given project.
@@ -111,6 +112,7 @@ Interact with these Azure DevOps services:
 - **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
 - **repo_search_commits**: Searches for commits.
 - **repo_create_pull_request_thread**: Creates a new comment thread on a pull request.
+- **git_get_commit**: Get information about a specific commit in a repository by commit SHA, project, and repository ID.
 
 ### 🛰️ Builds
 

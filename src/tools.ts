@@ -15,6 +15,7 @@ import { configureTestPlanTools } from "./tools/testplans.js";
 import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/workitems.js";
+import { configureGitCommitTools } from "./tools/git-commit.js";
 
 function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
@@ -27,6 +28,7 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<Acces
   configureTestPlanTools(server, tokenProvider, connectionProvider);
   configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureAdvSecTools(server, tokenProvider, connectionProvider);
+  configureGitCommitTools(server, tokenProvider, connectionProvider);
 }
 
 export { configureAllTools };
