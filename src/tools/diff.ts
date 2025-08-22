@@ -8,8 +8,9 @@ import { z } from "zod";
 import {
   GitVersionType,
   GitVersionOptions,
+  GitVersionDescriptor,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
-import { getEnumKeys, mapStringToEnum } from "../utils.js";
+import { getEnumKeys, safeEnumConvert } from "../utils.js";
 
 export function configureDiffTools(
   server: McpServer,
@@ -39,23 +40,24 @@ export function configureDiffTools(
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
-        // Map string to GitVersionType enum if needed
-        const baseVersionTypeEnum = typeof baseVersionType === "string" ? (GitVersionType as any)[baseVersionType] : baseVersionType;
-        const targetVersionTypeEnum = typeof targetVersionType === "string" ? (GitVersionType as any)[targetVersionType] : targetVersionType;
+        const baseVersionTypeEnum = safeEnumConvert(GitVersionType, baseVersionType);
+        const targetVersionTypeEnum = safeEnumConvert(GitVersionType, targetVersionType);
+        const baseVersionOptionEnum = safeEnumConvert(GitVersionType, baseVersionOptions);
+        const targetVersionOptionEnum = safeEnumConvert(GitVersionType, targetVersionOptions);
         // Build base and target version descriptors from parameters
         const baseVersionDescriptor = baseVersion
           ? {
               version: baseVersion,
-              versionType: baseVersionTypeEnum, // Default to Commit
-              versionOptions:  0,
-            }
+              versionType: baseVersionTypeEnum,
+              versionOptions:  baseVersionOptionEnum,
+            } as GitVersionDescriptor
           : undefined;
         const targetVersionDescriptor = targetVersion
           ? {
               version: targetVersion,
-              versionType: targetVersionTypeEnum, // Default to Commit
-              versionOptions: 0,
-            }
+              versionType: targetVersionTypeEnum,
+              versionOptions: targetVersionOptionEnum,
+            } as GitVersionDescriptor
           : undefined;
         const result = await gitApi.getCommitDiffs(
           repositoryId,

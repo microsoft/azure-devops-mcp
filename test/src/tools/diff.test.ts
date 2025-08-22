@@ -2,13 +2,15 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { AccessToken } from "@azure/identity";
+import { WebApi } from "azure-devops-node-api";
+import { configureDiffTools } from "../../../src/tools/diff";
 
 describe("repo_get_diff tool", () => {
   let server: McpServer;
-  let tokenProvider: jest.MockedFunction<() => Promise<any>>;
-  let connectionProvider: jest.MockedFunction<() => Promise<any>>;
-  let mockGitApi: { getCommitDiffs: jest.MockedFunction<any> };
-  const { configureDiffTools } = require("../../../src/tools/diff");
+  let tokenProvider: jest.MockedFunction<() => Promise<AccessToken>>;
+  let connectionProvider: jest.MockedFunction<() => Promise<WebApi>>;
+  let mockGitApi: { getCommitDiffs: jest.Mock };
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
