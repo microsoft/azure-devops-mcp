@@ -21,7 +21,6 @@ import { z } from "zod";
 import { getCurrentUserDetails } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { getEnumKeys } from "../utils.js";
-import { log } from "console";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -180,7 +179,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       if (status !== undefined) {
         updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
       }
-      log("Update Request:", updateRequest);
       // Validate that at least one field is provided for update
       if (Object.keys(updateRequest).length === 0) {
         return {
