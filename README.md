@@ -121,9 +121,11 @@ Interact with these Azure DevOps services:
 - **build_get_log_by_id**: Get a specific build log by log ID.
 - **build_get_changes**: Get the changes associated with a specific build.
 - **build_get_timeline**: Retrieve the timeline for a specific build, showing detailed information about steps and tasks.
-- **build_run_build**: Trigger a new build for a specified definition.
 - **build_get_status**: Fetch the status of a specific build.
 - **build_update_build_stage**: Update the stage of a specific build.
+- **pipelines_get_run**: Gets a run for a particular pipeline.
+- **pipelines_list_runs**: Gets top 10000 runs for a particular pipeline.
+- **pipelines_run_pipeline**: Starts a new run of a pipeline.
 
 ### 🚀 Releases
 
