@@ -85,6 +85,13 @@ function getAzureDevOpsClient(userAgentComposer: UserAgentComposer): () => Promi
 }
 
 async function main() {
+  console.log("Starting Azure DevOps MCP Server...");
+  console.log("Enabled domains:", Array.from(enabledDomains));
+  console.log("Parsed arguments:", {
+    organization: argv.organization,
+    domains: argv.domains,
+    tenant: argv.tenant
+  });
   const server = new McpServer({
     name: "Azure DevOps MCP Server",
     version: packageVersion,
