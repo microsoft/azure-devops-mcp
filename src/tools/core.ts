@@ -5,7 +5,7 @@ import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
-import { apiVersion } from "../utils.js";
+import { searchIdentities } from "./auth.js";
 
 import type { ProjectInfo } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
@@ -99,31 +99,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<Acce
     },
     async ({ searchFilter }) => {
       try {
-        const token = await tokenProvider();
-        const connection = await connectionProvider();
-        const orgName = connection.serverUrl.split("/")[3];
-        const baseUrl = `https://vssps.dev.azure.com/${orgName}/_apis/identities`;
-
-        const params = new URLSearchParams({
-          "api-version": apiVersion,
-          "searchFilter": "General",
-          "filterValue": searchFilter,
-        });
-
-        const response = await fetch(`${baseUrl}?${params}`, {
-          headers: {
-            "Authorization": `Bearer ${token.token}`,
-            "Content-Type": "application/json",
-            "User-Agent": userAgentProvider(),
-          },
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-
-        const identities = await response.json();
+        const identities = await searchIdentities(searchFilter, tokenProvider, connectionProvider, userAgentProvider);
 
         if (!identities || identities.value?.length === 0) {
           return { content: [{ type: "text", text: "No identities found" }], isError: true };

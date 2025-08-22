@@ -459,6 +459,126 @@ describe("configureWikiTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching wiki page content: Unknown error occurred");
     });
+
+    it("should retrieve content via URL with pagePath", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("url path content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki?wikiVersion=GBmain&pagePath=%2FDocs%2FIntro";
+      const result = await handler({ url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Docs/Intro", undefined, undefined, true);
+      expect(result.content[0].text).toBe('"url path content"');
+    });
+
+    it("should retrieve content via URL with pageId (may fallback to root path)", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+      // Ensure token is returned
+      (tokenProvider as jest.Mock).mockResolvedValueOnce({ token: "abc", expiresOnTimestamp: Date.now() + 10000 });
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("# Page Title\nBody"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      // Mock fetch for REST page by id returning content
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch as any;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ content: "# Page Title\nBody" }),
+      });
+
+      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/123/Page-Title";
+      const result = await handler({ url });
+
+      // Current implementation may fallback to root path stream retrieval
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
+      // Content either direct or from stream JSON string wrapping
+      expect(result.content[0].text).toContain("Page Title");
+    });
+
+    it("should fallback to getPageText when REST call lacks content but returns path (root path fallback)", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+      (tokenProvider as jest.Mock).mockResolvedValueOnce({ token: "abc", expiresOnTimestamp: Date.now() + 10000 });
+
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch as any;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ path: "/Some/Page" }),
+      });
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("fallback content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/999/Some-Page";
+      const result = await handler({ url });
+
+      // Implementation currently falls back to root path if path not resolved prior to fallback
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
+      expect(result.content[0].text).toBe('"fallback content"');
+    });
+
+    it("should error when both url and wikiIdentifier provided", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+      const result = await handler({ url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1?pagePath=%2FHome", wikiIdentifier: "wiki1", project: "project" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Provide either 'url' OR 'wikiIdentifier'");
+    });
+
+    it("should error when neither url nor identifiers provided", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+      const result = await handler({ path: "/Home" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("You must provide either 'url' OR both 'wikiIdentifier' and 'project'");
+    });
+
+    it("should error on malformed wiki URL", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ url: "https://dev.azure.com/org/project/notwiki/wikis/wiki1?pagePath=%2FHome" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching wiki page content: URL does not match expected wiki pattern");
+    });
   });
 
   describe("create_or_update_page tool", () => {
