@@ -120,6 +120,7 @@ Interact with these Azure DevOps services:
 - **build_get_log**: Retrieve the logs for a specific build.
 - **build_get_log_by_id**: Get a specific build log by log ID.
 - **build_get_changes**: Get the changes associated with a specific build.
+- **build_get_timeline**: Retrieve the timeline for a specific build, showing detailed information about steps and tasks.
 - **build_run_build**: Trigger a new build for a specified definition.
 - **build_get_status**: Fetch the status of a specific build.
 - **build_update_build_stage**: Update the stage of a specific build.
@@ -209,6 +210,27 @@ In your project, add a `.vscode\mcp.json` file with the following content:
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+    }
+  }
+}
+```
+
+🔥 To stay up to date with the latest features, you can use our nightly builds. Simply update your `mcp.json` configuration to use `@azure-devops/mcp@next`. Here is an updated example:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp@next", "${input:ado_org}"]
     }
   }
 }

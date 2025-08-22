@@ -19,6 +19,7 @@ const BUILD_TOOLS = {
   run_build: "build_run_build",
   get_status: "build_get_status",
   update_build_stage: "build_update_build_stage",
+  get_timeline: "build_get_timeline",
 };
 
 function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -354,6 +355,27 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
 
       return {
         content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    BUILD_TOOLS.get_timeline,
+    "Retrieves the timeline for a specific build, showing detailed information about steps and tasks.",
+    {
+      project: z.string().describe("Project ID or name to get the build timeline for"),
+      buildId: z.number().describe("ID of the build to get the timeline for"),
+      timelineId: z.string().optional().describe("The ID of a specific timeline to retrieve. If not specified, the primary timeline is returned."),
+      changeId: z.number().optional().describe("If specified, only includes timeline records that changed after this watermark."),
+      planId: z.string().optional().describe("The ID of the plan to retrieve the timeline for."),
+    },
+    async ({ project, buildId, timelineId, changeId, planId }) => {
+      const connection = await connectionProvider();
+      const buildApi = await connection.getBuildApi();
+      const timeline = await buildApi.getBuildTimeline(project, buildId, timelineId, changeId, planId);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(timeline, null, 2) }],
       };
     }
   );

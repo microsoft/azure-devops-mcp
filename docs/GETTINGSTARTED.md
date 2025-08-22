@@ -6,6 +6,7 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
 - [Getting started with Visual Studio 2022 & GitHub Copilot](#-visual-studio-2022--github-copilot-1)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
+- [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
 - [Getting started with Cursor](#-using-mcp-server-with-cursor)
 - [Optimizing Your Experience](#-optimizing-your-experience)
 
@@ -28,7 +29,7 @@ Before you begin, make sure you have:
 2. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 3. Open a project in Visual Studio
 
-### Azure Login
+### Azure CLI Login
 
 Ensure you are logged in to Azure DevOps via the Azure CLI:
 
@@ -215,6 +216,41 @@ claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
 ```
 
 Replace `Contoso` with your own organization name
+
+### ✴️ Using MCP Server with Claude Desktop
+
+Ensure you are logged in to Azure DevOps using the Azure CLI:
+
+```sh
+az login
+```
+
+Open Claude Desktop and navigate to **File > Settings > Developer**. Click **Edit Config**.
+
+![Configuring MCP servers in Claude Desktop](../docs/media/claude-desktop-getting-started-1.png)
+
+Open the configuration file in your preferred editor (e.g., VS Code) and add the following JSON:
+
+```json
+{
+  "mcpServers": {
+    "ado": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "{Contoso}"]
+    }
+  }
+}
+```
+
+Replace `{Contoso}` with your Azure DevOps organization name. Save the file and perform a hard restart of the Claude app.
+
+Start a new chat, then click the **Search and Tools** icon. The `ado` toolset should now be available.
+
+![ADO tools in Claude Desktop](../docs/media/claude-desktop-getting-started-2.png)
+
+You’re ready to start using the Azure DevOps MCP Server in Claude Desktop. Try a simple request such as: `get list of ado projects`.
+
+For additional guidance on Claude Desktop, see the [Quickstart](https://modelcontextprotocol.io/quickstart/user#installing-the-filesystem-server).
 
 ### 🍇 Using MCP Server with Cursor
 

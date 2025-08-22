@@ -499,6 +499,8 @@ describe("repos tools", () => {
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
           isDraft: false,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
         },
       ];
       mockGitApi.getPullRequests.mockResolvedValue(mockPRs);
@@ -561,6 +563,8 @@ describe("repos tools", () => {
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
           isDraft: false,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
         },
       ];
       mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
@@ -586,6 +590,8 @@ describe("repos tools", () => {
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
           isDraft: false,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
         },
       ];
 
@@ -757,7 +763,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined);
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", undefined, undefined, undefined, undefined, undefined, undefined);
 
       const expectedResult = ["main", "feature-2", "feature-1"]; // Sorted reverse alphabetically
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
@@ -782,7 +788,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, undefined, undefined, undefined, true);
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", undefined, undefined, true, undefined, undefined, undefined);
 
       const expectedResult = ["my-feature", "main"];
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
@@ -876,7 +882,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123");
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "main");
       expect(result.content[0].text).toBe(JSON.stringify(mockBranches[0], null, 2));
     });
 

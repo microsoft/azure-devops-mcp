@@ -41,4 +41,4 @@ jobs:
           DATE_STRING=$(date +%Y%m%d)
           CURRENT_VERSION=$(npm pkg get version | tr -d '"')
           npm version "$CURRENT_VERSION-nightly.$DATE_STRING" --no-git-tag-version
-          npm publish --access public --tag nightly --tag pre-release --provenance
+          npm publish --access public --tag nightly --tag next --provenance
