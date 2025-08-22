@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, mapStringArrayToEnum, mapStringToEnum } from "../../src/utils";
+import { createEnumMapping, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -342,6 +342,92 @@ describe("utils", () => {
       expect(mappedAlertTypes).toEqual([AlertType.Code, AlertType.Secret, AlertType.Dependency]);
       expect(mappedSeverities).toEqual([Severity.Critical, Severity.High, Severity.Medium]);
       expect(mappedStates).toEqual([State.Active, State.Dismissed, State.Fixed]);
+    });
+  });
+
+  describe("getEnumKeys", () => {
+    it("should return string keys from a numeric enum", () => {
+      const keys = getEnumKeys(AlertType);
+      expect(keys).toEqual(["Unknown", "Dependency", "Secret", "Code", "License"]);
+    });
+
+    it("should filter out numeric keys", () => {
+      // Create a mock enum with numeric keys (similar to TypeScript's reverse mappings)
+      const mockEnum = {
+        A: 0,
+        B: 1,
+        C: 2,
+        0: "A",  // Reverse mapping
+        1: "B",  // Reverse mapping
+        2: "C"   // Reverse mapping
+      };
+
+      const keys = getEnumKeys(mockEnum);
+      expect(keys).toEqual(["A", "B", "C"]);
+    });
+
+    it("should handle empty enum object", () => {
+      const keys = getEnumKeys({});
+      expect(keys).toEqual([]);
+    });
+
+    it("should work with different enum types", () => {
+      expect(getEnumKeys(State)).toEqual(["Unknown", "Active", "Dismissed", "Fixed", "AutoDismissed"]);
+      expect(getEnumKeys(Severity)).toEqual(["Low", "Medium", "High", "Critical", "Note", "Warning", "Error", "Undefined"]);
+      expect(getEnumKeys(Confidence)).toEqual(["High", "Other"]);
+    });
+  });
+
+  describe("safeEnumConvert", () => {
+    it("should convert valid enum string keys to values", () => {
+      expect(safeEnumConvert(AlertType, "Code")).toBe(AlertType.Code);
+      expect(safeEnumConvert(AlertType, "Secret")).toBe(AlertType.Secret);
+      expect(safeEnumConvert(AlertType, "Unknown")).toBe(AlertType.Unknown);
+    });
+
+    it("should return undefined for invalid keys", () => {
+      expect(safeEnumConvert(AlertType, "InvalidKey")).toBeUndefined();
+      expect(safeEnumConvert(AlertType, "code")).toBeUndefined(); // Case sensitive
+      expect(safeEnumConvert(AlertType, "SECRET")).toBeUndefined(); // Case sensitive
+    });
+
+    it("should handle undefined input", () => {
+      expect(safeEnumConvert(AlertType, undefined)).toBeUndefined();
+    });
+
+    it("should handle empty string", () => {
+      expect(safeEnumConvert(AlertType, "")).toBeUndefined();
+    });
+
+    it("should work with numeric enums", () => {
+      expect(safeEnumConvert(State, "Active")).toBe(State.Active);
+      expect(safeEnumConvert(State, "Dismissed")).toBe(State.Dismissed);
+      expect(safeEnumConvert(State, "Fixed")).toBe(State.Fixed);
+    });
+
+    it("should respect case sensitivity", () => {
+      // This differs from mapStringToEnum which is case-insensitive
+      expect(safeEnumConvert(State, "active")).toBeUndefined();
+      expect(safeEnumConvert(State, "ACTIVE")).toBeUndefined();
+      expect(safeEnumConvert(State, "Active")).toBe(State.Active);
+    });
+
+    it("should work with empty enum", () => {
+      expect(safeEnumConvert({}, "anyKey")).toBeUndefined();
+    });
+
+    it("should validate against enum keys", () => {
+      // Create a mock enum with numeric keys (similar to TypeScript's reverse mappings)
+      const mockEnum = {
+        A: 0,
+        B: 1,
+        0: "A",  // Reverse mapping
+        1: "B",  // Reverse mapping
+      };
+
+      expect(safeEnumConvert(mockEnum, "A")).toBe(0);
+      expect(safeEnumConvert(mockEnum, "B")).toBe(1);
+      expect(safeEnumConvert(mockEnum, "0")).toBeUndefined(); // Numeric strings aren't valid keys
     });
   });
 });
