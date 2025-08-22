@@ -590,7 +590,14 @@ describe("repos tools", () => {
       await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalled();
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", { status: PullRequestStatus.Active, repositoryId: "repo123", creatorId: "user123", reviewerId: "user123" }, undefined, undefined, 0, 100);
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        { status: PullRequestStatus.Active, repositoryId: "repo123", creatorId: "user123", reviewerId: "user123" },
+        undefined,
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should filter pull requests created by specific user successfully", async () => {
@@ -706,13 +713,7 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
-        "test-project",
-        { status: PullRequestStatus.Active, creatorId: "user123" },
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, creatorId: "user123" }, undefined, 0, 100);
 
       const expectedResult = [
         {
@@ -766,13 +767,7 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
-        "test-project",
-        { status: PullRequestStatus.Active, reviewerId: "user123" },
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, reviewerId: "user123" }, undefined, 0, 100);
 
       const expectedResult = [
         {
@@ -827,13 +822,7 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
-        "test-project",
-        { status: PullRequestStatus.Active, creatorId: "user123", reviewerId: "user123" },
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, creatorId: "user123", reviewerId: "user123" }, undefined, 0, 100);
 
       const expectedResult = [
         {
@@ -892,13 +881,7 @@ describe("repos tools", () => {
 
       expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific@example.com", tokenProvider, connectionProvider, userAgentProvider);
       expect(mockGetCurrentUserDetails).not.toHaveBeenCalled(); // Should not be called when created_by_user is provided
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
-        "test-project",
-        { status: PullRequestStatus.Active, creatorId: "specific-user-123" },
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, creatorId: "specific-user-123" }, undefined, 0, 100);
 
       const expectedResult = [
         {
@@ -2159,8 +2142,8 @@ describe("repos tools", () => {
         status: "Active", // Provide explicit status to avoid undefined
         created_by_me: false,
         i_am_reviewer: false,
-        top: 100,    // Explicit defaults
-        skip: 0,     // Explicit defaults
+        top: 100, // Explicit defaults
+        skip: 0, // Explicit defaults
         // created_by_user is undefined - should test the case where we don't call getCurrentUserDetails
       };
 
@@ -2173,8 +2156,8 @@ describe("repos tools", () => {
         { status: PullRequestStatus.Active, repositoryId: "repo123" },
         undefined,
         undefined,
-        0,   // skip
-        100  // top
+        0, // skip
+        100 // top
       );
     });
 
@@ -2192,8 +2175,8 @@ describe("repos tools", () => {
         status: "Active", // Provide explicit status to avoid undefined
         created_by_me: false,
         i_am_reviewer: false,
-        top: 100,    // Explicit defaults
-        skip: 0,     // Explicit defaults
+        top: 100, // Explicit defaults
+        skip: 0, // Explicit defaults
         // created_by_user is undefined - should test the case where we don't call getCurrentUserDetails
       };
 
@@ -2205,8 +2188,8 @@ describe("repos tools", () => {
         "test-project",
         { status: PullRequestStatus.Active },
         undefined,
-        0,   // skip
-        100  // top
+        0, // skip
+        100 // top
       );
     });
 
@@ -2649,9 +2632,7 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_list_repos_by_project tool not registered");
       const [, , , handler] = call;
 
-      const mockRepos = [
-        { id: "repo1", name: "Repository 1", isDisabled: false, isFork: false, isInMaintenance: false, webUrl: "url1", size: 1024 },
-      ];
+      const mockRepos = [{ id: "repo1", name: "Repository 1", isDisabled: false, isFork: false, isInMaintenance: false, webUrl: "url1", size: 1024 }];
       mockGitApi.getRepositories.mockResolvedValue(mockRepos);
 
       const params = {

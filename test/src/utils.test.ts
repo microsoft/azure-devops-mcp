@@ -357,9 +357,9 @@ describe("utils", () => {
         A: 0,
         B: 1,
         C: 2,
-        0: "A",  // Reverse mapping
-        1: "B",  // Reverse mapping
-        2: "C"   // Reverse mapping
+        0: "A", // Reverse mapping
+        1: "B", // Reverse mapping
+        2: "C", // Reverse mapping
       };
 
       const keys = getEnumKeys(mockEnum);
@@ -421,8 +421,8 @@ describe("utils", () => {
       const mockEnum = {
         A: 0,
         B: 1,
-        0: "A",  // Reverse mapping
-        1: "B",  // Reverse mapping
+        0: "A", // Reverse mapping
+        1: "B", // Reverse mapping
       };
 
       expect(safeEnumConvert(mockEnum, "A")).toBe(0);
