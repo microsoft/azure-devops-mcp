@@ -3,19 +3,19 @@
 ### Domain Naming and Organization
 - Our tools are named `<domain>_tool` to reflect the domain they belong to.
 - Files are organized by domain, e.g., `tools/repositories.ts`.
-- If you are working by enabling exclusively the domains you depend on, you need that domain enabled.
+- If you are working by enabling exclusively the domains you depend on, if you need that tool, you need that domain which file belongs to.
 
 ### Domain Ownership: **[here](https://github.com/microsoft/azure-devops-mcp/wiki/Area-Owners)**
-- Domain owners from Azure DevOps (ADO) teams are responsible for maintaining their respective domains. 
-- This ownership model was already being followed implicitly and is now formalized.
+- Domain owners from Azure DevOps (ADO) teams are responsible for maintaining their respective domain.
 - Stability of Domains: Domains are expected to uphold a high level of stability. Any breaking changes will be managed with due diligence, similar to our tool deprecation process (e.g., deprecation notices, and major version updates for Generally Available features). **Domain owners** are pivotal in maintaining this stability on **available tools** for agents, ensuring their domains align with the project's overarching goals and long-term vision.
+- This ownership model was already being followed implicitly and is now formalized, per doucment above.
 
-## Becoming a Maintainer
-- Maintainers are contributors who have demonstrated expertise and consistent contributions to a specific domain.
+## Becoming a Maintainer (Microsoft only)
+- Maintainers are contributors who have demonstrated expertise and consistent contributions to project areas.
 - To become a maintainer, contributors must:
   - Submit high-quality contributions over a sustained period.
   - Actively participate in code reviews and discussions.
-  - Demonstrate a deep understanding of the domain and its tools.
+  - If for a particular domain, demonstrate a deep understanding of domain and its tools.
 - New maintainers are nominated by existing maintainers and approved by the governance team.
 
 ## Hierarchy and Responsibilities
@@ -34,5 +34,5 @@
 - Violations of the Code of Conduct may result in temporary or permanent removal from the project.
 
 ## Transparency and Communication
-- All governance decisions, including maintainer nominations and major changes, are documented and shared publicly.
-- Regular updates are provided to the community through release notes, blog posts, and other channels.
+- All governance decisions, including maintainer nominations and major changes, are documented and shared publicly for our production clients relying on those.
+- Regular updates are provided to the community through Discussion sections, and other channels.
