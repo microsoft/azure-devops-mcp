@@ -970,5 +970,255 @@ describe("configureBuildTools", () => {
 
       await expect(handler(params)).rejects.toThrow("Timeline not found");
     });
+
+    it("should filter timeline records when errorsOnly is true", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockTimeline = {
+        id: "timeline-123",
+        records: [
+          {
+            id: "record-1",
+            name: "Successful task",
+            type: "Task",
+            state: "Completed",
+            result: "Succeeded",
+            errorCount: 0,
+          },
+          {
+            id: "record-2",
+            name: "Failed task",
+            type: "Task",
+            state: "Completed",
+            result: "Failed",
+            errorCount: 2,
+          },
+          {
+            id: "record-3",
+            name: "Another successful task",
+            type: "Task",
+            state: "Completed",
+            result: "Succeeded",
+            errorCount: 0,
+          },
+          {
+            id: "record-4",
+            name: "Warning task",
+            type: "Task",
+            state: "Completed",
+            result: "SucceededWithIssues",
+            errorCount: 1,
+          },
+        ],
+      };
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockResolvedValue(mockTimeline),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 123,
+        errorsOnly: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getBuildTimeline).toHaveBeenCalledWith("test-project", 123, undefined, undefined, undefined);
+
+      const expectedFilteredTimeline = {
+        id: "timeline-123",
+        records: [
+          {
+            id: "record-2",
+            name: "Failed task",
+            type: "Task",
+            state: "Completed",
+            result: "Failed",
+            errorCount: 2,
+          },
+          {
+            id: "record-4",
+            name: "Warning task",
+            type: "Task",
+            state: "Completed",
+            result: "SucceededWithIssues",
+            errorCount: 1,
+          },
+        ],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedFilteredTimeline, null, 2));
+    });
+
+    it("should return all records when errorsOnly is false", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockTimeline = {
+        id: "timeline-123",
+        records: [
+          {
+            id: "record-1",
+            name: "Successful task",
+            type: "Task",
+            state: "Completed",
+            result: "Succeeded",
+            errorCount: 0,
+          },
+          {
+            id: "record-2",
+            name: "Failed task",
+            type: "Task",
+            state: "Completed",
+            result: "Failed",
+            errorCount: 2,
+          },
+        ],
+      };
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockResolvedValue(mockTimeline),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 123,
+        errorsOnly: false,
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getBuildTimeline).toHaveBeenCalledWith("test-project", 123, undefined, undefined, undefined);
+      expect(result.content[0].text).toBe(JSON.stringify(mockTimeline, null, 2));
+    });
+
+    it("should handle timeline with no records when errorsOnly is true", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockTimeline = {
+        id: "timeline-123",
+        records: undefined,
+      };
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockResolvedValue(mockTimeline),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 123,
+        errorsOnly: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getBuildTimeline).toHaveBeenCalledWith("test-project", 123, undefined, undefined, undefined);
+      expect(result.content[0].text).toBe(JSON.stringify(mockTimeline, null, 2));
+    });
+
+    it("should handle timeline with empty records array when errorsOnly is true", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockTimeline = {
+        id: "timeline-123",
+        records: [],
+      };
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockResolvedValue(mockTimeline),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 123,
+        errorsOnly: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getBuildTimeline).toHaveBeenCalledWith("test-project", 123, undefined, undefined, undefined);
+
+      const expectedFilteredTimeline = {
+        id: "timeline-123",
+        records: [],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedFilteredTimeline, null, 2));
+    });
+
+    it("should handle records without errorCount property when errorsOnly is true", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_timeline");
+      if (!call) throw new Error("build_get_timeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockTimeline = {
+        id: "timeline-123",
+        records: [
+          {
+            id: "record-1",
+            name: "Task without errorCount",
+            type: "Task",
+            state: "Completed",
+            result: "Succeeded",
+          },
+          {
+            id: "record-2",
+            name: "Task with errorCount",
+            type: "Task",
+            state: "Completed",
+            result: "Failed",
+            errorCount: 1,
+          },
+        ],
+      };
+
+      const mockBuildApi = {
+        getBuildTimeline: jest.fn().mockResolvedValue(mockTimeline),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        buildId: 123,
+        errorsOnly: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getBuildTimeline).toHaveBeenCalledWith("test-project", 123, undefined, undefined, undefined);
+
+      const expectedFilteredTimeline = {
+        id: "timeline-123",
+        records: [
+          {
+            id: "record-2",
+            name: "Task with errorCount",
+            type: "Task",
+            state: "Completed",
+            result: "Failed",
+            errorCount: 1,
+          },
+        ],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedFilteredTimeline, null, 2));
+    });
   });
 });
