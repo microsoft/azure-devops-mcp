@@ -8,7 +8,7 @@
 ### Domain Ownership: **[here](https://github.com/microsoft/azure-devops-mcp/wiki/Area-Owners)**
 - Domain owners from Azure DevOps (ADO) teams are responsible for maintaining their respective domains. 
 - This ownership model was already being followed implicitly and is now formalized.
-- Sunsetting a domain will involve publishing a major version to ensure proper deprecation care, similar to our approach for tool deprecation.
+- Stability of Domains: Domains are expected to uphold a high level of stability. Any breaking changes will be managed with due diligence, similar to our tool deprecation process (e.g., deprecation notices, and major version updates for Generally Available features). **Domain owners** are pivotal in maintaining this stability on **available tools** for agents, ensuring their domains align with the project's overarching goals and long-term vision.
 
 ## Becoming a Maintainer
 - Maintainers are contributors who have demonstrated expertise and consistent contributions to a specific domain.
