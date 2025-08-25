@@ -2,9 +2,8 @@
   "servers": {
     "ado": {
       "type": "stdio",
-      "command": "node",
+      "command": "mcp-server-azuredevops",
       "args": [
-        "./dist/index.js",
         "${input:ado_org}",
         "-d",
         "core",
