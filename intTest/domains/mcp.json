@@ -9,7 +9,7 @@
         "core",
         "work",
         "workitems"
-        // ... any other domain to enable, you can also use 'all'
+        // ... any other domain to enable, you can also use 'all' (which is already the default)
       ]
     }
   },
