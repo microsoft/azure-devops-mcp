@@ -375,27 +375,27 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       const buildApi = await connection.getBuildApi();
       const timeline = await buildApi.getBuildTimeline(project, buildId, timelineId, changeId, planId);
 
-      if(!errorsOnly)
-      {
+      if (!errorsOnly) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(timeline, null, 2) }],
+        };
+      }
+
+      // If errorsOnly is true, filter the timeline to only include records with errors
+      if (errorsOnly && timeline.records) {
+        const failedRecords = timeline.records.filter((record) => record.errorCount && record.errorCount > 0);
+        const filteredTimeline = { ...timeline, records: failedRecords };
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(filteredTimeline, null, 2) }],
+        };
+      }
+
       return {
         content: [{ type: "text", text: JSON.stringify(timeline, null, 2) }],
       };
     }
-
-    // If errorsOnly is true, filter the timeline to only include records with errors
-    if (errorsOnly && timeline.records) {
-      const failedRecords = timeline.records.filter(record => record.errorCount && record.errorCount > 0);
-      const filteredTimeline = { ...timeline, records: failedRecords };
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(filteredTimeline, null, 2) }],
-      };
-    }
-
-    return {
-      content: [{ type: "text", text: JSON.stringify(timeline, null, 2) }],
-    };
-  });
+  );
 }
 
 export { BUILD_TOOLS, configureBuildTools };
