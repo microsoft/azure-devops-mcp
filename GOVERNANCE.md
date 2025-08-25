@@ -1,18 +1,13 @@
 # Governance
 
-## Domains
-
 ### Domain Naming and Organization
 - Our tools are named `<domain>_tool` to reflect the domain they belong to.
 - Files are organized by domain, e.g., `tools/repositories.ts`.
 - If you are working by enabling exclusively the domains you depend on, you need that domain enabled.
 
-### Domain Ownership
-- Domain owners from Azure DevOps (ADO) teams are responsible for maintaining their respective domains. You can see them here: [Area Owners](https://github.com/microsoft/azure-devops-mcp/wiki/Area-Owners)
+### Domain Ownership: **[here](https://github.com/microsoft/azure-devops-mcp/wiki/Area-Owners)**
+- Domain owners from Azure DevOps (ADO) teams are responsible for maintaining their respective domains. 
 - This ownership model was already being followed implicitly and is now formalized.
-
-### Commitment to Domains
-- We are committed to maintaining domains responsibly.
 - Sunsetting a domain will involve publishing a major version to ensure proper deprecation care, similar to our approach for tool deprecation.
 
 ## Becoming a Maintainer
