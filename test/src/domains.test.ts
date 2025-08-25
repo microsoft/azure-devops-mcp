@@ -4,17 +4,14 @@
 import { DomainsManager } from "../../src/shared/domains";
 
 describe("DomainsManager: backward compatibility and domain enabling", () => {
-  let consoleSpy: jest.SpyInstance;
-  let warnSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    consoleSpy = jest.spyOn(console, "log").mockImplementation();
-    warnSpy = jest.spyOn(console, "warn").mockImplementation();
+    errorSpy = jest.spyOn(console, "error").mockImplementation();
   });
 
   afterEach(() => {
-    consoleSpy.mockRestore();
-    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   describe("constructor", () => {
@@ -33,8 +30,6 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       expect(enabledDomains.has("wiki")).toBe(true);
       expect(enabledDomains.has("work")).toBe(true);
       expect(enabledDomains.has("work-items")).toBe(true);
-
-      expect(consoleSpy).toHaveBeenCalledWith("No valid domains specified, enabling all domains by default");
     });
 
     it("enables all domains when undefined is passed as argument", () => {
@@ -85,7 +80,7 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(10);
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         "Error: Unknown domain 'invalid-domain'. Available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items"
       );
     });
