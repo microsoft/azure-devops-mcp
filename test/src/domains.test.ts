@@ -81,7 +81,7 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
 
       expect(enabledDomains.size).toBe(10);
       expect(errorSpy).toHaveBeenCalledWith(
-        "Error: Unknown domain 'invalid-domain'. Available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items"
+        "Error: Specified invalid domain 'invalid-domain'. Please specify exactly as available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items"
       );
     });
   });
