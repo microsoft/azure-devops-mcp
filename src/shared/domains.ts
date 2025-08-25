@@ -17,6 +17,8 @@ export enum Domain {
   WORK_ITEMS = "work-items",
 }
 
+export const ALL_DOMAINS = "all";
+
 /**
  * Manages domain parsing and validation for Azure DevOps MCP server tools
  */
@@ -37,7 +39,6 @@ export class DomainsManager {
    */
   private parseDomains(domainsInput?: string | string[]): void {
     if (!domainsInput) {
-      console.log("No domains specified, enabling all domains for backward compatibility");
       this.enableAllDomains();
       return;
     }
@@ -51,13 +52,12 @@ export class DomainsManager {
   }
 
   private handleArrayInput(domainsInput: string[]): void {
-    if (domainsInput.length === 0) {
-      console.log("No valid domains specified, enabling all domains by default");
+    if (domainsInput.length === 0 || domainsInput.includes(ALL_DOMAINS)) {
       this.enableAllDomains();
       return;
     }
 
-    if (domainsInput.length === 1 && domainsInput[0] === "all") {
+    if (domainsInput.length === 1 && domainsInput[0] === ALL_DOMAINS) {
       this.enableAllDomains();
       return;
     }
@@ -67,7 +67,7 @@ export class DomainsManager {
   }
 
   private handleStringInput(domainsInput: string): void {
-    if (domainsInput === "all") {
+    if (domainsInput === ALL_DOMAINS) {
       this.enableAllDomains();
       return;
     }
@@ -77,17 +77,18 @@ export class DomainsManager {
   }
 
   private validateAndAddDomains(domains: string[]): void {
+    const availableDomainsAsStringArray = Object.values(Domain) as string[];
     domains.forEach((domain) => {
-      if ((Object.values(Domain) as string[]).includes(domain)) {
-        console.log(`Adding domain: ${domain}`);
+      if (availableDomainsAsStringArray.includes(domain)) {
         this.enabledDomains.add(domain);
+      } else if (domain === ALL_DOMAINS) {
+        this.enableAllDomains();
       } else {
-        console.warn(`Warning: Unknown domain '${domain}'. Available domains: ${Object.values(Domain).join(", ")}`);
+        console.error(`Error: Specified invalid domain '${domain}'. Please specify exactly as available domains: ${Object.values(Domain).join(", ")}`);
       }
     });
 
     if (this.enabledDomains.size === 0) {
-      console.log("No valid domains specified, enabling all domains by default");
       this.enableAllDomains();
     }
   }
