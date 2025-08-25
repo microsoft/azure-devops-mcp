@@ -368,17 +368,34 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       timelineId: z.string().optional().describe("The ID of a specific timeline to retrieve. If not specified, the primary timeline is returned."),
       changeId: z.number().optional().describe("If specified, only includes timeline records that changed after this watermark."),
       planId: z.string().optional().describe("The ID of the plan to retrieve the timeline for."),
+      errorsOnly: z.boolean().optional().describe("If true, only return records with errors."),
     },
-    async ({ project, buildId, timelineId, changeId, planId }) => {
+    async ({ project, buildId, timelineId, changeId, planId, errorsOnly }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
       const timeline = await buildApi.getBuildTimeline(project, buildId, timelineId, changeId, planId);
 
+      if(!errorsOnly)
+      {
       return {
         content: [{ type: "text", text: JSON.stringify(timeline, null, 2) }],
       };
     }
-  );
+
+    // If errorsOnly is true, filter the timeline to only include records with errors
+    if (errorsOnly && timeline.records) {
+      const failedRecords = timeline.records.filter(record => record.errorCount && record.errorCount > 0);
+      const filteredTimeline = { ...timeline, records: failedRecords };
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(filteredTimeline, null, 2) }],
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(timeline, null, 2) }],
+    };
+  });
 }
 
 export { BUILD_TOOLS, configureBuildTools };
