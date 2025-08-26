@@ -15,10 +15,11 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 2. [🏆 Expectations](#-expectations)
 3. [⚙️ Supported Tools](#️-supported-tools)
 4. [🔌 Installation & Getting Started](#-installation--getting-started)
-5. [📝 Troubleshooting](#-troubleshooting)
-6. [🎩 Examples & Best Practices](#-examples--best-practices)
-7. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-8. [📌 Contributing](#-contributing)
+5. [🌏 Using Domains](#-using-domains)
+6. [📝 Troubleshooting](#-troubleshooting)
+7. [🎩 Examples & Best Practices](#-examples--best-practices)
+8. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+9. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -241,6 +242,40 @@ Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
 
 See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
+
+## 🌏 Using Domains
+
+Azure DevOps exposes a large surface area. As a result, our Azure DevOps MCP Server includes many tools. To keep the toolset manageable, avoid confusing the model, and respect client limits on loaded tools, use Domains to load only the areas you need. Domains are named groups of related tools (for example: core, work, work-items, repositories, wiki). Add the `-d` argument and the domain names to the server args in your `mcp.json` to list the domains to enable.
+
+For example, use `"-d", "core", "work", "work-items"` to load only Work Item related tools (see the example below).
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "mcp-server-azuredevops",
+      "args": ["${input:ado_org}", "-d",
+        "core",
+        "work",
+        "work-items"]
+    }
+  }
+}
+```
+
+Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `builds`, `releases`, `advanced-security`
+
+We recommend that you always enable `core` tools so that you can fetch project level information.
+
+> By default all domains are loaded
 
 ## 📝 Troubleshooting
 
