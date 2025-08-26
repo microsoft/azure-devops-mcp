@@ -23,7 +23,9 @@
    If tools do not appear, click "Add Context" in Agent Mode and ensure all tools starting with `ado_` are selected.
 
 4. **Too Many Tools Selected (Over 128 Limit)**
-   VS Code supports a maximum of 128 tools. If you exceed this limit, ensure you do not have multiple MCP Servers running. Check both your project's `mcp.json` and your VS Code `settings.json` to confirm that the MCP Server is configured in only one location—not both.
+   Some tools have a default maximum limot of 128 tools. If you exceed this limit, ensure you do not have multiple MCP Servers running. Check both your project's `mcp.json` and your VS Code `settings.json` to confirm that the MCP Server is configured in only one location—not both.
+
+   You can also use [Domains](../README.md?tab=readme-ov-file#-using-domains) as a way to limit the number of tools you load for the Azure DevOps MCP Server.
 
 ## Project-Specific Issues
 
