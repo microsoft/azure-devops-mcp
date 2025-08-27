@@ -1227,5 +1227,4 @@ describe("configureBuildTools", () => {
       );
     });
   });
-
 });
