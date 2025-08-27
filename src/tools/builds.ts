@@ -19,7 +19,6 @@ const BUILD_TOOLS = {
   run_build: "build_run_build",
   get_status: "build_get_status",
   update_build_stage: "build_update_build_stage",
-  get_timeline: "build_get_timeline",
 };
 
 function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -358,7 +357,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       };
     }
   );
-
+  
   server.tool(
     BUILD_TOOLS.get_timeline,
     "Retrieves the timeline for a specific build, showing detailed information about steps and tasks.",

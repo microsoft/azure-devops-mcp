@@ -14,17 +14,26 @@ import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
+import { DomainsManager } from "./shared/domains.js";
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
   .usage("Usage: $0 <organization> [options]")
   .version(packageVersion)
-  .command("$0 <organization>", "Azure DevOps MCP Server", (yargs) => {
+  .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
     yargs.positional("organization", {
       describe: "Azure DevOps organization name",
       type: "string",
+      demandOption: true,
     });
+  })
+  .option("domains", {
+    alias: "d",
+    describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
+    type: "string",
+    array: true,
+    default: "all",
   })
   .option("tenant", {
     alias: "t",
@@ -34,9 +43,13 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .parseSync();
 
-export const orgName = argv.organization as string;
 const tenantId = argv.tenant;
+
+export const orgName = argv.organization as string;
 const orgUrl = "https://dev.azure.com/" + orgName;
+
+const domainsManager = new DomainsManager(argv.domains);
+export const enabledDomains = domainsManager.getEnabledDomains();
 
 async function getAzureDevOpsToken(): Promise<AccessToken> {
   if (process.env.ADO_MCP_AZURE_TOKEN_CREDENTIALS) {
@@ -84,7 +97,7 @@ async function main() {
 
   configurePrompts(server);
 
-  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient(userAgentComposer), () => userAgentComposer.userAgent);
+  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient(userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
