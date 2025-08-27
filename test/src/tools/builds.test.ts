@@ -1218,7 +1218,13 @@ describe("configureBuildTools", () => {
         ],
       };
 
-      expect(result.content[0].text).toBe(JSON.stringify(expectedFilteredTimeline, null, 2));
+      expect(result.content).toBeDefined();
+      expect(result.content.length).toBe(1);
+      expect(result.content).toContainEqual(
+        expect.objectContaining({
+          text: JSON.stringify(expectedFilteredTimeline, null, 2),
+        })
+      );
     });
   });
 });
