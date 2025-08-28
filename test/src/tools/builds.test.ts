@@ -891,9 +891,7 @@ describe("configureBuildTools", () => {
         yamlOverride: "some yaml",
       };
 
-      await expect(handler(params)).rejects.toThrow(
-        "Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'."
-      );
+      await expect(handler(params)).rejects.toThrow("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
     });
 
     it("should handle missing build ID from pipeline run", async () => {

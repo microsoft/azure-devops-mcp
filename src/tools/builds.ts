@@ -303,25 +303,40 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   });
 
   const resourcesSchema = z.object({
-    builds: z.record(z.string(), z.object({
-      version: z.string().optional(),
-    })),
-    containers: z.record(z.string(), z.object({
-      version: z.string().optional(),
-    })),
-    packages: z.record(z.string(), z.object({
-      version: z.string().optional(),
-    })),
-    pipelines: z.record(z.string(), z.object({
-      runId: z.number(),
-      version: z.string().optional(),
-    })),
-    repositories: z.record(z.string(), z.object({
-      refName: z.string(),
-      token: z.string().optional(),
-      tokenType: z.string().optional(),
-      version: z.string().optional(),
-    })),
+    builds: z.record(
+      z.string(),
+      z.object({
+        version: z.string().optional(),
+      })
+    ),
+    containers: z.record(
+      z.string(),
+      z.object({
+        version: z.string().optional(),
+      })
+    ),
+    packages: z.record(
+      z.string(),
+      z.object({
+        version: z.string().optional(),
+      })
+    ),
+    pipelines: z.record(
+      z.string(),
+      z.object({
+        runId: z.number(),
+        version: z.string().optional(),
+      })
+    ),
+    repositories: z.record(
+      z.string(),
+      z.object({
+        refName: z.string(),
+        token: z.string().optional(),
+        tokenType: z.string().optional(),
+        version: z.string().optional(),
+      })
+    ),
   });
 
   server.tool(
@@ -339,7 +354,6 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       yamlOverride: z.string().optional().describe("YAML override for the pipeline run."),
     },
     async ({ project, pipelineId, pipelineVersion, previewRun, resources, stagesToSkip, templateParameters, variables, yamlOverride }) => {
-
       if (!previewRun && yamlOverride) {
         throw new Error("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
       }
@@ -369,7 +383,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       };
     }
   );
-  
+
   server.tool(
     BUILD_TOOLS.get_status,
     "Fetches the status of a specific build.",
