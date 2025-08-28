@@ -303,39 +303,39 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
 
   const resourcesSchema = z.object({
     builds: z.record(
-      z.string(),
+      z.string().describe("Name of the build resource."),
       z.object({
-        version: z.string().optional(),
+        version: z.string().optional().describe("Version of the build resource."),
       })
-    ),
+    ).optional(),
     containers: z.record(
-      z.string(),
+      z.string().describe("Name of the container resource."),
       z.object({
-        version: z.string().optional(),
+        version: z.string().optional().describe("Version of the container resource."),
       })
-    ),
+    ).optional(),
     packages: z.record(
-      z.string(),
+      z.string().describe("Name of the package resource."),
       z.object({
-        version: z.string().optional(),
+        version: z.string().optional().describe("Version of the package resource."),
       })
-    ),
+    ).optional(),
     pipelines: z.record(
-      z.string(),
+      z.string().describe("Name of the pipeline resource."),
       z.object({
-        runId: z.number(),
-        version: z.string().optional(),
+        runId: z.number().describe("Id of the source pipeline run that triggered or is referenced by this pipeline run."),
+        version: z.string().optional().describe("Version of the source pipeline run."),
       })
     ),
     repositories: z.record(
-      z.string(),
+      z.string().describe("Name of the repository resource."),
       z.object({
-        refName: z.string(),
+        refName: z.string().describe("Reference name, e.g., refs/heads/main."),
         token: z.string().optional(),
         tokenType: z.string().optional(),
-        version: z.string().optional(),
+        version: z.string().optional().describe("Version of the repository resource, git commit sha."),
       })
-    ),
+    ).optional(),
   });
 
   server.tool(
