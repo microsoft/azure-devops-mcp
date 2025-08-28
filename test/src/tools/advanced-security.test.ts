@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { Alert, AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
 import { PagedList } from "azure-devops-node-api/interfaces/common/VSSInterfaces";
-import { configureAdvSecTools } from "../../../src/tools/advsec";
+import { configureAdvSecTools } from "../../../src/tools/advanced-security";
 
 type TokenProviderMock = () => Promise<AccessToken>;
 type ConnectionProviderMock = () => Promise<WebApi>;
