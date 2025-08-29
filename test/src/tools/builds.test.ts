@@ -612,46 +612,124 @@ describe("configureBuildTools", () => {
     });
   });
 
-  describe("run_build tool", () => {
-    it("should trigger build with correct parameters", async () => {
+  describe("pipelines_get_run tool", () => {
+    it("should call getRun with correct parameters", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
-      if (!call) throw new Error("build_run_build tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_run");
+      if (!call) fail("Tool not found");
       const [, , , handler] = call;
 
-      const mockBuildApi = {
-        getDefinition: jest.fn().mockResolvedValue({
-          repository: {
-            defaultBranch: "refs/heads/main",
-          },
-        }),
-        getBuildReport: jest.fn().mockResolvedValue({
-          id: 456,
-          status: "queued",
-        }),
-      };
-
       const mockPipelinesApi = {
-        runPipeline: jest.fn().mockResolvedValue({
-          id: 456,
-        }),
+        getRun: jest.fn().mockResolvedValue({ id: 1, name: "run-1" }),
       };
-
-      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
       mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
 
       const params = {
         project: "test-project",
-        definitionId: 123,
-        sourceBranch: "refs/heads/feature/new-feature",
-        parameters: { key1: "value1", key2: "value2" },
+        pipelineId: 123,
+        runId: 456,
       };
 
       const result = await handler(params);
 
-      expect(mockBuildApi.getDefinition).toHaveBeenCalledWith("test-project", 123);
+      expect(mockPipelinesApi.getRun).toHaveBeenCalledWith("test-project", 123, 456);
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 1, name: "run-1" }, null, 2));
+    });
+
+    it("should handle API errors for pipelines_get_run", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_run");
+      if (!call) fail("Tool not found");
+      const [, , , handler] = call;
+
+      const mockPipelinesApi = {
+        getRun: jest.fn().mockRejectedValue(new Error("Run not found")),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
+      const params = {
+        project: "test-project",
+        pipelineId: 123,
+        runId: 999,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Run not found");
+    });
+  });
+
+  describe("pipelines_list_runs tool", () => {
+    it("should call listRuns with correct parameters", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_list_runs");
+      if (!call) fail("Tool not found");
+      const [, , , handler] = call;
+
+      const mockPipelinesApi = {
+        listRuns: jest.fn().mockResolvedValue([{ id: 1, name: "run-1" }]),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
+      const params = {
+        project: "test-project",
+        pipelineId: 123,
+      };
+
+      const result = await handler(params);
+
+      expect(mockPipelinesApi.listRuns).toHaveBeenCalledWith("test-project", 123);
+      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "run-1" }], null, 2));
+    });
+
+    it("should handle API errors for pipelines_list_runs", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_list_runs");
+      if (!call) fail("Tool not found");
+      const [, , , handler] = call;
+
+      const mockPipelinesApi = {
+        listRuns: jest.fn().mockRejectedValue(new Error("Pipeline not found")),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
+      const params = {
+        project: "test-project",
+        pipelineId: 999,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Pipeline not found");
+    });
+  });
+
+  describe("pipelines_run_pipeline tool", () => {
+    it("should trigger pipeline with correct parameters", async () => {
+      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
+      if (!call) fail("Tool not found");
+      const [, , , handler] = call;
+
+      const mockPipelinesApi = {
+        runPipeline: jest.fn().mockResolvedValue({ id: 456 }),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
+      const params = {
+        project: "test-project",
+        pipelineId: 123,
+        resources: {
+          repositories: {
+            self: {
+              refName: "refs/heads/feature/new-feature",
+            },
+          },
+        },
+        templateParameters: { key1: "value1", key2: "value2" },
+      };
+
+      const result = await handler(params);
+
       expect(mockPipelinesApi.runPipeline).toHaveBeenCalledWith(
         {
+          previewRun: undefined,
           resources: {
             repositories: {
               self: {
@@ -659,216 +737,99 @@ describe("configureBuildTools", () => {
               },
             },
           },
+          stagesToSkip: undefined,
           templateParameters: { key1: "value1", key2: "value2" },
+          variables: undefined,
+          yamlOverride: undefined,
         },
         "test-project",
-        123
+        123,
+        undefined
       );
-      expect(mockBuildApi.getBuildReport).toHaveBeenCalledWith("test-project", 456);
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          {
-            id: 456,
-            status: "queued",
-          },
-          null,
-          2
-        )
-      );
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 456 }, null, 2));
     });
 
-    it("should use default branch when sourceBranch not provided", async () => {
+    it("should handle preview run", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
-      if (!call) throw new Error("build_run_build tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
+      if (!call) fail("Tool not found");
       const [, , , handler] = call;
 
-      const mockBuildApi = {
-        getDefinition: jest.fn().mockResolvedValue({
-          repository: {
-            defaultBranch: "refs/heads/develop",
-          },
-        }),
-        getBuildReport: jest.fn().mockResolvedValue({ id: 456 }),
-      };
-
       const mockPipelinesApi = {
-        runPipeline: jest.fn().mockResolvedValue({ id: 456 }),
+        runPipeline: jest.fn().mockResolvedValue({ id: 456, finalYaml: "final yaml" }),
       };
-
-      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
       mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
 
       const params = {
         project: "test-project",
-        definitionId: 123,
+        pipelineId: 123,
+        previewRun: true,
       };
 
       await handler(params);
 
       expect(mockPipelinesApi.runPipeline).toHaveBeenCalledWith(
-        {
-          resources: {
-            repositories: {
-              self: {
-                refName: "refs/heads/develop",
-              },
-            },
-          },
-          templateParameters: undefined,
-        },
+        expect.objectContaining({
+          previewRun: true,
+        }),
         "test-project",
-        123
+        123,
+        undefined
       );
     });
 
-    it("should use fallback branch when no repository default branch", async () => {
+    it("should throw error for previewRun and yamlOverride", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
-      if (!call) throw new Error("build_run_build tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
+      if (!call) fail("Tool not found");
       const [, , , handler] = call;
-
-      const mockBuildApi = {
-        getDefinition: jest.fn().mockResolvedValue({
-          repository: null,
-        }),
-        getBuildReport: jest.fn().mockResolvedValue({ id: 456 }),
-      };
-
-      const mockPipelinesApi = {
-        runPipeline: jest.fn().mockResolvedValue({ id: 456 }),
-      };
-
-      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
-      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
 
       const params = {
         project: "test-project",
-        definitionId: 123,
+        pipelineId: 123,
+        previewRun: false,
+        yamlOverride: "some yaml",
       };
 
-      await handler(params);
-
-      expect(mockPipelinesApi.runPipeline).toHaveBeenCalledWith(
-        {
-          resources: {
-            repositories: {
-              self: {
-                refName: "refs/heads/main",
-              },
-            },
-          },
-          templateParameters: undefined,
-        },
-        "test-project",
-        123
-      );
+      await expect(handler(params)).rejects.toThrow("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
     });
 
     it("should handle missing build ID from pipeline run", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
-      if (!call) throw new Error("build_run_build tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
+      if (!call) fail("Tool not found");
       const [, , , handler] = call;
 
-      const mockBuildApi = {
-        getDefinition: jest.fn().mockResolvedValue({
-          repository: { defaultBranch: "refs/heads/main" },
-        }),
-      };
-
       const mockPipelinesApi = {
-        runPipeline: jest.fn().mockResolvedValue({
-          id: undefined, // Missing build ID
-        }),
+        runPipeline: jest.fn().mockResolvedValue({}),
       };
-
-      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
-      mockConnection.getPipelinesApi = jest.fn().mockResolvedValue(mockPipelinesApi);
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
 
       const params = {
         project: "test-project",
-        definitionId: 123,
+        pipelineId: 123,
       };
 
       await expect(handler(params)).rejects.toThrow("Failed to get build ID from pipeline run");
     });
 
-    it("should handle API errors for run_build", async () => {
+    it("should handle API errors for pipelines_run_pipeline", async () => {
       configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_run_build");
-      if (!call) throw new Error("build_run_build tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
+      if (!call) fail("Tool not found");
       const [, , , handler] = call;
 
-      const mockBuildApi = {
-        getDefinition: jest.fn().mockRejectedValue(new Error("Definition not found")),
+      const mockPipelinesApi = {
+        runPipeline: jest.fn().mockRejectedValue(new Error("API Error")),
       };
-
-      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
 
       const params = {
         project: "test-project",
-        definitionId: 999,
+        pipelineId: 123,
       };
 
-      await expect(handler(params)).rejects.toThrow("Definition not found");
-    });
-  });
-
-  describe("get_status tool", () => {
-    it("should call getBuildReport with correct parameters", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_status");
-      if (!call) throw new Error("build_get_status tool not registered");
-      const [, , , handler] = call;
-
-      const mockBuildApi = {
-        getBuildReport: jest.fn().mockResolvedValue({
-          id: 123,
-          status: "completed",
-          result: "succeeded",
-        }),
-      };
-      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
-
-      const params = {
-        project: "test-project",
-        buildId: 123,
-      };
-
-      const result = await handler(params);
-
-      expect(mockBuildApi.getBuildReport).toHaveBeenCalledWith("test-project", 123);
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          {
-            id: 123,
-            status: "completed",
-            result: "succeeded",
-          },
-          null,
-          2
-        )
-      );
-    });
-
-    it("should handle API errors for get_status", async () => {
-      configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_status");
-      if (!call) throw new Error("build_get_status tool not registered");
-      const [, , , handler] = call;
-
-      const mockBuildApi = {
-        getBuildReport: jest.fn().mockRejectedValue(new Error("Build not found")),
-      };
-      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
-
-      const params = {
-        project: "test-project",
-        buildId: 999,
-      };
-
-      await expect(handler(params)).rejects.toThrow("Build not found");
+      await expect(handler(params)).rejects.toThrow("API Error");
     });
   });
 });

@@ -10,14 +10,16 @@ import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
 const BUILD_TOOLS = {
+  get_builds: "build_get_builds",
+  get_changes: "build_get_changes",
   get_definitions: "build_get_definitions",
   get_definition_revisions: "build_get_definition_revisions",
-  get_builds: "build_get_builds",
   get_log: "build_get_log",
   get_log_by_id: "build_get_log_by_id",
-  get_changes: "build_get_changes",
-  run_build: "build_run_build",
   get_status: "build_get_status",
+  pipelines_get_run: "pipelines_get_run",
+  pipelines_list_runs: "pipelines_list_runs",
+  pipelines_run_pipeline: "pipelines_run_pipeline",
   update_build_stage: "build_update_build_stage",
 };
 
@@ -258,40 +260,133 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.run_build,
-    "Triggers a new build for a specified definition.",
+    BUILD_TOOLS.pipelines_get_run,
+    "Gets a run for a particular pipeline.",
     {
       project: z.string().describe("Project ID or name to run the build in"),
-      definitionId: z.number().describe("ID of the build definition to run"),
-      sourceBranch: z.string().optional().describe("Source branch to run the build from. If not provided, the default branch will be used."),
-      parameters: z.record(z.string(), z.string()).optional().describe("Custom build parameters as key-value pairs"),
+      pipelineId: z.number().describe("ID of the pipeline to run"),
+      runId: z.number().describe("ID of the run to get"),
     },
-    async ({ project, definitionId, sourceBranch, parameters }) => {
+    async ({ project, pipelineId, runId }) => {
       const connection = await connectionProvider();
-      const buildApi = await connection.getBuildApi();
       const pipelinesApi = await connection.getPipelinesApi();
-      const definition = await buildApi.getDefinition(project, definitionId);
+      const pipelineRun = await pipelinesApi.getRun(project, pipelineId, runId);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    BUILD_TOOLS.pipelines_list_runs,
+    "Gets top 10000 runs for a particular pipeline.",
+    {
+      project: z.string().describe("Project ID or name to run the build in"),
+      pipelineId: z.number().describe("ID of the pipeline to run"),
+    },
+    async ({ project, pipelineId }) => {
+      const connection = await connectionProvider();
+      const pipelinesApi = await connection.getPipelinesApi();
+      const pipelineRuns = await pipelinesApi.listRuns(project, pipelineId);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(pipelineRuns, null, 2) }],
+      };
+    }
+  );
+
+  const variableSchema = z.object({
+    value: z.string().optional(),
+    isSecret: z.boolean().optional(),
+  });
+
+  const resourcesSchema = z.object({
+    builds: z
+      .record(
+        z.string().describe("Name of the build resource."),
+        z.object({
+          version: z.string().optional().describe("Version of the build resource."),
+        })
+      )
+      .optional(),
+    containers: z
+      .record(
+        z.string().describe("Name of the container resource."),
+        z.object({
+          version: z.string().optional().describe("Version of the container resource."),
+        })
+      )
+      .optional(),
+    packages: z
+      .record(
+        z.string().describe("Name of the package resource."),
+        z.object({
+          version: z.string().optional().describe("Version of the package resource."),
+        })
+      )
+      .optional(),
+    pipelines: z.record(
+      z.string().describe("Name of the pipeline resource."),
+      z.object({
+        runId: z.number().describe("Id of the source pipeline run that triggered or is referenced by this pipeline run."),
+        version: z.string().optional().describe("Version of the source pipeline run."),
+      })
+    ),
+    repositories: z
+      .record(
+        z.string().describe("Name of the repository resource."),
+        z.object({
+          refName: z.string().describe("Reference name, e.g., refs/heads/main."),
+          token: z.string().optional(),
+          tokenType: z.string().optional(),
+          version: z.string().optional().describe("Version of the repository resource, git commit sha."),
+        })
+      )
+      .optional(),
+  });
+
+  server.tool(
+    BUILD_TOOLS.pipelines_run_pipeline,
+    "Starts a new run of a pipeline.",
+    {
+      project: z.string().describe("Project ID or name to run the build in"),
+      pipelineId: z.number().describe("ID of the pipeline to run"),
+      pipelineVersion: z.number().optional().describe("Version of the pipeline to run. If not provided, the latest version will be used."),
+      previewRun: z.boolean().optional().describe("If true, returns the final YAML document after parsing templates without creating a new run."),
+      resources: resourcesSchema.optional().describe("A dictionary of resources to pass to the pipeline."),
+      stagesToSkip: z.array(z.string()).optional().describe("A list of stages to skip."),
+      templateParameters: z.record(z.string(), z.string()).optional().describe("Custom build parameters as key-value pairs"),
+      variables: z.record(z.string(), variableSchema).optional().describe("A dictionary of variables to pass to the pipeline."),
+      yamlOverride: z.string().optional().describe("YAML override for the pipeline run."),
+    },
+    async ({ project, pipelineId, pipelineVersion, previewRun, resources, stagesToSkip, templateParameters, variables, yamlOverride }) => {
+      if (!previewRun && yamlOverride) {
+        throw new Error("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
+      }
+
+      const connection = await connectionProvider();
+      const pipelinesApi = await connection.getPipelinesApi();
       const runRequest = {
+        previewRun: previewRun,
         resources: {
-          repositories: {
-            self: {
-              refName: sourceBranch || definition.repository?.defaultBranch || "refs/heads/main",
-            },
-          },
+          ...resources,
         },
-        templateParameters: parameters,
+        stagesToSkip: stagesToSkip,
+        templateParameters: templateParameters,
+        variables: variables,
+        yamlOverride: yamlOverride,
       };
 
-      const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, definitionId);
+      const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, pipelineId, pipelineVersion);
       const queuedBuild = { id: pipelineRun.id };
       const buildId = queuedBuild.id;
       if (buildId === undefined) {
         throw new Error("Failed to get build ID from pipeline run");
       }
 
-      const buildReport = await buildApi.getBuildReport(project, buildId);
       return {
-        content: [{ type: "text", text: JSON.stringify(buildReport, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }],
       };
     }
   );
