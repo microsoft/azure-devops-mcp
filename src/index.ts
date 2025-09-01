@@ -10,6 +10,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
+import { getOrgTenant } from "./org-tenants.js";
 import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
@@ -50,8 +51,6 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .parseSync();
 
-const tenantId = argv.tenant;
-
 export const orgName = argv.organization as string;
 const orgUrl = "https://dev.azure.com/" + orgName;
 
@@ -81,7 +80,8 @@ async function main() {
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
-  const authenticator = createAuthenticator(argv.authentication, argv.tenant);
+  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
+  const authenticator = createAuthenticator(argv.authentication, tenantId);
 
   configurePrompts(server);
 
