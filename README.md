@@ -152,16 +152,7 @@ For the best experience, use Visual Studio Code and GitHub Copilot. See the [get
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-4. Open VS Code in an empty folder
-
-### Azure Login
-
-Ensure you are logged in to Azure DevOps via the Azure CLI:
-
-```sh
-az login
-```
+3. Open VS Code in an empty folder
 
 ### Installation
 
@@ -232,7 +223,7 @@ Click "Select Tools" and choose the available tools.
 
 ![configure mcp server tools](./docs/media/configure-mcp-server-tools.gif)
 
-Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
+Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first time an ADO tool is executed browser will open prompting to login with your Microsoft account. Please ensure you are using credentials matching selected Azure DevOps organization.
 
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.

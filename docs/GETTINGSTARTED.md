@@ -20,22 +20,12 @@ Before you begin, make sure you have:
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-4. Open VS Code in an empty folder
+3. Open VS Code in an empty folder
 
 ### For Visual Studio 2022
 
 1. Install [VS Studio 2022 version 17.14](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history) or later
-2. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-3. Open a project in Visual Studio
-
-### Azure CLI Login
-
-Ensure you are logged in to Azure DevOps via the Azure CLI:
-
-```sh
-az login
-```
+2. Open a project in Visual Studio
 
 ## 🍕 Installation Options
 
@@ -218,12 +208,6 @@ claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
 Replace `Contoso` with your own organization name
 
 ### ✴️ Using MCP Server with Claude Desktop
-
-Ensure you are logged in to Azure DevOps using the Azure CLI:
-
-```sh
-az login
-```
 
 Open Claude Desktop and navigate to **File > Settings > Developer**. Click **Edit Config**.
 

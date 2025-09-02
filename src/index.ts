@@ -45,7 +45,7 @@ const argv = yargs(hideBin(process.argv))
   })
   .option("tenant", {
     alias: "t",
-    describe: "Azure tenant ID (optional, applied only when using 'azcli' type of authentication)",
+    describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
     type: "string",
   })
   .help()
