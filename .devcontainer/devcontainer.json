@@ -11,7 +11,7 @@
     },
     "ghcr.io/devcontainers/features/azure-cli:1": {}
   },
-  "postCreateCommand": "rm -f .npmrc && npm install && npm install -g . ; az login --use-device-code",
+  "postCreateCommand": "rm -f .npmrc && npm install && npm install -g .",
   "customizations": {
     "codespaces": {
       "openFiles": ["CONTRIBUTING.md"]
