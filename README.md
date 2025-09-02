@@ -27,7 +27,6 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 
 - "List my ADO projects"
 - "List ADO Builds for 'Contoso'"
-- "List ADO Releases for 'Contoso'"
 - "List ADO Repos for 'Contoso'"
 - "List test plans for 'Contoso'"
 - "List teams for project 'Contoso'"
@@ -103,7 +102,7 @@ Interact with these Azure DevOps services:
 - **repo_search_commits**: Searches for commits.
 - **repo_create_pull_request_thread**: Creates a new comment thread on a pull request.
 
-### 🛰️ Builds
+### 🚀 Pipelines
 
 - **build_get_definitions**: Retrieve a list of build definitions for a given project.
 - **build_get_definition_revisions**: Retrieve a list of revisions for a specific build definition.
@@ -117,12 +116,7 @@ Interact with these Azure DevOps services:
 - **pipelines_list_runs**: Gets top 10000 runs for a particular pipeline.
 - **pipelines_run_pipeline**: Starts a new run of a pipeline.
 
-### 🚀 Releases
-
-- **release_get_definitions**: Retrieve a list of release definitions for a given project.
-- **release_get_releases**: Retrieve a list of releases for a given project.
-
-### 🔒 Advanced Security
+### Advanced Security
 
 - **advsec_get_alerts**: Retrieve Advanced Security alerts for a repository.
 - **advsec_get_alert_details**: Get detailed information about a specific Advanced Security alert.
@@ -270,7 +264,7 @@ For example, use `"-d", "core", "work", "work-items"` to load only Work Item rel
 }
 ```
 
-Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `builds`, `releases`, `advanced-security`
+Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `pipelines`, `advanced-security`
 
 We recommend that you always enable `core` tools so that you can fetch project level information.
 
