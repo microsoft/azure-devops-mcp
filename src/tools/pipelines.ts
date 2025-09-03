@@ -10,7 +10,7 @@ import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
 const PIPELINE_TOOLS = {
-  build_get_builds: "build_get_builds",
+  pipelines_get_builds: "build_get_builds",
   build_get_changes: "build_get_changes",
   build_get_definitions: "build_get_definitions",
   build_get_definition_revisions: "build_get_definition_revisions",
