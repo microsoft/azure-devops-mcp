@@ -10,14 +10,14 @@ import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
 const PIPELINE_TOOLS = {
-  pipelines_get_builds: "build_get_builds",
-  build_get_changes: "build_get_changes",
-  build_get_definitions: "build_get_definitions",
-  build_get_definition_revisions: "build_get_definition_revisions",
-  build_get_log: "build_get_log",
-  build_get_log_by_id: "build_get_log_by_id",
-  build_get_status: "build_get_status",
-  build_update_build_stage: "build_update_build_stage",
+  pipelines_get_builds: "pipelines_get_builds",
+  pipelines_get_build_changes: "pipelines_get_build_changes",
+  pipelines_get_build_definitions: "pipelines_get_build_definitions",
+  pipelines_get_build_definition_revisions: "pipelines_get_build_definition_revisions",
+  pipelines_get_build_log: "pipelines_get_build_log",
+  pipelines_get_build_log_by_id: "pipelines_get_build_log_by_id",
+  pipelines_get_build_status: "pipelines_get_build_status",
+  pipelines_update_build_stage: "pipelines_update_build_stage",
   pipelines_get_run: "pipelines_get_run",
   pipelines_list_runs: "pipelines_list_runs",
   pipelines_run_pipeline: "pipelines_run_pipeline",
@@ -25,7 +25,7 @@ const PIPELINE_TOOLS = {
 
 function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
-    PIPELINE_TOOLS.build_get_definitions,
+    PIPELINE_TOOLS.pipelines_get_build_definitions,
     "Retrieves a list of build definitions for a given project.",
     {
       project: z.string().describe("Project ID or name to get build definitions for"),
@@ -97,7 +97,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    PIPELINE_TOOLS.build_get_definition_revisions,
+    PIPELINE_TOOLS.pipelines_get_build_definition_revisions,
     "Retrieves a list of revisions for a specific build definition.",
     {
       project: z.string().describe("Project ID or name to get the build definition revisions for"),
@@ -115,7 +115,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    PIPELINE_TOOLS.build_get_builds,
+    PIPELINE_TOOLS.pipelines_get_builds,
     "Retrieves a list of builds for a given project.",
     {
       project: z.string().describe("Project ID or name to get builds for"),
@@ -200,7 +200,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    PIPELINE_TOOLS.build_get_log,
+    PIPELINE_TOOLS.pipelines_get_build_log,
     "Retrieves the logs for a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build log for"),
@@ -218,7 +218,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    PIPELINE_TOOLS.build_get_log_by_id,
+    PIPELINE_TOOLS.pipelines_get_build_log_by_id,
     "Get a specific build log by log ID.",
     {
       project: z.string().describe("Project ID or name to get the build log for"),
@@ -239,7 +239,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    PIPELINE_TOOLS.build_get_changes,
+    PIPELINE_TOOLS.pipelines_get_build_changes,
     "Get the changes associated with a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build changes for"),
@@ -392,7 +392,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    PIPELINE_TOOLS.build_get_status,
+    PIPELINE_TOOLS.pipelines_get_build_status,
     "Fetches the status of a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build status for"),
@@ -410,7 +410,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    PIPELINE_TOOLS.build_update_build_stage,
+    PIPELINE_TOOLS.pipelines_update_build_stage,
     "Updates the stage of a specific build.",
     {
       project: z.string().describe("Project ID or name to update the build stage for"),

@@ -43,8 +43,8 @@ describe("configurePipelineTools", () => {
   describe("update_build_stage tool", () => {
     it("should update build stage with correct parameters and return the expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
-      if (!call) throw new Error("build_update_build_stage tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+      if (!call) throw new Error("pipelines_update_build_stage tool not registered");
       const [, , , handler] = call;
 
       // Mock the token provider
@@ -86,8 +86,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle HTTP errors correctly", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
-      if (!call) throw new Error("build_update_build_stage tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+      if (!call) throw new Error("pipelines_update_build_stage tool not registered");
       const [, , , handler] = call;
 
       // Mock the token provider
@@ -128,8 +128,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle network errors correctly", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
-      if (!call) throw new Error("build_update_build_stage tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+      if (!call) throw new Error("pipelines_update_build_stage tool not registered");
       const [, , , handler] = call;
 
       // Mock the token provider
@@ -166,8 +166,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle token provider errors correctly", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
-      if (!call) throw new Error("build_update_build_stage tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+      if (!call) throw new Error("pipelines_update_build_stage tool not registered");
       const [, , , handler] = call;
 
       // Mock token provider error
@@ -190,8 +190,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle different StageUpdateType values correctly", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_update_build_stage");
-      if (!call) throw new Error("build_update_build_stage tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+      if (!call) throw new Error("pipelines_update_build_stage tool not registered");
       const [, , , handler] = call;
 
       const mockToken = { token: "mock-token" };
@@ -228,8 +228,8 @@ describe("configurePipelineTools", () => {
   describe("get_definitions tool", () => {
     it("should call getDefinitions with correct parameters and return expected result", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definitions");
-      if (!call) throw new Error("build_get_definitions tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
+      if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -284,8 +284,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle API errors for get_definitions", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definitions");
-      if (!call) throw new Error("build_get_definitions tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
+      if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -302,8 +302,8 @@ describe("configurePipelineTools", () => {
   describe("get_definition_revisions tool", () => {
     it("should call getDefinitionRevisions with correct parameters", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definition_revisions");
-      if (!call) throw new Error("build_get_definition_revisions tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definition_revisions");
+      if (!call) throw new Error("pipelines_get_build_definition_revisions tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -336,8 +336,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle API errors for get_definition_revisions", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_definition_revisions");
-      if (!call) throw new Error("build_get_definition_revisions tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definition_revisions");
+      if (!call) throw new Error("pipelines_get_build_definition_revisions tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -357,8 +357,8 @@ describe("configurePipelineTools", () => {
   describe("get_builds tool", () => {
     it("should call getBuilds with correct parameters", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_builds");
-      if (!call) throw new Error("build_get_builds tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_builds");
+      if (!call) throw new Error("pipelines_get_builds tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -416,8 +416,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle API errors for get_builds", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_builds");
-      if (!call) throw new Error("build_get_builds tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_builds");
+      if (!call) throw new Error("pipelines_get_builds tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -434,8 +434,8 @@ describe("configurePipelineTools", () => {
   describe("get_log tool", () => {
     it("should call getBuildLogs with correct parameters", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log");
-      if (!call) throw new Error("build_get_log tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log");
+      if (!call) throw new Error("pipelines_get_build_log tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -468,8 +468,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle API errors for get_log", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log");
-      if (!call) throw new Error("build_get_log tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log");
+      if (!call) throw new Error("pipelines_get_build_log tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -489,8 +489,8 @@ describe("configurePipelineTools", () => {
   describe("get_log_by_id tool", () => {
     it("should call getBuildLogLines with correct parameters", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log_by_id");
-      if (!call) throw new Error("build_get_log_by_id tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log_by_id");
+      if (!call) throw new Error("pipelines_get_build_log_by_id tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -514,8 +514,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle API errors for get_log_by_id", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_log_by_id");
-      if (!call) throw new Error("build_get_log_by_id tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log_by_id");
+      if (!call) throw new Error("pipelines_get_build_log_by_id tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -536,8 +536,8 @@ describe("configurePipelineTools", () => {
   describe("get_changes tool", () => {
     it("should call getBuildChanges with correct parameters", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_changes");
-      if (!call) throw new Error("build_get_changes tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_changes");
+      if (!call) throw new Error("pipelines_get_build_changes tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -573,8 +573,8 @@ describe("configurePipelineTools", () => {
 
     it("should use default top value when not provided", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_changes");
-      if (!call) throw new Error("build_get_changes tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_changes");
+      if (!call) throw new Error("pipelines_get_build_changes tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {
@@ -594,8 +594,8 @@ describe("configurePipelineTools", () => {
 
     it("should handle API errors for get_changes", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "build_get_changes");
-      if (!call) throw new Error("build_get_changes tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_changes");
+      if (!call) throw new Error("pipelines_get_build_changes tool not registered");
       const [, , , handler] = call;
 
       const mockBuildApi = {

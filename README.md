@@ -104,14 +104,14 @@ Interact with these Azure DevOps services:
 
 ### 🚀 Pipelines
 
-- **build_get_definitions**: Retrieve a list of build definitions for a given project.
-- **build_get_definition_revisions**: Retrieve a list of revisions for a specific build definition.
-- **build_get_builds**: Retrieve a list of builds for a given project.
-- **build_get_log**: Retrieve the logs for a specific build.
-- **build_get_log_by_id**: Get a specific build log by log ID.
-- **build_get_changes**: Get the changes associated with a specific build.
-- **build_get_status**: Fetch the status of a specific build.
-- **build_update_build_stage**: Update the stage of a specific build.
+- **pipelines_get_build_definitions**: Retrieve a list of build definitions for a given project.
+- **pipelines_get_build_definition_revisions**: Retrieve a list of revisions for a specific build definition.
+- **pipelines_get_builds**: Retrieve a list of builds for a given project.
+- **pipelines_get_build_log**: Retrieve the logs for a specific build.
+- **pipelines_get_build_log_by_id**: Get a specific build log by log ID.
+- **pipelines_get_build_changes**: Get the changes associated with a specific build.
+- **pipelines_get_build_status**: Fetch the status of a specific build.
+- **pipelines_update_build_stage**: Update the stage of a specific build.
 - **pipelines_get_run**: Gets a run for a particular pipeline.
 - **pipelines_list_runs**: Gets top 10000 runs for a particular pipeline.
 - **pipelines_run_pipeline**: Starts a new run of a pipeline.

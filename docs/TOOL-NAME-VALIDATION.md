@@ -149,7 +149,7 @@ test/src/tool-name-validation.test.ts # Comprehensive tests (100% coverage)
 
 - Use descriptive but concise names
 - Follow the pattern: `{category}_{action}_{object}`
-- Examples: `repo_create_pull_request`, `build_get_status`
+- Examples: `repo_create_pull_request`, `pipelines_get_build_status`
 - Maximum 64 characters (current longest is 40 characters)
 
 ### Parameter Naming
