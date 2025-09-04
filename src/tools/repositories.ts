@@ -906,7 +906,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
   server.tool(
     REPO_TOOLS.list_pull_requests,
-    "Comprehensive pull request search with advanced filtering options. Supports filtering by status, draft state, reviewers, branches, text search, and more. Uses server-side filtering where possible for optimal performance.",
+    "Comprehensive pull request search with advanced filtering options. Supports filtering by status, draft state, reviewers, branches, text search, and more. Uses server-side filtering where possible for optimal performance. Returns Azure DevOps PRs where status field indicates PR state: Active=Open/InProgress, Completed=Merged, Abandoned=Closed.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repositoryId: z.string().optional().describe("If provided, scope search to this specific repository."),
@@ -915,7 +915,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
-        .describe("Filter pull requests by status. Defaults to 'Active'."),
+        .describe("Filter by Azure DevOps PR status: 'Active' means OPEN/IN-PROGRESS (equivalent to GitHub 'open'), 'Completed' means MERGED, 'Abandoned' means CLOSED. Active PRs are NOT merged."),
       isDraft: z.boolean().optional().describe("Filter by draft status: true=drafts only, false=ready for review only, undefined=both."),
 
       // People
