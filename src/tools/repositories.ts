@@ -909,86 +909,55 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
     "Comprehensive pull request search with advanced filtering options. Supports filtering by status, draft state, reviewers, branches, text search, and more. Uses server-side filtering where possible for optimal performance.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      repositoryId: z
-        .string()
-        .optional()
-        .describe("If provided, scope search to this specific repository."),
-      
+      repositoryId: z.string().optional().describe("If provided, scope search to this specific repository."),
+
       // Status & State
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
-      isDraft: z
-        .boolean()
-        .optional()
-        .describe("Filter by draft status: true=drafts only, false=ready for review only, undefined=both."),
-      
+      isDraft: z.boolean().optional().describe("Filter by draft status: true=drafts only, false=ready for review only, undefined=both."),
+
       // People
-      createdBy: z
-        .string()
-        .optional()
-        .describe("Filter pull requests created by a specific user (provide email or unique name)."),
-      reviewerId: z
-        .string()
-        .uuid()
-        .optional()
-        .describe("The UUID of a reviewer to filter by."),
-      reviewerDisplayName: z
-        .string()
-        .optional()
-        .describe("The display name of a reviewer to filter by (e.g., 'File Core API Support')."),
+      createdBy: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name)."),
+      reviewerId: z.string().uuid().optional().describe("The UUID of a reviewer to filter by."),
+      reviewerDisplayName: z.string().optional().describe("The display name of a reviewer to filter by (e.g., 'File Core API Support')."),
       reviewerRequirement: z
         .enum(["required", "optional", "any"])
         .default("any")
         .describe("Filter by reviewer requirement type: 'required' (must be required reviewer), 'optional' (must be optional reviewer), 'any' (can be either). Defaults to 'any'."),
-      
+
       // Branches
-      sourceBranch: z
-        .string()
-        .optional()
-        .describe("Filter by source branch name (e.g., 'feature/my-branch')."),
-      targetBranch: z
-        .string()
-        .optional()
-        .describe("Filter by target branch name (e.g., 'main', 'develop')."),
-      
+      sourceBranch: z.string().optional().describe("Filter by source branch name (e.g., 'feature/my-branch')."),
+      targetBranch: z.string().optional().describe("Filter by target branch name (e.g., 'main', 'develop')."),
+
       // Text Search
-      titleContains: z
-        .string()
-        .optional()
-        .describe("Filter by pull requests with titles containing this text (case-insensitive)."),
-      
+      titleContains: z.string().optional().describe("Filter by pull requests with titles containing this text (case-insensitive)."),
+
       // Date Filtering
-      createdAfter: z
-        .string()
-        .optional()
-        .describe("Filter pull requests created after this date (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."),
-      createdBefore: z
-        .string()
-        .optional()
-        .describe("Filter pull requests created before this date (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."),
-      
+      createdAfter: z.string().optional().describe("Filter pull requests created after this date (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."),
+      createdBefore: z.string().optional().describe("Filter pull requests created before this date (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."),
+
       // Pagination
       top: z.number().default(100).describe("The maximum number of pull requests to return."),
       skip: z.number().default(0).describe("The number of pull requests to skip."),
     },
-    async ({ 
-      project, 
-      repositoryId, 
-      status, 
-      isDraft, 
-      createdBy, 
-      reviewerId, 
-      reviewerDisplayName, 
-      reviewerRequirement, 
-      sourceBranch, 
-      targetBranch, 
-      titleContains, 
-      createdAfter, 
-      createdBefore, 
-      top, 
-      skip 
+    async ({
+      project,
+      repositoryId,
+      status,
+      isDraft,
+      createdBy,
+      reviewerId,
+      reviewerDisplayName,
+      reviewerRequirement,
+      sourceBranch,
+      targetBranch,
+      titleContains,
+      createdAfter,
+      createdBefore,
+      top,
+      skip,
     }) => {
       try {
         const connection = await connectionProvider();
@@ -1035,10 +1004,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
         // Server-side filtering for branches
         if (sourceBranch) {
-          searchCriteria.sourceRefName = sourceBranch.startsWith('refs/heads/') ? sourceBranch : `refs/heads/${sourceBranch}`;
+          searchCriteria.sourceRefName = sourceBranch.startsWith("refs/heads/") ? sourceBranch : `refs/heads/${sourceBranch}`;
         }
         if (targetBranch) {
-          searchCriteria.targetRefName = targetBranch.startsWith('refs/heads/') ? targetBranch : `refs/heads/${targetBranch}`;
+          searchCriteria.targetRefName = targetBranch.startsWith("refs/heads/") ? targetBranch : `refs/heads/${targetBranch}`;
         }
 
         // Fetch PRs based on whether we're scoping to a repo or project-wide
@@ -1068,7 +1037,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
         // Helper function to normalize strings for comparison
         const normalize = (str?: string) => (str ?? "").trim().toLowerCase();
-        
+
         // Client-side filtering for criteria not supported by server-side API
         let filteredPullRequests = pullRequests.filter((pr) => {
           // Draft status filtering
@@ -1100,7 +1069,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             const hasMatchingReviewer = reviewers.some((reviewer) => {
               // Check if this is the target reviewer
               let isTargetReviewer = false;
-              
+
               if (reviewerId && reviewer.id) {
                 isTargetReviewer = reviewer.id.toLowerCase() === reviewerId.toLowerCase();
               } else if (reviewerDisplayName) {
@@ -1151,10 +1120,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             vote: r.vote,
           })),
           labels: pr.labels,
-          autoCompleteSetBy: pr.autoCompleteSetBy ? {
-            displayName: pr.autoCompleteSetBy.displayName,
-            uniqueName: pr.autoCompleteSetBy.uniqueName,
-          } : undefined,
+          autoCompleteSetBy: pr.autoCompleteSetBy
+            ? {
+                displayName: pr.autoCompleteSetBy.displayName,
+                uniqueName: pr.autoCompleteSetBy.uniqueName,
+              }
+            : undefined,
           closedDate: pr.closedDate,
           mergeStatus: pr.mergeStatus,
         }));

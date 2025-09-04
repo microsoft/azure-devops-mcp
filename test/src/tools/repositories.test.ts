@@ -3003,13 +3003,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
-        "test-project",
-        { status: PullRequestStatus.Active },
-        undefined,
-        0,
-        100
-      );
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active }, undefined, 0, 100);
 
       const expectedResult = [
         {
