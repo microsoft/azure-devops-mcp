@@ -2955,7 +2955,7 @@ describe("repos tools", () => {
   });
 
   describe("repo_list_ready_prs_with_required_reviewer", () => {
-    it("should list ready PRs with required reviewer by display name", async () => {
+    it("should list ready PRs with required reviewer by display name (default behavior)", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
@@ -3028,6 +3028,189 @@ describe("repos tools", () => {
       ];
 
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should list ready PRs with optional reviewer when reviewerRequirement is 'optional'", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
+      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
+      const [, , , handler] = call;
+
+      const mockPRs = [
+        {
+          pullRequestId: 124,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Jane Doe", uniqueName: "jane@example.com" },
+          creationDate: "2023-01-02T00:00:00Z",
+          title: "Bug Fix PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/bugfix-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [
+            {
+              id: "reviewer-1",
+              displayName: "File Core API Support",
+              uniqueName: "file-core@example.com",
+              isRequired: false, // Optional reviewer
+              vote: 0,
+            },
+          ],
+        },
+      ];
+      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
+
+      const params = {
+        project: "test-project",
+        requiredReviewerDisplayName: "File Core API Support",
+        reviewerRequirement: "optional",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      const expectedResult = [
+        {
+          pullRequestId: 124,
+          repository: "test-repo",
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Jane Doe", uniqueName: "jane@example.com" },
+          creationDate: "2023-01-02T00:00:00Z",
+          title: "Bug Fix PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/bugfix-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [
+            {
+              displayName: "File Core API Support",
+              uniqueName: "file-core@example.com",
+              id: "reviewer-1",
+              isRequired: false,
+              vote: 0,
+            },
+          ],
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should list ready PRs with any reviewer type when reviewerRequirement is 'any'", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
+      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
+      const [, , , handler] = call;
+
+      const mockPRs = [
+        {
+          pullRequestId: 125,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Bob Smith", uniqueName: "bob@example.com" },
+          creationDate: "2023-01-03T00:00:00Z",
+          title: "Enhancement PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/enhancement-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [
+            {
+              id: "reviewer-1",
+              displayName: "File Core API Support",
+              uniqueName: "file-core@example.com",
+              isRequired: false, // Optional reviewer
+              vote: 0,
+            },
+          ],
+        },
+        {
+          pullRequestId: 126,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Alice Johnson", uniqueName: "alice@example.com" },
+          creationDate: "2023-01-04T00:00:00Z",
+          title: "Refactor PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/refactor-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [
+            {
+              id: "reviewer-1",
+              displayName: "File Core API Support",
+              uniqueName: "file-core@example.com",
+              isRequired: true, // Required reviewer
+              vote: 0,
+            },
+          ],
+        },
+      ];
+      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
+
+      const params = {
+        project: "test-project",
+        requiredReviewerDisplayName: "File Core API Support",
+        reviewerRequirement: "any",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      // Should return both PRs since we accept any reviewer type
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult).toHaveLength(2);
+      expect(parsedResult[0].pullRequestId).toBe(125);
+      expect(parsedResult[1].pullRequestId).toBe(126);
+    });
+
+    it("should filter out required reviewers when reviewerRequirement is 'optional'", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
+      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
+      const [, , , handler] = call;
+
+      const mockPRs = [
+        {
+          pullRequestId: 127,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Test User", uniqueName: "test@example.com" },
+          creationDate: "2023-01-05T00:00:00Z",
+          title: "Test PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/test-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [
+            {
+              id: "reviewer-1",
+              displayName: "File Core API Support",
+              uniqueName: "file-core@example.com",
+              isRequired: true, // Required reviewer - should be filtered out
+              vote: 0,
+            },
+          ],
+        },
+      ];
+      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
+
+      const params = {
+        project: "test-project",
+        requiredReviewerDisplayName: "File Core API Support",
+        reviewerRequirement: "optional",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      // Should return empty array since the reviewer is required, not optional
+      expect(result.content[0].text).toBe(JSON.stringify([], null, 2));
     });
 
     it("should return error when no reviewer identifier is provided", async () => {

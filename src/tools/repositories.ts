@@ -906,7 +906,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
 
   server.tool(
     REPO_TOOLS.list_ready_prs_with_required_reviewer,
-    "List pull requests that are ready for review (not draft) and include the given REQUIRED reviewer. Uses server-side filtering where possible (status, repository, reviewer ID) and client-side filtering for draft status and required reviewer distinction.",
+    "List pull requests that are ready for review (not draft) and include the given reviewer. Supports filtering by reviewer requirement type (required, optional, or any). Uses server-side filtering where possible (status, repository, reviewer ID) and client-side filtering for draft status and reviewer requirement distinction.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repositoryId: z
@@ -917,11 +917,15 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         .string()
         .uuid()
         .optional()
-        .describe("The UUID of the required reviewer."),
+        .describe("The UUID of the reviewer."),
       requiredReviewerDisplayName: z
         .string()
         .optional()
-        .describe("The display name of the required reviewer (e.g., 'File Core API Support')."),
+        .describe("The display name of the reviewer (e.g., 'File Core API Support')."),
+      reviewerRequirement: z
+        .enum(["required", "optional", "any"])
+        .default("required")
+        .describe("Filter by reviewer requirement type: 'required' (must be required reviewer), 'optional' (must be optional reviewer), 'any' (can be either required or optional). Defaults to 'required'."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
@@ -929,7 +933,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       top: z.number().default(100).describe("The maximum number of pull requests to return."),
       skip: z.number().default(0).describe("The number of pull requests to skip."),
     },
-    async ({ project, repositoryId, requiredReviewerId, requiredReviewerDisplayName, status, top, skip }) => {
+    async ({ project, repositoryId, requiredReviewerId, requiredReviewerDisplayName, reviewerRequirement, status, top, skip }) => {
       // Validate that at least one reviewer identifier is provided
       if (!requiredReviewerId && !requiredReviewerDisplayName) {
         return {
@@ -996,7 +1000,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         
         // Client-side filtering for criteria not supported by server-side API:
         // 1. Draft status (ready for review = not draft)
-        // 2. Required reviewer distinction (isRequired property)
+        // 2. Reviewer requirement distinction (isRequired property based on reviewerRequirement parameter)
         // 3. Display name matching (when no ID provided)
         const wantId = requiredReviewerId?.toLowerCase();
         const wantDisplayName = normalize(requiredReviewerDisplayName);
@@ -1006,23 +1010,37 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           // Note: This filtering is necessary because the API doesn't support isDraft filtering
           if (pr.isDraft) return false;
 
-          // Must have the specified required reviewer
+          // Must have the specified reviewer with the correct requirement type
           const reviewers = pr.reviewers ?? [];
           return reviewers.some((reviewer) => {
-            // Cast to access isRequired property which may not be in the interface
-            // Note: This filtering is necessary because the API doesn't distinguish between
-            // required vs optional reviewers in the reviewerId filter
-            const isRequired = (reviewer as any).isRequired === true;
-            if (!isRequired) return false;
-
+            // First check if this is the reviewer we're looking for
+            let isTargetReviewer = false;
+            
             // If we used server-side filtering by ID, all remaining reviewers should match
             if (wantId && reviewer.id) {
-              return reviewer.id.toLowerCase() === wantId;
+              isTargetReviewer = reviewer.id.toLowerCase() === wantId;
+            } else if (wantDisplayName) {
+              // Match by display name (only when ID not provided)
+              // Note: We can't do server-side filtering by display name, only by ID
+              isTargetReviewer = normalize(reviewer.displayName) === wantDisplayName;
             }
 
-            // Match by display name (only when ID not provided)
-            // Note: We can't do server-side filtering by display name, only by ID
-            return normalize(reviewer.displayName) === wantDisplayName;
+            if (!isTargetReviewer) return false;
+
+            // Now check if the reviewer requirement type matches what we want
+            // Cast to access isRequired property which may not be in the interface
+            const isRequired = (reviewer as any).isRequired === true;
+            
+            switch (reviewerRequirement) {
+              case "required":
+                return isRequired;
+              case "optional":
+                return !isRequired;
+              case "any":
+                return true; // Accept both required and optional
+              default:
+                return isRequired; // Default to required for backward compatibility
+            }
           });
         });
 
