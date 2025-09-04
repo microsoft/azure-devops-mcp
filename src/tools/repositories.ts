@@ -41,7 +41,7 @@ const REPO_TOOLS = {
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
-  list_ready_prs_with_required_reviewer: "repo_list_ready_prs_with_required_reviewer",
+  list_pull_requests: "repo_list_pull_requests",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -905,48 +905,91 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
   );
 
   server.tool(
-    REPO_TOOLS.list_ready_prs_with_required_reviewer,
-    "List pull requests that are ready for review (not draft) and include the given reviewer. Supports filtering by reviewer requirement type (required, optional, or any). Uses server-side filtering where possible (status, repository, reviewer ID) and client-side filtering for draft status and reviewer requirement distinction.",
+    REPO_TOOLS.list_pull_requests,
+    "Comprehensive pull request search with advanced filtering options. Supports filtering by status, draft state, reviewers, branches, text search, and more. Uses server-side filtering where possible for optimal performance.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repositoryId: z
         .string()
         .optional()
         .describe("If provided, scope search to this specific repository."),
-      requiredReviewerId: z
-        .string()
-        .uuid()
-        .optional()
-        .describe("The UUID of the reviewer."),
-      requiredReviewerDisplayName: z
-        .string()
-        .optional()
-        .describe("The display name of the reviewer (e.g., 'File Core API Support')."),
-      reviewerRequirement: z
-        .enum(["required", "optional", "any"])
-        .default("required")
-        .describe("Filter by reviewer requirement type: 'required' (must be required reviewer), 'optional' (must be optional reviewer), 'any' (can be either required or optional). Defaults to 'required'."),
+      
+      // Status & State
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
+      isDraft: z
+        .boolean()
+        .optional()
+        .describe("Filter by draft status: true=drafts only, false=ready for review only, undefined=both."),
+      
+      // People
+      createdBy: z
+        .string()
+        .optional()
+        .describe("Filter pull requests created by a specific user (provide email or unique name)."),
+      reviewerId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe("The UUID of a reviewer to filter by."),
+      reviewerDisplayName: z
+        .string()
+        .optional()
+        .describe("The display name of a reviewer to filter by (e.g., 'File Core API Support')."),
+      reviewerRequirement: z
+        .enum(["required", "optional", "any"])
+        .default("any")
+        .describe("Filter by reviewer requirement type: 'required' (must be required reviewer), 'optional' (must be optional reviewer), 'any' (can be either). Defaults to 'any'."),
+      
+      // Branches
+      sourceBranch: z
+        .string()
+        .optional()
+        .describe("Filter by source branch name (e.g., 'feature/my-branch')."),
+      targetBranch: z
+        .string()
+        .optional()
+        .describe("Filter by target branch name (e.g., 'main', 'develop')."),
+      
+      // Text Search
+      titleContains: z
+        .string()
+        .optional()
+        .describe("Filter by pull requests with titles containing this text (case-insensitive)."),
+      
+      // Date Filtering
+      createdAfter: z
+        .string()
+        .optional()
+        .describe("Filter pull requests created after this date (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."),
+      createdBefore: z
+        .string()
+        .optional()
+        .describe("Filter pull requests created before this date (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)."),
+      
+      // Pagination
       top: z.number().default(100).describe("The maximum number of pull requests to return."),
       skip: z.number().default(0).describe("The number of pull requests to skip."),
     },
-    async ({ project, repositoryId, requiredReviewerId, requiredReviewerDisplayName, reviewerRequirement, status, top, skip }) => {
-      // Validate that at least one reviewer identifier is provided
-      if (!requiredReviewerId && !requiredReviewerDisplayName) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Error: Either requiredReviewerId or requiredReviewerDisplayName must be provided.",
-            },
-          ],
-          isError: true,
-        };
-      }
-
+    async ({ 
+      project, 
+      repositoryId, 
+      status, 
+      isDraft, 
+      createdBy, 
+      reviewerId, 
+      reviewerDisplayName, 
+      reviewerRequirement, 
+      sourceBranch, 
+      targetBranch, 
+      titleContains, 
+      createdAfter, 
+      createdBefore, 
+      top, 
+      skip 
+    }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -956,6 +999,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           status: number;
           repositoryId?: string;
           reviewerId?: string;
+          creatorId?: string;
+          sourceRefName?: string;
+          targetRefName?: string;
         } = {
           status: pullRequestStatusStringToInt(status),
         };
@@ -964,10 +1010,35 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           searchCriteria.repositoryId = repositoryId;
         }
 
-        // If we have a reviewer ID, we can use it for server-side filtering
-        // This will significantly reduce the number of PRs we need to process client-side
-        if (requiredReviewerId) {
-          searchCriteria.reviewerId = requiredReviewerId;
+        // Server-side filtering for creator
+        if (createdBy) {
+          try {
+            const userId = await getUserIdFromEmail(createdBy, tokenProvider, connectionProvider, userAgentProvider);
+            searchCriteria.creatorId = userId;
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error finding user with email ${createdBy}: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
+        // Server-side filtering for reviewer (if ID provided)
+        if (reviewerId) {
+          searchCriteria.reviewerId = reviewerId;
+        }
+
+        // Server-side filtering for branches
+        if (sourceBranch) {
+          searchCriteria.sourceRefName = sourceBranch.startsWith('refs/heads/') ? sourceBranch : `refs/heads/${sourceBranch}`;
+        }
+        if (targetBranch) {
+          searchCriteria.targetRefName = targetBranch.startsWith('refs/heads/') ? targetBranch : `refs/heads/${targetBranch}`;
         }
 
         // Fetch PRs based on whether we're scoping to a repo or project-wide
@@ -998,50 +1069,63 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         // Helper function to normalize strings for comparison
         const normalize = (str?: string) => (str ?? "").trim().toLowerCase();
         
-        // Client-side filtering for criteria not supported by server-side API:
-        // 1. Draft status (ready for review = not draft)
-        // 2. Reviewer requirement distinction (isRequired property based on reviewerRequirement parameter)
-        // 3. Display name matching (when no ID provided)
-        const wantId = requiredReviewerId?.toLowerCase();
-        const wantDisplayName = normalize(requiredReviewerDisplayName);
+        // Client-side filtering for criteria not supported by server-side API
+        let filteredPullRequests = pullRequests.filter((pr) => {
+          // Draft status filtering
+          if (isDraft !== undefined) {
+            if (isDraft && !pr.isDraft) return false;
+            if (!isDraft && pr.isDraft) return false;
+          }
 
-        const filteredPullRequests = pullRequests.filter((pr) => {
-          // Must be ready for review (not draft)
-          // Note: This filtering is necessary because the API doesn't support isDraft filtering
-          if (pr.isDraft) return false;
+          // Title search filtering
+          if (titleContains && !normalize(pr.title).includes(normalize(titleContains))) {
+            return false;
+          }
 
-          // Must have the specified reviewer with the correct requirement type
-          const reviewers = pr.reviewers ?? [];
-          return reviewers.some((reviewer) => {
-            // First check if this is the reviewer we're looking for
-            let isTargetReviewer = false;
-            
-            // If we used server-side filtering by ID, all remaining reviewers should match
-            if (wantId && reviewer.id) {
-              isTargetReviewer = reviewer.id.toLowerCase() === wantId;
-            } else if (wantDisplayName) {
-              // Match by display name (only when ID not provided)
-              // Note: We can't do server-side filtering by display name, only by ID
-              isTargetReviewer = normalize(reviewer.displayName) === wantDisplayName;
-            }
+          // Date filtering
+          if (createdAfter && pr.creationDate) {
+            const createdDate = new Date(pr.creationDate);
+            const afterDate = new Date(createdAfter);
+            if (createdDate <= afterDate) return false;
+          }
+          if (createdBefore && pr.creationDate) {
+            const createdDate = new Date(pr.creationDate);
+            const beforeDate = new Date(createdBefore);
+            if (createdDate >= beforeDate) return false;
+          }
 
-            if (!isTargetReviewer) return false;
+          // Reviewer filtering (when display name provided or when requirement type matters)
+          if (reviewerDisplayName || (reviewerId && reviewerRequirement !== "any")) {
+            const reviewers = pr.reviewers ?? [];
+            const hasMatchingReviewer = reviewers.some((reviewer) => {
+              // Check if this is the target reviewer
+              let isTargetReviewer = false;
+              
+              if (reviewerId && reviewer.id) {
+                isTargetReviewer = reviewer.id.toLowerCase() === reviewerId.toLowerCase();
+              } else if (reviewerDisplayName) {
+                isTargetReviewer = normalize(reviewer.displayName) === normalize(reviewerDisplayName);
+              }
 
-            // Now check if the reviewer requirement type matches what we want
-            // Cast to access isRequired property which may not be in the interface
-            const isRequired = (reviewer as any).isRequired === true;
-            
-            switch (reviewerRequirement) {
-              case "required":
-                return isRequired;
-              case "optional":
-                return !isRequired;
-              case "any":
-                return true; // Accept both required and optional
-              default:
-                return isRequired; // Default to required for backward compatibility
-            }
-          });
+              if (!isTargetReviewer) return false;
+
+              // Check reviewer requirement type
+              const isRequired = (reviewer as any).isRequired === true;
+              switch (reviewerRequirement) {
+                case "required":
+                  return isRequired;
+                case "optional":
+                  return !isRequired;
+                case "any":
+                default:
+                  return true;
+              }
+            });
+
+            if (!hasMatchingReviewer) return false;
+          }
+
+          return true;
         });
 
         // Format the response with relevant properties
@@ -1049,13 +1133,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           pullRequestId: pr.pullRequestId,
           repository: pr.repository?.name,
           status: pr.status,
+          isDraft: pr.isDraft,
           createdBy: {
             displayName: pr.createdBy?.displayName,
             uniqueName: pr.createdBy?.uniqueName,
           },
           creationDate: pr.creationDate,
           title: pr.title,
-          isDraft: pr.isDraft,
+          description: pr.description,
           sourceRefName: pr.sourceRefName,
           targetRefName: pr.targetRefName,
           reviewers: pr.reviewers?.map((r) => ({
@@ -1065,6 +1150,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             isRequired: (r as any).isRequired,
             vote: r.vote,
           })),
+          labels: pr.labels,
+          autoCompleteSetBy: pr.autoCompleteSetBy ? {
+            displayName: pr.autoCompleteSetBy.displayName,
+            uniqueName: pr.autoCompleteSetBy.uniqueName,
+          } : undefined,
+          closedDate: pr.closedDate,
+          mergeStatus: pr.mergeStatus,
         }));
 
         return {
@@ -1075,7 +1167,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           content: [
             {
               type: "text",
-              text: `Error fetching pull requests with required reviewer: ${error instanceof Error ? error.message : String(error)}`,
+              text: `Error retrieving pull requests: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

@@ -88,7 +88,7 @@ Interact with these Azure DevOps services:
 - **repo_list_branches_by_repo**: Retrieve a list of branches for a given repository.
 - **repo_list_my_branches_by_repo**: Retrieve a list of your branches for a given repository ID.
 - **repo_list_pull_requests_by_commits**: List pull requests associated with commits.
-- **repo_list_ready_prs_with_required_reviewer**: List pull requests that are ready for review (not draft) and include the given reviewer. Supports filtering by reviewer requirement type (required, optional, or any).
+- **repo_list_pull_requests**: Comprehensive pull request search with advanced filtering options. Supports filtering by status, draft state, reviewers, branches, text search, date ranges, and more.
 - **repo_list_pull_request_threads**: Retrieve a list of comment threads for a pull request.
 - **repo_list_pull_request_thread_comments**: Retrieve a list of comments in a pull request thread.
 - **repo_get_repo_by_name_or_id**: Get the repository by project and repository name or ID.

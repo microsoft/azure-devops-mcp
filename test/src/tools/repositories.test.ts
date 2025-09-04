@@ -2954,12 +2954,12 @@ describe("repos tools", () => {
     });
   });
 
-  describe("repo_list_ready_prs_with_required_reviewer", () => {
-    it("should list ready PRs with required reviewer by display name (default behavior)", async () => {
+  describe("repo_list_pull_requests", () => {
+    it("should list PRs with comprehensive filtering options", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
-      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests);
+      if (!call) throw new Error("repo_list_pull_requests tool not registered");
       const [, , , handler] = call;
 
       const mockPRs = [
@@ -2970,6 +2970,7 @@ describe("repos tools", () => {
           createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
+          description: "Adding new feature",
           isDraft: false,
           sourceRefName: "refs/heads/feature-branch",
           targetRefName: "refs/heads/main",
@@ -2982,13 +2983,19 @@ describe("repos tools", () => {
               vote: 0,
             },
           ],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
         },
       ];
       mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
 
       const params = {
         project: "test-project",
-        requiredReviewerDisplayName: "File Core API Support",
+        reviewerDisplayName: "File Core API Support",
+        isDraft: false,
+        titleContains: "Feature",
         status: "Active",
         top: 100,
         skip: 0,
@@ -3009,10 +3016,11 @@ describe("repos tools", () => {
           pullRequestId: 123,
           repository: "test-repo",
           status: PullRequestStatus.Active,
+          isDraft: false,
           createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
-          isDraft: false,
+          description: "Adding new feature",
           sourceRefName: "refs/heads/feature-branch",
           targetRefName: "refs/heads/main",
           reviewers: [
@@ -3024,17 +3032,21 @@ describe("repos tools", () => {
               vote: 0,
             },
           ],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
         },
       ];
 
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
     });
 
-    it("should list ready PRs with optional reviewer when reviewerRequirement is 'optional'", async () => {
+    it("should filter by draft status (drafts only)", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
-      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests);
+      if (!call) throw new Error("repo_list_pull_requests tool not registered");
       const [, , , handler] = call;
 
       const mockPRs = [
@@ -3044,115 +3056,40 @@ describe("repos tools", () => {
           status: PullRequestStatus.Active,
           createdBy: { displayName: "Jane Doe", uniqueName: "jane@example.com" },
           creationDate: "2023-01-02T00:00:00Z",
-          title: "Bug Fix PR",
-          isDraft: false,
-          sourceRefName: "refs/heads/bugfix-branch",
+          title: "Draft PR",
+          description: "Work in progress",
+          isDraft: true,
+          sourceRefName: "refs/heads/draft-branch",
           targetRefName: "refs/heads/main",
-          reviewers: [
-            {
-              id: "reviewer-1",
-              displayName: "File Core API Support",
-              uniqueName: "file-core@example.com",
-              isRequired: false, // Optional reviewer
-              vote: 0,
-            },
-          ],
+          reviewers: [],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
         },
-      ];
-      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
-
-      const params = {
-        project: "test-project",
-        requiredReviewerDisplayName: "File Core API Support",
-        reviewerRequirement: "optional",
-        status: "Active",
-        top: 100,
-        skip: 0,
-      };
-
-      const result = await handler(params);
-
-      const expectedResult = [
-        {
-          pullRequestId: 124,
-          repository: "test-repo",
-          status: PullRequestStatus.Active,
-          createdBy: { displayName: "Jane Doe", uniqueName: "jane@example.com" },
-          creationDate: "2023-01-02T00:00:00Z",
-          title: "Bug Fix PR",
-          isDraft: false,
-          sourceRefName: "refs/heads/bugfix-branch",
-          targetRefName: "refs/heads/main",
-          reviewers: [
-            {
-              displayName: "File Core API Support",
-              uniqueName: "file-core@example.com",
-              id: "reviewer-1",
-              isRequired: false,
-              vote: 0,
-            },
-          ],
-        },
-      ];
-
-      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
-    });
-
-    it("should list ready PRs with any reviewer type when reviewerRequirement is 'any'", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
-      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
-      const [, , , handler] = call;
-
-      const mockPRs = [
         {
           pullRequestId: 125,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
           createdBy: { displayName: "Bob Smith", uniqueName: "bob@example.com" },
           creationDate: "2023-01-03T00:00:00Z",
-          title: "Enhancement PR",
+          title: "Ready PR",
+          description: "Ready for review",
           isDraft: false,
-          sourceRefName: "refs/heads/enhancement-branch",
+          sourceRefName: "refs/heads/ready-branch",
           targetRefName: "refs/heads/main",
-          reviewers: [
-            {
-              id: "reviewer-1",
-              displayName: "File Core API Support",
-              uniqueName: "file-core@example.com",
-              isRequired: false, // Optional reviewer
-              vote: 0,
-            },
-          ],
-        },
-        {
-          pullRequestId: 126,
-          repository: { name: "test-repo" },
-          status: PullRequestStatus.Active,
-          createdBy: { displayName: "Alice Johnson", uniqueName: "alice@example.com" },
-          creationDate: "2023-01-04T00:00:00Z",
-          title: "Refactor PR",
-          isDraft: false,
-          sourceRefName: "refs/heads/refactor-branch",
-          targetRefName: "refs/heads/main",
-          reviewers: [
-            {
-              id: "reviewer-1",
-              displayName: "File Core API Support",
-              uniqueName: "file-core@example.com",
-              isRequired: true, // Required reviewer
-              vote: 0,
-            },
-          ],
+          reviewers: [],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
         },
       ];
       mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
 
       const params = {
         project: "test-project",
-        requiredReviewerDisplayName: "File Core API Support",
-        reviewerRequirement: "any",
+        isDraft: true, // Only drafts
         status: "Active",
         top: 100,
         skip: 0,
@@ -3160,28 +3097,89 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      // Should return both PRs since we accept any reviewer type
       const parsedResult = JSON.parse(result.content[0].text);
-      expect(parsedResult).toHaveLength(2);
-      expect(parsedResult[0].pullRequestId).toBe(125);
-      expect(parsedResult[1].pullRequestId).toBe(126);
+      expect(parsedResult).toHaveLength(1);
+      expect(parsedResult[0].pullRequestId).toBe(124);
+      expect(parsedResult[0].isDraft).toBe(true);
     });
 
-    it("should filter out required reviewers when reviewerRequirement is 'optional'", async () => {
+    it("should filter by title text", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
-      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests);
+      if (!call) throw new Error("repo_list_pull_requests tool not registered");
       const [, , , handler] = call;
 
       const mockPRs = [
         {
+          pullRequestId: 126,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Alice Johnson", uniqueName: "alice@example.com" },
+          creationDate: "2023-01-04T00:00:00Z",
+          title: "Fix critical bug in payment system",
+          description: "This fixes the bug",
+          isDraft: false,
+          sourceRefName: "refs/heads/bugfix-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
+        },
+        {
           pullRequestId: 127,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
-          createdBy: { displayName: "Test User", uniqueName: "test@example.com" },
+          createdBy: { displayName: "Charlie Brown", uniqueName: "charlie@example.com" },
           creationDate: "2023-01-05T00:00:00Z",
+          title: "Add new feature for users",
+          description: "New feature implementation",
+          isDraft: false,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
+        },
+      ];
+      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
+
+      const params = {
+        project: "test-project",
+        titleContains: "bug",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult).toHaveLength(1);
+      expect(parsedResult[0].pullRequestId).toBe(126);
+      expect(parsedResult[0].title).toContain("bug");
+    });
+
+    it("should filter by reviewer requirement type", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests);
+      if (!call) throw new Error("repo_list_pull_requests tool not registered");
+      const [, , , handler] = call;
+
+      const mockPRs = [
+        {
+          pullRequestId: 128,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Test User", uniqueName: "test@example.com" },
+          creationDate: "2023-01-06T00:00:00Z",
           title: "Test PR",
+          description: "Test description",
           isDraft: false,
           sourceRefName: "refs/heads/test-branch",
           targetRefName: "refs/heads/main",
@@ -3190,17 +3188,21 @@ describe("repos tools", () => {
               id: "reviewer-1",
               displayName: "File Core API Support",
               uniqueName: "file-core@example.com",
-              isRequired: true, // Required reviewer - should be filtered out
+              isRequired: false, // Optional reviewer
               vote: 0,
             },
           ],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
         },
       ];
       mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
 
       const params = {
         project: "test-project",
-        requiredReviewerDisplayName: "File Core API Support",
+        reviewerDisplayName: "File Core API Support",
         reviewerRequirement: "optional",
         status: "Active",
         top: 100,
@@ -3209,28 +3211,9 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      // Should return empty array since the reviewer is required, not optional
-      expect(result.content[0].text).toBe(JSON.stringify([], null, 2));
-    });
-
-    it("should return error when no reviewer identifier is provided", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_ready_prs_with_required_reviewer);
-      if (!call) throw new Error("repo_list_ready_prs_with_required_reviewer tool not registered");
-      const [, , , handler] = call;
-
-      const params = {
-        project: "test-project",
-        status: "Active",
-        top: 100,
-        skip: 0,
-      };
-
-      const result = await handler(params);
-
-      expect(result.content[0].text).toBe("Error: Either requiredReviewerId or requiredReviewerDisplayName must be provided.");
-      expect(result.isError).toBe(true);
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult).toHaveLength(1);
+      expect(parsedResult[0].reviewers[0].isRequired).toBe(false);
     });
   });
 });
