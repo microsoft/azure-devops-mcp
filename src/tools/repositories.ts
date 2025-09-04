@@ -41,6 +41,7 @@ const REPO_TOOLS = {
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
+  list_ready_prs_with_required_reviewer: "repo_list_ready_prs_with_required_reviewer",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -895,6 +896,168 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             {
               type: "text",
               text: `Error querying pull requests by commits: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.list_ready_prs_with_required_reviewer,
+    "List pull requests that are ready for review (not draft) and include the given REQUIRED reviewer. Uses server-side filtering where possible (status, repository, reviewer ID) and client-side filtering for draft status and required reviewer distinction.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      repositoryId: z
+        .string()
+        .optional()
+        .describe("If provided, scope search to this specific repository."),
+      requiredReviewerId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe("The UUID of the required reviewer."),
+      requiredReviewerDisplayName: z
+        .string()
+        .optional()
+        .describe("The display name of the required reviewer (e.g., 'File Core API Support')."),
+      status: z
+        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
+        .default("Active")
+        .describe("Filter pull requests by status. Defaults to 'Active'."),
+      top: z.number().default(100).describe("The maximum number of pull requests to return."),
+      skip: z.number().default(0).describe("The number of pull requests to skip."),
+    },
+    async ({ project, repositoryId, requiredReviewerId, requiredReviewerDisplayName, status, top, skip }) => {
+      // Validate that at least one reviewer identifier is provided
+      if (!requiredReviewerId && !requiredReviewerDisplayName) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Error: Either requiredReviewerId or requiredReviewerDisplayName must be provided.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        // Build the search criteria for server-side filtering
+        const searchCriteria: {
+          status: number;
+          repositoryId?: string;
+          reviewerId?: string;
+        } = {
+          status: pullRequestStatusStringToInt(status),
+        };
+
+        if (repositoryId) {
+          searchCriteria.repositoryId = repositoryId;
+        }
+
+        // If we have a reviewer ID, we can use it for server-side filtering
+        // This will significantly reduce the number of PRs we need to process client-side
+        if (requiredReviewerId) {
+          searchCriteria.reviewerId = requiredReviewerId;
+        }
+
+        // Fetch PRs based on whether we're scoping to a repo or project-wide
+        const pullRequests = repositoryId
+          ? await gitApi.getPullRequests(
+              repositoryId,
+              searchCriteria,
+              undefined, // project
+              undefined, // maxCommentLength
+              skip,
+              top
+            )
+          : await gitApi.getPullRequestsByProject(
+              project,
+              searchCriteria,
+              undefined, // maxCommentLength
+              skip,
+              top
+            );
+
+        // Early return if no PRs found
+        if (!pullRequests || pullRequests.length === 0) {
+          return {
+            content: [{ type: "text", text: JSON.stringify([], null, 2) }],
+          };
+        }
+
+        // Helper function to normalize strings for comparison
+        const normalize = (str?: string) => (str ?? "").trim().toLowerCase();
+        
+        // Client-side filtering for criteria not supported by server-side API:
+        // 1. Draft status (ready for review = not draft)
+        // 2. Required reviewer distinction (isRequired property)
+        // 3. Display name matching (when no ID provided)
+        const wantId = requiredReviewerId?.toLowerCase();
+        const wantDisplayName = normalize(requiredReviewerDisplayName);
+
+        const filteredPullRequests = pullRequests.filter((pr) => {
+          // Must be ready for review (not draft)
+          // Note: This filtering is necessary because the API doesn't support isDraft filtering
+          if (pr.isDraft) return false;
+
+          // Must have the specified required reviewer
+          const reviewers = pr.reviewers ?? [];
+          return reviewers.some((reviewer) => {
+            // Cast to access isRequired property which may not be in the interface
+            // Note: This filtering is necessary because the API doesn't distinguish between
+            // required vs optional reviewers in the reviewerId filter
+            const isRequired = (reviewer as any).isRequired === true;
+            if (!isRequired) return false;
+
+            // If we used server-side filtering by ID, all remaining reviewers should match
+            if (wantId && reviewer.id) {
+              return reviewer.id.toLowerCase() === wantId;
+            }
+
+            // Match by display name (only when ID not provided)
+            // Note: We can't do server-side filtering by display name, only by ID
+            return normalize(reviewer.displayName) === wantDisplayName;
+          });
+        });
+
+        // Format the response with relevant properties
+        const result = filteredPullRequests.map((pr) => ({
+          pullRequestId: pr.pullRequestId,
+          repository: pr.repository?.name,
+          status: pr.status,
+          createdBy: {
+            displayName: pr.createdBy?.displayName,
+            uniqueName: pr.createdBy?.uniqueName,
+          },
+          creationDate: pr.creationDate,
+          title: pr.title,
+          isDraft: pr.isDraft,
+          sourceRefName: pr.sourceRefName,
+          targetRefName: pr.targetRefName,
+          reviewers: pr.reviewers?.map((r) => ({
+            displayName: r.displayName,
+            uniqueName: r.uniqueName,
+            id: r.id,
+            isRequired: (r as any).isRequired,
+            vote: r.vote,
+          })),
+        }));
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error fetching pull requests with required reviewer: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
