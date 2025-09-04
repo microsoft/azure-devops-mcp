@@ -921,7 +921,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       // People
       createdBy: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name)."),
       reviewerId: z.string().uuid().optional().describe("The UUID of a reviewer to filter by."),
-      reviewerDisplayName: z.string().optional().describe("The display name of a reviewer to filter by (e.g., 'File Core API Support')."),
+      reviewerDisplayName: z.string().optional().describe("The display name of a reviewer to filter by (e.g., 'File Core API Support'). Uses contains matching to handle prefixes like '[TEAM FOUNDATION]\\'."),
       reviewerRequirement: z
         .enum(["required", "optional", "any"])
         .default("any")
@@ -1073,7 +1073,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
               if (reviewerId && reviewer.id) {
                 isTargetReviewer = reviewer.id.toLowerCase() === reviewerId.toLowerCase();
               } else if (reviewerDisplayName) {
-                isTargetReviewer = normalize(reviewer.displayName) === normalize(reviewerDisplayName);
+                isTargetReviewer = normalize(reviewer.displayName).includes(normalize(reviewerDisplayName));
               }
 
               if (!isTargetReviewer) return false;

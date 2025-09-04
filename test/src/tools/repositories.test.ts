@@ -3209,5 +3209,82 @@ describe("repos tools", () => {
       expect(parsedResult).toHaveLength(1);
       expect(parsedResult[0].reviewers[0].isRequired).toBe(false);
     });
+
+    it("should match reviewers with display name using contains matching (handles prefixes)", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests);
+      if (!call) throw new Error("repo_list_pull_requests tool not registered");
+      const [, , , handler] = call;
+
+      const mockPRs = [
+        {
+          pullRequestId: 129,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Test User", uniqueName: "test@example.com" },
+          creationDate: "2023-01-07T00:00:00Z",
+          title: "Test PR with prefixed reviewer",
+          description: "Test description",
+          isDraft: false,
+          sourceRefName: "refs/heads/test-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [
+            {
+              id: "reviewer-1",
+              displayName: "[TEAM FOUNDATION]\\File Core API Support", // Display name with prefix
+              uniqueName: "file-core@example.com",
+              isRequired: true,
+              vote: 0,
+            },
+          ],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
+        },
+        {
+          pullRequestId: 130,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.Active,
+          createdBy: { displayName: "Another User", uniqueName: "another@example.com" },
+          creationDate: "2023-01-08T00:00:00Z",
+          title: "PR without matching reviewer",
+          description: "Test description",
+          isDraft: false,
+          sourceRefName: "refs/heads/other-branch",
+          targetRefName: "refs/heads/main",
+          reviewers: [
+            {
+              id: "reviewer-2",
+              displayName: "Different Reviewer",
+              uniqueName: "different@example.com",
+              isRequired: false,
+              vote: 0,
+            },
+          ],
+          labels: [],
+          autoCompleteSetBy: undefined,
+          closedDate: undefined,
+          mergeStatus: undefined,
+        },
+      ];
+      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
+
+      const params = {
+        project: "test-project",
+        reviewerDisplayName: "File Core API Support", // Search without prefix
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult).toHaveLength(1);
+      expect(parsedResult[0].pullRequestId).toBe(129);
+      expect(parsedResult[0].reviewers[0].displayName).toBe("[TEAM FOUNDATION]\\File Core API Support");
+    });
   });
 });
