@@ -280,8 +280,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
+      sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
+      targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
-    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status }) => {
+    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -291,10 +293,20 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         repositoryId: string;
         creatorId?: string;
         reviewerId?: string;
+        sourceRefName?: string;
+        targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
         repositoryId: repositoryId,
       };
+
+      if (sourceRefName) {
+        searchCriteria.sourceRefName = sourceRefName;
+      }
+
+      if (targetRefName) {
+        searchCriteria.targetRefName = targetRefName;
+      }
 
       if (created_by_user) {
         try {
@@ -387,8 +399,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
+      sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
+      targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
-    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status }) => {
+    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -397,9 +411,19 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         status: number;
         creatorId?: string;
         reviewerId?: string;
+        sourceRefName?: string;
+        targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
       };
+
+      if (sourceRefName) {
+        gitPullRequestSearchCriteria.sourceRefName = sourceRefName;
+      }
+
+      if (targetRefName) {
+        gitPullRequestSearchCriteria.targetRefName = targetRefName;
+      }
 
       if (created_by_user) {
         try {

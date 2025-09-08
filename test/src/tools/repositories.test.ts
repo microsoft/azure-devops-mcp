@@ -625,6 +625,147 @@ describe("repos tools", () => {
       expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", { status: PullRequestStatus.Active, repositoryId: "repo123", creatorId: "specific-user-123" }, undefined, undefined, 0, 100);
     });
 
+    it("should filter pull requests by source branch", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_repo);
+      if (!call) throw new Error("repo_list_pull_requests_by_repo tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequests.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature-branch",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
+    });
+
+    it("should filter pull requests by target branch", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_repo);
+      if (!call) throw new Error("repo_list_pull_requests_by_repo tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequests.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "repo123",
+        targetRefName: "refs/heads/main",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
+    });
+
+    it("should filter pull requests by both source and target branches", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_repo);
+      if (!call) throw new Error("repo_list_pull_requests_by_repo tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequests.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
+    });
+
+    it("should combine branch filters with user filters", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_repo);
+      if (!call) throw new Error("repo_list_pull_requests_by_repo tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequests.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        created_by_me: true,
+        i_am_reviewer: true,
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGetCurrentUserDetails).toHaveBeenCalled();
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+          creatorId: "user123",
+          reviewerId: "user123",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
+    });
+
     it("should filter pull requests by specific reviewer successfully", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -984,6 +1125,137 @@ describe("repos tools", () => {
       ];
 
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should filter pull requests by source branch", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_project);
+      if (!call) throw new Error("repo_list_pull_requests_by_project tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestsByProject.mockResolvedValue([]);
+
+      const params = {
+        project: "test-project",
+        sourceRefName: "refs/heads/feature-branch",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          sourceRefName: "refs/heads/feature-branch",
+        },
+        undefined,
+        0,
+        100
+      );
+    });
+
+    it("should filter pull requests by target branch", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_project);
+      if (!call) throw new Error("repo_list_pull_requests_by_project tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestsByProject.mockResolvedValue([]);
+
+      const params = {
+        project: "test-project",
+        targetRefName: "refs/heads/main",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        0,
+        100
+      );
+    });
+
+    it("should filter pull requests by both source and target branches", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_project);
+      if (!call) throw new Error("repo_list_pull_requests_by_project tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestsByProject.mockResolvedValue([]);
+
+      const params = {
+        project: "test-project",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        0,
+        100
+      );
+    });
+
+    it("should combine branch filters with user filters", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_project);
+      if (!call) throw new Error("repo_list_pull_requests_by_project tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestsByProject.mockResolvedValue([]);
+
+      const params = {
+        project: "test-project",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        created_by_me: true,
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      await handler(params);
+
+      expect(mockGetCurrentUserDetails).toHaveBeenCalled();
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+          creatorId: "user123",
+        },
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should filter pull requests by specific reviewer successfully", async () => {
