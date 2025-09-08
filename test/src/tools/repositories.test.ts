@@ -644,11 +644,18 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", {
-        status: PullRequestStatus.Active,
-        repositoryId: "repo123",
-        sourceRefName: "refs/heads/feature-branch"
-      }, undefined, undefined, 0, 100);
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature-branch",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should filter pull requests by target branch", async () => {
@@ -670,11 +677,18 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", {
-        status: PullRequestStatus.Active,
-        repositoryId: "repo123",
-        targetRefName: "refs/heads/main"
-      }, undefined, undefined, 0, 100);
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should filter pull requests by both source and target branches", async () => {
@@ -697,12 +711,19 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", {
-        status: PullRequestStatus.Active,
-        repositoryId: "repo123",
-        sourceRefName: "refs/heads/feature-branch",
-        targetRefName: "refs/heads/main"
-      }, undefined, undefined, 0, 100);
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should combine branch filters with user filters", async () => {
@@ -728,14 +749,21 @@ describe("repos tools", () => {
       await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalled();
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", {
-        status: PullRequestStatus.Active,
-        repositoryId: "repo123",
-        sourceRefName: "refs/heads/feature-branch",
-        targetRefName: "refs/heads/main",
-        creatorId: "user123",
-        reviewerId: "user123"
-      }, undefined, undefined, 0, 100);
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        {
+          status: PullRequestStatus.Active,
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+          creatorId: "user123",
+          reviewerId: "user123",
+        },
+        undefined,
+        undefined,
+        0,
+        100
+      );
     });
   });
 
@@ -1033,10 +1061,16 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", {
-        status: PullRequestStatus.Active,
-        sourceRefName: "refs/heads/feature-branch"
-      }, undefined, 0, 100);
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          sourceRefName: "refs/heads/feature-branch",
+        },
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should filter pull requests by target branch", async () => {
@@ -1058,10 +1092,16 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", {
-        status: PullRequestStatus.Active,
-        targetRefName: "refs/heads/main"
-      }, undefined, 0, 100);
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should filter pull requests by both source and target branches", async () => {
@@ -1084,11 +1124,17 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", {
-        status: PullRequestStatus.Active,
-        sourceRefName: "refs/heads/feature-branch",
-        targetRefName: "refs/heads/main"
-      }, undefined, 0, 100);
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+        },
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should combine branch filters with user filters", async () => {
@@ -1113,12 +1159,18 @@ describe("repos tools", () => {
       await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalled();
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", {
-        status: PullRequestStatus.Active,
-        sourceRefName: "refs/heads/feature-branch",
-        targetRefName: "refs/heads/main",
-        creatorId: "user123"
-      }, undefined, 0, 100);
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+          creatorId: "user123",
+        },
+        undefined,
+        0,
+        100
+      );
     });
   });
 
