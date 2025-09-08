@@ -262,7 +262,118 @@ describe("repos tools", () => {
 
       expect(mockGitApi.updatePullRequest).not.toHaveBeenCalled();
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("At least one field (title, description, isDraft, targetRefName, or status) must be provided for update.");
+      expect(result.content[0].text).toContain("At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update.");
+    });
+
+    it("should update pull request with autocomplete enabled", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        title: "Updated PR",
+        autoCompleteSetBy: { id: "user-id" },
+        completionOptions: {
+          mergeStrategy: 2, // Squash
+          deleteSourceBranch: true,
+          transitionWorkItems: true,
+          bypassPolicy: false,
+        },
+      };
+
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+      mockGetCurrentUserDetails.mockResolvedValue({
+        authenticatedUser: { id: "current-user-id" },
+        authorizedUser: { id: "current-user-id" },
+      });
+
+      const params = {
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        autoComplete: true,
+        mergeStrategy: "Squash",
+        deleteSourceBranch: true,
+        transitionWorkItems: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoCompleteSetBy: { id: "current-user-id" },
+          completionOptions: expect.objectContaining({
+            mergeStrategy: 2, // GitPullRequestMergeStrategy.Squash
+            deleteSourceBranch: true,
+            transitionWorkItems: true,
+            bypassPolicy: false,
+          }),
+        }),
+        "test-repo-id",
+        123
+      );
+      expect(result.isError).toBeFalsy();
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.pullRequestId).toBe(123);
+    });
+
+    it("should disable autocomplete when autoComplete is false", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        title: "Updated PR",
+        autoCompleteSetBy: null,
+        completionOptions: null,
+      };
+
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
+      const params = {
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        autoComplete: false,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoCompleteSetBy: null,
+          completionOptions: null,
+        }),
+        "test-repo-id",
+        123
+      );
+      expect(result.isError).toBeFalsy();
+    });
+
+    it("should return error when bypassPolicy is true but bypassReason is not provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        autoComplete: true,
+        bypassPolicy: true,
+        // bypassReason is missing
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("bypassReason is required when bypassPolicy is set to true");
     });
   });
 
