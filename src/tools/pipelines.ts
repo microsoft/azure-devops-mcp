@@ -9,23 +9,23 @@ import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/int
 import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 
-const BUILD_TOOLS = {
-  get_builds: "build_get_builds",
-  get_changes: "build_get_changes",
-  get_definitions: "build_get_definitions",
-  get_definition_revisions: "build_get_definition_revisions",
-  get_log: "build_get_log",
-  get_log_by_id: "build_get_log_by_id",
-  get_status: "build_get_status",
+const PIPELINE_TOOLS = {
+  pipelines_get_builds: "pipelines_get_builds",
+  pipelines_get_build_changes: "pipelines_get_build_changes",
+  pipelines_get_build_definitions: "pipelines_get_build_definitions",
+  pipelines_get_build_definition_revisions: "pipelines_get_build_definition_revisions",
+  pipelines_get_build_log: "pipelines_get_build_log",
+  pipelines_get_build_log_by_id: "pipelines_get_build_log_by_id",
+  pipelines_get_build_status: "pipelines_get_build_status",
+  pipelines_update_build_stage: "pipelines_update_build_stage",
   pipelines_get_run: "pipelines_get_run",
   pipelines_list_runs: "pipelines_list_runs",
   pipelines_run_pipeline: "pipelines_run_pipeline",
-  update_build_stage: "build_update_build_stage",
 };
 
-function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
-    BUILD_TOOLS.get_definitions,
+    PIPELINE_TOOLS.pipelines_get_build_definitions,
     "Retrieves a list of build definitions for a given project.",
     {
       project: z.string().describe("Project ID or name to get build definitions for"),
@@ -97,7 +97,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_definition_revisions,
+    PIPELINE_TOOLS.pipelines_get_build_definition_revisions,
     "Retrieves a list of revisions for a specific build definition.",
     {
       project: z.string().describe("Project ID or name to get the build definition revisions for"),
@@ -115,7 +115,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_builds,
+    PIPELINE_TOOLS.pipelines_get_builds,
     "Retrieves a list of builds for a given project.",
     {
       project: z.string().describe("Project ID or name to get builds for"),
@@ -200,7 +200,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_log,
+    PIPELINE_TOOLS.pipelines_get_build_log,
     "Retrieves the logs for a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build log for"),
@@ -218,7 +218,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_log_by_id,
+    PIPELINE_TOOLS.pipelines_get_build_log_by_id,
     "Get a specific build log by log ID.",
     {
       project: z.string().describe("Project ID or name to get the build log for"),
@@ -239,7 +239,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_changes,
+    PIPELINE_TOOLS.pipelines_get_build_changes,
     "Get the changes associated with a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build changes for"),
@@ -260,7 +260,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.pipelines_get_run,
+    PIPELINE_TOOLS.pipelines_get_run,
     "Gets a run for a particular pipeline.",
     {
       project: z.string().describe("Project ID or name to run the build in"),
@@ -279,7 +279,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.pipelines_list_runs,
+    PIPELINE_TOOLS.pipelines_list_runs,
     "Gets top 10000 runs for a particular pipeline.",
     {
       project: z.string().describe("Project ID or name to run the build in"),
@@ -347,7 +347,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   });
 
   server.tool(
-    BUILD_TOOLS.pipelines_run_pipeline,
+    PIPELINE_TOOLS.pipelines_run_pipeline,
     "Starts a new run of a pipeline.",
     {
       project: z.string().describe("Project ID or name to run the build in"),
@@ -392,7 +392,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_status,
+    PIPELINE_TOOLS.pipelines_get_build_status,
     "Fetches the status of a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build status for"),
@@ -410,7 +410,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.update_build_stage,
+    PIPELINE_TOOLS.pipelines_update_build_stage,
     "Updates the stage of a specific build.",
     {
       project: z.string().describe("Project ID or name to update the build stage for"),
@@ -454,4 +454,4 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 }
 
-export { BUILD_TOOLS, configureBuildTools };
+export { PIPELINE_TOOLS, configurePipelineTools };

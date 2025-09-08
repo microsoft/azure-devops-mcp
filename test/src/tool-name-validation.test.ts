@@ -8,7 +8,7 @@ describe("Tool Name Validation", () => {
     test("should accept valid tool names", () => {
       const validNames = [
         "repo_create_pull_request",
-        "build_get_status",
+        "pipelines_get_build_status",
         "tool.name",
         "tool-name",
         "tool_123",
@@ -104,15 +104,15 @@ describe("Tool Name Validation", () => {
           createPullRequest: "repo_create_pull_request",
           listBranches: "repo_list_branches",
         };
-        
+
         const BUILD_TOOLS = {
-          getBuild: "build_get_build",
-          runBuild: "build_run_build",
+          getBuild: "pipelines_get_builds",
+          runBuild: "pipelines_run_pipeline",
         };
       `;
 
       const result = extractToolNames(fileContent);
-      expect(result).toEqual(["repo_get_repo", "repo_create_pull_request", "repo_list_branches", "build_get_build", "build_run_build"]);
+      expect(result).toEqual(["repo_get_repo", "repo_create_pull_request", "repo_list_branches", "pipelines_get_builds", "pipelines_run_pipeline"]);
     });
 
     test("should handle different tool constant naming patterns", () => {
@@ -121,11 +121,11 @@ describe("Tool Name Validation", () => {
           getWorkItem: "wit_get_work_item",
           updateWorkItem: "wit_update_work_item",
         };
-        
+
         const Test_Plan_Tools = {
           createTestPlan: "testplan_create_test_plan",
         };
-        
+
         const WIKI_TOOL = {
           getWiki: "wiki_get_wiki",
         };
@@ -140,7 +140,7 @@ describe("Tool Name Validation", () => {
         const someOtherConstant = {
           value: "not_a_tool",
         };
-        
+
         function someFunction() {
           return "also_not_a_tool";
         }
@@ -174,7 +174,7 @@ describe("Tool Name Validation", () => {
           includeDetails: z.boolean().optional(),
           maxResults: z.number(),
         });
-        
+
         const anotherSchema = z.object({
           buildId: z.string(),
           status: z.enum(['pending', 'running', 'completed']),
@@ -207,7 +207,7 @@ describe("Tool Name Validation", () => {
           regularProperty: "value",
           anotherProperty: 123,
         };
-        
+
         function regularFunction() {
           return "not a schema";
         }
@@ -220,20 +220,20 @@ describe("Tool Name Validation", () => {
     test("should handle mixed content with both schemas and other code", () => {
       const fileContent = `
         import { z } from 'zod';
-        
+
         const REPO_TOOLS = {
           getRepo: "repo_get_repo",
         };
-        
+
         const getRepoSchema = z.object({
           repositoryId: z.string(),
           includeMetadata: z.boolean().optional(),
         });
-        
+
         function someHelper() {
           return "helper function";
         }
-        
+
         const updateSchema = z.object({
           id: z.string(),
           name: z.string(),
