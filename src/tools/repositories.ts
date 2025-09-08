@@ -157,27 +157,16 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
       status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
       autoComplete: z.boolean().optional().describe("Set the pull request to autocomplete when all requirements are met."),
-      mergeStrategy: z.enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]]).optional().describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
+      mergeStrategy: z
+        .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
+        .optional()
+        .describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassPolicy: z.boolean().optional().default(false).describe("Whether to bypass branch policies when autocompleting. Defaults to false."),
       bypassReason: z.string().optional().describe("Reason for bypassing policies, required when bypassPolicy is true."),
     },
-    async ({
-      repositoryId,
-      pullRequestId,
-      title,
-      description,
-      isDraft,
-      targetRefName,
-      status,
-      autoComplete,
-      mergeStrategy,
-      deleteSourceBranch,
-      transitionWorkItems,
-      bypassPolicy,
-      bypassReason
-    }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassPolicy, bypassReason }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
