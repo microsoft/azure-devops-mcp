@@ -272,7 +272,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      user_is_reviewer: z.string().optional().describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
+      user_is_reviewer: z
+        .string()
+        .optional()
+        .describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
@@ -376,7 +379,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      user_is_reviewer: z.string().optional().describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
+      user_is_reviewer: z
+        .string()
+        .optional()
+        .describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")

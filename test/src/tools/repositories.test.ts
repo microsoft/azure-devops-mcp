@@ -674,7 +674,14 @@ describe("repos tools", () => {
 
       expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific-reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider);
       expect(mockGetCurrentUserDetails).not.toHaveBeenCalled(); // Should not be called since user_is_reviewer takes precedence
-      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", { status: PullRequestStatus.Active, repositoryId: "repo123", reviewerId: "specific-reviewer-123" }, undefined, undefined, 0, 100);
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        { status: PullRequestStatus.Active, repositoryId: "repo123", reviewerId: "specific-reviewer-123" },
+        undefined,
+        undefined,
+        0,
+        100
+      );
     });
 
     it("should handle error when user_is_reviewer user not found", async () => {
@@ -1115,11 +1122,17 @@ describe("repos tools", () => {
 
       expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("creator@example.com", tokenProvider, connectionProvider, userAgentProvider);
       expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider);
-      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", {
-        status: PullRequestStatus.Active,
-        creatorId: "creator-user-123",
-        reviewerId: "reviewer-user-123"
-      }, undefined, 0, 100);
+      expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
+        "test-project",
+        {
+          status: PullRequestStatus.Active,
+          creatorId: "creator-user-123",
+          reviewerId: "reviewer-user-123",
+        },
+        undefined,
+        0,
+        100
+      );
     });
   });
 
