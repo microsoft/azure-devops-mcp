@@ -94,7 +94,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.get_identity_ids,
     "Retrieve Azure DevOps identity IDs for a provided search filter.",
     {
-      searchFilter: z.string().describe("Search filter (unique namme, display name, email) to retrieve identity IDs for."),
+      searchFilter: z.string().describe("Search filter (unique name, display name, email) to retrieve identity IDs for."),
     },
     async ({ searchFilter }) => {
       try {
