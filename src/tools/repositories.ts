@@ -272,12 +272,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      user_is_reviewer: z
+        .string()
+        .optional()
+        .describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
+      sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
+      targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
-    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, status }) => {
+    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -287,10 +293,20 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         repositoryId: string;
         creatorId?: string;
         reviewerId?: string;
+        sourceRefName?: string;
+        targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
         repositoryId: repositoryId,
       };
+
+      if (sourceRefName) {
+        searchCriteria.sourceRefName = sourceRefName;
+      }
+
+      if (targetRefName) {
+        searchCriteria.targetRefName = targetRefName;
+      }
 
       if (created_by_user) {
         try {
@@ -307,15 +323,31 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             isError: true,
           };
         }
-      } else if (created_by_me || i_am_reviewer) {
+      } else if (created_by_me) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
-        if (created_by_me) {
-          searchCriteria.creatorId = userId;
+        searchCriteria.creatorId = userId;
+      }
+
+      if (user_is_reviewer) {
+        try {
+          const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+          searchCriteria.reviewerId = reviewerUserId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error finding reviewer with email ${user_is_reviewer}: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
         }
-        if (i_am_reviewer) {
-          searchCriteria.reviewerId = userId;
-        }
+      } else if (i_am_reviewer) {
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+        const userId = data.authenticatedUser.id;
+        searchCriteria.reviewerId = userId;
       }
 
       const pullRequests = await gitApi.getPullRequests(
@@ -359,12 +391,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      user_is_reviewer: z
+        .string()
+        .optional()
+        .describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
+      sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
+      targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
-    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, status }) => {
+    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -373,9 +411,19 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         status: number;
         creatorId?: string;
         reviewerId?: string;
+        sourceRefName?: string;
+        targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
       };
+
+      if (sourceRefName) {
+        gitPullRequestSearchCriteria.sourceRefName = sourceRefName;
+      }
+
+      if (targetRefName) {
+        gitPullRequestSearchCriteria.targetRefName = targetRefName;
+      }
 
       if (created_by_user) {
         try {
@@ -392,15 +440,31 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             isError: true,
           };
         }
-      } else if (created_by_me || i_am_reviewer) {
+      } else if (created_by_me) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
-        if (created_by_me) {
-          gitPullRequestSearchCriteria.creatorId = userId;
+        gitPullRequestSearchCriteria.creatorId = userId;
+      }
+
+      if (user_is_reviewer) {
+        try {
+          const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+          gitPullRequestSearchCriteria.reviewerId = reviewerUserId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error finding reviewer with email ${user_is_reviewer}: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
         }
-        if (i_am_reviewer) {
-          gitPullRequestSearchCriteria.reviewerId = userId;
-        }
+      } else if (i_am_reviewer) {
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+        const userId = data.authenticatedUser.id;
+        gitPullRequestSearchCriteria.reviewerId = userId;
       }
 
       const pullRequests = await gitApi.getPullRequestsByProject(
