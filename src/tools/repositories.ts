@@ -16,6 +16,7 @@ import {
   GitPullRequestQueryType,
   CommentThreadContext,
   CommentThreadStatus,
+  VersionControlChangeType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -41,6 +42,7 @@ const REPO_TOOLS = {
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
+  get_commit_changes: "repo_commit_get_changes",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -959,6 +961,82 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             {
               type: "text",
               text: `Error querying pull requests by commits: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.get_commit_changes,
+    "Get code snippets for changes in a commit (Add/Edit/Delete)",
+    {
+      project: z.string().describe("Project name or ID"),
+      repository: z.string().describe("Repository name or ID"),
+      commitId: z.string().describe("Commit ID to get changes for"),
+    },
+    async ({ project, repository, commitId }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const changes = await gitApi.getChanges(repository, commitId, project);
+
+        const changeSnippets: {
+          Add: Array<{ path: string; snippet: string }>;
+          Edit: Array<{ path: string; snippet: string }>;
+          Delete: Array<{ path: string; snippet: string }>;
+        } = { Add: [], Edit: [], Delete: [] };
+
+        if (changes.changes) {
+          for (const change of changes.changes) {
+            const type = change.changeType;
+            let snippet = "";
+
+            if (change.item && change.item.path) {
+              if (type === VersionControlChangeType.Add || type === VersionControlChangeType.Edit) {
+                try {
+                  const item = await gitApi.getItem(
+                    repository,
+                    change.item.path,
+                    project,
+                    undefined,
+                    undefined,
+                    true,
+                    false,
+                    false,
+                    { version: commitId, versionType: 2, versionOptions: 0 },
+                    true,
+                    true,
+                    true
+                  );
+                  snippet = item.content || "";
+                } catch (itemError) {
+                  snippet = `Error retrieving content: ${itemError instanceof Error ? itemError.message : String(itemError)}`;
+                }
+              } else if (type === VersionControlChangeType.Delete) {
+                snippet = change.item.path;
+              }
+
+              if (type === VersionControlChangeType.Add) {
+                changeSnippets.Add.push({ path: change.item.path, snippet });
+              } else if (type === VersionControlChangeType.Edit) {
+                changeSnippets.Edit.push({ path: change.item.path, snippet });
+              } else if (type === VersionControlChangeType.Delete) {
+                changeSnippets.Delete.push({ path: change.item.path, snippet });
+              }
+            }
+          }
+        }
+
+        return { content: [{ type: "text", text: JSON.stringify(changeSnippets, null, 2) }] };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error getting commit changes: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

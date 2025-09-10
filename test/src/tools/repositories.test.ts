@@ -39,6 +39,8 @@ describe("repos tools", () => {
     updateThread: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getCommits: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestQuery: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getChanges: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getItem: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
   };
 
   beforeEach(() => {
@@ -64,6 +66,8 @@ describe("repos tools", () => {
       updateThread: jest.fn(),
       getCommits: jest.fn(),
       getPullRequestQuery: jest.fn(),
+      getChanges: jest.fn(),
+      getItem: jest.fn(),
     };
 
     connectionProvider = jest.fn().mockResolvedValue({
@@ -3457,6 +3461,94 @@ describe("repos tools", () => {
         undefined
       );
       expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
+    });
+  });
+
+  describe("repo_commit_get_changes", () => {
+    it("should get commit changes with code snippets", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const mockChanges = {
+        changes: [
+          {
+            changeType: 1, // VersionControlChangeType.Add
+            item: { path: "/src/new-file.ts" },
+          },
+          {
+            changeType: 2, // VersionControlChangeType.Edit
+            item: { path: "/src/existing-file.ts" },
+          },
+          {
+            changeType: 16, // VersionControlChangeType.Delete
+            item: { path: "/src/old-file.ts" },
+          },
+        ],
+      };
+
+      const mockFileContent = {
+        content: "console.log('Hello, World!');",
+      };
+
+      mockGitApi.getChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getItem.mockResolvedValue(mockFileContent);
+
+      const toolCall = (server.tool as jest.Mock).mock.calls.find(
+        (call) => call[0] === REPO_TOOLS.get_commit_changes
+      );
+      const handler = toolCall[3];
+
+      const result = await handler({
+        project: "test-project",
+        repository: "test-repo",
+        commitId: "abc123",
+      });
+
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe("text");
+
+      const responseData = JSON.parse(result.content[0].text);
+      expect(responseData).toHaveProperty("Add");
+      expect(responseData).toHaveProperty("Edit");
+      expect(responseData).toHaveProperty("Delete");
+
+      expect(responseData.Add).toHaveLength(1);
+      expect(responseData.Edit).toHaveLength(1);
+      expect(responseData.Delete).toHaveLength(1);
+
+      expect(responseData.Add[0]).toEqual({
+        path: "/src/new-file.ts",
+        snippet: "console.log('Hello, World!');",
+      });
+
+      expect(responseData.Edit[0]).toEqual({
+        path: "/src/existing-file.ts",
+        snippet: "console.log('Hello, World!');",
+      });
+
+      expect(responseData.Delete[0]).toEqual({
+        path: "/src/old-file.ts",
+        snippet: "/src/old-file.ts",
+      });
+    });
+
+    it("should handle errors gracefully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      mockGitApi.getChanges.mockRejectedValue(new Error("API Error"));
+
+      const toolCall = (server.tool as jest.Mock).mock.calls.find(
+        (call) => call[0] === REPO_TOOLS.get_commit_changes
+      );
+      const handler = toolCall[3];
+
+      const result = await handler({
+        project: "test-project",
+        repository: "test-repo",
+        commitId: "abc123",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error getting commit changes");
     });
   });
 });
