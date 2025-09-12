@@ -216,7 +216,7 @@ In your project, add a `.vscode\mcp.json` file with the following content:
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp@next", "${input:ado_org}"]
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
     }
   }
 }
