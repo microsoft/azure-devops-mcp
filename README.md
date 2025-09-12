@@ -255,7 +255,7 @@ For example, use `"-d", "core", "work", "work-items"` to load only Work Item rel
     }
   ],
   "servers": {
-    "ado": {
+    "ado_with_filtered_domains": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "-d", "core", "work", "work-items"]
