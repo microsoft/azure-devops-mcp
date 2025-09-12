@@ -48,6 +48,19 @@
 
 ## Authentication Issues
 
+### GitHub Codespaces
+
+Due to limitations of the environment default OAuth option is not available in Codespace.
+Make sure you authenticate via
+
+```sh
+az login
+```
+
+in the terminal before using MCP tools.
+
+And in case there are authorization/access errors when using the tools please check the [Multi-Tenant Authentication Problems guide](#multi-tenant-authentication-problems-when-using-azcli)
+
 ### OAuth
 
 Recent switch to OAuth flow is supposed to simplify authentication against ADO APIs and remove additional software dependency.
