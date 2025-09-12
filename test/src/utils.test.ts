@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
+import { createEnumMapping, encodeFormattedValue, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -428,6 +428,43 @@ describe("utils", () => {
       expect(safeEnumConvert(mockEnum, "A")).toBe(0);
       expect(safeEnumConvert(mockEnum, "B")).toBe(1);
       expect(safeEnumConvert(mockEnum, "0")).toBeUndefined(); // Numeric strings aren't valid keys
+    });
+  });
+});
+
+describe("encodeFormattedValue", () => {
+  describe("basic encoding behavior (always encode in Markdown)", () => {
+    it("encodes angle brackets and dollar signs", () => {
+      const input = "Value <x> $var > end";
+      const result = encodeFormattedValue(input, "Markdown");
+      expect(result).toBe("Value &lt;x&gt; &#36;var &gt; end");
+    });
+
+    it("does nothing for Html format", () => {
+      const input = "Value <x> $var > end";
+      const result = encodeFormattedValue(input, "Html");
+      expect(result).toBe(input);
+    });
+
+    it("returns original when format undefined", () => {
+      const input = "<raw> $";
+      expect(encodeFormattedValue(input)).toBe(input);
+    });
+
+    it("handles empty/null/undefined", () => {
+      expect(encodeFormattedValue("", "Markdown")).toBe("");
+      expect(encodeFormattedValue(null as unknown as string, "Markdown")).toBe(null);
+      expect(encodeFormattedValue(undefined as unknown as string, "Markdown")).toBe(undefined);
+    });
+  });
+
+  describe("idempotence and entity protection", () => {
+    it("does not double encode entities", () => {
+      const input = "Already &lt;tag&gt; plus <new> and $cash";
+      const once = encodeFormattedValue(input, "Markdown");
+      const twice = encodeFormattedValue(once, "Markdown");
+      expect(once).toBe("Already &lt;tag&gt; plus &lt;new&gt; and &#36;cash");
+      expect(twice).toBe(once);
     });
   });
 });
