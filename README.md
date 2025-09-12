@@ -258,7 +258,7 @@ For example, use `"-d", "core", "work", "work-items"` to load only Work Item rel
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp@next", "${input:ado_org}", "-d", "core", "work", "work-items]
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "-d", "core", "work", "work-items]
     }
   }
 }
