@@ -7,7 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
+import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -292,6 +292,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         }
 
         const body = items.map((item, x) => {
+          const encodedDescription = encodeFormattedValue(item.description, item.format);
+
           const ops = [
             {
               op: "add",
@@ -306,12 +308,12 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             {
               op: "add",
               path: "/fields/System.Description",
-              value: item.description,
+              value: encodedDescription,
             },
             {
               op: "add",
               path: "/fields/Microsoft.VSTS.TCM.ReproSteps",
-              value: item.description,
+              value: encodedDescription,
             },
             {
               op: "add",
@@ -562,10 +564,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
 
-        const document = fields.map(({ name, value }) => ({
+        const document = fields.map(({ name, value, format }) => ({
           op: "add",
           path: `/fields/${name}`,
-          value: value,
+          value: encodeFormattedValue(value, format),
         }));
 
         // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
@@ -675,10 +677,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
       const body = uniqueIds.map((id) => {
         const workItemUpdates = updates.filter((update) => update.id === id);
-        const operations = workItemUpdates.map(({ op, path, value }) => ({
+        const operations = workItemUpdates.map(({ op, path, value, format }) => ({
           op: op,
           path: path,
-          value: value,
+          value: encodeFormattedValue(value, format),
         }));
 
         // Add format operations for Markdown fields
