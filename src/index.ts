@@ -17,6 +17,12 @@ import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
 
+function isGitHubCodespaceEnv(): boolean {
+  return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
+}
+
+const defaultAuthenticationType = isGitHubCodespaceEnv() ? "azcli" : "interactive";
+
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
@@ -41,7 +47,7 @@ const argv = yargs(hideBin(process.argv))
     describe: "Type of authentication to use. Supported values are 'interactive', 'azcli' and 'env' (default: 'interactive')",
     type: "string",
     choices: ["interactive", "azcli", "env"],
-    default: "interactive",
+    default: defaultAuthenticationType,
   })
   .option("tenant", {
     alias: "t",
