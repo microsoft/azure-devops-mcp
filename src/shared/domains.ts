@@ -15,6 +15,8 @@ export enum Domain {
   WIKI = "wiki",
   WORK = "work",
   WORK_ITEMS = "work-items",
+  AREAPATH = "areapath",
+  DASHBOARD = "dashboard",
 }
 
 export const ALL_DOMAINS = "all";
