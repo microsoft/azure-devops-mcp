@@ -9,11 +9,11 @@ import { orgName } from "../index.js";
 
 const TAG_TOOLS = {
   search_workitem_by_tags: "search_workitem_by_tags",
-  tags_usage_analytics: "tags_usage_analytics",
-  list_project_tags: "list_project_tags",
-  list_unused_tags: "list_unused_tags",
-  delete_tag_by_name: "delete_tag_by_name",
-  delete_unused_tags: "delete_unused_tags",
+  workitem_tags_usage_analytics: "workitem_tags_usage_analytics",
+  list_project_workitem_tags: "list_project_workitem_tags",
+  list_unused_workitem_tags: "list_unused_workitem_tags",
+  delete_workitem_tag_by_name: "delete_workitem_tag_by_name",
+  delete_unused_workitem_tags: "delete_unused_workitem_tags",
 };
 
 function configureTagTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -84,7 +84,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.list_project_tags,
+    TAG_TOOLS.list_project_workitem_tags,
     "List all tags for a repository.",
     {
       project: z.string().describe("Project name or ID"),
@@ -129,7 +129,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.tags_usage_analytics,
+    TAG_TOOLS.workitem_tags_usage_analytics,
     "Show tag usage statistics and trends",
     { 
       project: z.string().describe("Project name or ID"),
@@ -228,7 +228,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.list_unused_tags,
+    TAG_TOOLS.list_unused_workitem_tags,
     "List all unused tags in a project (tags not attached to any work items). Uses optimized individual tag checking for better accuracy.",
     {
       project: z.string().describe("Project name or ID"),
@@ -341,7 +341,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.delete_tag_by_name,
+    TAG_TOOLS.delete_workitem_tag_by_name,
     "Delete a tag from the project. Will only delete if the tag is unused (not attached to any work items).",
     {
       project: z.string().describe("Project name or ID"),
@@ -463,7 +463,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.delete_unused_tags,
+    TAG_TOOLS.delete_unused_workitem_tags,
     "Delete multiple unused tags from the project. Gets unused tags and deletes them in batch for cleanup.",
     {
       project: z.string().describe("Project name or ID"),
