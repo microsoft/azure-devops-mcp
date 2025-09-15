@@ -23,7 +23,14 @@ interface DashboardWidget {
     columnSpan: number;
   };
   settings?: string;
+  settingsVersion?: {
+    major: number;
+    minor: number;
+    patch: number;
+  };
   contributionId?: string;
+  areSettingsBlockedForUser?: boolean;
+  isEnabled?: boolean;
 }
 
 interface CreateDashboardRequest {
@@ -58,7 +65,14 @@ function configureDashboardTools(server: McpServer, tokenProvider: () => Promise
           rowSpan: z.number().describe("Number of rows the widget spans"),
           columnSpan: z.number().describe("Number of columns the widget spans"),
         }).describe("Widget size"),
-        settings: z.string().optional().describe("Widget settings as JSON string"),
+        settings: z.string().nullable().optional().describe("Widget settings as JSON string"),
+        settingsVersion: z.object({
+          major: z.number(),
+          minor: z.number(),
+          patch: z.number(),
+        }).optional().describe("Widget settings version"),
+        areSettingsBlockedForUser: z.boolean().optional().describe("Whether widget settings are blocked for the user"),
+        isEnabled: z.boolean().optional().describe("Whether the widget is enabled"),
       })).optional().describe("Array of widgets to add to the dashboard"),
     },
     async ({ project, team, name, description, dashboardScope, refreshInterval, position, widgets }) => {
