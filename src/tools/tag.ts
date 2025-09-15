@@ -9,10 +9,11 @@ import { orgName } from "../index.js";
 
 const TAG_TOOLS = {
   search_workitem_by_tags: "search_workitem_by_tags",
-  tags_usage_analytics: "tags_usage_analytics",
-  list_project_tags: "list_project_tags",
-  list_unused_tags: "list_unused_tags",
-  delete_tag_by_name: "delete_tag_by_name",
+  workitem_tags_usage_analytics: "workitem_tags_usage_analytics",
+  list_project_workitem_tags: "list_project_workitem_tags",
+  list_unused_workitem_tags: "list_unused_workitem_tags",
+  delete_workitem_tag_by_name: "delete_workitem_tag_by_name",
+  delete_unused_workitem_tags: "delete_unused_workitem_tags",
 };
 
 function configureTagTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -83,7 +84,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.list_project_tags,
+    TAG_TOOLS.list_project_workitem_tags,
     "List all tags for a repository.",
     {
       project: z.string().describe("Project name or ID"),
@@ -128,7 +129,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.tags_usage_analytics,
+    TAG_TOOLS.workitem_tags_usage_analytics,
     "Show tag usage statistics and trends",
     { 
       project: z.string().describe("Project name or ID"),
@@ -227,7 +228,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.list_unused_tags,
+    TAG_TOOLS.list_unused_workitem_tags,
     "List all unused tags in a project (tags not attached to any work items). Uses optimized individual tag checking for better accuracy.",
     {
       project: z.string().describe("Project name or ID"),
@@ -340,7 +341,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.delete_tag_by_name,
+    TAG_TOOLS.delete_workitem_tag_by_name,
     "Delete a tag from the project. Will only delete if the tag is unused (not attached to any work items).",
     {
       project: z.string().describe("Project name or ID"),
@@ -461,6 +462,195 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
     }
   );
 
+  server.tool(
+    TAG_TOOLS.delete_unused_workitem_tags,
+    "Delete multiple unused tags from the project. Gets unused tags and deletes them in batch for cleanup.",
+    {
+      project: z.string().describe("Project name or ID"),
+      top: z.number().default(20).describe("Maximum number of unused tags to delete. Defaults to 20 for safety."),
+      dryRun: z.boolean().default(true).describe("If true, only shows what would be deleted without actually deleting. Defaults to true for safety."),
+    },
+    async ({ project, top, dryRun }) => {
+      try {
+        const accessToken = await tokenProvider();
+
+        // Step 1: Get all tags in the project
+        const tagsUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags?api-version=7.0`;
+        const tagsResponse = await fetch(tagsUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!tagsResponse.ok) {
+          const errorText = await tagsResponse.text();
+          return {
+            content: [{ type: "text", text: `Error fetching tags: ${tagsResponse.status} ${tagsResponse.statusText} - ${errorText}` }],
+            isError: true,
+          };
+        }
+
+        const tagsData = await tagsResponse.json();
+        const allTags = tagsData.value || [];
+
+        if (allTags.length === 0) {
+          return {
+            content: [{ type: "text", text: "No tags found in the project." }],
+          };
+        }
+
+        // Step 2: Find unused tags (limited by top parameter)
+        const tagsToCheck = allTags.slice(0, Math.min(top * 2, allTags.length)); // Check more than we need to delete
+        const unusedTags: string[] = [];
+        const usedTags: string[] = [];
+        const errorTags: string[] = [];
+
+        for (const tag of tagsToCheck) {
+          // Use a simple count query to check if any work items have this tag
+          const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' AND [System.Tags] CONTAINS '${tag.name}'`;
+          const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=1&api-version=7.1-preview.2`;
+          
+          try {
+            const wiqlResponse = await fetch(wiqlUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessToken.token}`,
+                "User-Agent": userAgentProvider(),
+              },
+              body: JSON.stringify({ query: wiqlQuery }),
+            });
+
+            if (wiqlResponse.ok) {
+              const wiqlData = await wiqlResponse.json();
+              if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
+                unusedTags.push(tag.name);
+              } else {
+                usedTags.push(tag.name);
+              }
+            } else {
+              errorTags.push(tag.name);
+            }
+          } catch {
+            errorTags.push(tag.name);
+          }
+
+          // Stop if we have enough unused tags to delete
+          if (unusedTags.length >= top) {
+            break;
+          }
+        }
+
+        // Limit to the requested number of deletions
+        const tagsToDelete = unusedTags.slice(0, top);
+
+        if (tagsToDelete.length === 0) {
+          return {
+            content: [
+              { 
+                type: "text", 
+                text: JSON.stringify({
+                  success: true,
+                  message: "No unused tags found to delete.",
+                  project: project,
+                  tagsChecked: tagsToCheck.length,
+                  unusedTagsFound: 0,
+                  tagsToDelete: [],
+                  dryRun: dryRun
+                }, null, 2) 
+              }
+            ],
+          };
+        }
+
+        // Step 3: Delete tags (or simulate if dry run)
+        const deletionResults: { tag: string; success: boolean; error?: string }[] = [];
+
+        if (dryRun) {
+          // Dry run - just simulate the deletions
+          for (const tagName of tagsToDelete) {
+            deletionResults.push({ tag: tagName, success: true });
+          }
+        } else {
+          // Actually delete the tags
+          for (const tagName of tagsToDelete) {
+            try {
+              const deleteTagUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/${encodeURIComponent(tagName)}?api-version=7.0`;
+              
+              const deleteResponse = await fetch(deleteTagUrl, {
+                method: "DELETE",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${accessToken.token}`,
+                  "User-Agent": userAgentProvider(),
+                },
+              });
+
+              if (deleteResponse.ok) {
+                deletionResults.push({ tag: tagName, success: true });
+              } else {
+                const errorText = await deleteResponse.text();
+                deletionResults.push({ 
+                  tag: tagName, 
+                  success: false, 
+                  error: `${deleteResponse.status} ${deleteResponse.statusText} - ${errorText}` 
+                });
+              }
+            } catch (error) {
+              deletionResults.push({ 
+                tag: tagName, 
+                success: false, 
+                error: error instanceof Error ? error.message : String(error) 
+              });
+            }
+          }
+        }
+
+        const successfulDeletions = deletionResults.filter(r => r.success);
+        const failedDeletions = deletionResults.filter(r => !r.success);
+
+        return {
+          content: [
+            { 
+              type: "text", 
+              text: JSON.stringify({
+                success: failedDeletions.length === 0,
+                message: dryRun 
+                  ? `Dry run completed. Found ${tagsToDelete.length} unused tags that would be deleted.`
+                  : `Deletion completed. Successfully deleted ${successfulDeletions.length} out of ${tagsToDelete.length} unused tags.`,
+                project: project,
+                dryRun: dryRun,
+                tagsChecked: tagsToCheck.length,
+                unusedTagsFound: unusedTags.length,
+                tagsToDelete: tagsToDelete,
+                results: {
+                  successful: successfulDeletions.length,
+                  failed: failedDeletions.length,
+                  details: deletionResults
+                },
+                summary: dryRun 
+                  ? `Would delete ${tagsToDelete.length} unused tags. Set dryRun=false to actually delete them.`
+                  : `Deleted ${successfulDeletions.length} unused tags${failedDeletions.length > 0 ? `, ${failedDeletions.length} failed` : ''}.`
+              }, null, 2) 
+            }
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error deleting unused tags: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
 }
 
 export { TAG_TOOLS, configureTagTools };
