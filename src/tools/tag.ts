@@ -10,9 +10,9 @@ import { orgName } from "../index.js";
 const TAG_TOOLS = {
   search_workitem_by_tags: "search_workitem_by_tags",
   tags_usage_analytics: "tags_usage_analytics",
-  repo_list_tags: "repo_list_tags",
+  list_project_tags: "list_project_tags",
   list_unused_tags: "list_unused_tags",
-  delete_tag: "delete_tag",
+  delete_tag_by_name: "delete_tag_by_name",
 };
 
 function configureTagTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -83,7 +83,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.repo_list_tags,
+    TAG_TOOLS.list_project_tags,
     "List all tags for a repository.",
     {
       project: z.string().describe("Project name or ID"),
@@ -91,7 +91,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
     async ({ project }) => {
       try {
         const accessToken = await tokenProvider();
-        const url = `https://dev.azure.com/dynamicscrm/${project}/_apis/wit/tags/`;
+        const url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/`;
         const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -165,8 +165,6 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
         const wiqlResult = await wiqlResponse.json();
         const workItemIds = wiqlResult.workItems.map((w: { id: number }) => w.id);
-
-        console.log(`Found ${workItemIds.length} work items to analyze for tag usage.`);
 
         // Step 2: Batch fetch work item details to get Tags
         const workItemBatchSize = 200;
@@ -342,7 +340,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.delete_tag,
+    TAG_TOOLS.delete_tag_by_name,
     "Delete a tag from the project. Will only delete if the tag is unused (not attached to any work items).",
     {
       project: z.string().describe("Project name or ID"),
