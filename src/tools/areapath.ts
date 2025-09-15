@@ -12,10 +12,43 @@ interface ClassificationNode {
   children?: ClassificationNode[];
 }
 
+interface IterationNode {
+  id: number;
+  name: string;
+  path: string;
+  structureType: string;
+  hasChildren: boolean;
+  attributes?: Record<string, string>;
+  url: string;
+  children?: IterationNode[];
+}
+
+interface IterationResult {
+  status: "success" | "error";
+  iteration: string;
+  message: string;
+  data?: {
+    id: number;
+    name: string;
+    path: string;
+    parentPath?: string;
+    attributes?: Record<string, string>;
+  };
+}
+
+interface IterationRequestBody {
+  name: string;
+  attributes?: {
+    startDate?: string;
+    finishDate?: string;
+  };
+}
+
 const AREAPATH_TOOLS = {
   list_project_area_paths: "list_project_area_paths",
   create_area_path: "create_area_path",
   area_suggest_for_workitem: "area_suggest_for_workitem",
+  classification_manage_iterations: "classification_manage_iterations",
 };
 
 function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -207,168 +240,318 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   server.tool(
-    AREAPATH_TOOLS.area_suggest_for_workitem,
-    "LLM-powered area path suggestions based on work item content - analyzing work item descriptions, titles, and context to intelligently recommend the most appropriate area path",
+    AREAPATH_TOOLS.classification_manage_iterations,
+    "Bulk operations for iteration paths - allowing efficient management of sprint and iteration structures",
     {
       project: z.string().describe("Project name or ID"),
-      workItemId: z.number().describe("Work item ID to analyze"),
-      maxSuggestions: z.number().default(3).describe("Maximum number of area path suggestions to return (default: 3)"),
+      operation: z.enum(["create", "list", "delete", "update"]).describe("Bulk operation to perform on iterations"),
+      iterations: z.array(z.object({
+        name: z.string().describe("Name of the iteration"),
+        parentPath: z.string().optional().describe("Parent iteration path (optional, creates under root if not specified)"),
+        startDate: z.string().optional().describe("Start date of the iteration in ISO format (YYYY-MM-DD)"),
+        finishDate: z.string().optional().describe("Finish date of the iteration in ISO format (YYYY-MM-DD)"),
+        id: z.number().optional().describe("ID of the iteration (required for update/delete operations)"),
+        path: z.string().optional().describe("Full path of the iteration (alternative to parentPath + name)")
+      })).optional().describe("Array of iterations for bulk create/update/delete operations"),
+      depth: z.number().default(3).describe("Maximum depth for list operation. Defaults to 3."),
     },
-    async ({ project, workItemId, maxSuggestions }) => {
+    async ({ project, operation, iterations = [], depth }) => {
       try {
         const accessToken = await tokenProvider();
-        const connection = await connectionProvider();
+        const results: IterationResult[] = [];
         
-        let workItemTitle: string | undefined;
-        let workItemDescription: string | undefined;
-        let workItemType: string | undefined;
-        let workItemTags: string[] | undefined;
-
-        // Fetch the work item details
-        try {
-          const workItemApi = await connection.getWorkItemTrackingApi();
-          const workItem = await workItemApi.getWorkItem(workItemId, undefined, undefined, undefined, project);
+        if (operation === "list") {
+          // List all iteration paths
+          const url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Iterations?$depth=${depth}&api-version=7.2-preview.2`;
           
-          if (workItem && workItem.fields) {
-            workItemTitle = workItem.fields["System.Title"];
-            workItemDescription = workItem.fields["System.Description"];
-            workItemType = workItem.fields["System.WorkItemType"];
+          const response = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken.token}`,
+              "User-Agent": userAgentProvider(),
+            },
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            return {
+              content: [{ 
+                type: "text", 
+                text: `Error fetching iterations: ${response.status} ${response.statusText} - ${errorText}` 
+              }],
+              isError: true,
+            };
+          }
+
+          const data = await response.json();
+          
+          // Extract iteration paths from hierarchical structure
+          const iterationPaths: IterationNode[] = [];
+          
+          function extractIterations(node: IterationNode, parentPath = "") {
+            const currentPath = parentPath ? `${parentPath}\\${node.name}` : node.name;
             
-            // Parse tags if they exist
-            const tagsField = workItem.fields["System.Tags"];
-            if (tagsField) {
-              workItemTags = tagsField.split(";").map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+            if (parentPath || node.name !== "Iteration") { // Skip root "Iteration" node
+              iterationPaths.push({
+                id: node.id,
+                name: node.name,
+                path: currentPath,
+                structureType: node.structureType,
+                hasChildren: node.hasChildren || false,
+                attributes: node.attributes || {},
+                url: node.url
+              });
             }
-          }
-        } catch (error) {
-          return {
-            content: [{ 
-              type: "text", 
-              text: `Error fetching work item ${workItemId}: ${error instanceof Error ? error.message : String(error)}` 
-            }],
-            isError: true,
-          };
-        }
-
-        // Validate we have work item content
-        if (!workItemTitle) {
-          return {
-            content: [{ 
-              type: "text", 
-              text: `Work item ${workItemId} not found or has no title` 
-            }],
-            isError: true,
-          };
-        }
-
-        // Get all available area paths for the project
-        const areaPathsUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes?$depth=10&api-version=7.0`;
-        
-        const areaPathsResponse = await fetch(areaPathsUrl, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken.token}`,
-            "User-Agent": userAgentProvider(),
-          },
-        });
-
-        if (!areaPathsResponse.ok) {
-          const errorText = await areaPathsResponse.text();
-          return {
-            content: [{ 
-              type: "text", 
-              text: `Error fetching area paths: ${areaPathsResponse.status} ${areaPathsResponse.statusText} - ${errorText}` 
-            }],
-            isError: true,
-          };
-        }
-
-        const areaPathsData = await areaPathsResponse.json();
-        
-        // Extract area paths
-        const areaPaths: string[] = [];
-        
-        function extractAreaPaths(node: ClassificationNode, parentPath = "", nodeType = "Area") {
-          const currentPath = parentPath ? `${parentPath}\\${node.name}` : node.name;
-          
-          if (parentPath && nodeType === "Area") {
-            areaPaths.push(currentPath);
+            
+            if (node.children && Array.isArray(node.children)) {
+              for (const child of node.children) {
+                extractIterations(child, node.name === "Iteration" ? "" : currentPath);
+              }
+            }
           }
           
-          if (node.children && Array.isArray(node.children)) {
-            for (const child of node.children) {
-              extractAreaPaths(child, currentPath, nodeType);
+          extractIterations(data);
+          
+          return {
+            content: [
+              { 
+                type: "text", 
+                text: JSON.stringify({
+                  operation: "list",
+                  project: project,
+                  totalIterations: iterationPaths.length,
+                  iterations: iterationPaths.sort((a, b) => a.path.localeCompare(b.path))
+                }, null, 2) 
+              }
+            ],
+          };
+        }
+        
+        if (operation === "create") {
+          // Bulk create iterations
+          for (const iteration of iterations) {
+            try {
+              let url: string;
+              if (iteration.parentPath) {
+                const encodedParentPath = encodeURIComponent(iteration.parentPath);
+                url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Iterations/${encodedParentPath}?api-version=7.2-preview.2`;
+              } else {
+                url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Iterations?api-version=7.2-preview.2`;
+              }
+
+              const requestBody: IterationRequestBody = {
+                name: iteration.name,
+              };
+
+              // Add attributes for start and finish dates if provided
+              if (iteration.startDate || iteration.finishDate) {
+                requestBody.attributes = {};
+                if (iteration.startDate) {
+                  requestBody.attributes.startDate = iteration.startDate;
+                }
+                if (iteration.finishDate) {
+                  requestBody.attributes.finishDate = iteration.finishDate;
+                }
+              }
+
+              const response = await fetch(url, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${accessToken.token}`,
+                  "User-Agent": userAgentProvider(),
+                },
+                body: JSON.stringify(requestBody),
+              });
+
+              if (response.ok) {
+                const createdIteration = await response.json();
+                results.push({
+                  status: "success",
+                  iteration: iteration.name,
+                  message: `Iteration "${iteration.name}" created successfully`,
+                  data: {
+                    id: createdIteration.id,
+                    name: createdIteration.name,
+                    path: createdIteration.path,
+                    parentPath: iteration.parentPath || "Root",
+                    attributes: createdIteration.attributes || {}
+                  }
+                });
+              } else {
+                const errorText = await response.text();
+                results.push({
+                  status: "error",
+                  iteration: iteration.name,
+                  message: `Failed to create iteration: ${response.status} ${response.statusText} - ${errorText}`
+                });
+              }
+            } catch (error) {
+              results.push({
+                status: "error",
+                iteration: iteration.name,
+                message: `Error creating iteration: ${error instanceof Error ? error.message : String(error)}`
+              });
             }
           }
         }
         
-        if (areaPathsData.value && Array.isArray(areaPathsData.value)) {
-          for (const rootNode of areaPathsData.value) {
-            if (rootNode.name === "Area") {
-              extractAreaPaths(rootNode, "", "Area");
+        if (operation === "update") {
+          // Bulk update iterations
+          for (const iteration of iterations) {
+            try {
+              if (!iteration.id && !iteration.path) {
+                results.push({
+                  status: "error",
+                  iteration: iteration.name,
+                  message: "Either 'id' or 'path' is required for update operation"
+                });
+                continue;
+              }
+
+              const identifier = iteration.id ? iteration.id.toString() : (iteration.path ? encodeURIComponent(iteration.path) : "");
+              if (!identifier) {
+                results.push({
+                  status: "error",
+                  iteration: iteration.name,
+                  message: "Valid 'id' or 'path' is required for update operation"
+                });
+                continue;
+              }
+              
+              const url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Iterations/${identifier}?api-version=7.2-preview.2`;
+
+              const requestBody: IterationRequestBody = {
+                name: iteration.name,
+              };
+
+              // Add attributes for start and finish dates if provided
+              if (iteration.startDate || iteration.finishDate) {
+                requestBody.attributes = {};
+                if (iteration.startDate) {
+                  requestBody.attributes.startDate = iteration.startDate;
+                }
+                if (iteration.finishDate) {
+                  requestBody.attributes.finishDate = iteration.finishDate;
+                }
+              }
+
+              const response = await fetch(url, {
+                method: "PATCH",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${accessToken.token}`,
+                  "User-Agent": userAgentProvider(),
+                },
+                body: JSON.stringify(requestBody),
+              });
+
+              if (response.ok) {
+                const updatedIteration = await response.json();
+                results.push({
+                  status: "success",
+                  iteration: iteration.name,
+                  message: `Iteration "${iteration.name}" updated successfully`,
+                  data: {
+                    id: updatedIteration.id,
+                    name: updatedIteration.name,
+                    path: updatedIteration.path,
+                    attributes: updatedIteration.attributes || {}
+                  }
+                });
+              } else {
+                const errorText = await response.text();
+                results.push({
+                  status: "error",
+                  iteration: iteration.name,
+                  message: `Failed to update iteration: ${response.status} ${response.statusText} - ${errorText}`
+                });
+              }
+            } catch (error) {
+              results.push({
+                status: "error",
+                iteration: iteration.name,
+                message: `Error updating iteration: ${error instanceof Error ? error.message : String(error)}`
+              });
             }
           }
         }
+        
+        if (operation === "delete") {
+          // Bulk delete iterations
+          for (const iteration of iterations) {
+            try {
+              if (!iteration.id && !iteration.path) {
+                results.push({
+                  status: "error",
+                  iteration: iteration.name,
+                  message: "Either 'id' or 'path' is required for delete operation"
+                });
+                continue;
+              }
 
-        // Prepare content for LLM analysis
-        const analysisPrompt = `
-        You are an expert Azure DevOps consultant helping to assign the most appropriate area path for a work item.
+              const identifier = iteration.id ? iteration.id.toString() : (iteration.path ? encodeURIComponent(iteration.path) : "");
+              if (!identifier) {
+                results.push({
+                  status: "error",
+                  iteration: iteration.name,
+                  message: "Valid 'id' or 'path' is required for delete operation"
+                });
+                continue;
+              }
+              
+              const url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Iterations/${identifier}?api-version=7.2-preview.2`;
 
-        **Work Item Details:**
-        - Title: ${workItemTitle || "Not provided"}
-        - Description: ${workItemDescription || "Not provided"}
-        - Type: ${workItemType || "Not specified"}
-        - Tags: ${workItemTags && workItemTags.length > 0 ? workItemTags.join(", ") : "None"}
+              const response = await fetch(url, {
+                method: "DELETE",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${accessToken.token}`,
+                  "User-Agent": userAgentProvider(),
+                },
+              });
 
-        **Available Area Paths in Project "${project}":**
-        ${areaPaths.length > 0 ? areaPaths.map(path => `- ${path}`).join('\n') : "No area paths found"}
-
-        **Instructions:**
-        1. Analyze the work item title, description, type, and tags
-        2. Consider keywords, technology stack, feature areas, team responsibilities, and component mentions
-        3. Match the work item content to the most appropriate area path(s)
-        4. Provide ${maxSuggestions} suggestions ranked by relevance
-        5. For each suggestion, provide a confidence score (0-100) and reasoning
-
-        **Response Format (JSON):**
-        {
-        "suggestions": [
-            {
-            "areaPath": "ProjectName\\TeamName\\Component",
-            "confidence": 95,
-            "reasoning": "Clear match because..."
+              if (response.ok || response.status === 204) {
+                results.push({
+                  status: "success",
+                  iteration: iteration.name,
+                  message: `Iteration "${iteration.name}" deleted successfully`
+                });
+              } else {
+                const errorText = await response.text();
+                results.push({
+                  status: "error",
+                  iteration: iteration.name,
+                  message: `Failed to delete iteration: ${response.status} ${response.statusText} - ${errorText}`
+                });
+              }
+            } catch (error) {
+              results.push({
+                status: "error",
+                iteration: iteration.name,
+                message: `Error deleting iteration: ${error instanceof Error ? error.message : String(error)}`
+              });
             }
-        ],
-        "analysis": {
-            "keyWords": ["extracted", "keywords"],
-            "primaryTopic": "Main topic identified",
-            "recommendedMatch": "Brief explanation of best match"
+          }
         }
-        }
-
-        Provide only the JSON response, no additional text.
-        `;
-
+        
+        const successCount = results.filter(r => r.status === "success").length;
+        const errorCount = results.filter(r => r.status === "error").length;
+        
         return {
           content: [
             { 
               type: "text", 
               text: JSON.stringify({
-                success: true,
-                workItem: {
-                  id: workItemId,
-                  title: workItemTitle,
-                  description: workItemDescription ? workItemDescription.substring(0, 200) + "..." : undefined,
-                  type: workItemType,
-                  tags: workItemTags,
-                },
+                operation: operation,
                 project: project,
-                availableAreaPaths: areaPaths,
-                totalAreaPaths: areaPaths.length,
-                llmPrompt: analysisPrompt,
-                instructions: "Use the provided LLM prompt to get AI-powered area path suggestions. The prompt contains all necessary context including work item details and available area paths.",
-                note: "This tool provides the analysis prompt. Use an LLM service to process the prompt and get intelligent area path recommendations."
+                summary: {
+                  total: results.length,
+                  successful: successCount,
+                  failed: errorCount
+                },
+                results: results
               }, null, 2) 
             }
           ],
@@ -378,7 +561,7 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
           content: [
             {
               type: "text",
-              text: `Error generating area path suggestions: ${error instanceof Error ? error.message : String(error)}`,
+              text: `Error performing bulk iteration operation: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
@@ -386,6 +569,8 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
       }
     }
   );
+
+  
 }
 
 export { AREAPATH_TOOLS, configureAreaPathTools };
