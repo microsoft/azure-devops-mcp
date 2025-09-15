@@ -17,17 +17,17 @@ const AREAPATH_TOOLS = {
 };
 
 function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
-  server.tool(
-    AREAPATH_TOOLS.list_project_area_paths,
-    "Get all area paths for a project in Azure DevOps",
-    {
-      project: z.string().describe("Project name or ID"),
-      depth: z.number().default(10).describe("Maximum depth of area path hierarchy to retrieve. Defaults to 10."),
-    },
-    async ({ project, depth }) => {
-      // Implementation for listing project area paths
-    }
-  );
+  // server.tool(
+  //   AREAPATH_TOOLS.list_project_area_paths,
+  //   "Get all area paths for a project in Azure DevOps",
+  //   {
+  //     project: z.string().describe("Project name or ID"),
+  //     depth: z.number().default(10).describe("Maximum depth of area path hierarchy to retrieve. Defaults to 10."),
+  //   },
+  //   async ({ project, depth }) => {
+  //     // Implementation for listing project area paths
+  //   }
+  // );
 }
 
 export { AREAPATH_TOOLS, configureAreaPathTools };
