@@ -763,7 +763,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
-      const threadContext: CommentThreadContext = { filePath: filePath };
+      const normalizedFilePath = filePath && !filePath.startsWith('/') ? `/${filePath}` : filePath;
+      const threadContext: CommentThreadContext = { filePath: normalizedFilePath };
 
       if (rightFileStartLine !== undefined) {
         if (rightFileStartLine < 1) {
