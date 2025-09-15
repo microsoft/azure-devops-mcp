@@ -9,6 +9,7 @@ import { orgName } from "../index.js";
 
 const DASHBOARD_TOOLS = {
   create_dashboard: "create_dashboard",
+  list_available_widgets: "list_available_widgets",
 };
 
 interface DashboardWidget {
@@ -35,7 +36,95 @@ interface CreateDashboardRequest {
   position?: number;
 }
 
+interface WidgetType {
+  contributionId: string;
+  name: string;
+  description: string;
+  isEnabled: boolean;
+  catalogIconUrl?: string;
+  supportedSizes?: { rowSpan: number; columnSpan: number }[];
+}
+
 function configureDashboardTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+  server.tool(
+    DASHBOARD_TOOLS.list_available_widgets,
+    "List all available widget contribution IDs for dashboards",
+    {
+      project: z.string().describe("Project ID or project name"),
+    },
+    async ({ project }) => {
+      try {
+        const accessToken = await tokenProvider();
+        
+        // Get widget catalog from the dashboard API
+        const url = `https://dev.azure.com/${orgName}/${project}/_apis/dashboard/widgetTypes?api-version=7.2-preview.1`;
+        
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          return {
+            content: [{ 
+              type: "text", 
+              text: `Error fetching widget types: ${response.status} ${response.statusText} - ${errorText}` 
+            }],
+            isError: true,
+          };
+        }
+
+        const result = await response.json();
+        
+        // Extract commonly used widget information
+        const widgets = result.value || [];
+        const widgetSummary = widgets.map((widget: WidgetType) => ({
+          contributionId: widget.contributionId,
+          name: widget.name,
+          description: widget.description,
+          isEnabled: widget.isEnabled,
+          catalogIconUrl: widget.catalogIconUrl,
+          supportedSizes: widget.supportedSizes,
+        }));
+
+        return {
+          content: [
+            { 
+              type: "text", 
+              text: JSON.stringify({
+                totalWidgets: widgets.length,
+                availableWidgets: widgetSummary.filter((w: typeof widgetSummary[0]) => w.isEnabled),
+                disabledWidgets: widgetSummary.filter((w: typeof widgetSummary[0]) => !w.isEnabled),
+                commonWidgetIds: [
+                  "ms.vss-dashboards-web.Microsoft.VisualStudioOnline.Dashboards.MarkdownWidget",
+                  "ms.vss-dashboards-web.Microsoft.VisualStudioOnline.Dashboards.QueryScalarWidget",
+                  "ms.vss-work-web.Microsoft.VisualStudioOnline.Agile.Widgets.WitChart",
+                  "ms.vss-work-web.Microsoft.VisualStudioOnline.Agile.Widgets.WorkItemQueryCountWidget"
+                ],
+                fullResponse: result
+              }, null, 2) 
+            }
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error fetching available widgets: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
   server.tool(
     DASHBOARD_TOOLS.create_dashboard,
     "Create a new dashboard in Azure DevOps project or team",
@@ -98,6 +187,9 @@ function configureDashboardTools(server: McpServer, tokenProvider: () => Promise
             size: widget.size,
             ...(widget.contributionId && { contributionId: widget.contributionId }),
             ...(widget.settings && { settings: widget.settings }),
+            ...(widget.settingsVersion && { settingsVersion: widget.settingsVersion }),
+            ...(widget.areSettingsBlockedForUser !== undefined && { areSettingsBlockedForUser: widget.areSettingsBlockedForUser }),
+            ...(widget.isEnabled !== undefined && { isEnabled: widget.isEnabled }),
           }));
         }
 
