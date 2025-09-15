@@ -12,6 +12,7 @@ const TAG_TOOLS = {
   tags_usage_analytics: "tags_usage_analytics",
   repo_list_tags: "repo_list_tags",
   list_unused_tags: "list_unused_tags",
+  delete_tag: "delete_tag",
 };
 
 function configureTagTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -229,10 +230,10 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
   server.tool(
     TAG_TOOLS.list_unused_tags,
-    "List all unused tags in a project (tags not attached to any work items).",
+    "List all unused tags in a project (tags not attached to any work items). Uses optimized individual tag checking for better accuracy.",
     {
       project: z.string().describe("Project name or ID"),
-      top: z.number().default(100).describe("The maximum number of tags to check for usage. Defaults to 100."),
+      top: z.number().default(50).describe("The maximum number of tags to check for usage. Defaults to 50 for performance."),
     },
     async ({ project, top }) => {
       try {
@@ -269,11 +270,121 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         // Limit the number of tags to check based on the top parameter
         const tagsToCheck = allTags.slice(0, top);
 
-        // Step 2: Get ALL tags that are actually used in work items with a single query
-        // We'll use a large result set to get comprehensive coverage of used tags
-        const wiqlQuery = `SELECT [System.Id], [System.Tags] FROM WorkItems WHERE [System.TeamProject] = '${project}'`;
+        // Step 2: For each tag, use a direct WIQL query to check if it's used
+        const unusedTags: string[] = [];
+        const usedTags: string[] = [];
+        const errorTags: string[] = [];
         
-        const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=19000&api-version=7.1-preview.2`;
+        for (const tag of tagsToCheck) {
+          // Use a simple count query to check if any work items have this tag
+          const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' AND [System.Tags] CONTAINS '${tag.name}'`;
+          
+          const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=1&api-version=7.1-preview.2`;
+          
+          try {
+            const wiqlResponse = await fetch(wiqlUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessToken.token}`,
+                "User-Agent": userAgentProvider(),
+              },
+              body: JSON.stringify({ query: wiqlQuery }),
+            });
+
+            if (wiqlResponse.ok) {
+              const wiqlData = await wiqlResponse.json();
+              // If no work items found with this tag, it's unused
+              if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
+                unusedTags.push(tag.name);
+              } else {
+                usedTags.push(tag.name);
+              }
+            } else {
+              errorTags.push(tag.name);
+            }
+          } catch {
+            // Skip this tag if there's an error
+            errorTags.push(tag.name);
+          }     
+        }
+
+        return {
+          content: [
+            { 
+              type: "text", 
+              text: JSON.stringify({
+                totalTagsInProject: allTags.length,
+                tagsChecked: tagsToCheck.length,
+                unusedTags: unusedTags,
+                unusedCount: unusedTags.length,
+                usedTags: usedTags,
+                usedCount: usedTags.length,
+                errorTags: errorTags,
+                errorCount: errorTags.length,
+                summary: `Found ${unusedTags.length} unused tags, ${usedTags.length} used tags, ${errorTags.length} errors out of ${tagsToCheck.length} checked`
+              }, null, 2) 
+            }
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error finding unused tags: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    TAG_TOOLS.delete_tag,
+    "Delete a tag from the project. Will only delete if the tag is unused (not attached to any work items).",
+    {
+      project: z.string().describe("Project name or ID"),
+      tagName: z.string().describe("The name of the tag to delete"),
+    },
+    async ({ project, tagName }) => {
+      try {
+        const accessToken = await tokenProvider();
+
+        // Step 1: Check if the tag exists and get its usage status
+        const tagsUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags?api-version=7.0`;
+        const tagsResponse = await fetch(tagsUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!tagsResponse.ok) {
+          const errorText = await tagsResponse.text();
+          return {
+            content: [{ type: "text", text: `Error fetching tags: ${tagsResponse.status} ${tagsResponse.statusText} - ${errorText}` }],
+            isError: true,
+          };
+        }
+
+        const tagsData = await tagsResponse.json();
+        const allTags = tagsData.value || [];
+        const tagExists = allTags.some((tag: { name: string }) => tag.name === tagName);
+
+        if (!tagExists) {
+          return {
+            content: [{ type: "text", text: `Tag "${tagName}" does not exist in project "${project}".` }],
+            isError: true,
+          };
+        }
+
+        // Step 2: Check if the tag is in use
+        const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' AND [System.Tags] CONTAINS '${tagName}'`;
+        const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=1&api-version=7.1-preview.2`;
         
         const wiqlResponse = await fetch(wiqlUrl, {
           method: "POST",
@@ -285,55 +396,55 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           body: JSON.stringify({ query: wiqlQuery }),
         });
 
-        if (!wiqlResponse.ok) {
-          const errorText = await wiqlResponse.text();
-          return {
-            content: [{ type: "text", text: `WIQL API error: ${wiqlResponse.status} ${wiqlResponse.statusText} - ${errorText}` }],
-            isError: true,
-          };
-        }
-
-        const wiqlData = await wiqlResponse.json();
-        const workItemIds = wiqlData.workItems?.map((w: { id: number }) => w.id) || [];
-
-        // Step 3: Extract all used tags from work items
-        const usedTags = new Set<string>();
-        const connection = await connectionProvider();
-        const workItemApi = await connection.getWorkItemTrackingApi();
-        
-        // Process work items in batches to get their tags
-        const batchSize = 200;
-        for (let i = 0; i < workItemIds.length; i += batchSize) {
-          const batchIds = workItemIds.slice(i, i + batchSize);
-          const workItems = await workItemApi.getWorkItemsBatch({ ids: batchIds, fields: ["System.Tags"] }, project);
-          
-          for (const wi of workItems) {
-            const tagsString = wi.fields && wi.fields["System.Tags"] ? wi.fields["System.Tags"] : "";
-            if (tagsString) {
-              const tags: string[] = tagsString.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-              
-              // Add each tag to the used set - once a tag is encountered, it's marked as used
-              tags.forEach((tag: string) => usedTags.add(tag));
-            }
+        if (wiqlResponse.ok) {
+          const wiqlData = await wiqlResponse.json();
+          if (wiqlData.workItems && wiqlData.workItems.length > 0) {
+            return {
+              content: [{ 
+                type: "text", 
+                text: JSON.stringify({
+                  success: false,
+                  error: "Tag is in use",
+                  message: `Tag "${tagName}" is currently in use by ${wiqlData.workItems.length} or more work items.`,
+                  tagName: tagName,
+                  project: project,
+                  workItemsFound: wiqlData.workItems.length
+                }, null, 2)
+              }],
+              isError: true,
+            };
           }
         }
 
-        // Step 4: Find unused tags by checking which project tags are NOT in the used tags set
-        const unusedTags = tagsToCheck
-          .map((tag: { name: string }) => tag.name)
-          .filter((tagName: string) => !usedTags.has(tagName));
+        // Step 3: Delete the tag using the DELETE API
+        const deleteTagUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/${encodeURIComponent(tagName)}?api-version=7.0`;
+        
+        const deleteResponse = await fetch(deleteTagUrl, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!deleteResponse.ok) {
+          const errorText = await deleteResponse.text();
+          return {
+            content: [{ type: "text", text: `Error deleting tag: ${deleteResponse.status} ${deleteResponse.statusText} - ${errorText}` }],
+            isError: true,
+          };
+        }
 
         return {
           content: [
             { 
               type: "text", 
               text: JSON.stringify({
-                totalTagsInProject: allTags.length,
-                tagsChecked: tagsToCheck.length,
-                workItemsAnalyzed: workItemIds.length,
-                totalUsedTags: usedTags.size,
-                unusedTags: unusedTags,
-                unusedCount: unusedTags.length
+                success: true,
+                message: `Tag "${tagName}" has been successfully deleted`,
+                tagName: tagName,
+                project: project,
               }, null, 2) 
             }
           ],
@@ -343,7 +454,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           content: [
             {
               type: "text",
-              text: `Error finding unused tags: ${error instanceof Error ? error.message : String(error)}`,
+              text: `Error deleting tag: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
