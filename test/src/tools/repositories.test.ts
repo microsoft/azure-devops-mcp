@@ -1944,9 +1944,79 @@ describe("repos tools", () => {
         {
           comments: [{ content: "Thread with position" }],
           threadContext: {
-            filePath: "src/test.ts",
+            filePath: "/src/test.ts",
             rightFileStart: { line: 10, offset: 5 },
             rightFileEnd: { line: 12, offset: 15 },
+          },
+          status: undefined,
+        },
+        "repo123",
+        456,
+        undefined
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
+    });
+
+    it("should normalize file path by adding leading slash if missing", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request_thread);
+      if (!call) throw new Error("repo_create_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = { id: 123 };
+      mockGitApi.createThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        content: "Thread with normalized path",
+        filePath: "src/file-without-slash.ts", // Path without leading slash
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.createThread).toHaveBeenCalledWith(
+        {
+          comments: [{ content: "Thread with normalized path" }],
+          threadContext: {
+            filePath: "/src/file-without-slash.ts", // Should have leading slash added
+          },
+          status: undefined,
+        },
+        "repo123",
+        456,
+        undefined
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
+    });
+
+    it("should preserve file path if it already starts with slash", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request_thread);
+      if (!call) throw new Error("repo_create_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = { id: 123 };
+      mockGitApi.createThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        content: "Thread with existing slash",
+        filePath: "/src/file-with-slash.ts", // Path already has leading slash
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.createThread).toHaveBeenCalledWith(
+        {
+          comments: [{ content: "Thread with existing slash" }],
+          threadContext: {
+            filePath: "/src/file-with-slash.ts", // Should remain unchanged
           },
           status: undefined,
         },
