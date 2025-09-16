@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { orgName } from "../index.js";
-import { apiVersion } from "../utils.js";
+import { areaPathApiVersion } from "../utils.js";
 
 interface ClassificationNode {
   name: string;
@@ -135,10 +135,10 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
         if (parentPath) {
           // Create under specific parent path
           const encodedParentPath = encodeURIComponent(parentPath);
-          url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Areas/${encodedParentPath}?api-version=${apiVersion}`;
+          url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Areas/${encodedParentPath}?api-version=${areaPathApiVersion}`;
         } else {
           // Create under root Areas
-          url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Areas?api-version=${apiVersion}`;
+          url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/classificationnodes/Areas?api-version=${areaPathApiVersion}`;
         }
 
         const requestBody = {
