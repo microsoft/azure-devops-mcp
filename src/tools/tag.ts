@@ -9,9 +9,8 @@ import { orgName } from "../index.js";
 
 const TAG_TOOLS = {
   search_workitem_by_tags: "search_workitem_by_tags",
-  workitem_tags_usage_analytics: "workitem_tags_usage_analytics",
+  workitem_tags_comprehensive_analytics: "workitem_tags_comprehensive_analytics",
   list_project_workitem_tags: "list_project_workitem_tags",
-  list_unused_workitem_tags: "list_unused_workitem_tags",
   delete_workitem_tag_by_name: "delete_workitem_tag_by_name",
   delete_unused_workitem_tags: "delete_unused_workitem_tags",
 };
@@ -129,19 +128,42 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   );
 
   server.tool(
-    TAG_TOOLS.workitem_tags_usage_analytics,
-    "Show tag usage statistics and trends",
+    TAG_TOOLS.workitem_tags_comprehensive_analytics,
+    "Comprehensive tag analytics showing usage statistics, trends, and unused tags in a single response",
     { 
       project: z.string().describe("Project name or ID"),
-      top: z.number().default(1000).describe("The maximum number of work items to analyze for tag usage. Defaults to 1000.")
+      top: z.number().default(1000).describe("The maximum number of work items to analyze for tag usage. Defaults to 1000."),
+      maxTagsToCheck: z.number().default(100).describe("The maximum number of tags to check for unused status. Defaults to 100 for performance.")
     },
-    async ({ project, top }) => {
+    async ({ project, top, maxTagsToCheck }) => {
       try {
         const accessToken = await tokenProvider();
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
 
-        // Step 1: WIQL query to fetch work items (limited by top parameter)
+        // Step 1: Get all tags in the project
+        const tagsUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags?api-version=7.0`;
+        const tagsResponse = await fetch(tagsUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!tagsResponse.ok) {
+          const errorText = await tagsResponse.text();
+          return {
+            content: [{ type: "text", text: `Error fetching tags: ${tagsResponse.status} ${tagsResponse.statusText} - ${errorText}` }],
+            isError: true,
+          };
+        }
+
+        const tagsData = await tagsResponse.json();
+        const allProjectTags = tagsData.value?.map((tag: { name: string }) => tag.name) || [];
+
+        // Step 2: WIQL query to fetch work items (limited by top parameter)
         const wiqlQuery = `SELECT [System.Id], [System.Title], [System.Tags], [System.ChangedDate] FROM WorkItems WHERE [System.TeamProject] = '${project}' ORDER BY [System.Id]`;
 
         const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=${top}&api-version=7.1-preview.2`;
@@ -167,7 +189,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         const wiqlResult = await wiqlResponse.json();
         const workItemIds = wiqlResult.workItems.map((w: { id: number }) => w.id);
 
-        // Step 2: Batch fetch work item details to get Tags
+        // Step 3: Batch fetch work item details to get Tags and analyze usage
         const workItemBatchSize = 200;
         const tagCounts: Record<string, { count: number; lastUsed: string | null }> = {};
 
@@ -199,14 +221,41 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           }
         }
 
-        // Step 3: Format results, sorted by usage count
-        const result = Object.entries(tagCounts)
+        // Step 4: Identify used and unused tags
+        const usedTagNames = Object.keys(tagCounts);
+        const unusedTags = allProjectTags.filter((tag: string) => !usedTagNames.includes(tag));
+
+        // Limit the number of unused tags we report based on maxTagsToCheck
+        const reportedUnusedTags = unusedTags.slice(0, maxTagsToCheck);
+
+        // Step 5: Format used tags results, sorted by usage count
+        const usedTagsAnalytics = Object.entries(tagCounts)
           .map(([tag, info]) => ({
             tag,
             usageCount: info.count,
             lastUsed: info.lastUsed,
           }))
           .sort((a, b) => b.usageCount - a.usageCount);
+
+        // Step 6: Create comprehensive result
+        const result = {
+          summary: {
+            totalTagsInProject: allProjectTags.length,
+            usedTagsCount: usedTagNames.length,
+            unusedTagsCount: unusedTags.length,
+            workItemsAnalyzed: workItemIds.length,
+            maxWorkItemsRequested: top,
+            unusedTagsReported: reportedUnusedTags.length,
+            maxUnusedTagsToCheck: maxTagsToCheck
+          },
+          usedTags: usedTagsAnalytics,
+          unusedTags: reportedUnusedTags,
+          analysis: {
+            mostUsedTag: usedTagsAnalytics.length > 0 ? usedTagsAnalytics[0] : null,
+            leastUsedTag: usedTagsAnalytics.length > 0 ? usedTagsAnalytics[usedTagsAnalytics.length - 1] : null,
+            tagUtilizationRate: allProjectTags.length > 0 ? ((usedTagNames.length / allProjectTags.length) * 100).toFixed(2) + '%' : '0%'
+          }
+        };
 
         return {
           content: [
@@ -218,120 +267,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           content: [
             {
               type: "text",
-              text: `Error in tag usage analytics: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    TAG_TOOLS.list_unused_workitem_tags,
-    "List all unused tags in a project (tags not attached to any work items). Uses optimized individual tag checking for better accuracy.",
-    {
-      project: z.string().describe("Project name or ID"),
-      top: z.number().default(50).describe("The maximum number of tags to check for usage. Defaults to 50 for performance."),
-    },
-    async ({ project, top }) => {
-      try {
-        const accessToken = await tokenProvider();
-
-        // Step 1: Get all tags in the project
-        const tagsUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags?api-version=7.0`;
-        const tagsResponse = await fetch(tagsUrl, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken.token}`,
-            "User-Agent": userAgentProvider(),
-          },
-        });
-
-        if (!tagsResponse.ok) {
-          const errorText = await tagsResponse.text();
-          return {
-            content: [{ type: "text", text: `Error fetching tags: ${tagsResponse.status} ${tagsResponse.statusText} - ${errorText}` }],
-            isError: true,
-          };
-        }
-
-        const tagsData = await tagsResponse.json();
-        const allTags = tagsData.value || [];
-
-        if (allTags.length === 0) {
-          return {
-            content: [{ type: "text", text: "No tags found in the project." }],
-          };
-        }
-
-        // Limit the number of tags to check based on the top parameter
-        const tagsToCheck = allTags.slice(0, top);
-
-        // Step 2: For each tag, use a direct WIQL query to check if it's used
-        const unusedTags: string[] = [];
-        const usedTags: string[] = [];
-        const errorTags: string[] = [];
-        
-        for (const tag of tagsToCheck) {
-          // Use a simple count query to check if any work items have this tag
-          const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' AND [System.Tags] CONTAINS '${tag.name}'`;
-          
-          const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=1&api-version=7.1-preview.2`;
-          
-          try {
-            const wiqlResponse = await fetch(wiqlUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${accessToken.token}`,
-                "User-Agent": userAgentProvider(),
-              },
-              body: JSON.stringify({ query: wiqlQuery }),
-            });
-
-            if (wiqlResponse.ok) {
-              const wiqlData = await wiqlResponse.json();
-              // If no work items found with this tag, it's unused
-              if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
-                unusedTags.push(tag.name);
-              } else {
-                usedTags.push(tag.name);
-              }
-            } else {
-              errorTags.push(tag.name);
-            }
-          } catch {
-            // Skip this tag if there's an error
-            errorTags.push(tag.name);
-          }     
-        }
-
-        return {
-          content: [
-            { 
-              type: "text", 
-              text: JSON.stringify({
-                totalTagsInProject: allTags.length,
-                tagsChecked: tagsToCheck.length,
-                unusedTags: unusedTags,
-                unusedCount: unusedTags.length,
-                usedTags: usedTags,
-                usedCount: usedTags.length,
-                errorTags: errorTags,
-                errorCount: errorTags.length,
-                summary: `Found ${unusedTags.length} unused tags, ${usedTags.length} used tags, ${errorTags.length} errors out of ${tagsToCheck.length} checked`
-              }, null, 2) 
-            }
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error finding unused tags: ${error instanceof Error ? error.message : String(error)}`,
+              text: `Error in comprehensive tag analytics: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
