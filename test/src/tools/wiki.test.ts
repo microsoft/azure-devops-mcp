@@ -755,14 +755,17 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1", {
-        method: "PUT",
-        headers: {
-          "Authorization": "Bearer test-token",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content: "# Welcome\nThis is the home page." }),
-      });
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content: "# Welcome\nThis is the home page." }),
+        }
+      );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
       expect(result.isError).toBeUndefined();
     });
@@ -1176,7 +1179,10 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1", expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        expect.any(Object)
+      );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
     });
 
@@ -1206,7 +1212,10 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg//_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1", expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg//_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        expect.any(Object)
+      );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
     });
 
@@ -1270,14 +1279,17 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=main&api-version=7.1", {
-        method: "PUT",
-        headers: {
-          "Authorization": "Bearer test-token",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content: "# Welcome" }),
-      });
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=main&api-version=7.1",
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content: "# Welcome" }),
+        }
+      );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
       expect(result.isError).toBeUndefined();
     });
