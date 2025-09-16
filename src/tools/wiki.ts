@@ -220,8 +220,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
       content: z.string().describe("The content of the wiki page in markdown format."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
       etag: z.string().optional().describe("ETag for editing existing pages (optional, will be fetched if not provided)."),
+      branch: z.string().default("wikiMaster").describe("The branch name for the wiki repository. Defaults to 'wikiMaster' which is the default branch for Azure DevOps wikis."),
     },
-    async ({ wikiIdentifier, path, content, project, etag }) => {
+    async ({ wikiIdentifier, path, content, project, etag, branch = "wikiMaster" }) => {
       try {
         const connection = await connectionProvider();
         const accessToken = await tokenProvider();
@@ -230,10 +231,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
         const normalizedPath = path.startsWith("/") ? path : `/${path}`;
         const encodedPath = encodeURIComponent(normalizedPath);
 
-        // Build the URL for the wiki page API
+        // Build the URL for the wiki page API with version descriptor
         const baseUrl = connection.serverUrl;
         const projectParam = project || "";
-        const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&api-version=7.1`;
+        const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&versionDescriptor.versionType=branch&versionDescriptor.version=${encodeURIComponent(branch)}&api-version=7.1`;
 
         // First, try to create a new page (PUT without ETag)
         try {
