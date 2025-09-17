@@ -13,6 +13,9 @@ const TAG_TOOLS = {
   list_project_workitem_tags: "list_project_workitem_tags",
   delete_workitem_tag_by_name: "delete_workitem_tag_by_name",
   delete_unused_workitem_tags: "delete_unused_workitem_tags",
+  update_workitem_tag: "update_workitem_tag",
+  add_tags_to_workitem: "add_tags_to_workitem",
+  remove_tags_from_workitem: "remove_tags_from_workitem",
 };
 
 function configureTagTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -438,16 +441,21 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           };
         }
 
-        // Step 2: Find unused tags (limited by top parameter)
-        const tagsToCheck = allTags.slice(0, Math.min(top * 2, allTags.length)); // Check more than we need to delete
+        // Step 2: Find unused tags by processing work items in batches
         const unusedTags: string[] = [];
         const usedTags: string[] = [];
-        const errorTags: string[] = [];
+        let tagsChecked = 0;
+        let workItemsProcessed = 0;
+        const workItemBatchSize = 100; // Process 100 work items at a time
+        let skip = 0;
+        const allTagNames = allTags.map((tag: { name: string }) => tag.name);
+        const potentiallyUnusedTags = new Set<string>(allTagNames); // Start with all tags as potentially unused
 
-        for (const tag of tagsToCheck) {
-          // Use a simple count query to check if any work items have this tag
-          const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' AND [System.Tags] CONTAINS '${tag.name}'`;
-          const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=1&api-version=7.1-preview.2`;
+        // Process work items in batches until we find enough unused tags
+        while (unusedTags.length < top && potentiallyUnusedTags.size > 0) {
+          // Get a batch of work items using WIQL with SKIP
+          const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' ORDER BY [System.Id]`;
+          const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=${workItemBatchSize}&$skip=${skip}&api-version=7.1-preview.2`;
           
           try {
             const wiqlResponse = await fetch(wiqlUrl, {
@@ -460,28 +468,77 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
               body: JSON.stringify({ query: wiqlQuery }),
             });
 
-            if (wiqlResponse.ok) {
-              const wiqlData = await wiqlResponse.json();
-              if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
-                unusedTags.push(tag.name);
-              } else {
-                usedTags.push(tag.name);
-              }
-            } else {
-              errorTags.push(tag.name);
+            if (!wiqlResponse.ok) {
+              break; // Exit if we can't get work items
             }
-          } catch {
-            errorTags.push(tag.name);
-          }
 
-          // Stop if we have enough unused tags to delete
-          if (unusedTags.length >= top) {
+            const wiqlResult = await wiqlResponse.json();
+            const batchWorkItemIds = wiqlResult.workItems?.map((w: { id: number }) => w.id) || [];
+            
+            // If no more work items, break
+            if (batchWorkItemIds.length === 0) {
+              break;
+            }
+
+            // Get work item details for this batch (using Azure DevOps Node API)
+            const connection = await connectionProvider();
+            const workItemApi = await connection.getWorkItemTrackingApi();
+            const workItems = await workItemApi.getWorkItemsBatch(
+              { ids: batchWorkItemIds, fields: ["System.Tags"] }, 
+              project
+            );
+
+            // Process tags from this batch of work items
+            for (const workItem of workItems) {
+              const tagsString = workItem.fields?.["System.Tags"] || "";
+              if (tagsString) {
+                const workItemTags = tagsString
+                  .split(";")
+                  .map((tag: string) => tag.trim())
+                  .filter((tag: string) => tag.length > 0);
+                
+                // Remove these tags from potentially unused set
+                for (const tag of workItemTags) {
+                  if (potentiallyUnusedTags.has(tag)) {
+                    potentiallyUnusedTags.delete(tag);
+                    usedTags.push(tag);
+                  }
+                }
+              }
+              workItemsProcessed++;
+            }
+
+            // Update counters
+            skip += workItemBatchSize;
+
+            // Check if we have enough unused tags from remaining potentially unused tags
+            const currentUnusedTags = Array.from(potentiallyUnusedTags);
+            if (currentUnusedTags.length >= top) {
+              // We have enough unused tags, take only what we need
+              unusedTags.push(...currentUnusedTags.slice(0, top));
+              break;
+            } else {
+              // Add all remaining unused tags and continue if we need more
+              unusedTags.push(...currentUnusedTags);
+              if (unusedTags.length >= top) {
+                break;
+              }
+            }
+
+          } catch (error) {
+            console.warn("Error processing work item batch:", error);
             break;
           }
         }
 
-        // Limit to the requested number of deletions
-        const tagsToDelete = unusedTags.slice(0, top);
+        // If we still don't have enough unused tags and there are remaining potentially unused tags
+        if (unusedTags.length < top && potentiallyUnusedTags.size > 0) {
+          const remainingUnused = Array.from(potentiallyUnusedTags).slice(0, top - unusedTags.length);
+          unusedTags.push(...remainingUnused);
+        }
+
+        tagsChecked = allTags.length;
+        const tagsToDelete = unusedTags.slice(0, top); // Ensure we don't exceed the requested limit
 
         if (tagsToDelete.length === 0) {
           return {
@@ -492,7 +549,8 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
                   success: true,
                   message: "No unused tags found to delete.",
                   project: project,
-                  tagsChecked: tagsToCheck.length,
+                  tagsChecked: tagsChecked,
+                  workItemsProcessed: workItemsProcessed,
                   unusedTagsFound: 0,
                   tagsToDelete: [],
                   dryRun: dryRun
@@ -559,7 +617,8 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
                   : `Deletion completed. Successfully deleted ${successfulDeletions.length} out of ${tagsToDelete.length} unused tags.`,
                 project: project,
                 dryRun: dryRun,
-                tagsChecked: tagsToCheck.length,
+                tagsChecked: tagsChecked,
+                workItemsProcessed: workItemsProcessed,
                 unusedTagsFound: unusedTags.length,
                 tagsToDelete: tagsToDelete,
                 results: {
@@ -580,6 +639,385 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
             {
               type: "text",
               text: `Error deleting unused tags: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    TAG_TOOLS.update_workitem_tag,
+    "Update a work item tag in the project",
+    {
+      project: z.string().describe("Project ID or project name"),
+      tagIdOrName: z.string().describe("Tag ID or tag name to update"),
+      name: z.string().describe("New name for the tag"),
+    },
+    async ({ project, tagIdOrName, name }) => {
+      try {
+        const accessToken = await tokenProvider();
+        
+        // First, get the current tag to retrieve its ID and other properties
+        const getTagUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/${encodeURIComponent(tagIdOrName)}?api-version=7.2-preview.1`;
+        const getTagResponse = await fetch(getTagUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!getTagResponse.ok) {
+          throw new Error(`Failed to get tag details: ${getTagResponse.status} ${getTagResponse.statusText}`);
+        }
+
+        const currentTag = await getTagResponse.json();
+
+        // Prepare the update request body
+        const updateBody = {
+          id: currentTag.id,
+          name: name,
+          url: currentTag.url,
+        };
+
+        // Update the tag
+        const updateUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/${encodeURIComponent(tagIdOrName)}?api-version=7.2-preview.1`;
+        const updateResponse = await fetch(updateUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
+          },
+          body: JSON.stringify(updateBody),
+        });
+
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text();
+          throw new Error(`Failed to update tag: ${updateResponse.status} ${updateResponse.statusText}. ${errorText}`);
+        }
+
+        const updatedTag = await updateResponse.json();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: true,
+                message: `Tag '${tagIdOrName}' successfully updated to '${name}'`,
+                updatedTag: updatedTag
+              }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error updating tag: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    TAG_TOOLS.add_tags_to_workitem,
+    "Add one or more tags to a specific work item. Existing tags on the work item will be preserved.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      workItemId: z.number().describe("Work item ID to add tags to"),
+      tags: z.array(z.string()).describe("Array of tag names to add to the work item"),
+      createTagsIfNotExist: z.boolean().default(true).describe("If true, creates tags in the project if they don't exist. Defaults to true."),
+    },
+    async ({ project, workItemId, tags, createTagsIfNotExist }) => {
+      try {
+        const accessToken = await tokenProvider();
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+
+        if (tags.length === 0) {
+          return {
+            content: [{ type: "text", text: "No tags provided to add." }],
+            isError: true,
+          };
+        }
+
+        // Step 1: If createTagsIfNotExist is true, ensure all tags exist in the project
+        if (createTagsIfNotExist) {
+          const existingTagsUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags?api-version=7.0`;
+          const existingTagsResponse = await fetch(existingTagsUrl, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken.token}`,
+              "User-Agent": userAgentProvider(),
+            },
+          });
+
+          if (existingTagsResponse.ok) {
+            const existingTagsData = await existingTagsResponse.json();
+            const existingTagNames = existingTagsData.value?.map((tag: { name: string }) => tag.name) || [];
+            
+            // Create tags that don't exist
+            for (const tagName of tags) {
+              if (!existingTagNames.includes(tagName)) {
+                const createTagUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags?api-version=7.0`;
+                try {
+                  await fetch(createTagUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${accessToken.token}`,
+                      "User-Agent": userAgentProvider(),
+                    },
+                    body: JSON.stringify({ name: tagName }),
+                  });
+                } catch (error) {
+                  console.warn(`Failed to create tag "${tagName}":`, error);
+                }
+              }
+            }
+          }
+        }
+
+        // Step 2: Get the current work item to retrieve existing tags
+        const workItems = await workItemApi.getWorkItemsBatch({ ids: [workItemId], fields: ["System.Tags"] }, project);
+        
+        if (!workItems || workItems.length === 0) {
+          return {
+            content: [{ type: "text", text: `Work item ${workItemId} not found in project ${project}.` }],
+            isError: true,
+          };
+        }
+
+        const currentWorkItem = workItems[0];
+
+        // Step 3: Parse existing tags
+        const existingTagsString = currentWorkItem.fields?.["System.Tags"] || "";
+        const existingTags = existingTagsString
+          ? existingTagsString.split(";").map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+          : [];
+
+        // Step 4: Determine new tags to add (avoid duplicates)
+        const newTags = tags.filter(tag => !existingTags.includes(tag));
+        
+        if (newTags.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  success: true,
+                  message: "All specified tags already exist on this work item.",
+                  workItemId,
+                  requestedTags: tags,
+                  existingTags,
+                  addedTags: [],
+                }, null, 2),
+              },
+            ],
+          };
+        }
+
+        // Step 5: Combine existing and new tags
+        const allTags = [...existingTags, ...newTags];
+        const combinedTagsString = allTags.join("; ");
+
+        // Step 6: Update the work item with the combined tags
+        const patchDocument = [
+          {
+            op: "add",
+            path: "/fields/System.Tags",
+            value: combinedTagsString,
+          },
+        ];
+
+        await workItemApi.updateWorkItem(
+          undefined,
+          patchDocument,
+          workItemId,
+          project
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: true,
+                message: `Successfully added ${newTags.length} new tag(s) to work item ${workItemId}.`,
+                workItemId,
+                addedTags: newTags,
+                existingTags,
+                allTags,
+                createTagsIfNotExist,
+              }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error adding tags to work item: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    TAG_TOOLS.remove_tags_from_workitem,
+    "Remove specific tags from a work item or clear all tags. Other existing tags will be preserved.",
+    {
+      project: z.string().describe("Project ID or project name"),
+      workItemId: z.number().describe("Work item ID to remove tags from"),
+      tagsToRemove: z.array(z.string()).optional().describe("Array of tag names to remove. If empty or not provided, all tags will be removed."),
+      removeAllTags: z.boolean().default(false).describe("If true, removes all tags from the work item. Defaults to false."),
+    },
+    async ({ project, workItemId, tagsToRemove, removeAllTags }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+
+        // Step 1: Get the current work item to retrieve existing tags
+        const workItems = await workItemApi.getWorkItemsBatch({ ids: [workItemId], fields: ["System.Tags"] }, project);
+        
+        if (!workItems || workItems.length === 0) {
+          return {
+            content: [{ type: "text", text: `Work item ${workItemId} not found in project ${project}.` }],
+            isError: true,
+          };
+        }
+
+        const currentWorkItem = workItems[0];
+
+        // Step 2: Parse existing tags
+        const existingTagsString = currentWorkItem.fields?.["System.Tags"] || "";
+        const existingTags = existingTagsString
+          ? existingTagsString.split(";").map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+          : [];
+
+        if (existingTags.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  success: true,
+                  message: "Work item has no tags to remove.",
+                  workItemId,
+                  existingTags: [],
+                  removedTags: [],
+                  remainingTags: [],
+                }, null, 2),
+              },
+            ],
+          };
+        }
+
+        // Step 3: Determine which tags to remove
+        let tagsToRemoveArray: string[] = [];
+        let remainingTags: string[] = [];
+
+        if (removeAllTags) {
+          // Remove all tags
+          tagsToRemoveArray = [...existingTags];
+          remainingTags = [];
+        } else if (tagsToRemove && tagsToRemove.length > 0) {
+          // Remove specific tags
+          tagsToRemoveArray = tagsToRemove.filter(tag => existingTags.includes(tag));
+          remainingTags = existingTags.filter((tag: string) => !tagsToRemove.includes(tag));
+        } else {
+          // No tags specified to remove and removeAllTags is false
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  success: false,
+                  message: "No tags specified to remove. Use 'tagsToRemove' parameter to specify tags or set 'removeAllTags' to true to remove all tags.",
+                  workItemId,
+                  existingTags,
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (tagsToRemoveArray.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  success: true,
+                  message: "None of the specified tags were found on this work item.",
+                  workItemId,
+                  requestedTagsToRemove: tagsToRemove || [],
+                  existingTags,
+                  removedTags: [],
+                  remainingTags: existingTags,
+                }, null, 2),
+              },
+            ],
+          };
+        }
+
+        // Step 4: Update the work item with remaining tags
+        const newTagsString = remainingTags.length > 0 ? remainingTags.join("; ") : "";
+
+        const patchDocument = [
+          {
+            op: remainingTags.length > 0 ? "add" : "remove",
+            path: "/fields/System.Tags",
+            value: remainingTags.length > 0 ? newTagsString : undefined,
+          },
+        ];
+
+        await workItemApi.updateWorkItem(
+          undefined,
+          patchDocument,
+          workItemId,
+          project
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: true,
+                message: `Successfully removed ${tagsToRemoveArray.length} tag(s) from work item ${workItemId}.`,
+                workItemId,
+                removedTags: tagsToRemoveArray,
+                remainingTags,
+                existingTags,
+                removeAllTags,
+                totalTagsRemoved: tagsToRemoveArray.length,
+                totalTagsRemaining: remainingTags.length,
+              }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error removing tags from work item: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
