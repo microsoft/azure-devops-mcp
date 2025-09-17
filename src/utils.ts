@@ -61,7 +61,7 @@ export function safeEnumConvert<T extends Record<string, string | number>>(enumO
 }
 
 /**
- * Encodes `>`, `<`, and `$` for Markdown formatted fields.
+ * Encodes `>` and `<` for Markdown formatted fields.
  *
  * @param value The text value to encode
  * @param format The format of the field ('Markdown' or 'Html')
@@ -69,7 +69,6 @@ export function safeEnumConvert<T extends Record<string, string | number>>(enumO
  */
 export function encodeFormattedValue(value: string, format?: "Markdown" | "Html"): string {
   if (!value || format !== "Markdown") return value;
-  const result = value.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\$/g, "&#36;");
-  console.log("[encodeFormattedValue] Encoded result:", result);
+  const result = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return result;
 }

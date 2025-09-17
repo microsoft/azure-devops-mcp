@@ -437,7 +437,7 @@ describe("encodeFormattedValue", () => {
     it("encodes angle brackets and dollar signs", () => {
       const input = "Value <x> $var > end";
       const result = encodeFormattedValue(input, "Markdown");
-      expect(result).toBe("Value &lt;x&gt; &#36;var &gt; end");
+      expect(result).toBe("Value &lt;x&gt; $var &gt; end");
     });
 
     it("does nothing for Html format", () => {
@@ -463,7 +463,7 @@ describe("encodeFormattedValue", () => {
       const input = "Already &lt;tag&gt; plus <new> and $cash";
       const once = encodeFormattedValue(input, "Markdown");
       const twice = encodeFormattedValue(once, "Markdown");
-      expect(once).toBe("Already &lt;tag&gt; plus &lt;new&gt; and &#36;cash");
+      expect(once).toBe("Already &lt;tag&gt; plus &lt;new&gt; and $cash");
       expect(twice).toBe(once);
     });
   });
