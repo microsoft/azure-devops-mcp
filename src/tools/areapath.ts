@@ -44,23 +44,25 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
         if (!response.ok) {
           const errorText = await response.text();
           return {
-            content: [{ 
-              type: "text", 
-              text: `Error fetching classification nodes: ${response.status} ${response.statusText} - ${errorText}` 
-            }],
+            content: [
+              {
+                type: "text",
+                text: `Error fetching classification nodes: ${response.status} ${response.statusText} - ${errorText}`,
+              },
+            ],
             isError: true,
           };
         }
 
         const data = await response.json();
-        
+
         // Extract area paths from the hierarchical structure
         const areaPaths: string[] = [];
         const iterationPaths: string[] = [];
-        
+
         function extractPaths(node: ClassificationNode, parentPath = "", nodeType = "Area") {
           const currentPath = parentPath ? `${parentPath}\\${node.name}` : node.name;
-          
+
           // Add current path if it's not the root project node
           if (parentPath) {
             if (nodeType === "Area") {
@@ -69,7 +71,7 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
               iterationPaths.push(currentPath);
             }
           }
-          
+
           // Recursively process children
           if (node.children && Array.isArray(node.children)) {
             for (const child of node.children) {
@@ -77,7 +79,7 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
             }
           }
         }
-        
+
         // Process both Area and Iteration classification nodes
         if (data.value && Array.isArray(data.value)) {
           for (const rootNode of data.value) {
@@ -88,21 +90,25 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
             }
           }
         }
-        
+
         return {
           content: [
-            { 
-              type: "text", 
-              text: JSON.stringify({
-                project: project,
-                depth: depth,
-                totalAreaPaths: areaPaths.length,
-                totalIterationPaths: iterationPaths.length,
-                areaPaths: areaPaths.sort(),
-                iterationPaths: iterationPaths.sort(),
-                rawResponse: data
-              }, null, 2) 
-            }
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  project: project,
+                  depth: depth,
+                  totalAreaPaths: areaPaths.length,
+                  totalIterationPaths: iterationPaths.length,
+                  areaPaths: areaPaths.sort(),
+                  iterationPaths: iterationPaths.sort(),
+                  rawResponse: data,
+                },
+                null,
+                2
+              ),
+            },
           ],
         };
       } catch (error) {
@@ -130,7 +136,7 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, name, parentPath }) => {
       try {
         const accessToken = await tokenProvider();
-        
+
         let url: string;
         if (parentPath) {
           // Create under specific parent path
@@ -158,35 +164,41 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
         if (!response.ok) {
           const errorText = await response.text();
           return {
-            content: [{ 
-              type: "text", 
-              text: `Error creating area path: ${response.status} ${response.statusText} - ${errorText}` 
-            }],
+            content: [
+              {
+                type: "text",
+                text: `Error creating area path: ${response.status} ${response.statusText} - ${errorText}`,
+              },
+            ],
             isError: true,
           };
         }
 
         const createdAreaPath = await response.json();
-        
+
         return {
           content: [
-            { 
-              type: "text", 
-              text: JSON.stringify({
-                success: true,
-                message: `Area path "${name}" created successfully`,
-                areaPath: {
-                  id: createdAreaPath.id,
-                  name: createdAreaPath.name,
-                  path: createdAreaPath.path,
-                  parentPath: parentPath || "Root",
-                  hasChildren: createdAreaPath.hasChildren || false,
-                  structureType: createdAreaPath.structureType,
-                  url: createdAreaPath.url,
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: `Area path "${name}" created successfully`,
+                  areaPath: {
+                    id: createdAreaPath.id,
+                    name: createdAreaPath.name,
+                    path: createdAreaPath.path,
+                    parentPath: parentPath || "Root",
+                    hasChildren: createdAreaPath.hasChildren || false,
+                    structureType: createdAreaPath.structureType,
+                    url: createdAreaPath.url,
+                  },
+                  fullResponse: createdAreaPath,
                 },
-                fullResponse: createdAreaPath
-              }, null, 2) 
-            }
+                null,
+                2
+              ),
+            },
           ],
         };
       } catch (error) {
@@ -201,7 +213,7 @@ function configureAreaPathTools(server: McpServer, tokenProvider: () => Promise<
         };
       }
     }
-  );  
+  );
 }
 
 export { AREAPATH_TOOLS, configureAreaPathTools };

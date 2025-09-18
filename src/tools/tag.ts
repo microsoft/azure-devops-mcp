@@ -51,7 +51,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         wiqlConditions.push(`[System.AssignedTo] IN ('${assignedTo.join("','")}')`);
       }
 
-      tag.forEach(t => {
+      tag.forEach((t) => {
         wiqlConditions.push(`[System.Tags] CONTAINS '${t}'`);
       });
 
@@ -62,7 +62,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         ORDER BY [System.ChangedDate] DESC
       `;
 
-      const wiqlUrl = `https://dev.azure.com/${orgName}/${project?.[0] || ''}/_apis/wit/wiql?api-version=7.1-preview.2`;
+      const wiqlUrl = `https://dev.azure.com/${orgName}/${project?.[0] || ""}/_apis/wit/wiql?api-version=7.1-preview.2`;
 
       const wiqlResponse = await fetch(wiqlUrl, {
         method: "POST",
@@ -96,28 +96,28 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         const accessToken = await tokenProvider();
         const url = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/`;
         const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken.token}`,
-          "User-Agent": userAgentProvider(),
-        },
-      });
-      const tags = await response.json();
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              tags.value.map((tag: { name: string }) => tag.name),
-              null,
-              2
-            ),
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken.token}`,
+            "User-Agent": userAgentProvider(),
           },
-        ],
-      };
-    } catch (error) {
-      return {
+        });
+        const tags = await response.json();
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                tags.value.map((tag: { name: string }) => tag.name),
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
           content: [
             {
               type: "text",
@@ -133,10 +133,10 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
   server.tool(
     TAG_TOOLS.workitem_tags_comprehensive_analytics,
     "Comprehensive tag analytics showing usage statistics, trends, and unused tags in a single response",
-    { 
+    {
       project: z.string().describe("Project name or ID"),
       top: z.number().default(1000).describe("The maximum number of work items to analyze for tag usage. Defaults to 1000."),
-      maxTagsToCheck: z.number().default(100).describe("The maximum number of tags to check for unused status. Defaults to 100 for performance.")
+      maxTagsToCheck: z.number().default(100).describe("The maximum number of tags to check for unused status. Defaults to 100 for performance."),
     },
     async ({ project, top, maxTagsToCheck }) => {
       try {
@@ -198,14 +198,28 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
         for (let i = 0; i < workItemIds.length; i += workItemBatchSize) {
           const batchIds = workItemIds.slice(i, i + workItemBatchSize);
-          const defaultFields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "System.ChangedDate", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
+          const defaultFields = [
+            "System.Id",
+            "System.WorkItemType",
+            "System.Title",
+            "System.State",
+            "System.Parent",
+            "System.Tags",
+            "System.ChangedDate",
+            "Microsoft.VSTS.Common.StackRank",
+            "System.AssignedTo",
+          ];
 
           const workitems = await workItemApi.getWorkItemsBatch({ ids: batchIds, fields: defaultFields }, project);
 
           for (const wi of workitems) {
-            const tags: string[] = wi.fields && wi.fields["System.Tags"]
-              ? wi.fields["System.Tags"].split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-              : [];
+            const tags: string[] =
+              wi.fields && wi.fields["System.Tags"]
+                ? wi.fields["System.Tags"]
+                    .split(";")
+                    .map((s: string) => s.trim())
+                    .filter((s: string) => s.length > 0)
+                : [];
 
             // Skip work items without tags
             if (tags.length === 0) continue;
@@ -215,7 +229,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
             for (const t of tags) {
               if (!tagCounts[t]) tagCounts[t] = { count: 0, lastUsed: null };
               tagCounts[t].count += 1;
-              
+
               // Track the most recent usage
               if (!tagCounts[t].lastUsed || (changedDate && tagCounts[t].lastUsed && new Date(changedDate) > new Date(tagCounts[t].lastUsed))) {
                 tagCounts[t].lastUsed = changedDate;
@@ -249,21 +263,19 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
             workItemsAnalyzed: workItemIds.length,
             maxWorkItemsRequested: top,
             unusedTagsReported: reportedUnusedTags.length,
-            maxUnusedTagsToCheck: maxTagsToCheck
+            maxUnusedTagsToCheck: maxTagsToCheck,
           },
           usedTags: usedTagsAnalytics,
           unusedTags: reportedUnusedTags,
           analysis: {
             mostUsedTag: usedTagsAnalytics.length > 0 ? usedTagsAnalytics[0] : null,
             leastUsedTag: usedTagsAnalytics.length > 0 ? usedTagsAnalytics[usedTagsAnalytics.length - 1] : null,
-            tagUtilizationRate: allProjectTags.length > 0 ? ((usedTagNames.length / allProjectTags.length) * 100).toFixed(2) + '%' : '0%'
-          }
+            tagUtilizationRate: allProjectTags.length > 0 ? ((usedTagNames.length / allProjectTags.length) * 100).toFixed(2) + "%" : "0%",
+          },
         };
 
         return {
-          content: [
-            { type: "text", text: JSON.stringify(result, null, 2) },
-          ],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
@@ -323,7 +335,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         // Step 2: Check if the tag is in use
         const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' AND [System.Tags] CONTAINS '${tagName}'`;
         const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=1&api-version=7.1-preview.2`;
-        
+
         const wiqlResponse = await fetch(wiqlUrl, {
           method: "POST",
           headers: {
@@ -338,17 +350,23 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           const wiqlData = await wiqlResponse.json();
           if (wiqlData.workItems && wiqlData.workItems.length > 0) {
             return {
-              content: [{ 
-                type: "text", 
-                text: JSON.stringify({
-                  success: false,
-                  error: "Tag is in use",
-                  message: `Tag "${tagName}" is currently in use by ${wiqlData.workItems.length} or more work items.`,
-                  tagName: tagName,
-                  project: project,
-                  workItemsFound: wiqlData.workItems.length
-                }, null, 2)
-              }],
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      success: false,
+                      error: "Tag is in use",
+                      message: `Tag "${tagName}" is currently in use by ${wiqlData.workItems.length} or more work items.`,
+                      tagName: tagName,
+                      project: project,
+                      workItemsFound: wiqlData.workItems.length,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
               isError: true,
             };
           }
@@ -356,7 +374,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
         // Step 3: Delete the tag using the DELETE API
         const deleteTagUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/${encodeURIComponent(tagName)}?api-version=7.0`;
-        
+
         const deleteResponse = await fetch(deleteTagUrl, {
           method: "DELETE",
           headers: {
@@ -376,15 +394,19 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
         return {
           content: [
-            { 
-              type: "text", 
-              text: JSON.stringify({
-                success: true,
-                message: `Tag "${tagName}" has been successfully deleted`,
-                tagName: tagName,
-                project: project,
-              }, null, 2) 
-            }
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: `Tag "${tagName}" has been successfully deleted`,
+                  tagName: tagName,
+                  project: project,
+                },
+                null,
+                2
+              ),
+            },
           ],
         };
       } catch (error) {
@@ -456,7 +478,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           // Get a batch of work items using WIQL with SKIP
           const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' ORDER BY [System.Id]`;
           const wiqlUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/wiql?$top=${workItemBatchSize}&$skip=${skip}&api-version=7.1-preview.2`;
-          
+
           try {
             const wiqlResponse = await fetch(wiqlUrl, {
               method: "POST",
@@ -474,7 +496,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
             const wiqlResult = await wiqlResponse.json();
             const batchWorkItemIds = wiqlResult.workItems?.map((w: { id: number }) => w.id) || [];
-            
+
             // If no more work items, break
             if (batchWorkItemIds.length === 0) {
               break;
@@ -483,10 +505,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
             // Get work item details for this batch (using Azure DevOps Node API)
             const connection = await connectionProvider();
             const workItemApi = await connection.getWorkItemTrackingApi();
-            const workItems = await workItemApi.getWorkItemsBatch(
-              { ids: batchWorkItemIds, fields: ["System.Tags"] }, 
-              project
-            );
+            const workItems = await workItemApi.getWorkItemsBatch({ ids: batchWorkItemIds, fields: ["System.Tags"] }, project);
 
             // Process tags from this batch of work items
             for (const workItem of workItems) {
@@ -496,7 +515,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
                   .split(";")
                   .map((tag: string) => tag.trim())
                   .filter((tag: string) => tag.length > 0);
-                
+
                 // Remove these tags from potentially unused set
                 for (const tag of workItemTags) {
                   if (potentiallyUnusedTags.has(tag)) {
@@ -524,7 +543,6 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
                 break;
               }
             }
-
           } catch (error) {
             console.warn("Error processing work item batch:", error);
             break;
@@ -543,19 +561,23 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         if (tagsToDelete.length === 0) {
           return {
             content: [
-              { 
-                type: "text", 
-                text: JSON.stringify({
-                  success: true,
-                  message: "No unused tags found to delete.",
-                  project: project,
-                  tagsChecked: tagsChecked,
-                  workItemsProcessed: workItemsProcessed,
-                  unusedTagsFound: 0,
-                  tagsToDelete: [],
-                  dryRun: dryRun
-                }, null, 2) 
-              }
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    message: "No unused tags found to delete.",
+                    project: project,
+                    tagsChecked: tagsChecked,
+                    workItemsProcessed: workItemsProcessed,
+                    unusedTagsFound: 0,
+                    tagsToDelete: [],
+                    dryRun: dryRun,
+                  },
+                  null,
+                  2
+                ),
+              },
             ],
           };
         }
@@ -573,7 +595,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           for (const tagName of tagsToDelete) {
             try {
               const deleteTagUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/${encodeURIComponent(tagName)}?api-version=7.0`;
-              
+
               const deleteResponse = await fetch(deleteTagUrl, {
                 method: "DELETE",
                 headers: {
@@ -587,50 +609,54 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
                 deletionResults.push({ tag: tagName, success: true });
               } else {
                 const errorText = await deleteResponse.text();
-                deletionResults.push({ 
-                  tag: tagName, 
-                  success: false, 
-                  error: `${deleteResponse.status} ${deleteResponse.statusText} - ${errorText}` 
+                deletionResults.push({
+                  tag: tagName,
+                  success: false,
+                  error: `${deleteResponse.status} ${deleteResponse.statusText} - ${errorText}`,
                 });
               }
             } catch (error) {
-              deletionResults.push({ 
-                tag: tagName, 
-                success: false, 
-                error: error instanceof Error ? error.message : String(error) 
+              deletionResults.push({
+                tag: tagName,
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
               });
             }
           }
         }
 
-        const successfulDeletions = deletionResults.filter(r => r.success);
-        const failedDeletions = deletionResults.filter(r => !r.success);
+        const successfulDeletions = deletionResults.filter((r) => r.success);
+        const failedDeletions = deletionResults.filter((r) => !r.success);
 
         return {
           content: [
-            { 
-              type: "text", 
-              text: JSON.stringify({
-                success: failedDeletions.length === 0,
-                message: dryRun 
-                  ? `Dry run completed. Found ${tagsToDelete.length} unused tags that would be deleted.`
-                  : `Deletion completed. Successfully deleted ${successfulDeletions.length} out of ${tagsToDelete.length} unused tags.`,
-                project: project,
-                dryRun: dryRun,
-                tagsChecked: tagsChecked,
-                workItemsProcessed: workItemsProcessed,
-                unusedTagsFound: unusedTags.length,
-                tagsToDelete: tagsToDelete,
-                results: {
-                  successful: successfulDeletions.length,
-                  failed: failedDeletions.length,
-                  details: deletionResults
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: failedDeletions.length === 0,
+                  message: dryRun
+                    ? `Dry run completed. Found ${tagsToDelete.length} unused tags that would be deleted.`
+                    : `Deletion completed. Successfully deleted ${successfulDeletions.length} out of ${tagsToDelete.length} unused tags.`,
+                  project: project,
+                  dryRun: dryRun,
+                  tagsChecked: tagsChecked,
+                  workItemsProcessed: workItemsProcessed,
+                  unusedTagsFound: unusedTags.length,
+                  tagsToDelete: tagsToDelete,
+                  results: {
+                    successful: successfulDeletions.length,
+                    failed: failedDeletions.length,
+                    details: deletionResults,
+                  },
+                  summary: dryRun
+                    ? `Would delete ${tagsToDelete.length} unused tags. Set dryRun=false to actually delete them.`
+                    : `Deleted ${successfulDeletions.length} unused tags${failedDeletions.length > 0 ? `, ${failedDeletions.length} failed` : ""}.`,
                 },
-                summary: dryRun 
-                  ? `Would delete ${tagsToDelete.length} unused tags. Set dryRun=false to actually delete them.`
-                  : `Deleted ${successfulDeletions.length} unused tags${failedDeletions.length > 0 ? `, ${failedDeletions.length} failed` : ''}.`
-              }, null, 2) 
-            }
+                null,
+                2
+              ),
+            },
           ],
         };
       } catch (error) {
@@ -658,7 +684,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
     async ({ project, tagIdOrName, name }) => {
       try {
         const accessToken = await tokenProvider();
-        
+
         // First, get the current tag to retrieve its ID and other properties
         const getTagUrl = `https://dev.azure.com/${orgName}/${project}/_apis/wit/tags/${encodeURIComponent(tagIdOrName)}?api-version=7.2-preview.1`;
         const getTagResponse = await fetch(getTagUrl, {
@@ -706,11 +732,15 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                success: true,
-                message: `Tag '${tagIdOrName}' successfully updated to '${name}'`,
-                updatedTag: updatedTag
-              }, null, 2),
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: `Tag '${tagIdOrName}' successfully updated to '${name}'`,
+                  updatedTag: updatedTag,
+                },
+                null,
+                2
+              ),
             },
           ],
         };
@@ -765,7 +795,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           if (existingTagsResponse.ok) {
             const existingTagsData = await existingTagsResponse.json();
             const existingTagNames = existingTagsData.value?.map((tag: { name: string }) => tag.name) || [];
-            
+
             // Create tags that don't exist
             for (const tagName of tags) {
               if (!existingTagNames.includes(tagName)) {
@@ -790,7 +820,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
         // Step 2: Get the current work item to retrieve existing tags
         const workItems = await workItemApi.getWorkItemsBatch({ ids: [workItemId], fields: ["System.Tags"] }, project);
-        
+
         if (!workItems || workItems.length === 0) {
           return {
             content: [{ type: "text", text: `Work item ${workItemId} not found in project ${project}.` }],
@@ -803,25 +833,32 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         // Step 3: Parse existing tags
         const existingTagsString = currentWorkItem.fields?.["System.Tags"] || "";
         const existingTags = existingTagsString
-          ? existingTagsString.split(";").map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+          ? existingTagsString
+              .split(";")
+              .map((tag: string) => tag.trim())
+              .filter((tag: string) => tag.length > 0)
           : [];
 
         // Step 4: Determine new tags to add (avoid duplicates)
-        const newTags = tags.filter(tag => !existingTags.includes(tag));
-        
+        const newTags = tags.filter((tag) => !existingTags.includes(tag));
+
         if (newTags.length === 0) {
           return {
             content: [
               {
                 type: "text",
-                text: JSON.stringify({
-                  success: true,
-                  message: "All specified tags already exist on this work item.",
-                  workItemId,
-                  requestedTags: tags,
-                  existingTags,
-                  addedTags: [],
-                }, null, 2),
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    message: "All specified tags already exist on this work item.",
+                    workItemId,
+                    requestedTags: tags,
+                    existingTags,
+                    addedTags: [],
+                  },
+                  null,
+                  2
+                ),
               },
             ],
           };
@@ -840,26 +877,25 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           },
         ];
 
-        await workItemApi.updateWorkItem(
-          undefined,
-          patchDocument,
-          workItemId,
-          project
-        );
+        await workItemApi.updateWorkItem(undefined, patchDocument, workItemId, project);
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                success: true,
-                message: `Successfully added ${newTags.length} new tag(s) to work item ${workItemId}.`,
-                workItemId,
-                addedTags: newTags,
-                existingTags,
-                allTags,
-                createTagsIfNotExist,
-              }, null, 2),
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: `Successfully added ${newTags.length} new tag(s) to work item ${workItemId}.`,
+                  workItemId,
+                  addedTags: newTags,
+                  existingTags,
+                  allTags,
+                  createTagsIfNotExist,
+                },
+                null,
+                2
+              ),
             },
           ],
         };
@@ -893,7 +929,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
 
         // Step 1: Get the current work item to retrieve existing tags
         const workItems = await workItemApi.getWorkItemsBatch({ ids: [workItemId], fields: ["System.Tags"] }, project);
-        
+
         if (!workItems || workItems.length === 0) {
           return {
             content: [{ type: "text", text: `Work item ${workItemId} not found in project ${project}.` }],
@@ -906,7 +942,10 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
         // Step 2: Parse existing tags
         const existingTagsString = currentWorkItem.fields?.["System.Tags"] || "";
         const existingTags = existingTagsString
-          ? existingTagsString.split(";").map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+          ? existingTagsString
+              .split(";")
+              .map((tag: string) => tag.trim())
+              .filter((tag: string) => tag.length > 0)
           : [];
 
         if (existingTags.length === 0) {
@@ -914,14 +953,18 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
             content: [
               {
                 type: "text",
-                text: JSON.stringify({
-                  success: true,
-                  message: "Work item has no tags to remove.",
-                  workItemId,
-                  existingTags: [],
-                  removedTags: [],
-                  remainingTags: [],
-                }, null, 2),
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    message: "Work item has no tags to remove.",
+                    workItemId,
+                    existingTags: [],
+                    removedTags: [],
+                    remainingTags: [],
+                  },
+                  null,
+                  2
+                ),
               },
             ],
           };
@@ -937,7 +980,7 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           remainingTags = [];
         } else if (tagsToRemove && tagsToRemove.length > 0) {
           // Remove specific tags
-          tagsToRemoveArray = tagsToRemove.filter(tag => existingTags.includes(tag));
+          tagsToRemoveArray = tagsToRemove.filter((tag) => existingTags.includes(tag));
           remainingTags = existingTags.filter((tag: string) => !tagsToRemove.includes(tag));
         } else {
           // No tags specified to remove and removeAllTags is false
@@ -945,12 +988,16 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
             content: [
               {
                 type: "text",
-                text: JSON.stringify({
-                  success: false,
-                  message: "No tags specified to remove. Use 'tagsToRemove' parameter to specify tags or set 'removeAllTags' to true to remove all tags.",
-                  workItemId,
-                  existingTags,
-                }, null, 2),
+                text: JSON.stringify(
+                  {
+                    success: false,
+                    message: "No tags specified to remove. Use 'tagsToRemove' parameter to specify tags or set 'removeAllTags' to true to remove all tags.",
+                    workItemId,
+                    existingTags,
+                  },
+                  null,
+                  2
+                ),
               },
             ],
             isError: true,
@@ -962,15 +1009,19 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
             content: [
               {
                 type: "text",
-                text: JSON.stringify({
-                  success: true,
-                  message: "None of the specified tags were found on this work item.",
-                  workItemId,
-                  requestedTagsToRemove: tagsToRemove || [],
-                  existingTags,
-                  removedTags: [],
-                  remainingTags: existingTags,
-                }, null, 2),
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    message: "None of the specified tags were found on this work item.",
+                    workItemId,
+                    requestedTagsToRemove: tagsToRemove || [],
+                    existingTags,
+                    removedTags: [],
+                    remainingTags: existingTags,
+                  },
+                  null,
+                  2
+                ),
               },
             ],
           };
@@ -987,28 +1038,27 @@ function configureTagTools(server: McpServer, tokenProvider: () => Promise<Acces
           },
         ];
 
-        await workItemApi.updateWorkItem(
-          undefined,
-          patchDocument,
-          workItemId,
-          project
-        );
+        await workItemApi.updateWorkItem(undefined, patchDocument, workItemId, project);
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                success: true,
-                message: `Successfully removed ${tagsToRemoveArray.length} tag(s) from work item ${workItemId}.`,
-                workItemId,
-                removedTags: tagsToRemoveArray,
-                remainingTags,
-                existingTags,
-                removeAllTags,
-                totalTagsRemoved: tagsToRemoveArray.length,
-                totalTagsRemaining: remainingTags.length,
-              }, null, 2),
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: `Successfully removed ${tagsToRemoveArray.length} tag(s) from work item ${workItemId}.`,
+                  workItemId,
+                  removedTags: tagsToRemoveArray,
+                  remainingTags,
+                  existingTags,
+                  removeAllTags,
+                  totalTagsRemoved: tagsToRemoveArray.length,
+                  totalTagsRemaining: remainingTags.length,
+                },
+                null,
+                2
+              ),
             },
           ],
         };

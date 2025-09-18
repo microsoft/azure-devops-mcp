@@ -14,39 +14,37 @@ type TokenProviderMock = () => Promise<AccessToken>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 describe("configureAreaPathTools", () => {
-    let server: McpServer;
-    let tokenProvider: TokenProviderMock;
-    let connectionProvider: ConnectionProviderMock;
-    let userAgentProvider: () => string;
-    let mockConnection: { serverUrl?: string };
+  let server: McpServer;
+  let tokenProvider: TokenProviderMock;
+  let connectionProvider: ConnectionProviderMock;
+  let userAgentProvider: () => string;
+  let mockConnection: { serverUrl?: string };
 
-    beforeEach(() => {
-        server = { tool: jest.fn() } as unknown as McpServer;
+  beforeEach(() => {
+    server = { tool: jest.fn() } as unknown as McpServer;
 
-        tokenProvider = jest.fn();
-        userAgentProvider = () => "Jest";
+    tokenProvider = jest.fn();
+    userAgentProvider = () => "Jest";
 
-        mockConnection = {
-            serverUrl: "https://dev.azure.com/testorg",
-        } as WebApi;
+    mockConnection = {
+      serverUrl: "https://dev.azure.com/testorg",
+    } as WebApi;
 
-        connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+    connectionProvider = jest.fn().mockResolvedValue(mockConnection);
 
-        // Mock fetch globally for these tests
-        global.fetch = jest.fn();
-    });
+    // Mock fetch globally for these tests
+    global.fetch = jest.fn();
+  });
 
-    afterEach(() => {
-        jest.restoreAllMocks();
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   describe("list_project_area_paths tool", () => {
     it("should retrieve area paths with default depth", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
 
       if (!call) throw new Error("list_project_area_paths tool not registered");
       const [, , , handler] = call;
@@ -60,27 +58,24 @@ describe("configureAreaPathTools", () => {
             children: [
               {
                 name: "Team A",
-                children: [
-                  { name: "Sub Team 1" },
-                  { name: "Sub Team 2" }
-                ]
+                children: [{ name: "Sub Team 1" }, { name: "Sub Team 2" }],
               },
               {
                 name: "Team B",
-                children: []
-              }
-            ]
+                children: [],
+              },
+            ],
           },
           {
             name: "Iteration",
             children: [
               {
                 name: "Sprint 1",
-                children: []
-              }
-            ]
-          }
-        ]
+                children: [],
+              },
+            ],
+          },
+        ],
       };
 
       const mockFetch = jest.fn().mockResolvedValue({
@@ -123,9 +118,7 @@ describe("configureAreaPathTools", () => {
     it("should retrieve area paths with custom depth", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
 
       if (!call) throw new Error("list_project_area_paths tool not registered");
       const [, , , handler] = call;
@@ -145,18 +138,13 @@ describe("configureAreaPathTools", () => {
 
       await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        `https://dev.azure.com/testorg/TestProject/_apis/wit/classificationnodes?$depth=5&api-version=7.0`,
-        expect.any(Object)
-      );
+      expect(mockFetch).toHaveBeenCalledWith(`https://dev.azure.com/testorg/TestProject/_apis/wit/classificationnodes?$depth=5&api-version=7.0`, expect.any(Object));
     });
 
     it("should handle API errors gracefully", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
 
       if (!call) throw new Error("list_project_area_paths tool not registered");
       const [, , , handler] = call;
@@ -184,9 +172,7 @@ describe("configureAreaPathTools", () => {
     it("should handle network errors", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
 
       if (!call) throw new Error("list_project_area_paths tool not registered");
       const [, , , handler] = call;
@@ -209,9 +195,7 @@ describe("configureAreaPathTools", () => {
     it("should handle empty classification nodes", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
 
       if (!call) throw new Error("list_project_area_paths tool not registered");
       const [, , , handler] = call;
@@ -241,9 +225,7 @@ describe("configureAreaPathTools", () => {
     it("should correctly extract nested area paths", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
 
       if (!call) throw new Error("list_project_area_paths tool not registered");
       const [, , , handler] = call;
@@ -260,24 +242,18 @@ describe("configureAreaPathTools", () => {
                 children: [
                   {
                     name: "UI Components",
-                    children: [
-                      { name: "Buttons" },
-                      { name: "Forms" }
-                    ]
+                    children: [{ name: "Buttons" }, { name: "Forms" }],
                   },
-                  { name: "Routing" }
-                ]
+                  { name: "Routing" },
+                ],
               },
               {
                 name: "Backend",
-                children: [
-                  { name: "API" },
-                  { name: "Database" }
-                ]
-              }
-            ]
-          }
-        ]
+                children: [{ name: "API" }, { name: "Database" }],
+              },
+            ],
+          },
+        ],
       };
 
       const mockFetch = jest.fn().mockResolvedValue({
@@ -295,7 +271,7 @@ describe("configureAreaPathTools", () => {
 
       expect(result.isError).toBeFalsy();
       const responseData = JSON.parse(result.content[0].text);
-      
+
       expect(responseData.areaPaths).toContain("Area\\Frontend");
       expect(responseData.areaPaths).toContain("Area\\Frontend\\UI Components");
       expect(responseData.areaPaths).toContain("Area\\Frontend\\UI Components\\Buttons");
@@ -304,7 +280,7 @@ describe("configureAreaPathTools", () => {
       expect(responseData.areaPaths).toContain("Area\\Backend");
       expect(responseData.areaPaths).toContain("Area\\Backend\\API");
       expect(responseData.areaPaths).toContain("Area\\Backend\\Database");
-      
+
       // Verify paths are sorted
       const sortedPaths = [...responseData.areaPaths].sort();
       expect(responseData.areaPaths).toEqual(sortedPaths);
@@ -315,9 +291,7 @@ describe("configureAreaPathTools", () => {
     it("should create area path under root when no parent specified", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.create_area_path
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.create_area_path);
 
       if (!call) throw new Error("create_area_path tool not registered");
       const [, , , handler] = call;
@@ -330,7 +304,7 @@ describe("configureAreaPathTools", () => {
         path: "\\TestProject\\Area\\New Team",
         hasChildren: false,
         structureType: "area",
-        url: "https://dev.azure.com/contoso/_apis/wit/classificationNodes/Areas/123"
+        url: "https://dev.azure.com/contoso/_apis/wit/classificationNodes/Areas/123",
       };
 
       const mockFetch = jest.fn().mockResolvedValue({
@@ -369,9 +343,7 @@ describe("configureAreaPathTools", () => {
     it("should create area path under specified parent", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.create_area_path
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.create_area_path);
 
       if (!call) throw new Error("create_area_path tool not registered");
       const [, , , handler] = call;
@@ -384,7 +356,7 @@ describe("configureAreaPathTools", () => {
         path: "\\TestProject\\Area\\Team A\\Subteam",
         hasChildren: false,
         structureType: "area",
-        url: "https://dev.azure.com/contoso/_apis/wit/classificationNodes/Areas/124"
+        url: "https://dev.azure.com/contoso/_apis/wit/classificationNodes/Areas/124",
       };
 
       const mockFetch = jest.fn().mockResolvedValue({
@@ -424,9 +396,7 @@ describe("configureAreaPathTools", () => {
     it("should handle API error responses when creating area path", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.create_area_path
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.create_area_path);
 
       if (!call) throw new Error("create_area_path tool not registered");
       const [, , , handler] = call;
@@ -455,9 +425,7 @@ describe("configureAreaPathTools", () => {
     it("should handle fetch exceptions when creating area path", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.create_area_path
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.create_area_path);
 
       if (!call) throw new Error("create_area_path tool not registered");
       const [, , , handler] = call;
@@ -481,9 +449,7 @@ describe("configureAreaPathTools", () => {
     it("should properly encode parent path with special characters", async () => {
       configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
-      const call = (server.tool as jest.Mock).mock.calls.find(
-        ([toolName]) => toolName === AREAPATH_TOOLS.create_area_path
-      );
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.create_area_path);
 
       if (!call) throw new Error("create_area_path tool not registered");
       const [, , , handler] = call;
@@ -492,11 +458,12 @@ describe("configureAreaPathTools", () => {
 
       const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          id: 125,
-          name: "Child",
-          path: "\\TestProject\\Area\\Team With Spaces\\Child",
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 125,
+            name: "Child",
+            path: "\\TestProject\\Area\\Team With Spaces\\Child",
+          }),
       });
       global.fetch = mockFetch;
 
@@ -508,10 +475,7 @@ describe("configureAreaPathTools", () => {
 
       await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas/Team%20With%20Spaces?api-version=${areaPathApiVersion}`,
-        expect.any(Object)
-      );
+      expect(mockFetch).toHaveBeenCalledWith(`${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas/Team%20With%20Spaces?api-version=${areaPathApiVersion}`, expect.any(Object));
     });
   });
 });

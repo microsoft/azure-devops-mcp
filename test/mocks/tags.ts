@@ -7,29 +7,29 @@ export const _mockTags = {
     {
       id: "1",
       name: "bug",
-      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/1"
+      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/1",
     },
     {
       id: "2",
       name: "feature",
-      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/2"
+      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/2",
     },
     {
       id: "3",
       name: "high-priority",
-      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/3"
+      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/3",
     },
     {
       id: "4",
       name: "backend",
-      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/4"
+      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/4",
     },
     {
       id: "5",
       name: "unused-tag",
-      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/5"
-    }
-  ]
+      url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/5",
+    },
+  ],
 };
 
 export const _mockWorkItemsWithTags = {
@@ -43,7 +43,7 @@ export const _mockWorkItemsWithTags = {
         "System.WorkItemType": "Product Backlog Item",
         "System.Title": "Customer can sign in using their Microsoft Account",
         "System.Tags": "bug; high-priority",
-        "System.ChangedDate": "2023-01-15T10:30:00.000Z"
+        "System.ChangedDate": "2023-01-15T10:30:00.000Z",
       },
       url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/297",
     },
@@ -65,7 +65,7 @@ export const _mockWorkItemsWithTags = {
       rev: 1,
       fields: {
         "System.Id": 301,
-        "System.WorkItemType": "Task", 
+        "System.WorkItemType": "Task",
         "System.Title": "Unit Testing for MSA login",
         "System.Tags": "bug",
         "System.ChangedDate": "2023-01-10T09:00:00.000Z",
@@ -78,7 +78,7 @@ export const _mockWorkItemsWithTags = {
       rev: 1,
       fields: {
         "System.Id": 400,
-        "System.WorkItemType": "Task", 
+        "System.WorkItemType": "Task",
         "System.Title": "Work item without tags",
         "System.ChangedDate": "2023-01-22T11:00:00.000Z",
         "Microsoft.VSTS.Scheduling.RemainingWork": 2,
@@ -92,13 +92,13 @@ export const _mockWorkItemSearchByTagsResult = {
   workItems: [
     {
       id: 297,
-      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/297"
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/297",
     },
     {
       id: 301,
-      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/301"
-    }
-  ]
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/301",
+    },
+  ],
 };
 
 export const _mockWorkItemWithoutTags = {
@@ -108,15 +108,15 @@ export const _mockWorkItemWithoutTags = {
     "System.Id": 400,
     "System.WorkItemType": "Task",
     "System.Title": "Work item without tags",
-    "System.ChangedDate": "2023-01-25T16:30:00.000Z"
+    "System.ChangedDate": "2023-01-25T16:30:00.000Z",
   },
-  url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/400"
+  url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/400",
 };
 
 export const _mockUpdatedTag = {
   id: "1",
   name: "critical-bug",
-  url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/1"
+  url: "https://dev.azure.com/fabrikam/DefaultCollection/_apis/wit/tags/1",
 };
 
 export const _mockTagAnalyticsResponse = {
@@ -127,44 +127,44 @@ export const _mockTagAnalyticsResponse = {
     workItemsAnalyzed: 3,
     maxWorkItemsRequested: 1000,
     unusedTagsReported: 1,
-    maxUnusedTagsToCheck: 100
+    maxUnusedTagsToCheck: 100,
   },
   usedTags: [
     {
       tag: "bug",
       usageCount: 2,
-      lastUsed: "2023-01-15T10:30:00.000Z"
+      lastUsed: "2023-01-15T10:30:00.000Z",
     },
     {
       tag: "feature",
       usageCount: 1,
-      lastUsed: "2023-01-20T14:15:00.000Z"
+      lastUsed: "2023-01-20T14:15:00.000Z",
     },
     {
       tag: "high-priority",
       usageCount: 1,
-      lastUsed: "2023-01-15T10:30:00.000Z"
+      lastUsed: "2023-01-15T10:30:00.000Z",
     },
     {
       tag: "backend",
       usageCount: 1,
-      lastUsed: "2023-01-20T14:15:00.000Z"
-    }
+      lastUsed: "2023-01-20T14:15:00.000Z",
+    },
   ],
   unusedTags: ["unused-tag"],
   analysis: {
     mostUsedTag: {
       tag: "bug",
       usageCount: 2,
-      lastUsed: "2023-01-15T10:30:00.000Z"
+      lastUsed: "2023-01-15T10:30:00.000Z",
     },
     leastUsedTag: {
       tag: "backend",
       usageCount: 1,
-      lastUsed: "2023-01-20T14:15:00.000Z"
+      lastUsed: "2023-01-20T14:15:00.000Z",
     },
-    tagUtilizationRate: "80.00%"
-  }
+    tagUtilizationRate: "80.00%",
+  },
 };
 
 export const _mockWiqlQueryResult = {
@@ -172,18 +172,18 @@ export const _mockWiqlQueryResult = {
   workItems: [
     {
       id: 297,
-      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/297"
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/297",
     },
     {
       id: 301,
-      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/301"
-    }
-  ]
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/301",
+    },
+  ],
 };
 
 export const _mockEmptyWiqlQueryResult = {
   queryType: "flat",
-  workItems: []
+  workItems: [],
 };
 
 export const _mockDeleteUnusedTagsResponse = {
@@ -201,9 +201,9 @@ export const _mockDeleteUnusedTagsResponse = {
     details: [
       {
         tag: "unused-tag",
-        success: true
-      }
-    ]
+        success: true,
+      },
+    ],
   },
-  summary: "Deleted 1 unused tags."
+  summary: "Deleted 1 unused tags.",
 };

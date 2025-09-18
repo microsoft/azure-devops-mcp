@@ -13,7 +13,7 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
       expect(Array.isArray(_mockTags.value)).toBe(true);
       expect(_mockTags.count).toBe(5);
       expect(_mockTags.value.length).toBe(5);
-      
+
       _mockTags.value.forEach((tag) => {
         expect(tag).toHaveProperty("id");
         expect(tag).toHaveProperty("name");
@@ -27,7 +27,7 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
       expect(_mockWorkItemsWithTags).toHaveProperty("value");
       expect(Array.isArray(_mockWorkItemsWithTags.value)).toBe(true);
       expect(_mockWorkItemsWithTags.value.length).toBe(4);
-      
+
       _mockWorkItemsWithTags.value.forEach((workItem) => {
         expect(workItem).toHaveProperty("id");
         expect(workItem).toHaveProperty("fields");
@@ -41,7 +41,7 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
       expect(_mockWiqlQueryResult).toHaveProperty("workItems");
       expect(Array.isArray(_mockWiqlQueryResult.workItems)).toBe(true);
       expect(_mockWiqlQueryResult.workItems.length).toBe(2);
-      
+
       _mockWiqlQueryResult.workItems.forEach((item) => {
         expect(item).toHaveProperty("id");
         expect(item).toHaveProperty("url");
@@ -61,7 +61,7 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
       expect(_mockTagAnalyticsResponse).toHaveProperty("analysis");
       expect(Array.isArray(_mockTagAnalyticsResponse.usedTags)).toBe(true);
       expect(_mockTagAnalyticsResponse.usedTags.length).toBe(4);
-      
+
       _mockTagAnalyticsResponse.usedTags.forEach((usage) => {
         expect(usage).toHaveProperty("tag");
         expect(usage).toHaveProperty("usageCount");
@@ -81,18 +81,18 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
     // These tests verify the expected tool names exist in the codebase without importing the problematic module
     const expectedTagTools = [
       "search_workitem_by_tags",
-      "list_project_workitem_tags", 
+      "list_project_workitem_tags",
       "add_tags_to_workitem",
       "remove_tags_from_workitem",
       "delete_workitem_tag_by_name",
       "delete_unused_workitem_tags",
       "update_workitem_tag",
-      "workitem_tags_comprehensive_analytics"
+      "workitem_tags_comprehensive_analytics",
     ];
 
     it("should expect all 8 tag tools to be available", () => {
       expect(expectedTagTools.length).toBe(8);
-      
+
       // Verify each tool name follows expected naming convention
       expectedTagTools.forEach((toolName) => {
         expect(toolName).toMatch(/^[a-z_]+$/); // lowercase with underscores
@@ -101,13 +101,13 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
     });
 
     it("should have tag tools that cover main functionality areas", () => {
-      const searchTools = expectedTagTools.filter(name => name.includes("search"));
-      const listTools = expectedTagTools.filter(name => name.includes("list"));
-      const addTools = expectedTagTools.filter(name => name.includes("add"));
-      const removeTools = expectedTagTools.filter(name => name.includes("remove"));
-      const deleteTools = expectedTagTools.filter(name => name.includes("delete"));
-      const updateTools = expectedTagTools.filter(name => name.includes("update"));
-      const analyticsTools = expectedTagTools.filter(name => name.includes("analytics"));
+      const searchTools = expectedTagTools.filter((name) => name.includes("search"));
+      const listTools = expectedTagTools.filter((name) => name.includes("list"));
+      const addTools = expectedTagTools.filter((name) => name.includes("add"));
+      const removeTools = expectedTagTools.filter((name) => name.includes("remove"));
+      const deleteTools = expectedTagTools.filter((name) => name.includes("delete"));
+      const updateTools = expectedTagTools.filter((name) => name.includes("update"));
+      const analyticsTools = expectedTagTools.filter((name) => name.includes("analytics"));
 
       expect(searchTools.length).toBeGreaterThan(0);
       expect(listTools.length).toBeGreaterThan(0);
@@ -122,45 +122,35 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
   describe("Mock data integration scenarios", () => {
     it("should simulate tag search functionality", () => {
       const searchQuery = "backend";
-      const matchingTags = _mockTags.value.filter(tag => 
-        tag.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      
+      const matchingTags = _mockTags.value.filter((tag) => tag.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
       expect(matchingTags.length).toBe(1);
       expect(matchingTags[0].name).toBe("backend");
     });
 
     it("should simulate work item tag retrieval", () => {
-      const workItemWithTags = _mockWorkItemsWithTags.value.find(item => 
-        item.fields["System.Tags"] && item.fields["System.Tags"].includes("backend")
-      );
-      
+      const workItemWithTags = _mockWorkItemsWithTags.value.find((item) => item.fields["System.Tags"] && item.fields["System.Tags"].includes("backend"));
+
       expect(workItemWithTags).toBeDefined();
       expect(workItemWithTags?.fields["System.Tags"]).toContain("backend");
     });
 
     it("should simulate tag analytics processing", () => {
-      const totalUsage = _mockTagAnalyticsResponse.usedTags.reduce(
-        (sum, usage) => sum + usage.usageCount, 0
-      );
-      
+      const totalUsage = _mockTagAnalyticsResponse.usedTags.reduce((sum, usage) => sum + usage.usageCount, 0);
+
       expect(totalUsage).toBe(5); // 2 + 1 + 1 + 1
-      
-      const mostUsedTag = _mockTagAnalyticsResponse.usedTags.reduce(
-        (max, current) => current.usageCount > max.usageCount ? current : max
-      );
-      
+
+      const mostUsedTag = _mockTagAnalyticsResponse.usedTags.reduce((max, current) => (current.usageCount > max.usageCount ? current : max));
+
       expect(mostUsedTag.tag).toBe("bug");
       expect(mostUsedTag.usageCount).toBe(2);
     });
 
     it("should handle empty tag scenarios", () => {
       expect(_mockEmptyWiqlQueryResult.workItems.length).toBe(0);
-      
-      const workItemsWithoutTags = _mockWorkItemsWithTags.value.filter(item => 
-        !item.fields["System.Tags"]
-      );
-      
+
+      const workItemsWithoutTags = _mockWorkItemsWithTags.value.filter((item) => !item.fields["System.Tags"]);
+
       expect(workItemsWithoutTags.length).toBeGreaterThan(0);
     });
   });
@@ -169,7 +159,7 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
     it("should handle invalid tag operations gracefully", () => {
       const invalidTagName = "";
       const invalidWorkItemId = -1;
-      
+
       expect(typeof invalidTagName).toBe("string");
       expect(typeof invalidWorkItemId).toBe("number");
       expect(invalidTagName.length).toBe(0);
@@ -179,17 +169,14 @@ describe("Tag Tools - Mock Data and Structure Tests", () => {
     it("should validate tag name constraints", () => {
       const validTagNames = ["backend", "feature", "high-priority", "bug"];
       const invalidTagNames = ["", "   ", "tag with spaces", "tag;with;semicolons"];
-      
-      validTagNames.forEach(name => {
+
+      validTagNames.forEach((name) => {
         expect(name.length).toBeGreaterThan(0);
         expect(name.trim()).toBe(name);
       });
-      
-      invalidTagNames.forEach(name => {
-        const hasIssues = name.length === 0 || 
-                         name.trim() !== name || 
-                         name.includes(" ") || 
-                         name.includes(";");
+
+      invalidTagNames.forEach((name) => {
+        const hasIssues = name.length === 0 || name.trim() !== name || name.includes(" ") || name.includes(";");
         expect(hasIssues).toBe(true);
       });
     });

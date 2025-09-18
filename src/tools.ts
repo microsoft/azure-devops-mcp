@@ -16,7 +16,7 @@ import { configureTestPlanTools } from "./tools/test-plans.js";
 import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/work-items.js";
-import { configureAreaPathTools } from './tools/areapath.js';
+import { configureAreaPathTools } from "./tools/areapath.js";
 
 function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, enabledDomains: Set<string>) {
   const configureIfDomainEnabled = (domain: string, configureFn: () => void) => {
