@@ -755,14 +755,17 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&api-version=7.1", {
-        method: "PUT",
-        headers: {
-          "Authorization": "Bearer test-token",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content: "# Welcome\nThis is the home page." }),
-      });
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content: "# Welcome\nThis is the home page." }),
+        }
+      );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
       expect(result.isError).toBeUndefined();
     });
@@ -1176,7 +1179,10 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&api-version=7.1", expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        expect.any(Object)
+      );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
     });
 
@@ -1206,7 +1212,10 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg//_apis/wiki/wikis/wiki1/pages?path=%2FHome&api-version=7.1", expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg//_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        expect.any(Object)
+      );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
     });
 
@@ -1241,6 +1250,48 @@ describe("configureWikiTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error creating/updating wiki page: Could not retrieve ETag for existing page");
+    });
+
+    it("should use custom branch when specified", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockResponse = {
+        path: "/Home",
+        id: 123,
+        content: "# Welcome",
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue(mockResponse),
+      });
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Welcome",
+        project: "proj1",
+        branch: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/testorg/proj1/_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=main&api-version=7.1",
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content: "# Welcome" }),
+        }
+      );
+      expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
+      expect(result.isError).toBeUndefined();
     });
   });
 });
