@@ -408,6 +408,52 @@ describe("configureAreaPathTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error retrieving area paths: String error message");
     });
+
+    it("should handle nodes with null or undefined children", async () => {
+      configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
+
+      if (!call) throw new Error("list_project_area_paths tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      const mockClassificationData = {
+        value: [
+          {
+            name: "Area",
+            children: null, // Test null children
+          },
+          {
+            name: "Iteration",
+            // Test undefined children (no children property)
+          },
+        ],
+      };
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockClassificationData),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "TestProject",
+        depth: 2,
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBeFalsy();
+      const responseData = JSON.parse(result.content[0].text);
+      
+      // Should handle gracefully with empty results since no valid children
+      expect(responseData.totalAreaPaths).toBe(0);
+      expect(responseData.totalIterationPaths).toBe(0);
+      expect(responseData.areaPaths).toEqual([]);
+      expect(responseData.iterationPaths).toEqual([]);
+    });
   });
 
   describe("create_area_path tool", () => {
