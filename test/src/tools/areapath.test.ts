@@ -3,7 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureAreaPathTools, AREAPATH_TOOLS } from "../../../src/tools/areapath";
-import { apiVersion } from "../../../src/utils";
+import { areaPathApiVersion } from "../../../src/utils";
 
 // Mock the orgName from index.ts
 jest.mock("../../../src/index.js", () => ({
@@ -347,7 +347,7 @@ describe("configureAreaPathTools", () => {
       const result = await handler(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas?api-version=${apiVersion}`,
+        `${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas?api-version=${areaPathApiVersion}`,
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -402,7 +402,7 @@ describe("configureAreaPathTools", () => {
       const result = await handler(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas/Team%20A?api-version=${apiVersion}`,
+        `${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas/Team%20A?api-version=${areaPathApiVersion}`,
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -509,7 +509,7 @@ describe("configureAreaPathTools", () => {
       await handler(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas/Team%20With%20Spaces?api-version=${apiVersion}`,
+        `${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas/Team%20With%20Spaces?api-version=${areaPathApiVersion}`,
         expect.any(Object)
       );
     });
