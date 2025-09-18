@@ -285,6 +285,129 @@ describe("configureAreaPathTools", () => {
       const sortedPaths = [...responseData.areaPaths].sort();
       expect(responseData.areaPaths).toEqual(sortedPaths);
     });
+
+    it("should handle classification nodes with unknown types", async () => {
+      configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
+
+      if (!call) throw new Error("list_project_area_paths tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      const mockClassificationData = {
+        value: [
+          {
+            name: "Area",
+            children: [{ name: "Team A" }],
+          },
+          {
+            name: "Iteration",
+            children: [{ name: "Sprint 1" }],
+          },
+          {
+            name: "UnknownType",
+            children: [
+              { 
+                name: "Unknown Item",
+                children: [{ name: "Nested Unknown" }]
+              }
+            ],
+          },
+        ],
+      };
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockClassificationData),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "TestProject",
+        depth: 3,
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBeFalsy();
+      const responseData = JSON.parse(result.content[0].text);
+      
+      // Should only include Area and Iteration paths, not unknown types
+      expect(responseData.areaPaths).toContain("Area\\Team A");
+      expect(responseData.iterationPaths).toContain("Iteration\\Sprint 1");
+      expect(responseData.totalAreaPaths).toBe(1);
+      expect(responseData.totalIterationPaths).toBe(1);
+      
+      // Verify unknown type is not processed (this hits the missing branch)
+      expect(responseData.areaPaths).not.toContain("UnknownType\\Unknown Item");
+      expect(responseData.iterationPaths).not.toContain("UnknownType\\Unknown Item");
+      expect(responseData.areaPaths).not.toContain("UnknownType\\Unknown Item\\Nested Unknown");
+      expect(responseData.iterationPaths).not.toContain("UnknownType\\Unknown Item\\Nested Unknown");
+    });
+
+    it("should handle invalid data.value structure", async () => {
+      configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
+
+      if (!call) throw new Error("list_project_area_paths tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      // Test with data.value being a non-array
+      const mockClassificationData = {
+        value: "not an array",
+      };
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockClassificationData),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "TestProject",
+        depth: 2,
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBeFalsy();
+      const responseData = JSON.parse(result.content[0].text);
+      
+      // Should handle gracefully with empty results
+      expect(responseData.totalAreaPaths).toBe(0);
+      expect(responseData.totalIterationPaths).toBe(0);
+      expect(responseData.areaPaths).toEqual([]);
+      expect(responseData.iterationPaths).toEqual([]);
+    });
+
+    it("should handle non-Error exception in list_project_area_paths", async () => {
+      configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.list_project_area_paths);
+
+      if (!call) throw new Error("list_project_area_paths tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      // Mock fetch to throw a non-Error exception
+      const mockFetch = jest.fn().mockRejectedValue("String error message");
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "TestProject",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error retrieving area paths: String error message");
+    });
   });
 
   describe("create_area_path tool", () => {
@@ -476,6 +599,31 @@ describe("configureAreaPathTools", () => {
       await handler(params);
 
       expect(mockFetch).toHaveBeenCalledWith(`${mockConnection.serverUrl}/TestProject/_apis/wit/classificationnodes/Areas/Team%20With%20Spaces?api-version=${areaPathApiVersion}`, expect.any(Object));
+    });
+
+    it("should handle non-Error exception in create_area_path", async () => {
+      configureAreaPathTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === AREAPATH_TOOLS.create_area_path);
+
+      if (!call) throw new Error("create_area_path tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+
+      // Mock fetch to throw a non-Error exception
+      const mockFetch = jest.fn().mockRejectedValue("String error message");
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "TestProject",
+        name: "New Team",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating area path: String error message");
     });
   });
 });
