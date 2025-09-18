@@ -309,10 +309,10 @@ describe("configureAreaPathTools", () => {
           {
             name: "UnknownType",
             children: [
-              { 
+              {
                 name: "Unknown Item",
-                children: [{ name: "Nested Unknown" }]
-              }
+                children: [{ name: "Nested Unknown" }],
+              },
             ],
           },
         ],
@@ -333,13 +333,13 @@ describe("configureAreaPathTools", () => {
 
       expect(result.isError).toBeFalsy();
       const responseData = JSON.parse(result.content[0].text);
-      
+
       // Should only include Area and Iteration paths, not unknown types
       expect(responseData.areaPaths).toContain("Area\\Team A");
       expect(responseData.iterationPaths).toContain("Iteration\\Sprint 1");
       expect(responseData.totalAreaPaths).toBe(1);
       expect(responseData.totalIterationPaths).toBe(1);
-      
+
       // Verify unknown type is not processed (this hits the missing branch)
       expect(responseData.areaPaths).not.toContain("UnknownType\\Unknown Item");
       expect(responseData.iterationPaths).not.toContain("UnknownType\\Unknown Item");
@@ -377,7 +377,7 @@ describe("configureAreaPathTools", () => {
 
       expect(result.isError).toBeFalsy();
       const responseData = JSON.parse(result.content[0].text);
-      
+
       // Should handle gracefully with empty results
       expect(responseData.totalAreaPaths).toBe(0);
       expect(responseData.totalIterationPaths).toBe(0);
@@ -447,7 +447,7 @@ describe("configureAreaPathTools", () => {
 
       expect(result.isError).toBeFalsy();
       const responseData = JSON.parse(result.content[0].text);
-      
+
       // Should handle gracefully with empty results since no valid children
       expect(responseData.totalAreaPaths).toBe(0);
       expect(responseData.totalIterationPaths).toBe(0);
