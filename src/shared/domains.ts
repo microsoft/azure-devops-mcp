@@ -10,10 +10,12 @@ export enum Domain {
   CORE = "core",
   REPOSITORIES = "repositories",
   SEARCH = "search",
+  TAG = "tag",
   TEST_PLANS = "test-plans",
   WIKI = "wiki",
   WORK = "work",
   WORK_ITEMS = "work-items",
+  AREAPATH = "areapath",
 }
 
 export const ALL_DOMAINS = "all";
