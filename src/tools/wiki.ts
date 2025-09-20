@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
@@ -15,7 +14,7 @@ const WIKI_TOOLS = {
   create_or_update_page: "wiki_create_or_update_page",
 };
 
-function configureWikiTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureWikiTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WIKI_TOOLS.get_wiki,
     "Get the wiki by wikiIdentifier",
@@ -162,14 +161,14 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
 
           if (parsed.pageId) {
             try {
-              let accessToken: AccessToken | undefined;
-              try {
-                accessToken = await tokenProvider();
-              } catch {}
+              const accessToken = await tokenProvider();
               const baseUrl = connection.serverUrl.replace(/\/$/, "");
               const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages/${parsed.pageId}?includeContent=true&api-version=7.1`;
               const resp = await fetch(restUrl, {
-                headers: accessToken?.token ? { Authorization: `Bearer ${accessToken.token}` } : {},
+                headers: {
+                  "Authorization": `Bearer ${accessToken}`,
+                  "User-Agent": userAgentProvider(),
+                },
               });
               if (resp.ok) {
                 const json = await resp.json();
@@ -241,8 +240,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
           const createResponse = await fetch(url, {
             method: "PUT",
             headers: {
-              "Authorization": `Bearer ${accessToken.token}`,
+              "Authorization": `Bearer ${accessToken}`,
               "Content-Type": "application/json",
+              "User-Agent": userAgentProvider(),
             },
             body: JSON.stringify({ content: content }),
           });
@@ -269,7 +269,8 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
               const getResponse = await fetch(url, {
                 method: "GET",
                 headers: {
-                  Authorization: `Bearer ${accessToken.token}`,
+                  "Authorization": `Bearer ${accessToken}`,
+                  "User-Agent": userAgentProvider(),
                 },
               });
 
@@ -290,8 +291,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
             const updateResponse = await fetch(url, {
               method: "PUT",
               headers: {
-                "Authorization": `Bearer ${accessToken.token}`,
+                "Authorization": `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
+                "User-Agent": userAgentProvider(),
                 "If-Match": currentEtag,
               },
               body: JSON.stringify({ content: content }),
