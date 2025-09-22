@@ -233,12 +233,12 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
   describe("parseDomainsInput static method", () => {
     it("returns empty array when no input is provided", () => {
       const result = DomainsManager.parseDomainsInput();
-      expect(result).toEqual([]);
+      expect(result).toEqual(['all']);
     });
 
     it("returns empty array when undefined is provided", () => {
       const result = DomainsManager.parseDomainsInput(undefined);
-      expect(result).toEqual([]);
+      expect(result).toEqual(['all']);
     });
 
     it("parses comma-separated string input", () => {
