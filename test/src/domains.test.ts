@@ -112,6 +112,9 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(10);
+      expect(Array.from(enabledDomains).sort()).toEqual([
+        "advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items"
+      ]);
     });
 
     it("filters out invalid domains and enables only valid ones when mixed array is passed", () => {
@@ -227,6 +230,26 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager(["a", "all", "wiki"]);
       const enabledDomains = manager.getEnabledDomains();
 
+      expect(enabledDomains.size).toBe(10);
+    });
+  });
+
+  describe("edge empty string cases for enabling all domains", () => {
+    it("when an empty array is passed", () => {
+      const manager = new DomainsManager([]);
+      const enabledDomains = manager.getEnabledDomains();
+      expect(enabledDomains.size).toBe(10);
+    });
+
+    it("when a string with only a break line is passed", () => {
+      const manager = new DomainsManager("\n");
+      const enabledDomains = manager.getEnabledDomains();
+      expect(enabledDomains.size).toBe(10);
+    });
+
+    it("when an empty string is passed", () => {
+      const manager = new DomainsManager("");
+      const enabledDomains = manager.getEnabledDomains();
       expect(enabledDomains.size).toBe(10);
     });
   });
