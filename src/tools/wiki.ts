@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
@@ -15,7 +14,7 @@ const WIKI_TOOLS = {
   create_or_update_page: "wiki_create_or_update_page",
 };
 
-function configureWikiTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>) {
+function configureWikiTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WIKI_TOOLS.get_wiki,
     "Get the wiki by wikiIdentifier",
@@ -162,14 +161,14 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
 
           if (parsed.pageId) {
             try {
-              let accessToken: AccessToken | undefined;
-              try {
-                accessToken = await tokenProvider();
-              } catch {}
+              const accessToken = await tokenProvider();
               const baseUrl = connection.serverUrl.replace(/\/$/, "");
               const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages/${parsed.pageId}?includeContent=true&api-version=7.1`;
               const resp = await fetch(restUrl, {
-                headers: accessToken?.token ? { Authorization: `Bearer ${accessToken.token}` } : {},
+                headers: {
+                  "Authorization": `Bearer ${accessToken}`,
+                  "User-Agent": userAgentProvider(),
+                },
               });
               if (resp.ok) {
                 const json = await resp.json();
@@ -220,8 +219,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
       content: z.string().describe("The content of the wiki page in markdown format."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
       etag: z.string().optional().describe("ETag for editing existing pages (optional, will be fetched if not provided)."),
+      branch: z.string().default("wikiMaster").describe("The branch name for the wiki repository. Defaults to 'wikiMaster' which is the default branch for Azure DevOps wikis."),
     },
-    async ({ wikiIdentifier, path, content, project, etag }) => {
+    async ({ wikiIdentifier, path, content, project, etag, branch = "wikiMaster" }) => {
       try {
         const connection = await connectionProvider();
         const accessToken = await tokenProvider();
@@ -230,18 +230,19 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
         const normalizedPath = path.startsWith("/") ? path : `/${path}`;
         const encodedPath = encodeURIComponent(normalizedPath);
 
-        // Build the URL for the wiki page API
+        // Build the URL for the wiki page API with version descriptor
         const baseUrl = connection.serverUrl;
         const projectParam = project || "";
-        const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&api-version=7.1`;
+        const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&versionDescriptor.versionType=branch&versionDescriptor.version=${encodeURIComponent(branch)}&api-version=7.1`;
 
         // First, try to create a new page (PUT without ETag)
         try {
           const createResponse = await fetch(url, {
             method: "PUT",
             headers: {
-              "Authorization": `Bearer ${accessToken.token}`,
+              "Authorization": `Bearer ${accessToken}`,
               "Content-Type": "application/json",
+              "User-Agent": userAgentProvider(),
             },
             body: JSON.stringify({ content: content }),
           });
@@ -268,7 +269,8 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
               const getResponse = await fetch(url, {
                 method: "GET",
                 headers: {
-                  Authorization: `Bearer ${accessToken.token}`,
+                  "Authorization": `Bearer ${accessToken}`,
+                  "User-Agent": userAgentProvider(),
                 },
               });
 
@@ -289,8 +291,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<Acce
             const updateResponse = await fetch(url, {
               method: "PUT",
               headers: {
-                "Authorization": `Bearer ${accessToken.token}`,
+                "Authorization": `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
+                "User-Agent": userAgentProvider(),
                 "If-Match": currentEtag,
               },
               body: JSON.stringify({ content: content }),

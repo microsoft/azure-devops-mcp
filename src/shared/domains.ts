@@ -6,9 +6,8 @@
  */
 export enum Domain {
   ADVANCED_SECURITY = "advanced-security",
-  BUILDS = "builds",
+  PIPELINES = "pipelines",
   CORE = "core",
-  RELEASES = "releases",
   REPOSITORIES = "repositories",
   SEARCH = "search",
   TEST_PLANS = "test-plans",
@@ -29,8 +28,7 @@ export class DomainsManager {
 
   constructor(domainsInput?: string | string[]) {
     this.enabledDomains = new Set();
-    const normalizedInput = DomainsManager.parseDomainsInput(domainsInput);
-    this.parseDomains(normalizedInput);
+    this.parseDomains(domainsInput);
   }
 
   /**
@@ -57,11 +55,6 @@ export class DomainsManager {
       return;
     }
 
-    if (domainsInput.length === 1 && domainsInput[0] === ALL_DOMAINS) {
-      this.enableAllDomains();
-      return;
-    }
-
     const domains = domainsInput.map((d) => d.trim().toLowerCase());
     this.validateAndAddDomains(domains);
   }
@@ -72,7 +65,8 @@ export class DomainsManager {
       return;
     }
 
-    const domains = [domainsInput.trim().toLowerCase()];
+    // Handle comma-separated domains
+    const domains = domainsInput.split(",").map((d) => d.trim().toLowerCase());
     this.validateAndAddDomains(domains);
   }
 

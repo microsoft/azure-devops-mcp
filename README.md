@@ -27,7 +27,6 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 
 - "List my ADO projects"
 - "List ADO Builds for 'Contoso'"
-- "List ADO Releases for 'Contoso'"
 - "List ADO Repos for 'Contoso'"
 - "List test plans for 'Contoso'"
 - "List teams for project 'Contoso'"
@@ -103,26 +102,21 @@ Interact with these Azure DevOps services:
 - **repo_search_commits**: Searches for commits.
 - **repo_create_pull_request_thread**: Creates a new comment thread on a pull request.
 
-### 🛰️ Builds
+### 🚀 Pipelines
 
-- **build_get_definitions**: Retrieve a list of build definitions for a given project.
-- **build_get_definition_revisions**: Retrieve a list of revisions for a specific build definition.
-- **build_get_builds**: Retrieve a list of builds for a given project.
-- **build_get_log**: Retrieve the logs for a specific build.
-- **build_get_log_by_id**: Get a specific build log by log ID.
-- **build_get_changes**: Get the changes associated with a specific build.
-- **build_get_status**: Fetch the status of a specific build.
-- **build_update_build_stage**: Update the stage of a specific build.
+- **pipelines_get_build_definitions**: Retrieve a list of build definitions for a given project.
+- **pipelines_get_build_definition_revisions**: Retrieve a list of revisions for a specific build definition.
+- **pipelines_get_builds**: Retrieve a list of builds for a given project.
+- **pipelines_get_build_log**: Retrieve the logs for a specific build.
+- **pipelines_get_build_log_by_id**: Get a specific build log by log ID.
+- **pipelines_get_build_changes**: Get the changes associated with a specific build.
+- **pipelines_get_build_status**: Fetch the status of a specific build.
+- **pipelines_update_build_stage**: Update the stage of a specific build.
 - **pipelines_get_run**: Gets a run for a particular pipeline.
 - **pipelines_list_runs**: Gets top 10000 runs for a particular pipeline.
 - **pipelines_run_pipeline**: Starts a new run of a pipeline.
 
-### 🚀 Releases
-
-- **release_get_definitions**: Retrieve a list of release definitions for a given project.
-- **release_get_releases**: Retrieve a list of releases for a given project.
-
-### 🔒 Advanced Security
+### Advanced Security
 
 - **advsec_get_alerts**: Retrieve Advanced Security alerts for a repository.
 - **advsec_get_alert_details**: Get detailed information about a specific Advanced Security alert.
@@ -158,16 +152,7 @@ For the best experience, use Visual Studio Code and GitHub Copilot. See the [get
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-4. Open VS Code in an empty folder
-
-### Azure Login
-
-Ensure you are logged in to Azure DevOps via the Azure CLI:
-
-```sh
-az login
-```
+3. Open VS Code in an empty folder
 
 ### Installation
 
@@ -238,7 +223,7 @@ Click "Select Tools" and choose the available tools.
 
 ![configure mcp server tools](./docs/media/configure-mcp-server-tools.gif)
 
-Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
+Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first time an ADO tool is executed browser will open prompting to login with your Microsoft account. Please ensure you are using credentials matching selected Azure DevOps organization.
 
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
@@ -261,16 +246,16 @@ For example, use `"-d", "core", "work", "work-items"` to load only Work Item rel
     }
   ],
   "servers": {
-    "ado": {
+    "ado_with_filtered_domains": {
       "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "-d", "core", "work", "work-items"]
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "-d", "core", "work", "work-items"]
     }
   }
 }
 ```
 
-Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `builds`, `releases`, `advanced-security`
+Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `pipelines`, `advanced-security`
 
 We recommend that you always enable `core` tools so that you can fetch project level information.
 

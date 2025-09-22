@@ -6,7 +6,7 @@ import { Alert, AlertType, AlertValidityStatus, Confidence, Severity, State } fr
 import { PagedList } from "azure-devops-node-api/interfaces/common/VSSInterfaces";
 import { configureAdvSecTools } from "../../../src/tools/advanced-security";
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 interface AlertApiMock {

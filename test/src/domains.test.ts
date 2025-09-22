@@ -19,11 +19,10 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager();
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
       expect(enabledDomains.has("advanced-security")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
       expect(enabledDomains.has("core")).toBe(true);
-      expect(enabledDomains.has("releases")).toBe(true);
       expect(enabledDomains.has("repositories")).toBe(true);
       expect(enabledDomains.has("search")).toBe(true);
       expect(enabledDomains.has("test-plans")).toBe(true);
@@ -36,16 +35,16 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager(undefined);
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
-      expect(Array.from(enabledDomains).sort()).toEqual(["advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items"]);
+      expect(enabledDomains.size).toBe(9);
+      expect(Array.from(enabledDomains).sort()).toEqual(["advanced-security", "core", "pipelines", "repositories", "search", "test-plans", "wiki", "work", "work-items"]);
     });
 
     it("enables all domains when null is passed as argument (legacy support)", () => {
-      // @ts-ignore - Testing null input for backward compatibility
+      // @ts-expect-error - Testing null input for backward compatibility
       const manager = new DomainsManager(null);
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
     });
   });
 
@@ -54,9 +53,9 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager("all");
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
       expect(enabledDomains.has("repositories")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
     });
 
     it("enables only the specified domain when a valid domain name string is passed", () => {
@@ -79,9 +78,9 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager("invalid-domain");
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
       expect(errorSpy).toHaveBeenCalledWith(
-        "Error: Specified invalid domain 'invalid-domain'. Please specify exactly as available domains: advanced-security, builds, core, releases, repositories, search, test-plans, wiki, work, work-items"
+        "Error: Specified invalid domain 'invalid-domain'. Please specify exactly as available domains: advanced-security, pipelines, core, repositories, search, test-plans, wiki, work, work-items"
       );
     });
   });
@@ -91,18 +90,18 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager(["all"]);
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
       expect(enabledDomains.has("repositories")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
     });
 
     it("enables only the specified domains when an array of valid domain names is passed", () => {
-      const manager = new DomainsManager(["repositories", "builds", "work"]);
+      const manager = new DomainsManager(["repositories", "pipelines", "work"]);
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(3);
       expect(enabledDomains.has("repositories")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
       expect(enabledDomains.has("work")).toBe(true);
       expect(enabledDomains.has("wiki")).toBe(false);
     });
@@ -111,45 +110,42 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager([]);
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
-      expect(Array.from(enabledDomains).sort()).toEqual([
-        "advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items"
-      ]);
+      expect(enabledDomains.size).toBe(9);
     });
 
     it("filters out invalid domains and enables only valid ones when mixed array is passed", () => {
-      const manager = new DomainsManager(["repositories", "invalid-domain", "builds"]);
+      const manager = new DomainsManager(["repositories", "invalid-domain", "pipelines"]);
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(2);
       expect(enabledDomains.has("repositories")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
     });
 
     it("enables specified domains when array contains valid domain names in any case", () => {
-      const manager = new DomainsManager(["REPOSITORIES", "Builds", "work"]);
+      const manager = new DomainsManager(["REPOSITORIES", "pipelines", "work"]);
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(3);
       expect(enabledDomains.has("repositories")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
       expect(enabledDomains.has("work")).toBe(true);
     });
   });
 
   describe("isDomainEnabled method", () => {
     it("returns true for domains that are enabled", () => {
-      const manager = new DomainsManager(["repositories", "builds"]);
+      const manager = new DomainsManager(["repositories", "pipelines"]);
 
       expect(manager.isDomainEnabled("repositories")).toBe(true);
-      expect(manager.isDomainEnabled("builds")).toBe(true);
+      expect(manager.isDomainEnabled("pipelines")).toBe(true);
       expect(manager.isDomainEnabled("wiki")).toBe(false);
     });
 
     it("returns false for domains that are not enabled", () => {
       const manager = new DomainsManager(["repositories"]);
 
-      expect(manager.isDomainEnabled("builds")).toBe(false);
+      expect(manager.isDomainEnabled("pipelines")).toBe(false);
       expect(manager.isDomainEnabled("wiki")).toBe(false);
     });
   });
@@ -158,8 +154,8 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
     it("returns the full list of available domains", () => {
       const availableDomains = DomainsManager.getAvailableDomains();
 
-      expect(availableDomains).toEqual(["advanced-security", "builds", "core", "releases", "repositories", "search", "test-plans", "wiki", "work", "work-items"]);
-      expect(availableDomains.length).toBe(10);
+      expect(availableDomains).toEqual(["advanced-security", "pipelines", "core", "repositories", "search", "test-plans", "wiki", "work", "work-items"]);
+      expect(availableDomains.length).toBe(9);
     });
   });
 
@@ -177,37 +173,37 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager(["repositories"]);
       const enabledDomains = manager.getEnabledDomains();
 
-      enabledDomains.add("builds");
+      enabledDomains.add("pipelines");
 
-      expect(manager.isDomainEnabled("builds")).toBe(false);
-      expect(manager.getEnabledDomains().has("builds")).toBe(false);
+      expect(manager.isDomainEnabled("pipelines")).toBe(false);
+      expect(manager.getEnabledDomains().has("pipelines")).toBe(false);
     });
   });
 
   describe("edge cases", () => {
     it("trims whitespace from domain names in input array", () => {
-      const manager = new DomainsManager([" repositories ", " builds "]);
+      const manager = new DomainsManager([" repositories ", " pipelines "]);
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(2);
       expect(enabledDomains.has("repositories")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
     });
 
     it("handles duplicate domain names in input array by enabling each only once", () => {
-      const manager = new DomainsManager(["repositories", "repositories", "builds"]);
+      const manager = new DomainsManager(["repositories", "repositories", "pipelines"]);
       const enabledDomains = manager.getEnabledDomains();
 
       expect(enabledDomains.size).toBe(2);
       expect(enabledDomains.has("repositories")).toBe(true);
-      expect(enabledDomains.has("builds")).toBe(true);
+      expect(enabledDomains.has("pipelines")).toBe(true);
     });
 
     it("enables all domains when the string 'ALL' (any case) is passed", () => {
       const manager = new DomainsManager("ALL");
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
     });
   });
 
@@ -216,21 +212,116 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager(["all"]);
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
     });
 
     it("enables all domains when 'all' is passed together with other valid domains", () => {
-      const manager = new DomainsManager(["all", "builds"]);
+      const manager = new DomainsManager(["all", "pipelines"]);
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
     });
 
     it("enables all domains when 'all' is passed along with invalid domains", () => {
       const manager = new DomainsManager(["a", "all", "wiki"]);
       const enabledDomains = manager.getEnabledDomains();
 
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
+    });
+  });
+
+  describe("parseDomainsInput static method", () => {
+    it("returns empty array when no input is provided", () => {
+      const result = DomainsManager.parseDomainsInput();
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when undefined is provided", () => {
+      const result = DomainsManager.parseDomainsInput(undefined);
+      expect(result).toEqual([]);
+    });
+
+    it("parses comma-separated string input", () => {
+      const result = DomainsManager.parseDomainsInput("repositories,pipelines,core");
+      expect(result).toEqual(["repositories", "pipelines", "core"]);
+    });
+
+    it("trims and lowercases comma-separated string input", () => {
+      const result = DomainsManager.parseDomainsInput(" REPOSITORIES , pipelines , CORE ");
+      expect(result).toEqual(["repositories", "pipelines", "core"]);
+    });
+
+    it("processes array input by trimming and lowercasing", () => {
+      const result = DomainsManager.parseDomainsInput([" REPOSITORIES ", " pipelines ", " CORE "]);
+      expect(result).toEqual(["repositories", "pipelines", "core"]);
+    });
+  });
+
+  describe("edge cases and additional coverage", () => {
+    it("handles 'all' mixed with valid domains in validateAndAddDomains", () => {
+      const manager = new DomainsManager(["repositories", "all", "pipelines"]);
+      const enabledDomains = manager.getEnabledDomains();
+
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("enables all domains when all specified domains are invalid", () => {
+      const manager = new DomainsManager(["invalid1", "invalid2"]);
+      const enabledDomains = manager.getEnabledDomains();
+
+      expect(enabledDomains.size).toBe(9);
+      expect(errorSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("handles case insensitive 'ALL' string input", () => {
+      const manager = new DomainsManager("ALL");
+      const enabledDomains = manager.getEnabledDomains();
+
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("processes 'all' through validateAndAddDomains when passed as uppercase string", () => {
+      // This tests the case where "ALL" goes through validateAndAddDomains
+      // and hits the domain === ALL_DOMAINS branch after being lowercased
+      const manager = new DomainsManager("ALL");
+      const enabledDomains = manager.getEnabledDomains();
+
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("processes 'all' through validateAndAddDomains in comma-separated string", () => {
+      // This will test the parseDomainsInput -> validateAndAddDomains path
+      const manager = new DomainsManager("repositories,all");
+      const enabledDomains = manager.getEnabledDomains();
+
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("hits handleStringInput with exact 'all' string", () => {
+      // This should hit the domainsInput === ALL_DOMAINS path in handleStringInput
+      const manager = new DomainsManager("all");
+      const enabledDomains = manager.getEnabledDomains();
+
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("tests direct parseDomainsInput with empty string", () => {
+      // Test parseDomains with falsy value
+      const manager = new DomainsManager("");
+      const enabledDomains = manager.getEnabledDomains();
+
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("tests comma-separated string input with 'all' keyword", () => {
+      // This should trigger parseDomainsInput splitting, then validateAndAddDomains with 'all'
+      const result = DomainsManager.parseDomainsInput("repositories,all,core");
+      expect(result).toEqual(["repositories", "all", "core"]);
+
+      // Test that this actually gets processed correctly
+      const manager = new DomainsManager("repositories,all,core");
+      const enabledDomains = manager.getEnabledDomains();
+      expect(enabledDomains.size).toBe(9); // Should enable all because 'all' is present
     });
   });
 
@@ -238,19 +329,19 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
     it("when an empty array is passed", () => {
       const manager = new DomainsManager([]);
       const enabledDomains = manager.getEnabledDomains();
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
     });
 
     it("when a string with only a break line is passed", () => {
       const manager = new DomainsManager("\n");
       const enabledDomains = manager.getEnabledDomains();
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
     });
 
     it("when an empty string is passed", () => {
       const manager = new DomainsManager("");
       const enabledDomains = manager.getEnabledDomains();
-      expect(enabledDomains.size).toBe(10);
+      expect(enabledDomains.size).toBe(9);
     });
   });
 });
