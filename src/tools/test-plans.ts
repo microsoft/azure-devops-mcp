@@ -13,7 +13,7 @@ const Test_Plan_Tools = {
   test_results_from_build_id: "testplan_show_test_results_from_build_id",
   list_test_cases: "testplan_list_test_cases",
   list_test_plans: "testplan_list_test_plans",
-  create_test_suite: "ado_create_test_suite",
+  create_test_suite: "testplan_create_test_suite",
 };
 
 function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
