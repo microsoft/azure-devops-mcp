@@ -129,6 +129,7 @@ Interact with these Azure DevOps services:
 - **testplan_list_test_plans**: Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.
 - **testplan_list_test_cases**: Get a list of test cases in the test plan.
 - **testplan_show_test_results_from_build_id**: Get a list of test results for a given project and build ID.
+- **testplan_create_test_suite**: Creates a new test suite in a test plan.
 
 ### 📖 Wiki
 
