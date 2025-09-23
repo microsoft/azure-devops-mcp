@@ -89,7 +89,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       project: z.string().describe("Project ID or project name"),
       planId: z.number().describe("ID of the test plan that contains the suites"),
       parentSuiteId: z.number().describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
-      name: z.string().describe("Name of the test suite"),
+      name: z.string().describe("Name of the child test suite"),
     },
     async ({ project, planId, parentSuiteId, name }) => {
       const connection = await connectionProvider();
