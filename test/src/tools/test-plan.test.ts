@@ -58,7 +58,14 @@ describe("configureTestPlanTools", () => {
     it("registers test plan tools on the server", () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       expect((server.tool as jest.Mock).mock.calls.map((call) => call[0])).toEqual(
-        expect.arrayContaining(["testplan_list_test_plans", "testplan_create_test_plan", "testplan_create_test_suite", "testplan_add_test_cases_to_suite", "testplan_list_test_cases", "testplan_show_test_results_from_build_id"])
+        expect.arrayContaining([
+          "testplan_list_test_plans",
+          "testplan_create_test_plan",
+          "testplan_create_test_suite",
+          "testplan_add_test_cases_to_suite",
+          "testplan_list_test_cases",
+          "testplan_show_test_results_from_build_id",
+        ])
       );
     });
   });
@@ -173,10 +180,10 @@ describe("configureTestPlanTools", () => {
       if (!call) throw new Error("testplan_create_test_suite tool not registered");
       const [, , , handler] = call;
 
-      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({ 
-        id: 15, 
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({
+        id: 15,
         name: "Child Test Suite",
-        parentSuite: { id: 10 }
+        parentSuite: { id: 10 },
       });
       const params = {
         project: "proj1",
@@ -198,11 +205,17 @@ describe("configureTestPlanTools", () => {
         "proj1",
         2
       );
-      expect(result.content[0].text).toBe(JSON.stringify({ 
-        id: 15, 
-        name: "Child Test Suite",
-        parentSuite: { id: 10 }
-      }, null, 2));
+      expect(result.content[0].text).toBe(
+        JSON.stringify(
+          {
+            id: 15,
+            name: "Child Test Suite",
+            parentSuite: { id: 10 },
+          },
+          null,
+          2
+        )
+      );
     });
 
     it("should handle empty or null response from createTestSuite", async () => {
