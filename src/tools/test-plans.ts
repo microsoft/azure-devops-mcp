@@ -13,7 +13,7 @@ const Test_Plan_Tools = {
   test_results_from_build_id: "testplan_show_test_results_from_build_id",
   list_test_cases: "testplan_list_test_cases",
   list_test_plans: "testplan_list_test_plans",
-  create_test_suite: "ado_create_test_suite"
+  create_test_suite: "ado_create_test_suite",
 };
 
 function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
@@ -89,7 +89,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       project: z.string().describe("Project ID or project name"),
       planId: z.number().describe("ID of the test plan that contains the suites"),
       parentSuiteId: z.number().describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
-      name: z.string().describe("Name of the test suite")
+      name: z.string().describe("Name of the test suite"),
     },
     async ({ project, planId, parentSuiteId, name }) => {
       const connection = await connectionProvider();
@@ -99,21 +99,15 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         name,
         parentSuite: {
           id: parentSuiteId,
-          name: ""
+          name: "",
         },
-        suiteType: 2
+        suiteType: 2,
       };
 
-      const createdTestSuite = await testPlanApi.createTestSuite(
-        testSuiteToCreate,
-        project,
-        planId
-      );
+      const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
 
       return {
-        content: [
-          { type: "text", text: JSON.stringify(createdTestSuite, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
       };
     }
   );
