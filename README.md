@@ -94,6 +94,7 @@ Interact with these Azure DevOps services:
 - **repo_get_branch_by_name**: Get a branch by its name.
 - **repo_get_pull_request_by_id**: Get a pull request by its ID.
 - **repo_create_pull_request**: Create a new pull request.
+- **repo_create_branch**: Create a new branch in the repository.
 - **repo_update_pull_request_status**: Update the status of an existing pull request to active or abandoned.
 - **repo_update_pull_request**: Update various fields of an existing pull request (title, description, draft status, target branch).
 - **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
