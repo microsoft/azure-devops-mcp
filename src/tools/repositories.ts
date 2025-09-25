@@ -211,9 +211,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             ],
           };
         } else {
-          const errorMessage = result && result.length > 0 && result[0].customMessage
-            ? result[0].customMessage
-            : "Unknown error occurred during branch creation";
+          const errorMessage = result && result.length > 0 && result[0].customMessage ? result[0].customMessage : "Unknown error occurred during branch creation";
           return {
             content: [
               {
