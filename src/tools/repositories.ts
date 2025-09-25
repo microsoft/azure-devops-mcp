@@ -33,6 +33,7 @@ const REPO_TOOLS = {
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",
+  create_branch: "repo_create_branch",
   update_pull_request: "repo_update_pull_request",
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
@@ -139,6 +140,101 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       return {
         content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
       };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.create_branch,
+    "Create a new branch in the repository.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the branch will be created."),
+      branchName: z.string().describe("The name of the new branch to create, e.g., 'feature-branch'."),
+      sourceBranchName: z.string().optional().default("main").describe("The name of the source branch to create the new branch from. Defaults to 'main'."),
+      sourceCommitId: z.string().optional().describe("The commit ID to create the branch from. If not provided, uses the latest commit of the source branch."),
+    },
+    async ({ repositoryId, branchName, sourceBranchName, sourceCommitId }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      let commitId = sourceCommitId;
+
+      // If no commit ID is provided, get the latest commit from the source branch
+      if (!commitId) {
+        const sourceRefName = `refs/heads/${sourceBranchName}`;
+        try {
+          const sourceBranch = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, sourceBranchName);
+          const branch = sourceBranch.find((b) => b.name === sourceRefName);
+          if (!branch || !branch.objectId) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error: Source branch '${sourceBranchName}' not found in repository ${repositoryId}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          commitId = branch.objectId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error retrieving source branch '${sourceBranchName}': ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Create the new branch using updateRefs
+      const newRefName = `refs/heads/${branchName}`;
+      const refUpdate = {
+        name: newRefName,
+        newObjectId: commitId,
+        oldObjectId: "0000000000000000000000000000000000000000", // All zeros indicates creating a new ref
+      };
+
+      try {
+        const result = await gitApi.updateRefs([refUpdate], repositoryId);
+
+        // Check if the branch creation was successful
+        if (result && result.length > 0 && result[0].success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Branch '${branchName}' created successfully from '${sourceBranchName}' (${commitId})`,
+              },
+            ],
+          };
+        } else {
+          const errorMessage = result && result.length > 0 && result[0].customMessage
+            ? result[0].customMessage
+            : "Unknown error occurred during branch creation";
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error creating branch '${branchName}': ${errorMessage}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error creating branch '${branchName}': ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
   );
 
