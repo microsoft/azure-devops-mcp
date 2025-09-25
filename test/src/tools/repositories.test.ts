@@ -39,6 +39,7 @@ describe("repos tools", () => {
     updateThread: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getCommits: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestQuery: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    updateRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
   };
 
   beforeEach(() => {
@@ -64,6 +65,7 @@ describe("repos tools", () => {
       updateThread: jest.fn(),
       getCommits: jest.fn(),
       getPullRequestQuery: jest.fn(),
+      updateRefs: jest.fn(),
     };
 
     connectionProvider = jest.fn().mockResolvedValue({
@@ -348,6 +350,311 @@ describe("repos tools", () => {
       );
 
       expect(result.content[0].text).toBe(JSON.stringify(mockCreatedPR, null, 2));
+    });
+  });
+
+  describe("repo_create_branch", () => {
+    it("should create branch with default source branch (main)", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockSourceBranch = [
+        {
+          name: "refs/heads/main",
+          objectId: "abc123def456",
+        },
+      ];
+      const mockUpdateResult = [
+        {
+          success: true,
+          updateStatus: 0,
+        },
+      ];
+
+      mockGitApi.getRefs.mockResolvedValue(mockSourceBranch);
+      mockGitApi.updateRefs.mockResolvedValue(mockUpdateResult);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "feature-branch",
+        sourceBranchName: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "main");
+      expect(mockGitApi.updateRefs).toHaveBeenCalledWith(
+        [
+          {
+            name: "refs/heads/feature-branch",
+            newObjectId: "abc123def456",
+            oldObjectId: "0000000000000000000000000000000000000000",
+          },
+        ],
+        "repo123"
+      );
+
+      expect(result.content[0].text).toBe("Branch 'feature-branch' created successfully from 'main' (abc123def456)");
+    });
+
+    it("should create branch with custom source branch", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockSourceBranch = [
+        {
+          name: "refs/heads/develop",
+          objectId: "def456ghi789",
+        },
+      ];
+      const mockUpdateResult = [
+        {
+          success: true,
+          updateStatus: 0,
+        },
+      ];
+
+      mockGitApi.getRefs.mockResolvedValue(mockSourceBranch);
+      mockGitApi.updateRefs.mockResolvedValue(mockUpdateResult);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "feature-branch",
+        sourceBranchName: "develop",
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "develop");
+      expect(mockGitApi.updateRefs).toHaveBeenCalledWith(
+        [
+          {
+            name: "refs/heads/feature-branch",
+            newObjectId: "def456ghi789",
+            oldObjectId: "0000000000000000000000000000000000000000",
+          },
+        ],
+        "repo123"
+      );
+
+      expect(result.content[0].text).toBe("Branch 'feature-branch' created successfully from 'develop' (def456ghi789)");
+    });
+
+    it("should create branch with specific commit ID", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdateResult = [
+        {
+          success: true,
+          updateStatus: 0,
+        },
+      ];
+
+      mockGitApi.updateRefs.mockResolvedValue(mockUpdateResult);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "feature-branch",
+        sourceBranchName: "main",
+        sourceCommitId: "xyz789abc123",
+      };
+
+      const result = await handler(params);
+
+      // Should not call getRefs when sourceCommitId is provided
+      expect(mockGitApi.getRefs).not.toHaveBeenCalled();
+      expect(mockGitApi.updateRefs).toHaveBeenCalledWith(
+        [
+          {
+            name: "refs/heads/feature-branch",
+            newObjectId: "xyz789abc123",
+            oldObjectId: "0000000000000000000000000000000000000000",
+          },
+        ],
+        "repo123"
+      );
+
+      expect(result.content[0].text).toBe("Branch 'feature-branch' created successfully from 'main' (xyz789abc123)");
+    });
+
+    it("should handle source branch not found error", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getRefs.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "feature-branch",
+        sourceBranchName: "nonexistent",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Source branch 'nonexistent' not found in repository repo123");
+    });
+
+    it("should handle getRefs API error", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockError = new Error("API Error");
+      mockGitApi.getRefs.mockRejectedValue(mockError);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "feature-branch",
+        sourceBranchName: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving source branch 'main': API Error");
+    });
+
+    it("should handle updateRefs failure", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockSourceBranch = [
+        {
+          name: "refs/heads/main",
+          objectId: "abc123def456",
+        },
+      ];
+      const mockUpdateResult = [
+        {
+          success: false,
+          customMessage: "Branch already exists",
+        },
+      ];
+
+      mockGitApi.getRefs.mockResolvedValue(mockSourceBranch);
+      mockGitApi.updateRefs.mockResolvedValue(mockUpdateResult);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "existing-branch",
+        sourceBranchName: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating branch 'existing-branch': Branch already exists");
+    });
+
+    it("should handle updateRefs failure without custom message", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockSourceBranch = [
+        {
+          name: "refs/heads/main",
+          objectId: "abc123def456",
+        },
+      ];
+      const mockUpdateResult = [
+        {
+          success: false,
+        },
+      ];
+
+      mockGitApi.getRefs.mockResolvedValue(mockSourceBranch);
+      mockGitApi.updateRefs.mockResolvedValue(mockUpdateResult);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "failing-branch",
+        sourceBranchName: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating branch 'failing-branch': Unknown error occurred during branch creation");
+    });
+
+    it("should handle updateRefs API error", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockSourceBranch = [
+        {
+          name: "refs/heads/main",
+          objectId: "abc123def456",
+        },
+      ];
+      const mockError = new Error("Update API Error");
+
+      mockGitApi.getRefs.mockResolvedValue(mockSourceBranch);
+      mockGitApi.updateRefs.mockRejectedValue(mockError);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "feature-branch",
+        sourceBranchName: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating branch 'feature-branch': Update API Error");
+    });
+
+    it("should handle source branch with missing objectId", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+      if (!call) throw new Error("repo_create_branch tool not registered");
+      const [, , , handler] = call;
+
+      const mockSourceBranch = [
+        {
+          name: "refs/heads/main",
+          // objectId is missing
+        },
+      ];
+
+      mockGitApi.getRefs.mockResolvedValue(mockSourceBranch);
+
+      const params = {
+        repositoryId: "repo123",
+        branchName: "feature-branch",
+        sourceBranchName: "main",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Source branch 'main' not found in repository repo123");
     });
   });
 
