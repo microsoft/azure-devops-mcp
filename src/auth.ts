@@ -1,5 +1,10 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
 import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 import open from "open";
 
 const scopes = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
@@ -50,6 +55,24 @@ class OAuthAuthenticator {
   }
 }
 
+/**
+  * When working in GitHub Codespaces with an Azure DevOps repo, it's common to use https://github.com/microsoft/ado-codespaces-auth
+  * This adds a ~/ado-auth-helper which connects back to VS Code to perform authentication with Azure DevOps.
+  *
+  * Utilizing this removes the requirement to install AzureCLI in codespaces, but limits the tenant to what is configured in VS Code.
+  */
+class AzureAuthHelper {
+  private adoHelper: string;
+  constructor() {
+    const home = process.env.HOME || process.env.USERPROFILE || "";
+    this.adoHelper = path.join(home, "ado-auth-helper");
+  }
+  async getToken(): Promise<string> {
+    // Switching to spawn would support context switching, but is a more complicated change.
+    return spawnSync(this.adoHelper, ["get-access-token"], { encoding: "utf8" }).stdout.trim();
+  }
+}
+
 function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
   switch (type) {
     case "azcli":
@@ -70,6 +93,10 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
         }
         return result.token;
       };
+
+    case "ado-codespaces":
+      const authHelper = new AzureAuthHelper();
+      return () => authHelper.getToken();
 
     default:
       const authenticator = new OAuthAuthenticator(tenantId);
