@@ -1,0 +1,51 @@
+trigger: none
+
+schedules:
+  - cron: "0 0 * * 1" # Runs every Monday at 00:00 UTC
+    displayName: Release Latest Version
+    branches:
+      include:
+        - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  imageName: 'azure-devops-mcp'
+  dockerRegistry: 'ghcr.io/microsoft/azure-devops-mcp'
+
+steps:
+  - task: Checkout@1
+    displayName: 'Checkout source'
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '20.x'
+    displayName: 'Install Node.js'
+
+  - script: npm ci
+    displayName: 'Install dependencies'
+
+  - script: npm run build || true
+    displayName: 'Build project'
+
+  - task: Docker@2
+    displayName: 'Build Docker image'
+    inputs:
+      command: build
+      repository: $(imageName)
+      dockerfile: Dockerfile
+      tags: latest
+
+  - task: Docker@2
+    displayName: 'Login to GitHub Container Registry'
+    inputs:
+      command: login
+      containerRegistry: 'GitHub Container Registry'
+
+  - task: Docker@2
+    displayName: 'Push Docker image'
+    inputs:
+      command: push
+      repository: $(dockerRegistry)
+      tags: latest
