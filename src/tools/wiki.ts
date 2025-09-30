@@ -5,11 +5,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
+import { apiVersion} from "../utils.js";
 
 const WIKI_TOOLS = {
   list_wikis: "wiki_list_wikis",
   get_wiki: "wiki_get_wiki",
   list_wiki_pages: "wiki_list_pages",
+  get_wiki_page: "wiki_get_page",
   get_wiki_page_content: "wiki_get_page_content",
   create_or_update_page: "wiki_create_or_update_page",
 };
@@ -117,6 +119,78 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     }
   );
 
+ server.tool(
+    WIKI_TOOLS.get_wiki_page,
+    "Retrieve wiki page metadata by path. This tool does not return page content.",
+    {
+      wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
+      project: z.string().describe("The project name or ID where the wiki is located."),
+      path: z.string().describe("The path of the wiki page (e.g., '/Home' or '/Documentation/Setup')."),
+      recursionLevel: z
+        .enum(["None", "OneLevel", "OneLevelPlusNestedEmptyFolders", "Full"])
+        .optional()
+        .describe("Recursion level for subpages. 'None' returns only the specified page. 'OneLevel' includes direct children. 'Full' includes all descendants."),
+      versionDescriptor: z.string().optional().describe("The version (branch name) of the wiki to retrieve the page from."),
+      includeContent: z.boolean().optional().describe("Whether to include the page content in the response."),
+    },
+    async ({ wikiIdentifier, project, path, recursionLevel, versionDescriptor, includeContent }) => {
+      try {
+        const connection = await connectionProvider();
+        const accessToken = await tokenProvider();
+
+        // Normalize the path
+        const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+        //const encodedPath = encodeURIComponent(normalizedPath);
+
+        // Build the URL for the wiki page API
+        const baseUrl = connection.serverUrl.replace(/\/$/, "");
+        const params = new URLSearchParams({
+          path: normalizedPath,
+          "api-version": apiVersion,
+        });
+
+        if (recursionLevel) {
+          params.append("recursionLevel", recursionLevel);
+        }
+
+        if (versionDescriptor) {
+          params.append("versionDescriptor.version", versionDescriptor);
+          params.append("versionDescriptor.versionType", "branch");
+        }
+
+        if (includeContent !== undefined) {
+          params.append("includeContent", includeContent.toString());
+        }
+        const url = `${baseUrl}/${project}/_apis/wiki/wikis/${wikiIdentifier}/pages?${params.toString()}`;
+
+        const response = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to get wiki page (${response.status}): ${errorText}`);
+        }
+
+        const pageData = await response.json();
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(pageData, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching wiki page metadata: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
   server.tool(
     WIKI_TOOLS.get_wiki_page_content,
     "Retrieve wiki page content. Provide either a 'url' parameter OR the combination of 'wikiIdentifier' and 'project' parameters.",
@@ -135,12 +209,14 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       try {
         const hasUrl = !!url;
         const hasPair = !!wikiIdentifier && !!project;
+
         if (hasUrl && hasPair) {
           return { content: [{ type: "text", text: "Error fetching wiki page content: Provide either 'url' OR 'wikiIdentifier' with 'project', not both." }], isError: true };
         }
         if (!hasUrl && !hasPair) {
           return { content: [{ type: "text", text: "Error fetching wiki page content: You must provide either 'url' OR both 'wikiIdentifier' and 'project'." }], isError: true };
         }
+
         const connection = await connectionProvider();
         const wikiApi = await connection.getWikiApi();
         let resolvedProject = project;
@@ -150,11 +226,14 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (url) {
           const parsed = parseWikiUrl(url);
+
           if ("error" in parsed) {
             return { content: [{ type: "text", text: `Error fetching wiki page content: ${parsed.error}` }], isError: true };
           }
+
           resolvedProject = parsed.project;
           resolvedWiki = parsed.wikiIdentifier;
+
           if (parsed.pagePath) {
             resolvedPath = parsed.pagePath;
           }
