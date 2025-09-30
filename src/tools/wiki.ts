@@ -130,10 +130,8 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         .enum(["None", "OneLevel", "OneLevelPlusNestedEmptyFolders", "Full"])
         .optional()
         .describe("Recursion level for subpages. 'None' returns only the specified page. 'OneLevel' includes direct children. 'Full' includes all descendants."),
-      versionDescriptor: z.string().optional().describe("The version (branch name) of the wiki to retrieve the page from."),
-      includeContent: z.boolean().optional().describe("Whether to include the page content in the response."),
     },
-    async ({ wikiIdentifier, project, path, recursionLevel, versionDescriptor, includeContent }) => {
+    async ({ wikiIdentifier, project, path, recursionLevel }) => {
       try {
         const connection = await connectionProvider();
         const accessToken = await tokenProvider();
@@ -153,14 +151,6 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           params.append("recursionLevel", recursionLevel);
         }
 
-        if (versionDescriptor) {
-          params.append("versionDescriptor.version", versionDescriptor);
-          params.append("versionDescriptor.versionType", "branch");
-        }
-
-        if (includeContent !== undefined) {
-          params.append("includeContent", includeContent.toString());
-        }
         const url = `${baseUrl}/${project}/_apis/wiki/wikis/${wikiIdentifier}/pages?${params.toString()}`;
 
         const response = await fetch(url, {

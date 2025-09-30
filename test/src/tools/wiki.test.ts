@@ -425,17 +425,12 @@ describe("configureWikiTools", () => {
         project: "proj1",
         path: "/Home",
         recursionLevel: "OneLevel" as const,
-        versionDescriptor: "main",
-        includeContent: true,
       };
 
       const result = await handler(params);
 
       const callUrl = mockFetch.mock.calls[0][0];
       expect(callUrl).toContain("recursionLevel=OneLevel");
-      expect(callUrl).toContain("versionDescriptor.version=main");
-      expect(callUrl).toContain("versionDescriptor.versionType=branch");
-      expect(callUrl).toContain("includeContent=true");
     });
 
     it("should handle API errors", async () => {
