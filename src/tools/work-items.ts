@@ -28,6 +28,8 @@ const WORKITEM_TOOLS = {
   work_items_link: "wit_work_items_link",
   work_item_unlink: "wit_work_item_unlink",
   add_artifact_link: "wit_add_artifact_link",
+  get_tags: "wit_get_tags",
+  delete_tag: "wit_delete_tag",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -1026,6 +1028,72 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           content: [{ type: "text", text: `Error adding artifact link to work item: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.get_tags,
+    "Retrieve a list of all tags for the given project.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project. If not provided, the default project will be used."),
+    },
+    async ({ project }) => {
+      const connection = await connectionProvider();
+      const workItemApi = await connection.getWorkItemTrackingApi();
+
+      try {
+        const tags = await workItemApi.getTags(project);
+
+        if (!tags || (Array.isArray(tags) && tags.length === 0)) {
+          return {
+            content: [{ type: "text", text: "No tags found for the specified project." }],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(tags, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error retrieving tags: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.delete_tag,
+    "Delete a specific tag from the given project, if it is not in use.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project. If not provided, the default project will be used."),
+      tagName: z.string().optional().describe("Name of the tag that is to be deleted."),
+    },
+    async ({ project, tagName }) => {
+      if (!tagName || tagName.trim() === "") {
+        return { content: [{ type: "text", text: "Tag name must be provided to delete a tag." }], isError: true };
+      }
+
+      const connection = await connectionProvider();
+      const workItemApi = await connection.getWorkItemTrackingApi();
+      const wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' AND [System.Tags] CONTAINS '${tagName}'`;
+
+      try {
+        const queryResult = await workItemApi.queryByWiql({ query: wiqlQuery }, { project });
+
+        if (queryResult.workItems && queryResult.workItems.length > 0) {
+          return { content: [{ type: "text", text: `Cannot delete tag '${tagName}' because it is in use by at least ${queryResult.workItems.length} work items.` }], isError: true };
+        }
+
+        await workItemApi.deleteTag(project, tagName);
+
+        return { content: [{ type: "text", text: `Tag '${tagName}' deleted successfully.` }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error deleting tag: ${errorMessage}` }], isError: true };
       }
     }
   );
