@@ -10,6 +10,7 @@ const WIKI_TOOLS = {
   list_wikis: "wiki_list_wikis",
   get_wiki: "wiki_get_wiki",
   list_wiki_pages: "wiki_list_pages",
+  get_wiki_page: "wiki_get_page",
   get_wiki_page_content: "wiki_get_page_content",
   create_or_update_page: "wiki_create_or_update_page",
 };
@@ -111,6 +112,82 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
         return {
           content: [{ type: "text", text: `Error fetching wiki pages: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WIKI_TOOLS.get_wiki_page,
+    "Retrieve wiki page metadata (including id) by path. The page id can be used to construct stable URLs.",
+    {
+      wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
+      project: z.string().describe("The project name or ID where the wiki is located."),
+      path: z.string().describe("The path of the wiki page (e.g., '/Home' or '/Documentation/Setup')."),
+      recursionLevel: z
+        .enum(["None", "OneLevel", "OneLevelPlusNestedEmptyFolders", "Full"])
+        .optional()
+        .describe("Recursion level for subpages. 'None' returns only the specified page. 'OneLevel' includes direct children. 'Full' includes all descendants."),
+      versionDescriptor: z
+        .string()
+        .optional()
+        .describe("The wiki version (branch name) to retrieve the page from. If not specified, uses the default branch."),
+      includeContent: z.boolean().optional().describe("Set to true to include the page's content in the response. Defaults to false."),
+    },
+    async ({ wikiIdentifier, project, path, recursionLevel, versionDescriptor, includeContent }) => {
+      try {
+        const connection = await connectionProvider();
+        const accessToken = await tokenProvider();
+
+        // Normalize the path
+        const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+        const encodedPath = encodeURIComponent(normalizedPath);
+
+        // Build the URL for the wiki page API
+        const baseUrl = connection.serverUrl.replace(/\/$/, "");
+        const params = new URLSearchParams({
+          path: normalizedPath,
+          "api-version": "7.1-preview.1",
+        });
+
+        if (recursionLevel) {
+          params.append("recursionLevel", recursionLevel);
+        }
+
+        if (versionDescriptor) {
+          params.append("versionDescriptor.version", versionDescriptor);
+          params.append("versionDescriptor.versionType", "branch");
+        }
+
+        if (includeContent !== undefined) {
+          params.append("includeContent", includeContent.toString());
+        }
+
+        const url = `${baseUrl}/${project}/_apis/wiki/wikis/${wikiIdentifier}/pages?${params.toString()}`;
+
+        const response = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to get wiki page (${response.status}): ${errorText}`);
+        }
+
+        const pageData = await response.json();
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(pageData, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching wiki page metadata: ${errorMessage}` }],
           isError: true,
         };
       }
