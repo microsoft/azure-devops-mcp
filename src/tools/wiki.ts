@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
-import { apiVersion} from "../utils.js";
+import { apiVersion } from "../utils.js";
 
 const WIKI_TOOLS = {
   list_wikis: "wiki_list_wikis",
@@ -119,7 +119,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     }
   );
 
- server.tool(
+  server.tool(
     WIKI_TOOLS.get_wiki_page,
     "Retrieve wiki page metadata by path. This tool does not return page content.",
     {
@@ -145,7 +145,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         // Build the URL for the wiki page API
         const baseUrl = connection.serverUrl.replace(/\/$/, "");
         const params = new URLSearchParams({
-          path: normalizedPath,
+          "path": normalizedPath,
           "api-version": apiVersion,
         });
 

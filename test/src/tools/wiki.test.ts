@@ -336,7 +336,7 @@ describe("configureWikiTools", () => {
     });
   });
 
- describe("get_page tool", () => {
+  describe("get_page tool", () => {
     let mockFetch: jest.Mock;
 
     beforeEach(() => {
@@ -405,10 +405,7 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("path=%2FDocumentation"),
-        expect.any(Object)
-      );
+      expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("path=%2FDocumentation"), expect.any(Object));
       expect(result.content[0].text).toContain('"id": 456');
     });
 
