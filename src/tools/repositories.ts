@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import {
@@ -36,6 +35,7 @@ const REPO_TOOLS = {
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
   create_pull_request: "repo_create_pull_request",
+  create_branch: "repo_create_branch",
   update_pull_request: "repo_update_pull_request",
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
@@ -99,7 +99,7 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   return filteredByName;
 }
 
-function configureRepoTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     REPO_TOOLS.create_pull_request,
     "Create a new pull request.",
@@ -142,6 +142,99 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       return {
         content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
       };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.create_branch,
+    "Create a new branch in the repository.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the branch will be created."),
+      branchName: z.string().describe("The name of the new branch to create, e.g., 'feature-branch'."),
+      sourceBranchName: z.string().optional().default("main").describe("The name of the source branch to create the new branch from. Defaults to 'main'."),
+      sourceCommitId: z.string().optional().describe("The commit ID to create the branch from. If not provided, uses the latest commit of the source branch."),
+    },
+    async ({ repositoryId, branchName, sourceBranchName, sourceCommitId }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      let commitId = sourceCommitId;
+
+      // If no commit ID is provided, get the latest commit from the source branch
+      if (!commitId) {
+        const sourceRefName = `refs/heads/${sourceBranchName}`;
+        try {
+          const sourceBranch = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, sourceBranchName);
+          const branch = sourceBranch.find((b) => b.name === sourceRefName);
+          if (!branch || !branch.objectId) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error: Source branch '${sourceBranchName}' not found in repository ${repositoryId}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          commitId = branch.objectId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error retrieving source branch '${sourceBranchName}': ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Create the new branch using updateRefs
+      const newRefName = `refs/heads/${branchName}`;
+      const refUpdate = {
+        name: newRefName,
+        newObjectId: commitId,
+        oldObjectId: "0000000000000000000000000000000000000000", // All zeros indicates creating a new ref
+      };
+
+      try {
+        const result = await gitApi.updateRefs([refUpdate], repositoryId);
+
+        // Check if the branch creation was successful
+        if (result && result.length > 0 && result[0].success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Branch '${branchName}' created successfully from '${sourceBranchName}' (${commitId})`,
+              },
+            ],
+          };
+        } else {
+          const errorMessage = result && result.length > 0 && result[0].customMessage ? result[0].customMessage : "Unknown error occurred during branch creation";
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error creating branch '${branchName}': ${errorMessage}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error creating branch '${branchName}': ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -304,12 +397,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      user_is_reviewer: z
+        .string()
+        .optional()
+        .describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
+      sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
+      targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
-    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, status }) => {
+    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -319,10 +418,20 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         repositoryId: string;
         creatorId?: string;
         reviewerId?: string;
+        sourceRefName?: string;
+        targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
         repositoryId: repositoryId,
       };
+
+      if (sourceRefName) {
+        searchCriteria.sourceRefName = sourceRefName;
+      }
+
+      if (targetRefName) {
+        searchCriteria.targetRefName = targetRefName;
+      }
 
       if (created_by_user) {
         try {
@@ -339,15 +448,31 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             isError: true,
           };
         }
-      } else if (created_by_me || i_am_reviewer) {
+      } else if (created_by_me) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
-        if (created_by_me) {
-          searchCriteria.creatorId = userId;
+        searchCriteria.creatorId = userId;
+      }
+
+      if (user_is_reviewer) {
+        try {
+          const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+          searchCriteria.reviewerId = reviewerUserId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error finding reviewer with email ${user_is_reviewer}: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
         }
-        if (i_am_reviewer) {
-          searchCriteria.reviewerId = userId;
-        }
+      } else if (i_am_reviewer) {
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+        const userId = data.authenticatedUser.id;
+        searchCriteria.reviewerId = userId;
       }
 
       const pullRequests = await gitApi.getPullRequests(
@@ -391,12 +516,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      user_is_reviewer: z
+        .string()
+        .optional()
+        .describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
       status: z
         .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
         .default("Active")
         .describe("Filter pull requests by status. Defaults to 'Active'."),
+      sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
+      targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
-    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, status }) => {
+    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -405,9 +536,19 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         status: number;
         creatorId?: string;
         reviewerId?: string;
+        sourceRefName?: string;
+        targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
       };
+
+      if (sourceRefName) {
+        gitPullRequestSearchCriteria.sourceRefName = sourceRefName;
+      }
+
+      if (targetRefName) {
+        gitPullRequestSearchCriteria.targetRefName = targetRefName;
+      }
 
       if (created_by_user) {
         try {
@@ -424,15 +565,31 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
             isError: true,
           };
         }
-      } else if (created_by_me || i_am_reviewer) {
+      } else if (created_by_me) {
         const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
         const userId = data.authenticatedUser.id;
-        if (created_by_me) {
-          gitPullRequestSearchCriteria.creatorId = userId;
+        gitPullRequestSearchCriteria.creatorId = userId;
+      }
+
+      if (user_is_reviewer) {
+        try {
+          const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+          gitPullRequestSearchCriteria.reviewerId = reviewerUserId;
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error finding reviewer with email ${user_is_reviewer}: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
         }
-        if (i_am_reviewer) {
-          gitPullRequestSearchCriteria.reviewerId = userId;
-        }
+      } else if (i_am_reviewer) {
+        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+        const userId = data.authenticatedUser.id;
+        gitPullRequestSearchCriteria.reviewerId = userId;
       }
 
       const pullRequests = await gitApi.getPullRequestsByProject(
@@ -731,7 +888,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
-      const threadContext: CommentThreadContext = { filePath: filePath };
+      const normalizedFilePath = filePath && !filePath.startsWith("/") ? `/${filePath}` : filePath;
+      const threadContext: CommentThreadContext = { filePath: normalizedFilePath };
 
       if (rightFileStartLine !== undefined) {
         if (rightFileStartLine < 1) {

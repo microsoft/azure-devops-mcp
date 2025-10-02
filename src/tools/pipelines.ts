@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
@@ -23,7 +22,7 @@ const PIPELINE_TOOLS = {
   pipelines_run_pipeline: "pipelines_run_pipeline",
 };
 
-function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     PIPELINE_TOOLS.pipelines_get_build_definitions,
     "Retrieves a list of build definitions for a given project.",
@@ -434,7 +433,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token.token}`,
+          "Authorization": `Bearer ${token}`,
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),

@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { IGitApi } from "azure-devops-node-api/GitApi.js";
@@ -17,7 +16,7 @@ const SEARCH_TOOLS = {
   search_workitem: "search_workitem",
 };
 
-function configureSearchTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configureSearchTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     SEARCH_TOOLS.search_code,
     "Search Azure DevOps Repositories for a given search text",
@@ -57,7 +56,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken.token}`,
+          "Authorization": `Bearer ${accessToken}`,
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(requestBody),
@@ -113,7 +112,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken.token}`,
+          "Authorization": `Bearer ${accessToken}`,
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(requestBody),
@@ -170,7 +169,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<Ac
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken.token}`,
+          "Authorization": `Bearer ${accessToken}`,
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(requestBody),

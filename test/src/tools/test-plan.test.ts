@@ -8,7 +8,7 @@ import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { ITestApi } from "azure-devops-node-api/TestApi";
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 describe("configureTestPlanTools", () => {
@@ -32,6 +32,7 @@ describe("configureTestPlanTools", () => {
     mockTestPlanApi = {
       getTestPlans: jest.fn(),
       createTestPlan: jest.fn(),
+      createTestSuite: jest.fn(),
       addTestCasesToSuite: jest.fn(),
       getTestCaseList: jest.fn(),
     } as unknown as ITestPlanApi;
@@ -57,7 +58,14 @@ describe("configureTestPlanTools", () => {
     it("registers test plan tools on the server", () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       expect((server.tool as jest.Mock).mock.calls.map((call) => call[0])).toEqual(
-        expect.arrayContaining(["testplan_list_test_plans", "testplan_create_test_plan", "testplan_add_test_cases_to_suite", "testplan_list_test_cases", "testplan_show_test_results_from_build_id"])
+        expect.arrayContaining([
+          "testplan_list_test_plans",
+          "testplan_create_test_plan",
+          "testplan_create_test_suite",
+          "testplan_add_test_cases_to_suite",
+          "testplan_list_test_cases",
+          "testplan_show_test_results_from_build_id",
+        ])
       );
     });
   });
@@ -114,6 +122,118 @@ describe("configureTestPlanTools", () => {
         "proj1"
       );
       expect(result.content[0].text).toBe(JSON.stringify({ id: 1, name: "New Test Plan" }, null, 2));
+    });
+  });
+
+  describe("create_test_suite tool", () => {
+    it("should call createTestSuite with the correct parameters and return the expected result", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({ id: 10, name: "New Test Suite" });
+      const params = {
+        project: "proj1",
+        planId: 1,
+        parentSuiteId: 5,
+        name: "New Test Suite",
+      };
+      const result = await handler(params);
+
+      expect(mockTestPlanApi.createTestSuite).toHaveBeenCalledWith(
+        {
+          name: "New Test Suite",
+          parentSuite: {
+            id: 5,
+            name: "",
+          },
+          suiteType: 2,
+        },
+        "proj1",
+        1
+      );
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 10, name: "New Test Suite" }, null, 2));
+    });
+
+    it("should handle API errors when creating test suite", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        project: "proj1",
+        planId: 1,
+        parentSuiteId: 5,
+        name: "Failed Test Suite",
+      };
+
+      await expect(handler(params)).rejects.toThrow("API Error");
+    });
+
+    it("should create test suite with different parent suite IDs", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({
+        id: 15,
+        name: "Child Test Suite",
+        parentSuite: { id: 10 },
+      });
+      const params = {
+        project: "proj1",
+        planId: 2,
+        parentSuiteId: 10,
+        name: "Child Test Suite",
+      };
+      const result = await handler(params);
+
+      expect(mockTestPlanApi.createTestSuite).toHaveBeenCalledWith(
+        {
+          name: "Child Test Suite",
+          parentSuite: {
+            id: 10,
+            name: "",
+          },
+          suiteType: 2,
+        },
+        "proj1",
+        2
+      );
+      expect(result.content[0].text).toBe(
+        JSON.stringify(
+          {
+            id: 15,
+            name: "Child Test Suite",
+            parentSuite: { id: 10 },
+          },
+          null,
+          2
+        )
+      );
+    });
+
+    it("should handle empty or null response from createTestSuite", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue(null);
+      const params = {
+        project: "proj1",
+        planId: 1,
+        parentSuiteId: 5,
+        name: "Empty Response Suite",
+      };
+      const result = await handler(params);
+
+      expect(result.content[0].text).toBe(JSON.stringify(null, null, 2));
     });
   });
 

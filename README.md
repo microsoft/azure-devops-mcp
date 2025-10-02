@@ -94,6 +94,7 @@ Interact with these Azure DevOps services:
 - **repo_get_branch_by_name**: Get a branch by its name.
 - **repo_get_pull_request_by_id**: Get a pull request by its ID.
 - **repo_create_pull_request**: Create a new pull request.
+- **repo_create_branch**: Create a new branch in the repository.
 - **repo_update_pull_request_status**: Update the status of an existing pull request to active or abandoned.
 - **repo_update_pull_request**: Update various fields of an existing pull request (title, description, draft status, target branch).
 - **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
@@ -129,6 +130,7 @@ Interact with these Azure DevOps services:
 - **testplan_list_test_plans**: Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.
 - **testplan_list_test_cases**: Get a list of test cases in the test plan.
 - **testplan_show_test_results_from_build_id**: Get a list of test results for a given project and build ID.
+- **testplan_create_test_suite**: Creates a new test suite in a test plan.
 
 ### 📖 Wiki
 
@@ -152,16 +154,7 @@ For the best experience, use Visual Studio Code and GitHub Copilot. See the [get
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-4. Open VS Code in an empty folder
-
-### Azure Login
-
-Ensure you are logged in to Azure DevOps via the Azure CLI:
-
-```sh
-az login
-```
+3. Open VS Code in an empty folder
 
 ### Installation
 
@@ -232,7 +225,7 @@ Click "Select Tools" and choose the available tools.
 
 ![configure mcp server tools](./docs/media/configure-mcp-server-tools.gif)
 
-Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
+Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first time an ADO tool is executed browser will open prompting to login with your Microsoft account. Please ensure you are using credentials matching selected Azure DevOps organization.
 
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
@@ -255,10 +248,10 @@ For example, use `"-d", "core", "work", "work-items"` to load only Work Item rel
     }
   ],
   "servers": {
-    "ado": {
+    "ado_with_filtered_domains": {
       "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "-d", "core", "work", "work-items"]
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "-d", "core", "work", "work-items"]
     }
   }
 }

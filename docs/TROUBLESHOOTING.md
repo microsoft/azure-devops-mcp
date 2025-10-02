@@ -31,12 +31,6 @@
 
 1. **npm Authentication Issues for Remote Access**
    If you encounter authentication errors:
-   - Ensure you are logged in to Azure DevOps using the `az` CLI:
-
-     ```pwsh
-     az login
-     ```
-
    - Verify your npm configuration:
 
      ```pwsh
@@ -54,7 +48,67 @@
 
 ## Authentication Issues
 
-### Multi-Tenant Authentication Problems
+### GitHub Codespaces
+
+Due to limitations of the environment default OAuth option is not available in Codespace.
+Make sure you authenticate via
+
+```sh
+az login
+```
+
+in the terminal before using MCP tools.
+
+And in case there are authorization/access errors when using the tools please check the [Multi-Tenant Authentication Problems guide](#multi-tenant-authentication-problems-when-using-azcli)
+
+### OAuth
+
+Recent switch to OAuth flow is supposed to simplify authentication against ADO APIs and remove additional software dependency.
+
+It is however possible that strict tenant admin policies prevent users from successfully logging in using OAuth flow. In that case consider falling back to AZ CLI.
+
+#### Symptoms
+
+Upon ADO tool execution browser opens a tab/window and after login attempt an error text is displayed:
+
+```
+Error occurred: ...
+```
+
+#### Solution
+
+Try using Azure login context instead:
+
+1. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) and **log in**:
+
+   ```sh
+   az login
+   ```
+
+2. **Configure the MCP server** with the azcli authentication option by updating your `.vscode/mcp.json`.
+
+   ```json
+   {
+     "inputs": [
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization name (e.g. 'contoso')"
+       }
+     ],
+     "servers": {
+       "ado": {
+         "type": "stdio",
+         "command": "npx",
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "azcli"]
+       }
+     }
+   }
+   ```
+
+3. **Restart VS Code** completely to ensure the MCP server picks up the new configuration.
+
+### Multi-Tenant Authentication Problems when using azcli
 
 If you encounter authentication errors like `TF400813: The user 'xxx' is not authorized to access this resource`, you may be experiencing multi-tenant authentication issues.
 
@@ -100,7 +154,7 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--tenant", "${input:ado_tenant}"]
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "azcli", "--tenant", "${input:ado_tenant}"]
        }
      }
    }
@@ -137,44 +191,3 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
 4. **When prompted**, enter:
    - Your Azure DevOps organization name
    - The tenant ID from step 1
-
-### Dev Container and WSL Authentication Issues
-
-If the tenant configuration solution above doesn't resolve your authentication issues, and you're working in a **Dev Container** or **WSL (Windows Subsystem for Linux)** environment, the root cause may be different.
-
-#### Dev Container/WSL Symptoms
-
-- Same authorization errors as above (`TF400813: The user 'xxx' is not authorized to access this resource`)
-- Tenant ID configuration didn't resolve the issue
-- You're using VS Code with Dev Containers or WSL
-- MCP server is configured in User Settings (global) rather than workspace settings
-
-#### Dev Container/WSL Root Cause
-
-When MCP servers are configured in **User Settings** (global configuration), they inherit the environment context from the **host machine**, including `az login` authentication settings. In Dev Container or WSL scenarios, this means:
-
-- The MCP server uses the host machine's Azure authentication
-- Any `az login` performed inside the Dev Container or WSL environment is ignored
-- There may be a mismatch between the authentication context the MCP server expects and your development environment
-
-#### Dev Container/WSL Solution
-
-1. **Verify your MCP configuration location**:
-   - Check if your MCP server is configured in User Settings (global) vs Workspace Settings
-   - User Settings: Run `MCP: Open User Configuration` from Command Palette
-   - Workspace Settings: Check for `.vscode/mcp.json` in your project
-
-2. **For User Settings (Global) MCP configuration**:
-   - Ensure you are logged into Azure from the **host machine** (not inside the Dev Container/WSL)
-   - Run `az login` on the host Windows machine (outside of WSL/Dev Container)
-   - Do NOT run `az login` inside the Dev Container or WSL environment
-   - Restart VS Code completely
-
-3. **Alternative: Use Workspace Settings instead**:
-   - Move your MCP server configuration from User Settings to Workspace Settings
-   - Create/update `.vscode/mcp.json` in your project
-   - This allows the MCP server to use the authentication context from within the Dev Container/WSL environment
-
-4. **For Dev Containers specifically**:
-   - Consider configuring MCP servers directly in your `devcontainer.json` file using the `customizations.vscode.mcp` section
-   - This ensures the MCP server runs within the containerized environment with the correct context

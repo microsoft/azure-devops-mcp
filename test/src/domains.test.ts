@@ -231,14 +231,14 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
   });
 
   describe("parseDomainsInput static method", () => {
-    it("returns empty array when no input is provided", () => {
+    it("returns 'all' when no input is provided", () => {
       const result = DomainsManager.parseDomainsInput();
-      expect(result).toEqual([]);
+      expect(result).toEqual(["all"]);
     });
 
-    it("returns empty array when undefined is provided", () => {
+    it("returns 'all' array when undefined is provided", () => {
       const result = DomainsManager.parseDomainsInput(undefined);
-      expect(result).toEqual([]);
+      expect(result).toEqual(["all"]);
     });
 
     it("parses comma-separated string input", () => {
@@ -322,6 +322,26 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       const manager = new DomainsManager("repositories,all,core");
       const enabledDomains = manager.getEnabledDomains();
       expect(enabledDomains.size).toBe(9); // Should enable all because 'all' is present
+    });
+  });
+
+  describe("edge empty string cases for enabling all domains", () => {
+    it("when an empty array is passed", () => {
+      const manager = new DomainsManager([]);
+      const enabledDomains = manager.getEnabledDomains();
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("when a string with only a break line is passed", () => {
+      const manager = new DomainsManager("\n");
+      const enabledDomains = manager.getEnabledDomains();
+      expect(enabledDomains.size).toBe(9);
+    });
+
+    it("when an empty string is passed", () => {
+      const manager = new DomainsManager("");
+      const enabledDomains = manager.getEnabledDomains();
+      expect(enabledDomains.size).toBe(9);
     });
   });
 });
