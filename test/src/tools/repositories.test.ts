@@ -354,6 +354,34 @@ describe("repos tools", () => {
       expect(result.isError).toBeFalsy();
     });
 
+    it("should not bypass policies when bypassReason is not provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        autoComplete: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoCompleteSetBy: { id: "user123" },
+          completionOptions: expect.objectContaining({
+            bypassPolicy: false,
+          }),
+        }),
+        "test-repo-id",
+        123
+      );
+      expect(result.isError).toBeFalsy();
+    });
+
     it("should automatically bypass policies when bypassReason is provided", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
