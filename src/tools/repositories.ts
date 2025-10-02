@@ -163,10 +163,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
         .describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
-      bypassPolicy: z.boolean().optional().default(false).describe("Whether to bypass branch policies when autocompleting. Defaults to false."),
-      bypassReason: z.string().optional().describe("Reason for bypassing policies, required when bypassPolicy is true."),
+      bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassPolicy, bypassReason }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -190,18 +189,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<Acce
           const completionOptions: GitPullRequestCompletionOptions = {
             deleteSourceBranch: deleteSourceBranch || false,
             transitionWorkItems: transitionWorkItems !== false, // Default to true unless explicitly set to false
-            bypassPolicy: bypassPolicy || false,
+            bypassPolicy: !!bypassReason, // Automatically set to true if bypassReason is provided
           };
 
           if (mergeStrategy) {
             completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
-          }
-
-          if (bypassPolicy && !bypassReason) {
-            return {
-              content: [{ type: "text", text: "Error: bypassReason is required when bypassPolicy is set to true." }],
-              isError: true,
-            };
           }
 
           if (bypassReason) {

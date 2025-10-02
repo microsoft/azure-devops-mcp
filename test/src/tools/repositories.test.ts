@@ -354,7 +354,7 @@ describe("repos tools", () => {
       expect(result.isError).toBeFalsy();
     });
 
-    it("should return error when bypassPolicy is true but bypassReason is not provided", async () => {
+    it("should automatically bypass policies when bypassReason is provided", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
@@ -365,15 +365,23 @@ describe("repos tools", () => {
         repositoryId: "test-repo-id",
         pullRequestId: 123,
         autoComplete: true,
-        bypassPolicy: true,
-        // bypassReason is missing
+        bypassReason: "Emergency fix needed",
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updatePullRequest).not.toHaveBeenCalled();
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("bypassReason is required when bypassPolicy is set to true");
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoCompleteSetBy: { id: "user123" },
+          completionOptions: expect.objectContaining({
+            bypassPolicy: true,
+            bypassReason: "Emergency fix needed",
+          }),
+        }),
+        "test-repo-id",
+        123
+      );
+      expect(result.isError).toBeFalsy();
     });
   });
 
