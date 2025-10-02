@@ -195,6 +195,7 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
 ## Common Errors
 
 1. **Incorrect Organization Name Error**
+
    ```
    Error fetching projects: Failed to find api location for area: Location id: e81700f7-3be2-46de-8624-2eb35882fcaa
    ```
