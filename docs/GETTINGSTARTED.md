@@ -4,7 +4,7 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 
 - [Prerequisites](#-prerequisites)
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
-- [Getting started with Visual Studio 2022 & GitHub Copilot](#-visual-studio-2022--github-copilot-1)
+- [Getting started with Visual Studio 2022 & GitHub Copilot](#-visual-studio-2022--github-copilot)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
 - [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
 - [Getting started with Cursor](#-using-mcp-server-with-cursor)
