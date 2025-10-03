@@ -15,6 +15,8 @@ import {
   GitPullRequestQueryType,
   CommentThreadContext,
   CommentThreadStatus,
+  GitPullRequestCompletionOptions,
+  GitPullRequestMergeStrategy,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -238,7 +240,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.update_pull_request,
-    "Update a Pull Request by ID with specified fields.",
+    "Update a Pull Request by ID with specified fields, including setting autocomplete with various completion options.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
       pullRequestId: z.number().describe("The ID of the pull request to update."),
@@ -247,19 +249,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       isDraft: z.boolean().optional().describe("Whether the pull request should be a draft."),
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
       status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
+      autoComplete: z.boolean().optional().describe("Set the pull request to autocomplete when all requirements are met."),
+      mergeStrategy: z
+        .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
+        .optional()
+        .describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
+      deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
+      transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
+      bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
       // Build update object with only provided fields
-      const updateRequest: {
-        title?: string;
-        description?: string;
-        isDraft?: boolean;
-        targetRefName?: string;
-        status?: number;
-      } = {};
+      const updateRequest: Record<string, unknown> = {};
+
       if (title !== undefined) updateRequest.title = title;
       if (description !== undefined) updateRequest.description = description;
       if (isDraft !== undefined) updateRequest.isDraft = isDraft;
@@ -268,10 +273,37 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
       }
 
+      if (autoComplete !== undefined) {
+        if (autoComplete) {
+          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const autoCompleteUserId = data.authenticatedUser.id;
+          updateRequest.autoCompleteSetBy = { id: autoCompleteUserId };
+
+          const completionOptions: GitPullRequestCompletionOptions = {
+            deleteSourceBranch: deleteSourceBranch || false,
+            transitionWorkItems: transitionWorkItems !== false, // Default to true unless explicitly set to false
+            bypassPolicy: !!bypassReason, // Automatically set to true if bypassReason is provided
+          };
+
+          if (mergeStrategy) {
+            completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
+          }
+
+          if (bypassReason) {
+            completionOptions.bypassReason = bypassReason;
+          }
+
+          updateRequest.completionOptions = completionOptions;
+        } else {
+          updateRequest.autoCompleteSetBy = null;
+          updateRequest.completionOptions = null;
+        }
+      }
+
       // Validate that at least one field is provided for update
       if (Object.keys(updateRequest).length === 0) {
         return {
-          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, or status) must be provided for update." }],
+          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update." }],
           isError: true,
         };
       }
