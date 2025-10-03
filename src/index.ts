@@ -11,7 +11,7 @@ import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
 import { getOrgTenant } from "./org-tenants.js";
-import { configurePrompts } from "./prompts.js";
+//import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
@@ -89,7 +89,7 @@ async function main() {
   const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
   const authenticator = createAuthenticator(argv.authentication, tenantId);
 
-  configurePrompts(server);
+  //configurePrompts(server);
 
   configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
 
