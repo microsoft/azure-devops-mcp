@@ -15,6 +15,7 @@ import {
   GitPullRequestQueryType,
   CommentThreadContext,
   CommentThreadStatus,
+  GitCommitRef,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -41,6 +42,7 @@ const REPO_TOOLS = {
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
+  list_pull_request_commits: "repo_list_pull_request_commits",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -351,6 +353,43 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
       return {
         content: [{ type: "text", text: JSON.stringify(trimmedRepositories, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.list_pull_request_commits,
+    "Retrieve a list of commits for a pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request for which to retrieve commits."),
+      project: z.string().describe("The name of the Azure DevOps project."),
+      top: z.number().default(100).describe("The maximum number of commits to return."),
+      skip: z.number().default(0).describe("The number of commits to skip."),
+      fullResponse: z.boolean().optional().default(false).describe("Return full commit JSON response instead of trimmed data."),
+    },
+    async ({ repositoryId, pullRequestId, project, top, skip, fullResponse }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      const commits = (await gitApi.getPullRequestCommits(repositoryId, pullRequestId, project)) as GitCommitRef[] | undefined;
+      const paginated = commits?.slice(skip, skip + top);
+
+      if (fullResponse) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(paginated, null, 2) }],
+        };
+      }
+
+      const trimmedCommits = paginated?.map((c) => ({
+        commitId: c.commitId,
+        author: c.author ? { name: c.author.name, email: c.author.email, date: c.author.date } : undefined,
+        committer: c.committer ? { name: c.committer.name, email: c.committer.email, date: c.committer.date } : undefined,
+        comment: c.comment,
+      }));
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(trimmedCommits, null, 2) }],
       };
     }
   );

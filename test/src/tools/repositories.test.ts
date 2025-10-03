@@ -40,6 +40,7 @@ describe("repos tools", () => {
     getCommits: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestQuery: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     updateRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getPullRequestCommits: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
   };
 
   beforeEach(() => {
@@ -66,6 +67,7 @@ describe("repos tools", () => {
       getCommits: jest.fn(),
       getPullRequestQuery: jest.fn(),
       updateRefs: jest.fn(),
+      getPullRequestCommits: jest.fn(),
     };
 
     connectionProvider = jest.fn().mockResolvedValue({
@@ -1904,6 +1906,85 @@ describe("repos tools", () => {
 
       // When fullResponse is true, it should return the full comment objects without trimming
       expect(result.content[0].text).toBe(JSON.stringify(mockComments, null, 2));
+    });
+  });
+
+  describe("repo_list_pull_request_commits", () => {
+    it("should list pull request commits with trimmed response by default", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_commits);
+      if (!call) throw new Error("repo_list_pull_request_commits tool not registered");
+      const [, , , handler] = call;
+
+      const mockCommits = [
+        {
+          commitId: "c1",
+          author: { name: "Alice", email: "alice@example.com", date: "2023-01-01T00:00:00Z" },
+          committer: { name: "Alice", email: "alice@example.com", date: "2023-01-01T00:00:00Z" },
+          comment: "feat: first change",
+        },
+        {
+          commitId: "c2",
+          author: { name: "Bob", email: "bob@example.com", date: "2023-01-02T00:00:00Z" },
+          committer: { name: "Bob", email: "bob@example.com", date: "2023-01-02T00:00:00Z" },
+          comment: "fix: bugfix",
+        },
+      ];
+
+      mockGitApi.getPullRequestCommits.mockResolvedValue(mockCommits);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        project: "test-project",
+        top: 1,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestCommits).toHaveBeenCalledWith("repo123", 456, "test-project");
+
+      const expected = [
+        {
+          commitId: "c1",
+          author: { name: "Alice", email: "alice@example.com", date: "2023-01-01T00:00:00Z" },
+          committer: { name: "Alice", email: "alice@example.com", date: "2023-01-01T00:00:00Z" },
+          comment: "feat: first change",
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expected, null, 2));
+    });
+
+    it("should list pull request commits with full response when requested", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_commits);
+      if (!call) throw new Error("repo_list_pull_request_commits tool not registered");
+      const [, , , handler] = call;
+
+      const mockCommits = [
+        { commitId: "c1", extra: true },
+        { commitId: "c2", more: "data" },
+      ];
+
+      mockGitApi.getPullRequestCommits.mockResolvedValue(mockCommits);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        project: "test-project",
+        fullResponse: true,
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestCommits).toHaveBeenCalledWith("repo123", 456, "test-project");
+      expect(result.content[0].text).toBe(JSON.stringify(mockCommits, null, 2));
     });
   });
 
