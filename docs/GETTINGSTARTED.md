@@ -139,8 +139,6 @@ Click "Select Tools" and choose the available tools.
 
 ### ➡️ Visual Studio 2022 & GitHub Copilot
 
-For the best experience, use Visual Studio Code and GitHub Copilot 👆.
-
 #### 🧨 Install from Public Feed (Recommended)
 
 This installation method is the easiest for all users of Visual Studio 2022.
