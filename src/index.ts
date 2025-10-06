@@ -89,7 +89,8 @@ async function main() {
   const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
   const authenticator = createAuthenticator(argv.authentication, tenantId);
 
-  //configurePrompts(server);
+  // removing prompts untill further notice
+  // configurePrompts(server);
 
   configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
 
