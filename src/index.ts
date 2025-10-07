@@ -16,12 +16,18 @@ import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
+import { createHttpServer } from "./http-server.js";
+import { configurePrompts } from "prompts.js";
 
 function isGitHubCodespaceEnv(): boolean {
   return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
 }
 
 const defaultAuthenticationType = isGitHubCodespaceEnv() ? "azcli" : "interactive";
+
+// Detect transport mode from environment variable
+const transportMode = process.env.MCP_TRANSPORT || "stdio";
+const httpPort = parseInt(process.env.PORT || "3000", 10);
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
@@ -77,25 +83,56 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
-  const server = new McpServer({
-    name: "Azure DevOps MCP Server",
-    version: packageVersion,
-  });
+  console.log(`🚀 Starting Azure DevOps MCP Server v${packageVersion}`);
+  console.log(`📡 Transport mode: ${transportMode}`);
+  console.log(`🏢 Organization: ${orgName}`);
 
-  const userAgentComposer = new UserAgentComposer(packageVersion);
-  server.server.oninitialized = () => {
-    userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
-  };
-  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
+  if (transportMode === "http") {
+    // HTTP mode - for Copilot Studio and web clients
+    console.log(`🌐 Starting HTTP server on port ${httpPort}...`);
 
-  // removing prompts untill further notice
-  // configurePrompts(server);
+    await createHttpServer({
+      port: httpPort,
+      orgName,
+      authenticationType: argv.authentication,
+      tenantId: argv.tenant,
+      domains: argv.domains,
+    });
 
-  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
+    // Keep process alive
+    process.on("SIGTERM", () => {
+      console.log("\n👋 Received SIGTERM, shutting down gracefully...");
+      process.exit(0);
+    });
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+    process.on("SIGINT", () => {
+      console.log("\n👋 Received SIGINT, shutting down gracefully...");
+      process.exit(0);
+    });
+  } else {
+    // Stdio mode - for local MCP clients (Claude, VS Code, etc.)
+    console.log(`📟 Starting stdio server for local MCP clients...`);
+
+    const server = new McpServer({
+      name: "Azure DevOps MCP Server",
+      version: packageVersion,
+    });
+
+    const userAgentComposer = new UserAgentComposer(packageVersion);
+    server.server.oninitialized = () => {
+      userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
+    };
+    const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
+    const authenticator = createAuthenticator(argv.authentication, tenantId);
+
+    configurePrompts(server);
+
+    configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
+
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.log(`✅ Stdio server connected and ready`);
+  }
 }
 
 main().catch((error) => {
