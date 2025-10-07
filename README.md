@@ -7,8 +7,6 @@ Easily install the Azure DevOps MCP Server for VS Code or VS Code Insiders:
 
 This TypeScript project provides a **local** MCP server for Azure DevOps, enabling you to perform a wide range of Azure DevOps tasks directly from your code editor.
 
-> 🚨 **Public Preview:** This project is in public preview. Tools and features may change before general availability.
-
 ## 📄 Table of Contents
 
 1. [📺 Overview](#-overview)
@@ -95,7 +93,6 @@ Interact with these Azure DevOps services:
 - **repo_get_pull_request_by_id**: Get a pull request by its ID.
 - **repo_create_pull_request**: Create a new pull request.
 - **repo_create_branch**: Create a new branch in the repository.
-- **repo_update_pull_request_status**: Update the status of an existing pull request to active or abandoned.
 - **repo_update_pull_request**: Update various fields of an existing pull request (title, description, draft status, target branch).
 - **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
 - **repo_reply_to_comment**: Replies to a specific comment on a pull request.
@@ -137,6 +134,7 @@ Interact with these Azure DevOps services:
 - **wiki_list_wikis**: Retrieve a list of wikis for an organization or project.
 - **wiki_get_wiki**: Get the wiki by wikiIdentifier.
 - **wiki_list_pages**: Retrieve a list of wiki pages for a specific wiki and project.
+- **wiki_get_page**: Retrieve wiki page metadata by path.
 - **wiki_get_page_content**: Retrieve wiki page content by wikiIdentifier and path.
 - **wiki_create_or_update_page**: Create or update wiki pages with full content support.
 
