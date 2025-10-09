@@ -331,9 +331,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
 
       const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+      const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
       };
     }
   );
