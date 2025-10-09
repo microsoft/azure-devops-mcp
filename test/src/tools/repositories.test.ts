@@ -425,6 +425,10 @@ describe("repos tools", () => {
 
       const mockCreatedPR = {
         pullRequestId: 456,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
         title: "New Feature",
         sourceRefName: "refs/heads/feature-branch",
         targetRefName: "refs/heads/main",
@@ -463,7 +467,13 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_create_pull_request tool not registered");
       const [, , , handler] = call;
 
-      const mockCreatedPR = { pullRequestId: 456 };
+      const mockCreatedPR = {
+        pullRequestId: 456,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+      };
       mockGitApi.createPullRequest.mockResolvedValue(mockCreatedPR);
 
       const params = {
@@ -2956,10 +2966,15 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_create_pull_request tool not registered");
       const [, , , handler] = call;
 
-      const mockPR = { pullRequestId: 123, title: "Test PR" };
-      mockGitApi.createPullRequest.mockResolvedValue(mockPR);
-
-      const params = {
+      const mockPR = {
+        pullRequestId: 123,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        title: "Test PR",
+      };
+      mockGitApi.createPullRequest.mockResolvedValue(mockPR);      const params = {
         repositoryId: "repo123",
         sourceRefName: "refs/heads/feature",
         targetRefName: "refs/heads/main",
