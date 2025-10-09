@@ -90,9 +90,19 @@ describe("repos tools", () => {
 
       const mockUpdatedPR = {
         pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
         title: "Updated Title",
         description: "Updated Description",
         isDraft: true,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
       };
       mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
@@ -118,7 +128,23 @@ describe("repos tools", () => {
         123
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: "test-repo",
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Updated Title",
+        description: "Updated Description",
+        isDraft: true,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
     it("should update pull request with only title", async () => {
@@ -129,7 +155,21 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_update_pull_request tool not registered");
       const [, , , handler] = call;
 
-      const mockUpdatedPR = { pullRequestId: 123, title: "New Title" };
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "New Title",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
       mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
       const params = {
@@ -148,7 +188,23 @@ describe("repos tools", () => {
         123
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: "test-repo",
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "New Title",
+        description: "",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
     it("should update pull request status to Active", async () => {
@@ -159,7 +215,21 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_update_pull_request tool not registered");
       const [, , , handler] = call;
 
-      const mockUpdatedPR = { pullRequestId: 123, status: PullRequestStatus.Active };
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
       mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
       const params = {
@@ -178,7 +248,23 @@ describe("repos tools", () => {
         123
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: "test-repo",
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        description: "",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
     it("should update pull request status to Abandoned", async () => {
@@ -189,7 +275,21 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_update_pull_request tool not registered");
       const [, , , handler] = call;
 
-      const mockUpdatedPR = { pullRequestId: 123, status: PullRequestStatus.Abandoned };
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Abandoned,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
       mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
       const params = {
@@ -208,7 +308,23 @@ describe("repos tools", () => {
         123
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: "test-repo",
+        status: PullRequestStatus.Abandoned,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        description: "",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
     it("should update pull request with status and other fields", async () => {
@@ -221,8 +337,18 @@ describe("repos tools", () => {
 
       const mockUpdatedPR = {
         pullRequestId: 123,
-        title: "Updated Title",
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
         status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Updated Title",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
       };
       mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
@@ -244,7 +370,23 @@ describe("repos tools", () => {
         123
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockUpdatedPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: "test-repo",
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Updated Title",
+        description: "",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
     it("should return error when no fields provided", async () => {
@@ -363,6 +505,23 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_update_pull_request tool not registered");
       const [, , , handler] = call;
 
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
       const params = {
         repositoryId: "test-repo-id",
         pullRequestId: 123,
@@ -390,6 +549,23 @@ describe("repos tools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
       if (!call) throw new Error("repo_update_pull_request tool not registered");
       const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
 
       const params = {
         repositoryId: "test-repo-id",
@@ -425,7 +601,16 @@ describe("repos tools", () => {
 
       const mockCreatedPR = {
         pullRequestId: 456,
+        codeReviewId: 456,
+        repository: { name: "test-repo" },
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
         title: "New Feature",
+        isDraft: false,
         sourceRefName: "refs/heads/feature-branch",
         targetRefName: "refs/heads/main",
       };
@@ -453,7 +638,23 @@ describe("repos tools", () => {
         "repo123"
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockCreatedPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 456,
+        codeReviewId: 456,
+        repository: "test-repo",
+        status: 1,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "New Feature",
+        description: "",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
     it("should create pull request with all optional fields", async () => {
@@ -463,7 +664,22 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_create_pull_request tool not registered");
       const [, , , handler] = call;
 
-      const mockCreatedPR = { pullRequestId: 456 };
+      const mockCreatedPR = {
+        pullRequestId: 456,
+        codeReviewId: 456,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "New Feature",
+        description: "This is a new feature",
+        isDraft: true,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
       mockGitApi.createPullRequest.mockResolvedValue(mockCreatedPR);
 
       const params = {
@@ -496,7 +712,23 @@ describe("repos tools", () => {
         "repo123"
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockCreatedPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 456,
+        codeReviewId: 456,
+        repository: "test-repo",
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "New Feature",
+        description: "This is a new feature",
+        isDraft: true,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
   });
 
@@ -934,7 +1166,7 @@ describe("repos tools", () => {
 
       const parsedResult = JSON.parse(result.content[0].text);
       expect(parsedResult).toHaveLength(2);
-      expect(parsedResult.map((r: any) => r.name).sort()).toEqual(["frontend-app", "frontend-web"]);
+      expect(parsedResult.map((r: { name: string }) => r.name).sort()).toEqual(["frontend-app", "frontend-web"]);
     });
   });
 
@@ -2956,9 +3188,23 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_create_pull_request tool not registered");
       const [, , , handler] = call;
 
-      const mockPR = { pullRequestId: 123, title: "Test PR" };
+      const mockPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        description: "",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
       mockGitApi.createPullRequest.mockResolvedValue(mockPR);
-
       const params = {
         repositoryId: "repo123",
         sourceRefName: "refs/heads/feature",
@@ -2984,7 +3230,23 @@ describe("repos tools", () => {
         "repo123"
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+      const expectedTrimmedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: "test-repo",
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        description: "",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
     it("should handle trimComments with undefined comments", async () => {

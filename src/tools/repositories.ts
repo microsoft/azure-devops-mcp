@@ -17,6 +17,8 @@ import {
   CommentThreadStatus,
   GitPullRequestCompletionOptions,
   GitPullRequestMergeStrategy,
+  GitPullRequest,
+  GitPullRequestCommentThread,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -52,6 +54,16 @@ function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) 
     .map((branch) => branch.replace("refs/heads/", ""))
     .sort((a, b) => b.localeCompare(a))
     .slice(0, top);
+}
+
+function trimPullRequestThread(thread: GitPullRequestCommentThread) {
+  return {
+    id: thread.id,
+    publishedDate: thread.publishedDate,
+    lastUpdatedDate: thread.lastUpdatedDate,
+    status: thread.status,
+    comments: trimComments(thread.comments),
+  };
 }
 
 /**
@@ -99,6 +111,25 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   return filteredByName;
 }
 
+function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
+  return {
+    pullRequestId: pr.pullRequestId,
+    codeReviewId: pr.codeReviewId,
+    repository: pr.repository?.name,
+    status: pr.status,
+    createdBy: {
+      displayName: pr.createdBy?.displayName,
+      uniqueName: pr.createdBy?.uniqueName,
+    },
+    creationDate: pr.creationDate,
+    title: pr.title,
+    ...(includeDescription ? { description: pr.description ?? "" } : {}),
+    isDraft: pr.isDraft,
+    sourceRefName: pr.sourceRefName,
+    targetRefName: pr.targetRefName,
+  };
+}
+
 function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     REPO_TOOLS.create_pull_request,
@@ -139,8 +170,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         repositoryId
       );
 
+      const trimmedPullRequest = trimPullRequest(pullRequest, true);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
       };
     }
   );
@@ -309,9 +342,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
 
       const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+      const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
       };
     }
   );
@@ -337,8 +371,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           pullRequestId
         );
 
+        const trimmedResponse = updatedPullRequest.map((item) => ({
+          displayName: item.displayName,
+          id: item.id,
+          uniqueName: item.uniqueName,
+          vote: item.vote,
+          hasDeclined: item.hasDeclined,
+          isFlagged: item.isFlagged,
+        }));
+
         return {
-          content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }],
         };
       } else {
         for (const reviewerId of reviewerIds) {
@@ -484,21 +527,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         top
       );
 
-      // Filter out the irrelevant properties
-      const filteredPullRequests = pullRequests?.map((pr) => ({
-        pullRequestId: pr.pullRequestId,
-        codeReviewId: pr.codeReviewId,
-        status: pr.status,
-        createdBy: {
-          displayName: pr.createdBy?.displayName,
-          uniqueName: pr.createdBy?.uniqueName,
-        },
-        creationDate: pr.creationDate,
-        title: pr.title,
-        isDraft: pr.isDraft,
-        sourceRefName: pr.sourceRefName,
-        targetRefName: pr.targetRefName,
-      }));
+      const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
 
       return {
         content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
@@ -600,22 +629,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         top
       );
 
-      // Filter out the irrelevant properties
-      const filteredPullRequests = pullRequests?.map((pr) => ({
-        pullRequestId: pr.pullRequestId,
-        codeReviewId: pr.codeReviewId,
-        repository: pr.repository?.name,
-        status: pr.status,
-        createdBy: {
-          displayName: pr.createdBy?.displayName,
-          uniqueName: pr.createdBy?.uniqueName,
-        },
-        creationDate: pr.creationDate,
-        title: pr.title,
-        isDraft: pr.isDraft,
-        sourceRefName: pr.sourceRefName,
-        targetRefName: pr.targetRefName,
-      }));
+      const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
 
       return {
         content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
@@ -651,13 +665,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
 
       // Return trimmed thread data focusing on essential information
-      const trimmedThreads = paginatedThreads?.map((thread) => ({
-        id: thread.id,
-        publishedDate: thread.publishedDate,
-        lastUpdatedDate: thread.lastUpdatedDate,
-        status: thread.status,
-        comments: trimComments(thread.comments),
-      }));
+      const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
 
       return {
         content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
@@ -934,8 +942,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         project
       );
 
+      const trimmedThread = trimPullRequestThread(thread);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
       };
     }
   );
