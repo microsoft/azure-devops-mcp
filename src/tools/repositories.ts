@@ -18,6 +18,7 @@ import {
   GitPullRequestCompletionOptions,
   GitPullRequestMergeStrategy,
   GitPullRequest,
+  GitPullRequestCommentThread,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -53,6 +54,16 @@ function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) 
     .map((branch) => branch.replace("refs/heads/", ""))
     .sort((a, b) => b.localeCompare(a))
     .slice(0, top);
+}
+
+function trimPullRequestThread(thread: GitPullRequestCommentThread) {
+  return {
+    id: thread.id,
+    publishedDate: thread.publishedDate,
+    lastUpdatedDate: thread.lastUpdatedDate,
+    status: thread.status,
+    comments: trimComments(thread.comments),
+  };
 }
 
 /**
@@ -655,13 +666,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
 
       // Return trimmed thread data focusing on essential information
-      const trimmedThreads = paginatedThreads?.map((thread) => ({
-        id: thread.id,
-        publishedDate: thread.publishedDate,
-        lastUpdatedDate: thread.lastUpdatedDate,
-        status: thread.status,
-        comments: trimComments(thread.comments),
-      }));
+      const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
 
       return {
         content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
@@ -938,8 +943,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         project
       );
 
+      const trimmedThread = trimPullRequestThread(thread);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
       };
     }
   );
