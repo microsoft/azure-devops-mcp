@@ -17,6 +17,7 @@ import {
   CommentThreadStatus,
   GitPullRequestCompletionOptions,
   GitPullRequestMergeStrategy,
+  GitPullRequest,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -99,6 +100,25 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   return filteredByName;
 }
 
+function trimPullRequest(pr: GitPullRequest) {
+  return {
+    pullRequestId: pr.pullRequestId,
+    codeReviewId: pr.codeReviewId,
+    repository: pr.repository?.name,
+    status: pr.status,
+    createdBy: {
+      displayName: pr.createdBy?.displayName,
+      uniqueName: pr.createdBy?.uniqueName,
+    },
+    creationDate: pr.creationDate,
+    title: pr.title,
+    isDraft: pr.isDraft,
+    sourceRefName: pr.sourceRefName,
+    targetRefName: pr.targetRefName,
+  };
+}
+
+
 function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     REPO_TOOLS.create_pull_request,
@@ -139,8 +159,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         repositoryId
       );
 
+      const trimmedPullRequest = trimPullRequest(pullRequest);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
       };
     }
   );
@@ -484,21 +506,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         top
       );
 
-      // Filter out the irrelevant properties
-      const filteredPullRequests = pullRequests?.map((pr) => ({
-        pullRequestId: pr.pullRequestId,
-        codeReviewId: pr.codeReviewId,
-        status: pr.status,
-        createdBy: {
-          displayName: pr.createdBy?.displayName,
-          uniqueName: pr.createdBy?.uniqueName,
-        },
-        creationDate: pr.creationDate,
-        title: pr.title,
-        isDraft: pr.isDraft,
-        sourceRefName: pr.sourceRefName,
-        targetRefName: pr.targetRefName,
-      }));
+      const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
 
       return {
         content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
@@ -600,22 +608,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         top
       );
 
-      // Filter out the irrelevant properties
-      const filteredPullRequests = pullRequests?.map((pr) => ({
-        pullRequestId: pr.pullRequestId,
-        codeReviewId: pr.codeReviewId,
-        repository: pr.repository?.name,
-        status: pr.status,
-        createdBy: {
-          displayName: pr.createdBy?.displayName,
-          uniqueName: pr.createdBy?.uniqueName,
-        },
-        creationDate: pr.creationDate,
-        title: pr.title,
-        isDraft: pr.isDraft,
-        sourceRefName: pr.sourceRefName,
-        targetRefName: pr.targetRefName,
-      }));
+      const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
 
       return {
         content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
