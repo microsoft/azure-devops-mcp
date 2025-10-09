@@ -361,8 +361,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           pullRequestId
         );
 
+        const trimmedResponse = updatedPullRequest.map((item) => ({
+          displayName: item.displayName,
+          id: item.id,
+          uniqueName: item.uniqueName,
+          vote: item.vote,
+          hasDeclined: item.hasDeclined,
+          isFlagged: item.isFlagged,
+        }));
+
         return {
-          content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }],
         };
       } else {
         for (const reviewerId of reviewerIds) {
