@@ -542,11 +542,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           project, // project
           undefined, // maxCommentLength
           skip,
-        top
-      );
-    }
-    else if(project)
-      {
+          top
+        );
+      } else if (project) {
         // If only project is provided, use getPullRequestsByProject
         pullRequests = await gitApi.getPullRequestsByProject(
           project,
@@ -555,8 +553,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           skip,
           top
         );
-      }
-      else{
+      } else {
         // This case should not occur due to earlier validation, but added for completeness
         return {
           content: [
