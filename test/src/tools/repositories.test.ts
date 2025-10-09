@@ -3204,7 +3204,8 @@ describe("repos tools", () => {
         sourceRefName: "refs/heads/feature",
         targetRefName: "refs/heads/main",
       };
-      mockGitApi.createPullRequest.mockResolvedValue(mockPR);      const params = {
+      mockGitApi.createPullRequest.mockResolvedValue(mockPR);
+      const params = {
         repositoryId: "repo123",
         sourceRefName: "refs/heads/feature",
         targetRefName: "refs/heads/main",

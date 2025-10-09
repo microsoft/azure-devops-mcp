@@ -130,7 +130,6 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
   };
 }
 
-
 function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     REPO_TOOLS.create_pull_request,
