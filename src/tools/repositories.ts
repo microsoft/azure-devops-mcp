@@ -100,7 +100,7 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   return filteredByName;
 }
 
-function trimPullRequest(pr: GitPullRequest) {
+function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
   return {
     pullRequestId: pr.pullRequestId,
     codeReviewId: pr.codeReviewId,
@@ -112,6 +112,7 @@ function trimPullRequest(pr: GitPullRequest) {
     },
     creationDate: pr.creationDate,
     title: pr.title,
+    ...(includeDescription ? { description: pr.description ?? "" } : {}),
     isDraft: pr.isDraft,
     sourceRefName: pr.sourceRefName,
     targetRefName: pr.targetRefName,
@@ -159,7 +160,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         repositoryId
       );
 
-      const trimmedPullRequest = trimPullRequest(pullRequest);
+      const trimmedPullRequest = trimPullRequest(pullRequest, true);
 
       return {
         content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
@@ -331,7 +332,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
 
       const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
-      const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest);
+      const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
 
       return {
         content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
