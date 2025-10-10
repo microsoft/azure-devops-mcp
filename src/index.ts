@@ -83,8 +83,8 @@ async function main() {
     icons: [
       {
         src: "https://cdn.vsassets.io/content/icons/favicon.ico",
-      }
-    ]
+      },
+    ],
   });
 
   const userAgentComposer = new UserAgentComposer(packageVersion);
