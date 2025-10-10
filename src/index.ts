@@ -80,6 +80,11 @@ async function main() {
   const server = new McpServer({
     name: "Azure DevOps MCP Server",
     version: packageVersion,
+    icons: [
+      {
+        src: "https://cdn.vsassets.io/content/icons/favicon.ico",
+      },
+    ],
   });
 
   const userAgentComposer = new UserAgentComposer(packageVersion);
