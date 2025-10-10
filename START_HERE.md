@@ -8,7 +8,7 @@
 
 **Project**: Azure DevOps MCP Server for Copilot Studio  
 **Last Updated**: October 10, 2025  
-**Current Phase**: Phase 2 (Docker Containerization) - Ready to Start
+**Current Phase**: Phase 3 (Azure Container Apps Deployment) - Ready to Start
 
 ---
 
@@ -38,7 +38,8 @@
 
 - [CAPACITES_ACTUELLES.md](./CAPACITES_ACTUELLES.md) - Phase 0 results
 - [PHASE1_COMPLETE.md](./PHASE1_COMPLETE.md) - Phase 1 results
-- [VALIDATION_REPORT.md](./VALIDATION_REPORT.md) - Validation results
+- [VALIDATION_REPORT.md](./VALIDATION_REPORT.md) - Phase 1 validation
+- [PHASE2_COMPLETE.md](./PHASE2_COMPLETE.md) - Phase 2 results (Docker)
 
 ---
 
@@ -49,50 +50,60 @@
 | **Phase 0**: Validation     | ✅ Complete | [CAPACITES_ACTUELLES.md](./CAPACITES_ACTUELLES.md) |
 | **Phase 1**: HTTP Transport | ✅ Complete | [PHASE1_COMPLETE.md](./PHASE1_COMPLETE.md)         |
 | **Phase 1.1**: Validation   | ✅ Complete | [VALIDATION_REPORT.md](./VALIDATION_REPORT.md)     |
+| **Phase 2**: Docker         | ✅ Complete | [PHASE2_COMPLETE.md](./PHASE2_COMPLETE.md)         |
 
 **Summary**:
 
 - ✅ Server validated and working
 - ✅ HTTP transport implemented
 - ✅ All endpoints tested (5/5 passing)
-- ✅ Ready for Docker containerization
+- ✅ Docker image created and tested (321 MB)
+- ✅ Container runs successfully with health checks
+- ✅ Ready for Azure deployment
 
 ---
 
-## 🎯 Next Step: Phase 2 (Docker Containerization)
+## 🎯 Next Step: Phase 3 (Azure Container Apps Deployment)
 
 **Status**: ⏳ Ready to Start  
-**Estimated Duration**: 1-2 days
+**Estimated Duration**: 3-4 days
 
 ### What Needs to Be Done:
 
-1. **Create Dockerfile**
-   - Multi-stage build (builder + runtime)
-   - Node.js 22 Alpine base image
-   - Optimized for production
+1. **Create Azure Container Registry (ACR)**
+   - Set up resource group
+   - Create ACR instance
+   - Configure authentication
 
-2. **Create .dockerignore**
-   - Exclude unnecessary files
-   - Minimize image size
+2. **Push Docker Image to ACR**
+   - Tag local image for ACR
+   - Push image to registry
+   - Verify image in ACR
 
-3. **Build and Test**
-   - Build Docker image locally
-   - Test container startup
-   - Validate all endpoints work in container
-   - Test environment variables
+3. **Create Container Apps Environment**
+   - Set up Container Apps environment
+   - Configure networking
+   - Set up monitoring
 
-4. **Document Results**
-   - Create `PHASE2_COMPLETE.md`
+4. **Deploy Container App**
+   - Deploy from ACR image
+   - Configure ingress (HTTPS)
+   - Set environment variables
+   - Configure scaling rules
+   - Test public endpoint
+
+5. **Document Results**
+   - Create `PHASE3_COMPLETE.md`
    - Update `PHASES_PROGRESS.md`
-   - Document any issues encountered
+   - Document configuration and URLs
 
 ### Detailed Instructions:
 
-See **[PHASES_PROGRESS.md - Phase 2](./PHASES_PROGRESS.md#phase-2-docker-containerization-)** for:
+See **[PHASES_PROGRESS.md - Phase 3](./PHASES_PROGRESS.md#phase-3-azure-container-apps-deployment-)** for:
 
 - Complete task checklist
-- Dockerfile template
-- Build commands
+- Azure CLI commands
+- Configuration templates
 - Testing procedures
 - Success criteria
 
@@ -161,6 +172,11 @@ npm run build
 
 # Test endpoints
 .\test-http-server.ps1
+
+# Docker commands (Phase 2 complete)
+docker build -t azure-devops-mcp:latest .
+docker run -d -p 3000:3000 --name azure-devops-mcp-server azure-devops-mcp:latest
+.\test-docker-container.ps1
 ```
 
 ### Git Repository:
@@ -175,13 +191,13 @@ npm run build
 
 When starting a new chat:
 
-1. **Mention the current phase**: "I'm working on Phase 2 (Docker)"
+1. **Mention the current phase**: "I'm working on Phase 3 (Azure Deployment)"
 2. **Reference the progress doc**: "I've read PHASES_PROGRESS.md"
-3. **Be specific**: "I need help creating the Dockerfile"
+3. **Be specific**: "I need help creating the Azure Container Registry"
 
 Example prompt:
 
-> "I'm starting Phase 2 (Docker Containerization) of the Azure DevOps MCP project. I've reviewed PHASES_PROGRESS.md and PLAN_AZURE_DEPLOYMENT.md. Can you help me create the Dockerfile following the multi-stage build pattern described in the plan?"
+> "I'm starting Phase 3 (Azure Container Apps Deployment) of the Azure DevOps MCP project. I've reviewed PHASES_PROGRESS.md and PLAN_AZURE_DEPLOYMENT.md. Phase 2 is complete with a Docker image ready (321MB). Can you help me create the Azure Container Registry and push the image?"
 
 ---
 
@@ -213,23 +229,28 @@ When you complete a phase:
 - 📊 **Progress**: [PHASES_PROGRESS.md](./PHASES_PROGRESS.md)
 - 📋 **Plan**: [PLAN_AZURE_DEPLOYMENT.md](./PLAN_AZURE_DEPLOYMENT.md)
 - 📖 **README**: [README.md](./README.md)
-- 🧪 **Tests**: `.\test-http-server.ps1`
-- 🚀 **Start Server**: `.\start-http-server.ps1`
+- 🧪 **HTTP Tests**: `.\test-http-server.ps1`
+- � **Docker Tests**: `.\test-docker-container.ps1`
+- �🚀 **Start Server**: `.\start-http-server.ps1`
+- 📦 **Docker Commands**: [DOCKER_COMMANDS.md](./DOCKER_COMMANDS.md)
 
 ---
 
-## ✨ Success Criteria for Phase 2
+## ✨ Success Criteria for Phase 3
 
-You'll know Phase 2 is complete when:
+You'll know Phase 3 is complete when:
 
-- ✅ Dockerfile created and builds successfully
-- ✅ Docker image size < 200MB
-- ✅ Container starts without errors
-- ✅ All HTTP endpoints work in container
-- ✅ Environment variables functional
-- ✅ `PHASE2_COMPLETE.md` created
+- ✅ Azure Container Registry created
+- ✅ Docker image pushed to ACR successfully
+- ✅ Container Apps environment created
+- ✅ Container app deployed and running
+- ✅ Public HTTPS URL accessible
+- ✅ Health check returns 200 OK
+- ✅ All MCP endpoints functional via HTTPS
+- ✅ Managed Identity configured
+- ✅ `PHASE3_COMPLETE.md` created
 - ✅ `PHASES_PROGRESS.md` updated
 
 ---
 
-**Ready to start? Open [PHASES_PROGRESS.md](./PHASES_PROGRESS.md) and dive into Phase 2!** 🚀
+**Ready to start? Open [PHASES_PROGRESS.md](./PHASES_PROGRESS.md) and dive into Phase 3!** 🚀
