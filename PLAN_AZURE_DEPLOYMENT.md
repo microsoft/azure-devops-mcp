@@ -1,8 +1,16 @@
 # Plan de Déploiement Azure - MCP Server Azure DevOps pour Copilot Studio
 
+> **📊 Suivi des Progrès**: Voir [PHASES_PROGRESS.md](./PHASES_PROGRESS.md) pour le statut actuel de chaque phase et les tâches complétées.
+
 ## 📋 Vue d'ensemble
 
 Ce plan détaille la transformation du serveur MCP Azure DevOps en service hébergé sur Azure, accessible via Copilot Studio avec authentification par utilisateur.
+
+**Statut Actuel** (Octobre 10, 2025):
+
+- ✅ **Phase 0**: Validation Initiale - COMPLÉTÉE
+- ✅ **Phase 1**: HTTP Transport - COMPLÉTÉE
+- ⏳ **Phase 2**: Conteneurisation Docker - PRÊTE À DÉMARRER
 
 ## 🎯 Objectifs
 
@@ -19,9 +27,10 @@ Ce plan détaille la transformation du serveur MCP Azure DevOps en service hébe
 ### 1. Protocole d'Authentification MCP avec Copilot Studio
 
 **Résultats clés:**
+
 - Copilot Studio supporte **OAuth 2.0** et **API Key** pour l'authentification MCP
 - Le transport **Streamable HTTP** est recommandé (SSE sera déprécié en août 2025)
-- Flux d'authentification: 
+- Flux d'authentification:
   - **Server URL** → URL du serveur MCP sur Azure
   - **OAuth 2.0 flow** → Authorization Code Grant pour déléguer l'identité utilisateur
   - **Token endpoint** → Pour échanger le code d'autorisation contre un access token
@@ -29,16 +38,19 @@ Ce plan détaille la transformation du serveur MCP Azure DevOps en service hébe
 **⚠️ Clarification Importante : OAuth 2.0 vs Entra ID**
 
 **OAuth 2.0** et **Microsoft Entra ID** ne sont PAS des alternatives :
+
 - **OAuth 2.0** = Le **protocole d'autorisation** (comment faire l'échange de tokens)
 - **Microsoft Entra ID** = Le **fournisseur d'identité** (qui authentifie et génère les tokens)
 
 **Nous utilisons OAuth 2.0 AVEC Entra ID** :
+
 - OAuth 2.0 définit les endpoints (`/authorize`, `/token`)
 - Entra ID héberge ces endpoints et authentifie les utilisateurs
 - Azure DevOps accepte **uniquement** les tokens Entra ID
 - C'est la seule façon de préserver l'identité utilisateur jusqu'à Azure DevOps
 
 **Configuration Copilot Studio:**
+
 ```yaml
 # Le PROTOCOLE utilisé
 Authentication Type: OAuth 2.0
@@ -59,6 +71,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 ### 2. Service Azure Recommandé: Azure Container Apps
 
 **Pourquoi Container Apps?**
+
 - ✅ **Serverless natif** avec scale-to-zero pour optimiser les coûts
 - ✅ **Support Node.js** via containers personnalisés
 - ✅ **VNet integration** pour sécurité réseau
@@ -68,6 +81,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 - ✅ **OAuth 2.0 intégré** dans l'infrastructure
 
 **Alternatives considérées:**
+
 - ❌ **Azure Functions**: Moins flexible pour MCP (timeouts, limitations HTTP)
 - ❌ **App Service**: Plus coûteux, toujours actif (pas de scale-to-zero)
 - ✅ **Container Apps**: Idéal pour serveurs MCP avec trafic intermittent
@@ -75,6 +89,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 ### 3. Code Actuel - Points d'Attention
 
 **Architecture actuelle:**
+
 - **Transport**: `StdioServerTransport` (stdio) → **À REMPLACER** par HTTP/SSE
 - **Authentification**: 3 modes (`interactive`, `azcli`, `env`)
   - `interactive`: OAuth avec MSAL (browser-based)
@@ -84,6 +99,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 - **Client Azure DevOps**: Créé avec bearer token
 
 **Changements nécessaires:**
+
 1. ⚠️ **Remplacer stdio par HTTP transport** (Streamable)
 2. ⚠️ **Implémenter endpoint OAuth 2.0** pour Copilot Studio
 3. ⚠️ **Gérer tokens utilisateur** (pas seulement le token du serveur)
@@ -136,7 +152,9 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 **Objectif:** Valider que le serveur MCP fonctionne correctement en local
 
 #### Tâches:
+
 1. **Tester le serveur localement avec stdio**
+
    ```bash
    npm install
    npm run build
@@ -154,6 +172,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    - Permissions Azure DevOps nécessaires
 
 **Critères de succès:**
+
 - ✅ Le serveur démarre sans erreur
 - ✅ L'authentification interactive fonctionne
 - ✅ Les tools répondent correctement
@@ -166,7 +185,9 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 **Objectif:** Remplacer stdio par Streamable HTTP pour compatibilité Copilot Studio
 
 #### Tâches:
+
 1. **Ajouter dépendances HTTP**
+
    ```bash
    npm install express @types/express
    npm install @modelcontextprotocol/sdk # version avec HTTP support
@@ -194,6 +215,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    ```
 
 **Critères de succès:**
+
 - ✅ Le serveur écoute sur HTTP (port 3000)
 - ✅ Les endpoints MCP répondent en HTTP
 - ✅ L'authentification OAuth fonctionne en local
@@ -206,7 +228,9 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 **Objectif:** Créer une image Docker pour déploiement sur Azure
 
 #### Tâches:
+
 1. **Créer `Dockerfile`**
+
    ```dockerfile
    FROM node:20-alpine
    WORKDIR /app
@@ -220,6 +244,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    ```
 
 2. **Créer `.dockerignore`**
+
    ```
    node_modules
    .env
@@ -229,6 +254,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    ```
 
 3. **Tester l'image localement**
+
    ```bash
    docker build -t azure-devops-mcp:test .
    docker run -p 8080:8080 \
@@ -242,6 +268,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    - Security scanning (npm audit)
 
 **Critères de succès:**
+
 - ✅ L'image Docker se construit sans erreur
 - ✅ Le conteneur démarre et écoute sur le port 8080
 - ✅ Les endpoints HTTP sont accessibles depuis l'hôte
@@ -254,13 +281,16 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 **Objectif:** Déployer le serveur MCP sur Azure Container Apps
 
 #### Tâches:
+
 1. **Créer Azure Container Registry (ACR)**
+
    ```bash
    az acr create --resource-group rg-mcp-devops \
      --name acrmcpdevops --sku Basic
    ```
 
 2. **Pousser l'image vers ACR**
+
    ```bash
    az acr login --name acrmcpdevops
    docker tag azure-devops-mcp:test acrmcpdevops.azurecr.io/mcp-devops:v1
@@ -274,6 +304,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    - Enable "Allow public client flows" → NO (confidential client)
 
 4. **Créer Container Apps Environment**
+
    ```bash
    az containerapp env create \
      --name env-mcp-devops \
@@ -282,6 +313,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    ```
 
 5. **Déployer Container App**
+
    ```bash
    az containerapp create \
      --name mcp-azuredevops-server \
@@ -299,6 +331,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    ```
 
 6. **Configurer Managed Identity** (optionnel, pour accès Key Vault)
+
    ```bash
    az containerapp identity assign \
      --name mcp-azuredevops-server \
@@ -312,6 +345,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    ```
 
 **Critères de succès:**
+
 - ✅ Le Container App est déployé et en cours d'exécution
 - ✅ L'URL publique est accessible
 - ✅ Le scaling fonctionne (scale-to-zero après inactivité)
@@ -324,6 +358,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 **Objectif:** Connecter Copilot Studio au serveur MCP hébergé
 
 #### Tâches:
+
 1. **Ouvrir Copilot Studio** → Créer ou ouvrir un agent
 
 2. **Ajouter le serveur MCP via l'assistant**
@@ -352,6 +387,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    - Confirmer que l'agent accède aux projets de l'utilisateur connecté
 
 **Critères de succès:**
+
 - ✅ Copilot Studio se connecte au serveur MCP
 - ✅ Les tools sont découverts automatiquement
 - ✅ L'authentification OAuth fonctionne (consent screen)
@@ -365,6 +401,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 **Objectif:** Valider le système end-to-end avec différents scénarios
 
 #### Scénarios de test:
+
 1. **Test multi-utilisateurs**
    - Utilisateur A avec projets X, Y
    - Utilisateur B avec projets Z
@@ -391,6 +428,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    - Vérifier les messages d'erreur appropriés
 
 **Critères de succès:**
+
 - ✅ Tous les scénarios passent sans erreur
 - ✅ Les performances sont acceptables (<2s par requête)
 - ✅ La sécurité est garantie (pas d'accès non autorisé)
@@ -403,6 +441,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 **Objectif:** Préparer pour la production et documenter
 
 #### Tâches:
+
 1. **Activer monitoring et alertes**
    - Azure Application Insights
    - Alertes sur erreurs HTTP 500
@@ -423,6 +462,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
    - Runbook pour incidents
 
 **Critères de succès:**
+
 - ✅ Monitoring actif et alertes configurées
 - ✅ Documentation complète et accessible
 - ✅ Procédures de support en place
@@ -431,15 +471,15 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 
 ## 📊 Estimation Globale
 
-| Phase | Durée | Complexité | Priorité |
-|-------|-------|------------|----------|
-| Phase 0: Validation | 1-2 jours | ⭐ Facile | 🔴 Critique |
-| Phase 1: HTTP Transport | 3-5 jours | ⭐⭐⭐ Moyen | 🔴 Critique |
-| Phase 2: Conteneurisation | 2-3 jours | ⭐⭐ Facile | 🔴 Critique |
-| Phase 3: Déploiement Azure | 3-4 jours | ⭐⭐ Moyen | 🔴 Critique |
-| Phase 4: Copilot Studio | 2-3 jours | ⭐⭐⭐ Moyen | 🔴 Critique |
-| Phase 5: Tests | 2-3 jours | ⭐⭐ Moyen | 🟡 Important |
-| Phase 6: Production | 1-2 jours | ⭐ Facile | 🟡 Important |
+| Phase                      | Durée     | Complexité   | Priorité     |
+| -------------------------- | --------- | ------------ | ------------ |
+| Phase 0: Validation        | 1-2 jours | ⭐ Facile    | 🔴 Critique  |
+| Phase 1: HTTP Transport    | 3-5 jours | ⭐⭐⭐ Moyen | 🔴 Critique  |
+| Phase 2: Conteneurisation  | 2-3 jours | ⭐⭐ Facile  | 🔴 Critique  |
+| Phase 3: Déploiement Azure | 3-4 jours | ⭐⭐ Moyen   | 🔴 Critique  |
+| Phase 4: Copilot Studio    | 2-3 jours | ⭐⭐⭐ Moyen | 🔴 Critique  |
+| Phase 5: Tests             | 2-3 jours | ⭐⭐ Moyen   | 🟡 Important |
+| Phase 6: Production        | 1-2 jours | ⭐ Facile    | 🟡 Important |
 
 **Total: 14-22 jours** (3-4 semaines)
 
@@ -448,18 +488,21 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 ## 🔐 Considérations de Sécurité
 
 ### Tokens et Secrets
+
 - ✅ **Client Secret** stocké dans Azure Key Vault (référencé par Container App)
 - ✅ **User tokens** jamais loggés ou persistés
 - ✅ **HTTPS uniquement** (pas de HTTP en production)
 - ✅ **Token rotation** automatique via refresh tokens
 
 ### Isolation des Données
+
 - ✅ Chaque requête inclut le token utilisateur
 - ✅ Azure DevOps API applique les permissions natives
 - ✅ Pas de cache partagé entre utilisateurs
 - ✅ Logs anonymisés (pas de PII)
 
 ### Conformité
+
 - ✅ **GDPR**: Pas de stockage de données utilisateur
 - ✅ **Azure Security**: Managed Identity, VNet, NSG si nécessaire
 - ✅ **Audit**: Logs Azure Monitor pour toutes les requêtes
@@ -469,6 +512,7 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 ## 💰 Estimation des Coûts Azure
 
 ### Services utilisés:
+
 1. **Azure Container Apps** (Consumption plan)
    - Scale-to-zero: gratuit quand inactif
    - Active: ~$0.000024/vCPU-second + $0.000004/GB-second
@@ -488,12 +532,14 @@ Scopes: 499b84ac-1321-427f-aa17-267ca6975798/.default offline_access
 ## 🎓 Ressources et Références
 
 ### Documentation officielle:
+
 - [MCP Specification](https://modelcontextprotocol.io/specification)
 - [Copilot Studio MCP Integration](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp)
 - [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/)
 - [Azure DevOps OAuth 2.0](https://learn.microsoft.com/en-us/azure/devops/integrate/get-started/authentication/oauth)
 
 ### Exemples de code:
+
 - [MCP for Beginners](https://github.com/microsoft/mcp-for-beginners)
 - [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 
@@ -513,12 +559,38 @@ Avant de commencer, assurez-vous d'avoir:
 
 ---
 
-## 🚀 Prochaines Étapes Immédiates
+## 🚀 Prochaines Étapes & Suivi des Progrès
 
-1. **Valider le serveur MCP local** (Phase 0)
-2. **Décision d'architecture**: Confirmer Azure Container Apps
-3. **Créer App Registration** dans Azure AD
-4. **Commencer Phase 1**: Transformation HTTP transport
+### 📊 Document de Suivi Principal
+
+**Voir [PHASES_PROGRESS.md](./PHASES_PROGRESS.md)** pour:
+
+- Statut en temps réel de chaque phase
+- Tâches complétées et en cours
+- Documentation de chaque phase
+- Instructions pour démarrer la prochaine phase
+- Historique complet du projet
+
+### Prochaines Actions Immédiates (Phase 2)
+
+Phase 2 est **PRÊTE À DÉMARRER**. Pour commencer:
+
+1. **Lire le suivi**: Consulter [PHASES_PROGRESS.md](./PHASES_PROGRESS.md)
+2. **Créer Dockerfile**: Suivre les instructions de la Phase 2 ci-dessus
+3. **Tester localement**: Build et test du container
+4. **Documenter**: Créer `PHASE2_COMPLETE.md` quand terminé
+5. **Mettre à jour**: Modifier `PHASES_PROGRESS.md` avec les résultats
+
+### Documents Complétés
+
+- ✅ [CAPACITES_ACTUELLES.md](./CAPACITES_ACTUELLES.md) - Phase 0 completion
+- ✅ [PHASE1_COMPLETE.md](./PHASE1_COMPLETE.md) - Phase 1 completion
+- ✅ [VALIDATION_REPORT.md](./VALIDATION_REPORT.md) - Phase 0 & 1 validation
+
+---
+
+**Note pour les nouvelles sessions de travail:**  
+Commencez toujours par lire [PHASES_PROGRESS.md](./PHASES_PROGRESS.md) pour comprendre l'état actuel du projet et les tâches à effectuer.
 
 ---
 

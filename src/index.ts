@@ -11,13 +11,12 @@ import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
 import { getOrgTenant } from "./org-tenants.js";
-//import { configurePrompts } from "./prompts.js";
+import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
 import { createHttpServer } from "./http-server.js";
-import { configurePrompts } from "prompts.js";
 
 function isGitHubCodespaceEnv(): boolean {
   return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
