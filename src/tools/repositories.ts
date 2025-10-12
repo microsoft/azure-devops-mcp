@@ -131,9 +131,6 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
 }
 
 function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, isReadOnlyMode: boolean) {
-  const gitVersionTypeStrings = Object.values(GitVersionType).filter((value): value is string => typeof value === "string");
-  const pullRequestQueryTypesStrings = Object.values(GitPullRequestQueryType).filter((value): value is string => typeof value === "string");
-
   const registeredTools = [
     server.tool(
       REPO_TOOLS.create_pull_request,
@@ -978,121 +975,128 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
     ),
 
-    server.tool(
-      REPO_TOOLS.search_commits,
-      "Searches for commits in a repository",
-      {
-        project: z.string().describe("Project name or ID"),
-        repository: z.string().describe("Repository name or ID"),
-        fromCommit: z.string().optional().describe("Starting commit ID"),
-        toCommit: z.string().optional().describe("Ending commit ID"),
-        version: z.string().optional().describe("The name of the branch, tag or commit to filter commits by"),
-        versionType: z
-          .enum(gitVersionTypeStrings as [string, ...string[]])
-          .optional()
-          .default(GitVersionType[GitVersionType.Branch])
-          .describe("The meaning of the version parameter, e.g., branch, tag or commit"),
-        skip: z.number().optional().default(0).describe("Number of commits to skip"),
-        top: z.number().optional().default(10).describe("Maximum number of commits to return"),
-        includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
-        includeWorkItems: z.boolean().optional().default(false).describe("Include associated work items"),
-      },
-      {
-        readOnlyHint: true,
-      },
-      async ({ project, repository, fromCommit, toCommit, version, versionType, skip, top, includeLinks, includeWorkItems }) => {
-        try {
-          const connection = await connectionProvider();
-          const gitApi = await connection.getGitApi();
+    (() => {
+      const gitVersionTypeStrings = Object.values(GitVersionType).filter((value): value is string => typeof value === "string");
+      return server.tool(
+        REPO_TOOLS.search_commits,
+        "Searches for commits in a repository",
+        {
+          project: z.string().describe("Project name or ID"),
+          repository: z.string().describe("Repository name or ID"),
+          fromCommit: z.string().optional().describe("Starting commit ID"),
+          toCommit: z.string().optional().describe("Ending commit ID"),
+          version: z.string().optional().describe("The name of the branch, tag or commit to filter commits by"),
+          versionType: z
+            .enum(gitVersionTypeStrings as [string, ...string[]])
+            .optional()
+            .default(GitVersionType[GitVersionType.Branch])
+            .describe("The meaning of the version parameter, e.g., branch, tag or commit"),
+          skip: z.number().optional().default(0).describe("Number of commits to skip"),
+          top: z.number().optional().default(10).describe("Maximum number of commits to return"),
+          includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
+          includeWorkItems: z.boolean().optional().default(false).describe("Include associated work items"),
+        },
+        {
+          readOnlyHint: true,
+        },
+        async ({ project, repository, fromCommit, toCommit, version, versionType, skip, top, includeLinks, includeWorkItems }) => {
+          try {
+            const connection = await connectionProvider();
+            const gitApi = await connection.getGitApi();
 
-          const searchCriteria: GitQueryCommitsCriteria = {
-            fromCommitId: fromCommit,
-            toCommitId: toCommit,
-            includeLinks: includeLinks,
-            includeWorkItems: includeWorkItems,
-          };
-
-          if (version) {
-            const itemVersion: GitVersionDescriptor = {
-              version: version,
-              versionType: GitVersionType[versionType as keyof typeof GitVersionType],
+            const searchCriteria: GitQueryCommitsCriteria = {
+              fromCommitId: fromCommit,
+              toCommitId: toCommit,
+              includeLinks: includeLinks,
+              includeWorkItems: includeWorkItems,
             };
-            searchCriteria.itemVersion = itemVersion;
+
+            if (version) {
+              const itemVersion: GitVersionDescriptor = {
+                version: version,
+                versionType: GitVersionType[versionType as keyof typeof GitVersionType],
+              };
+              searchCriteria.itemVersion = itemVersion;
+            }
+
+            const commits = await gitApi.getCommits(
+              repository,
+              searchCriteria,
+              project,
+              skip, // skip
+              top
+            );
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(commits, null, 2) }],
+            };
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error searching commits: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            };
           }
-
-          const commits = await gitApi.getCommits(
-            repository,
-            searchCriteria,
-            project,
-            skip, // skip
-            top
-          );
-
-          return {
-            content: [{ type: "text", text: JSON.stringify(commits, null, 2) }],
-          };
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error searching commits: ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            isError: true,
-          };
         }
-      }
-    ),
+      );
+    })(),
 
-    server.tool(
-      REPO_TOOLS.list_pull_requests_by_commits,
-      "Lists pull requests by commit IDs to find which pull requests contain specific commits",
-      {
-        project: z.string().describe("Project name or ID"),
-        repository: z.string().describe("Repository name or ID"),
-        commits: z.array(z.string()).describe("Array of commit IDs to query for"),
-        queryType: z
-          .enum(pullRequestQueryTypesStrings as [string, ...string[]])
-          .optional()
-          .default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit])
-          .describe("Type of query to perform"),
-      },
-      {
-        readOnlyHint: true,
-      },
-      async ({ project, repository, commits, queryType }) => {
-        try {
-          const connection = await connectionProvider();
-          const gitApi = await connection.getGitApi();
+    (() => {
+      const pullRequestQueryTypesStrings = Object.values(GitPullRequestQueryType).filter((value): value is string => typeof value === "string");
 
-          const query: GitPullRequestQuery = {
-            queries: [
-              {
-                items: commits,
-                type: GitPullRequestQueryType[queryType as keyof typeof GitPullRequestQueryType],
-              } as GitPullRequestQueryInput,
-            ],
-          };
+      return server.tool(
+        REPO_TOOLS.list_pull_requests_by_commits,
+        "Lists pull requests by commit IDs to find which pull requests contain specific commits",
+        {
+          project: z.string().describe("Project name or ID"),
+          repository: z.string().describe("Repository name or ID"),
+          commits: z.array(z.string()).describe("Array of commit IDs to query for"),
+          queryType: z
+            .enum(pullRequestQueryTypesStrings as [string, ...string[]])
+            .optional()
+            .default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit])
+            .describe("Type of query to perform"),
+        },
+        {
+          readOnlyHint: true,
+        },
+        async ({ project, repository, commits, queryType }) => {
+          try {
+            const connection = await connectionProvider();
+            const gitApi = await connection.getGitApi();
 
-          const queryResult = await gitApi.getPullRequestQuery(query, repository, project);
+            const query: GitPullRequestQuery = {
+              queries: [
+                {
+                  items: commits,
+                  type: GitPullRequestQueryType[queryType as keyof typeof GitPullRequestQueryType],
+                } as GitPullRequestQueryInput,
+              ],
+            };
 
-          return {
-            content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
-          };
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error querying pull requests by commits: ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            isError: true,
-          };
+            const queryResult = await gitApi.getPullRequestQuery(query, repository, project);
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
+            };
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error querying pull requests by commits: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
         }
-      }
-    ),
+      );
+    })(),
   ];
 
   if (isReadOnlyMode) {
