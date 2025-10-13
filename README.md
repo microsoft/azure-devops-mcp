@@ -13,11 +13,12 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 2. [🏆 Expectations](#-expectations)
 3. [⚙️ Supported Tools](#️-supported-tools)
 4. [🔌 Installation & Getting Started](#-installation--getting-started)
-5. [🌏 Using Domains](#-using-domains)
-6. [📝 Troubleshooting](#-troubleshooting)
-7. [🎩 Examples & Best Practices](#-examples--best-practices)
-8. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-9. [📌 Contributing](#-contributing)
+5. [🧭 Getting Started with Copilot CLI](#-getting-started-with-copilot-cli)
+6. [🌏 Using Domains](#-using-domains)
+7. [📝 Troubleshooting](#-troubleshooting)
+8. [🎩 Examples & Best Practices](#-examples--best-practices)
+9. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+10. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -228,6 +229,34 @@ Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first ti
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
 
 See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
+
+## 🧭 Getting Started with Copilot CLI
+
+Prefer the terminal? Use the **GitHub Copilot CLI** to talk to Azure DevOps through this MCP server.
+
+### Prerequisites
+* GitHub Copilot CLI installed (see official docs: https://github.com/github/copilot-cli)
+* Node.js 22+ and an active Copilot subscription
+* Your Azure DevOps organization name (e.g. `contoso`)
+
+### Add the Server (Interactive Mode)
+Open `copilot` from your terminal and add a new MCP server using the following command:
+
+```bash
+/mcp add
+```
+
+The critical piece is the command to run:
+
+```bash
+npx -y @azure-devops/mcp <org-name>
+```
+Replace `<org-name>` with your Azure DevOps organization slug.
+
+### Screenshot
+![Copilot CLI getting started](./docs/media/copilot-cli-getting-started.png)
+
+> Tip: Start simple. Load all tools first; narrow with domains later inside other clients if needed.
 
 ## 🌏 Using Domains
 

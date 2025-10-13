@@ -4,6 +4,7 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 
 - [Prerequisites](#-prerequisites)
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
+- [Getting started with GitHub Copilot CLI](#-getting-started-with-github-copilot-cli)
 - [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
 - [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
@@ -87,6 +88,30 @@ Click "Select Tools" and choose the available tools.
 2. Start the Azure DevOps MCP Server.
 3. The server appears in the tools list.
 4. Try prompts like "List ADO projects".
+
+### 🧭 Getting started with GitHub Copilot CLI
+
+Prefer the terminal? Install the **GitHub Copilot CLI** (see official docs: https://github.com/github/copilot-cli) and add this Azure DevOps MCP Server via the interactive MCP server UI.
+
+Use this command in the UI when prompted:
+```bash
+npx -y @azure-devops/mcp <org-name>
+```
+Replace `<org-name>` with your Azure DevOps organization (e.g. `contoso`).
+
+Screenshot:
+![Copilot CLI getting started](./media/copilot-cli-getting-started.png)
+
+Field reference:
+| Field | Value |
+|-------|-------|
+| Server Name | Friendly label (e.g. `ADO`) |
+| Server Type | Local (stdio) |
+| Command | `npx -y @azure-devops/mcp <org-name>` |
+| Environment Variables | (optional) usually blank |
+| Tools | `*` |
+
+Once added, try prompts like: `List ADO projects` or `List iterations for project "Contoso"`.
 
 #### 🛠️ Install from Source (Dev Mode)
 
