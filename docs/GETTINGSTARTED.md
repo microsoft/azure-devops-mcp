@@ -88,6 +88,32 @@ Click "Select Tools" and choose the available tools.
 3. The server appears in the tools list.
 4. Try prompts like "List ADO projects".
 
+### 🧭 Getting started with GitHub Copilot CLI
+
+Prefer the terminal? Install the **GitHub Copilot CLI** (see official docs: https://github.com/github/copilot-cli) and add this Azure DevOps MCP Server via the interactive MCP server UI.
+
+Use this command in the UI when prompted:
+
+```bash
+npx -y @azure-devops/mcp <org-name>
+```
+
+Replace `<org-name>` with your Azure DevOps organization (e.g. `contoso`).
+
+Screenshot:
+![Copilot CLI getting started](./media/copilot-cli-getting-started.png)
+
+Field reference:
+| Field | Value |
+|-------|-------|
+| Server Name | Friendly label (e.g. `ADO`) |
+| Server Type | Local (stdio) |
+| Command | `npx -y @azure-devops/mcp <org-name>` |
+| Environment Variables | (optional) usually blank |
+| Tools | `*` |
+
+Once added, try prompts like: `List ADO projects` or `List iterations for project "Contoso"`.
+
 #### 🛠️ Install from Source (Dev Mode)
 
 This installation method is recommended for advanced users and contributors who want immediate access to the latest updates from the main branch. It is ideal if you are developing new tools, enhancing existing features, or maintaining a custom fork.

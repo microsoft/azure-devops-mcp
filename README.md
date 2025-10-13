@@ -229,6 +229,38 @@ Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first ti
 
 See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
 
+## 🧭 Getting Started with Copilot CLI
+
+Prefer the terminal? Use the **GitHub Copilot CLI** to talk to Azure DevOps through this MCP server.
+
+### Prerequisites
+
+- GitHub Copilot CLI installed (see official docs: https://github.com/github/copilot-cli)
+- Node.js 22+ and an active Copilot subscription
+- Your Azure DevOps organization name (e.g. `contoso`)
+
+### Add the Server (Interactive Mode)
+
+Open `copilot` from your terminal and add a new MCP server using the following command:
+
+```bash
+/mcp add
+```
+
+The critical piece is the command to run:
+
+```bash
+npx -y @azure-devops/mcp <org-name>
+```
+
+Replace `<org-name>` with your Azure DevOps organization slug.
+
+### Screenshot
+
+![Copilot CLI getting started](./docs/media/copilot-cli-getting-started.png)
+
+> Tip: Start simple. Load all tools first; narrow with domains later inside other clients if needed.
+
 ## 🌏 Using Domains
 
 Azure DevOps exposes a large surface area. As a result, our Azure DevOps MCP Server includes many tools. To keep the toolset manageable, avoid confusing the model, and respect client limits on loaded tools, use Domains to load only the areas you need. Domains are named groups of related tools (for example: core, work, work-items, repositories, wiki). Add the `-d` argument and the domain names to the server args in your `mcp.json` to list the domains to enable.
