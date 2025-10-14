@@ -122,6 +122,7 @@ Interact with these Azure DevOps services:
 
 - **testplan_create_test_plan**: Create a new test plan in the project.
 - **testplan_create_test_case**: Create a new test case work item.
+- **testplan_update_test_case_steps**: Update an existing test case work item's steps.
 - **testplan_add_test_cases_to_suite**: Add existing test cases to a test suite.
 - **testplan_list_test_plans**: Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.
 - **testplan_list_test_cases**: Get a list of test cases in the test plan.

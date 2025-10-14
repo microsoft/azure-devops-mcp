@@ -9,6 +9,7 @@ import { z } from "zod";
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
   create_test_case: "testplan_create_test_case",
+  update_test_case_steps: "testplan_update_test_case_steps",
   add_test_cases_to_suite: "testplan_add_test_cases_to_suite",
   test_results_from_build_id: "testplan_show_test_results_from_build_id",
   list_test_cases: "testplan_list_test_cases",
@@ -17,10 +18,6 @@ const Test_Plan_Tools = {
 };
 
 function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
-  /*
-    LIST OF TEST PLANS
-    get list of test plans by project
-  */
   server.tool(
     Test_Plan_Tools.list_test_plans,
     "Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.",
@@ -43,9 +40,6 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     }
   );
 
-  /*
-    Create Test Plan - CREATE
-  */
   server.tool(
     Test_Plan_Tools.create_test_plan,
     "Creates a new test plan in the project.",
@@ -79,9 +73,6 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     }
   );
 
-  /*
-    Create Test Suite - CREATE
-  */
   server.tool(
     Test_Plan_Tools.create_test_suite,
     "Creates a new test suite in a test plan.",
@@ -112,9 +103,6 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     }
   );
 
-  /*
-    Add Test Cases to Suite - ADD
-  */
   server.tool(
     Test_Plan_Tools.add_test_cases_to_suite,
     "Adds existing test cases to a test suite.",
@@ -139,9 +127,6 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     }
   );
 
-  /*
-    Create Test Case - CREATE
-  */
   server.tool(
     Test_Plan_Tools.create_test_case,
     "Creates a new test case work item.",
@@ -157,8 +142,9 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       priority: z.number().optional().describe("The priority of the test case."),
       areaPath: z.string().optional().describe("The area path for the test case."),
       iterationPath: z.string().optional().describe("The iteration path for the test case."),
+      testsWorkItemId: z.number().optional().describe("Optional work item id that will be set as a Microsoft.VSTS.Common.TestedBy-Reverse link to the test case."),
     },
-    async ({ project, title, steps, priority, areaPath, iterationPath }) => {
+    async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId }) => {
       const connection = await connectionProvider();
       const witClient = await connection.getWorkItemTrackingApi();
 
@@ -175,6 +161,17 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         path: "/fields/System.Title",
         value: title,
       });
+
+      if (testsWorkItemId) {
+        patchDocument.push({
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+            url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${testsWorkItemId}`,
+          },
+        });
+      }
 
       if (stepsXml) {
         patchDocument.push({
@@ -216,10 +213,45 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     }
   );
 
-  /* 
-    TEST PLANS
-    Gets a list of test cases for a given testplan.
-  */
+  server.tool(
+    Test_Plan_Tools.update_test_case_steps,
+    "Update an existing test case work item.",
+    {
+      id: z.number().describe("The ID of the test case work item to update."),
+      steps: z
+        .string()
+        .describe(
+          "The steps to reproduce the test case. Make sure to format each step as '1. Step one|Expected result one\n2. Step two|Expected result two. USE '|' as the delimiter between step and expected result. DO NOT use '|' in the description of the step or expected result."
+        ),
+    },
+    async ({ id, steps }) => {
+      const connection = await connectionProvider();
+      const witClient = await connection.getWorkItemTrackingApi();
+
+      let stepsXml;
+      if (steps) {
+        stepsXml = convertStepsToXml(steps);
+      }
+
+      // Create JSON patch document for work item
+      const patchDocument = [];
+
+      if (stepsXml) {
+        patchDocument.push({
+          op: "add",
+          path: "/fields/Microsoft.VSTS.TCM.Steps",
+          value: stepsXml,
+        });
+      }
+
+      const workItem = await witClient.updateWorkItem({}, patchDocument, id);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
+      };
+    }
+  );
+
   server.tool(
     Test_Plan_Tools.list_test_cases,
     "Gets a list of test cases in the test plan.",
@@ -239,9 +271,6 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     }
   );
 
-  /*
-    Gets a list of test results for a given project and build ID
-  */
   server.tool(
     Test_Plan_Tools.test_results_from_build_id,
     "Gets a list of test results for a given project and build ID.",
