@@ -5,7 +5,7 @@ import { configureWorkTools } from "../../../src/tools/work";
 import { WebApi } from "azure-devops-node-api";
 import { TreeStructureGroup } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 interface WorkApiMock {
