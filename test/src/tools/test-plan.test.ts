@@ -1,4 +1,3 @@
-import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
@@ -20,6 +19,7 @@ describe("configureTestPlanTools", () => {
     getTestResultsApi: () => Promise<ITestResultsApi>;
     getWorkItemTrackingApi: () => Promise<IWorkItemTrackingApi>;
     getTestApi: () => Promise<ITestApi>;
+    serverUrl: string;
   };
   let mockTestPlanApi: ITestPlanApi;
   let mockTestResultsApi: ITestResultsApi;
@@ -41,6 +41,7 @@ describe("configureTestPlanTools", () => {
     } as unknown as ITestResultsApi;
     mockWitApi = {
       createWorkItem: jest.fn(),
+      updateWorkItem: jest.fn(),
     } as unknown as IWorkItemTrackingApi;
     mockTestApi = {
       addTestCasesToSuite: jest.fn(),
@@ -50,6 +51,7 @@ describe("configureTestPlanTools", () => {
       getTestResultsApi: jest.fn().mockResolvedValue(mockTestResultsApi),
       getWorkItemTrackingApi: jest.fn().mockResolvedValue(mockWitApi),
       getTestApi: jest.fn().mockResolvedValue(mockTestApi),
+      serverUrl: "https://dev.azure.com/testorg",
     };
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
   });
@@ -63,6 +65,8 @@ describe("configureTestPlanTools", () => {
           "testplan_create_test_plan",
           "testplan_create_test_suite",
           "testplan_add_test_cases_to_suite",
+          "testplan_create_test_case",
+          "testplan_update_test_case_steps",
           "testplan_list_test_cases",
           "testplan_show_test_results_from_build_id",
         ])
@@ -1105,6 +1109,536 @@ describe("configureTestPlanTools", () => {
         "Test Case"
       );
       expect(result.content[0].text).toContain("Non-numbered Pipe Test");
+    });
+
+    it("should create test case with testsWorkItemId relationship", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
+      if (!call) throw new Error("testplan_create_test_case tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.createWorkItem as jest.Mock).mockResolvedValue({
+        id: 2001,
+        fields: {
+          "System.Title": "Test Case with Link",
+        },
+        relations: [
+          {
+            rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+            url: "https://dev.azure.com/testorg/proj1/_apis/wit/workItems/115304",
+          },
+        ],
+      });
+
+      const params = {
+        project: "proj1",
+        title: "Test Case with Link",
+        steps: "1. Execute test|Test passes",
+        testsWorkItemId: 115304,
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.createWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/System.Title",
+            value: "Test Case with Link",
+          }),
+          expect.objectContaining({
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+              url: "https://dev.azure.com/testorg/proj1/_apis/wit/workItems/115304",
+            },
+          }),
+        ]),
+        "proj1",
+        "Test Case"
+      );
+      expect(result.content[0].text).toBe(
+        JSON.stringify(
+          {
+            id: 2001,
+            fields: {
+              "System.Title": "Test Case with Link",
+            },
+            relations: [
+              {
+                rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+                url: "https://dev.azure.com/testorg/proj1/_apis/wit/workItems/115304",
+              },
+            ],
+          },
+          null,
+          2
+        )
+      );
+    });
+
+    it("should create test case without testsWorkItemId when not provided", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
+      if (!call) throw new Error("testplan_create_test_case tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.createWorkItem as jest.Mock).mockResolvedValue({
+        id: 2002,
+        fields: {
+          "System.Title": "Test Case without Link",
+        },
+      });
+
+      const params = {
+        project: "proj1",
+        title: "Test Case without Link",
+        steps: "1. Execute test|Test passes",
+        // testsWorkItemId not provided
+      };
+      const result = await handler(params);
+
+      const patchDocument = (mockWitApi.createWorkItem as jest.Mock).mock.calls[0][1];
+      const relationsPatch = patchDocument.find((patch: { path: string }) => patch.path === "/relations/-");
+
+      expect(relationsPatch).toBeUndefined();
+      expect(mockWitApi.createWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/System.Title",
+            value: "Test Case without Link",
+          }),
+        ]),
+        "proj1",
+        "Test Case"
+      );
+      expect(result.content[0].text).toBe(
+        JSON.stringify(
+          {
+            id: 2002,
+            fields: {
+              "System.Title": "Test Case without Link",
+            },
+          },
+          null,
+          2
+        )
+      );
+    });
+
+    it("should create test case with testsWorkItemId and all other optional parameters", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
+      if (!call) throw new Error("testplan_create_test_case tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.createWorkItem as jest.Mock).mockResolvedValue({
+        id: 2003,
+        fields: {
+          "System.Title": "Complete Test Case with Link",
+          "Microsoft.VSTS.Common.Priority": 1,
+          "System.AreaPath": "MyProject\\Feature",
+          "System.IterationPath": "MyProject\\Sprint 1",
+        },
+        relations: [
+          {
+            rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+            url: "https://dev.azure.com/testorg/proj1/_apis/wit/workItems/115304",
+          },
+        ],
+      });
+
+      const params = {
+        project: "proj1",
+        title: "Complete Test Case with Link",
+        steps: "1. Execute comprehensive test|All tests pass successfully",
+        priority: 1,
+        areaPath: "MyProject\\Feature",
+        iterationPath: "MyProject\\Sprint 1",
+        testsWorkItemId: 115304,
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.createWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/System.Title",
+            value: "Complete Test Case with Link",
+          }),
+          expect.objectContaining({
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+              url: "https://dev.azure.com/testorg/proj1/_apis/wit/workItems/115304",
+            },
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.Common.Priority",
+            value: 1,
+          }),
+          expect.objectContaining({
+            path: "/fields/System.AreaPath",
+            value: "MyProject\\Feature",
+          }),
+          expect.objectContaining({
+            path: "/fields/System.IterationPath",
+            value: "MyProject\\Sprint 1",
+          }),
+        ]),
+        "proj1",
+        "Test Case"
+      );
+      expect(result.content[0].text).toContain("Complete Test Case with Link");
+    });
+  });
+
+  describe("update_test_case_steps tool", () => {
+    it("should update test case steps with proper parameters", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136717,
+        rev: 2,
+        fields: {
+          "System.Title": "Updated Test Case",
+          "System.WorkItemType": "Test Case",
+        },
+      });
+
+      const params = {
+        id: 136717,
+        steps: "1. Updated step 1|Expected result 1\n2. Updated step 2|Expected result 2",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith({}, expect.any(Array), 136717);
+      expect(result.content[0].text).toBe(
+        JSON.stringify(
+          {
+            id: 136717,
+            rev: 2,
+            fields: {
+              "System.Title": "Updated Test Case",
+              "System.WorkItemType": "Test Case",
+            },
+          },
+          null,
+          2
+        )
+      );
+    });
+
+    it("should handle steps with pipe delimiter for expected results", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136718,
+        rev: 3,
+        fields: {
+          "System.Title": "Test Case with Pipe Delimiters",
+        },
+      });
+
+      const params = {
+        id: 136718,
+        steps: "1. Login to application|User is logged in successfully\n2. Navigate to dashboard|Dashboard page loads correctly\n3. Perform action|Action completes as expected",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Login to application"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("User is logged in successfully"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Navigate to dashboard"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Dashboard page loads correctly"),
+          }),
+        ]),
+        136718
+      );
+      expect(result.content[0].text).toContain("Test Case with Pipe Delimiters");
+    });
+
+    it("should handle steps without pipe delimiter using default expected result", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136719,
+        rev: 2,
+        fields: {
+          "System.Title": "Test Case without Delimiters",
+        },
+      });
+
+      const params = {
+        id: 136719,
+        steps: "1. Click button\n2. Verify result\n3. Close application",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Click button"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Verify step completes successfully"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Verify result"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Close application"),
+          }),
+        ]),
+        136719
+      );
+      expect(result.content[0].text).toContain("Test Case without Delimiters");
+    });
+
+    it("should handle XML special characters in steps", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136720,
+        rev: 2,
+        fields: {
+          "System.Title": "Test Case with XML Characters",
+        },
+      });
+
+      const params = {
+        id: 136720,
+        steps: "1. Enter text with <special> & 'quotes' and \"double quotes\"|Text is accepted correctly\n2. Submit form|Form submits without errors",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;special&gt; &amp; &apos;quotes&apos; and &quot;double quotes&quot;"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Text is accepted correctly"),
+          }),
+        ]),
+        136720
+      );
+      expect(result.content[0].text).toContain("Test Case with XML Characters");
+    });
+
+    it("should handle empty or whitespace-only steps", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136721,
+        rev: 2,
+        fields: {
+          "System.Title": "Test Case with Empty Steps",
+        },
+      });
+
+      const params = {
+        id: 136721,
+        steps: "1. Valid step\n\n   \n2. Another valid step",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Valid step"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Another valid step"),
+          }),
+        ]),
+        136721
+      );
+      expect(result.content[0].text).toContain("Test Case with Empty Steps");
+    });
+
+    it("should handle API errors when updating test case steps", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        id: 136722,
+        steps: "1. Test step that will fail",
+      };
+
+      await expect(handler(params)).rejects.toThrow("API Error");
+    });
+
+    it("should handle mixed numbered and non-numbered steps", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136723,
+        rev: 2,
+        fields: {
+          "System.Title": "Mixed Steps Test Case",
+        },
+      });
+
+      const params = {
+        id: 136723,
+        steps: "1. Numbered step one|Expected result one\nNon-numbered step\n3. Another numbered step|Expected result three",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Numbered step one"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Expected result one"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Non-numbered step"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Another numbered step"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Expected result three"),
+          }),
+        ]),
+        136723
+      );
+      expect(result.content[0].text).toContain("Mixed Steps Test Case");
+    });
+
+    it("should handle multiple pipe characters in expected results", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136724,
+        rev: 2,
+        fields: {
+          "System.Title": "Multiple Pipes Test Case",
+        },
+      });
+
+      const params = {
+        id: 136724,
+        steps: "1. Check status message|Message shows 'Success | Warning | Error' status options",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Check status message"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Message shows &apos;Success"),
+          }),
+        ]),
+        136724
+      );
+      expect(result.content[0].text).toContain("Multiple Pipes Test Case");
+    });
+
+    it("should handle empty expected results after pipe delimiter", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 136725,
+        rev: 2,
+        fields: {
+          "System.Title": "Empty Expected Results Test Case",
+        },
+      });
+
+      const params = {
+        id: 136725,
+        steps: "1. Perform action|\n2. Another action|",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Perform action"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Verify step completes successfully"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("Another action"),
+          }),
+        ]),
+        136725
+      );
+      expect(result.content[0].text).toContain("Empty Expected Results Test Case");
     });
   });
 
