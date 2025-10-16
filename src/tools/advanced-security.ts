@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
@@ -13,7 +13,7 @@ const ADVSEC_TOOLS = {
 };
 
 function configureAdvSecTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>, isReadOnlyMode: boolean) {
-  const registeredTools = [
+  const registeredTools: RegisteredTool[] = [
     server.tool(
       ADVSEC_TOOLS.get_alerts,
       "Retrieve Advanced Security alerts for a repository.",

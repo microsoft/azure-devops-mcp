@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import {
   GitRef,
@@ -131,7 +131,7 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
 }
 
 function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, isReadOnlyMode: boolean) {
-  const registeredTools = [
+  const registeredTools: RegisteredTool[] = [
     server.tool(
       REPO_TOOLS.create_pull_request,
       "Create a new pull request.",
