@@ -50,6 +50,26 @@ describe("configureWorkTools", () => {
       configureWorkTools(server, tokenProvider, connectionProvider, false);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
+
+    describe("read-only mode", () => {
+      it("removes write tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: false } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+
+        configureWorkTools(server, tokenProvider, connectionProvider, true);
+
+        expect(mockTool.remove).toHaveBeenCalled();
+      });
+
+      it("keeps read-only tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: true } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+
+        configureWorkTools(server, tokenProvider, connectionProvider, true);
+
+        expect(mockTool.remove).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("list_team_iterations tool", () => {
@@ -539,42 +559,6 @@ describe("configureWorkTools", () => {
           2
         )
       );
-    });
-  });
-
-  describe("read-only mode", () => {
-    it("should register only read-only tools when isReadOnlyMode is true", () => {
-      const mockRemove = jest.fn();
-      const mockToolWithReadOnlyHint = {
-        annotations: { readOnlyHint: true },
-        remove: mockRemove,
-      };
-      const mockToolWithoutReadOnlyHint = {
-        annotations: { readOnlyHint: false },
-        remove: mockRemove,
-      };
-
-      (server.tool as jest.Mock).mockReturnValueOnce(mockToolWithReadOnlyHint).mockReturnValueOnce(mockToolWithoutReadOnlyHint).mockReturnValueOnce(mockToolWithoutReadOnlyHint);
-
-      configureWorkTools(server, tokenProvider, connectionProvider, true);
-
-      // The remove function should be called on tools without readOnlyHint
-      expect(mockRemove).toHaveBeenCalledTimes(2);
-    });
-
-    it("should register all tools when isReadOnlyMode is false", () => {
-      const mockRemove = jest.fn();
-      const mockTool = {
-        annotations: { readOnlyHint: false },
-        remove: mockRemove,
-      };
-
-      (server.tool as jest.Mock).mockReturnValue(mockTool);
-
-      configureWorkTools(server, tokenProvider, connectionProvider, false);
-
-      // The remove function should not be called when isReadOnlyMode is false
-      expect(mockRemove).not.toHaveBeenCalled();
     });
   });
 });

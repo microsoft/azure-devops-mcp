@@ -41,6 +41,26 @@ describe("configureCoreTools", () => {
       configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
+
+    describe("read-only mode", () => {
+      it("removes write tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: false } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+
+        configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider, true);
+
+        expect(mockTool.remove).toHaveBeenCalled();
+      });
+
+      it("keeps read-only tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: true } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+
+        configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider, true);
+
+        expect(mockTool.remove).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("list_projects tool", () => {

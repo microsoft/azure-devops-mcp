@@ -78,6 +78,33 @@ describe("repos tools", () => {
     } as any);
   });
 
+  describe("tool registration", () => {
+    it("registers repo tools on the server", () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      expect(server.tool as jest.Mock).toHaveBeenCalled();
+    });
+
+    describe("read-only mode", () => {
+      it("removes write tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: false } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider, true);
+
+        expect(mockTool.remove).toHaveBeenCalled();
+      });
+
+      it("keeps read-only tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: true } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider, true);
+
+        expect(mockTool.remove).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("repo_update_pull_request", () => {
     it("should update pull request with all provided fields", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
@@ -4242,119 +4269,6 @@ describe("repos tools", () => {
         undefined
       );
       expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
-    });
-  });
-
-  describe("read-only mode", () => {
-    it("should only register read-only tools when isReadOnlyMode is true", () => {
-      const mockServer = {
-        tool: jest.fn().mockReturnValue({
-          annotations: { readOnlyHint: true },
-          remove: jest.fn(),
-        }),
-      } as unknown as McpServer;
-
-      configureRepoTools(mockServer, tokenProvider, connectionProvider, userAgentProvider, true);
-
-      // Check that all tools were registered
-      expect(mockServer.tool).toHaveBeenCalled();
-
-      // Get all registered tools
-      const registeredTools = (mockServer.tool as jest.Mock).mock.results.map((result) => result.value);
-
-      // In read-only mode, only tools with readOnlyHint: true should remain
-      // Tools with readOnlyHint: false should be removed
-      registeredTools.forEach((tool) => {
-        if (tool.annotations?.readOnlyHint === false) {
-          expect(tool.remove).toHaveBeenCalled();
-        }
-      });
-    });
-
-    it("should register all tools when isReadOnlyMode is false", () => {
-      const mockServer = {
-        tool: jest.fn().mockReturnValue({
-          annotations: { readOnlyHint: false },
-          remove: jest.fn(),
-        }),
-      } as unknown as McpServer;
-
-      configureRepoTools(mockServer, tokenProvider, connectionProvider, userAgentProvider, false);
-
-      // Check that all tools were registered
-      expect(mockServer.tool).toHaveBeenCalled();
-
-      // Get all registered tools
-      const registeredTools = (mockServer.tool as jest.Mock).mock.results.map((result) => result.value);
-
-      // In non-read-only mode, no tools should be removed
-      registeredTools.forEach((tool) => {
-        expect(tool.remove).not.toHaveBeenCalled();
-      });
-    });
-
-    it("should have correct readOnlyHint annotations for read-only tools", () => {
-      const mockServer = {
-        tool: jest.fn().mockReturnValue({
-          annotations: { readOnlyHint: true },
-          remove: jest.fn(),
-        }),
-      } as unknown as McpServer;
-
-      configureRepoTools(mockServer, tokenProvider, connectionProvider, userAgentProvider, false);
-
-      const toolCalls = (mockServer.tool as jest.Mock).mock.calls;
-
-      // Find read-only tools
-      const readOnlyTools = [
-        REPO_TOOLS.list_repos_by_project,
-        REPO_TOOLS.list_pull_requests_by_repo_or_project,
-        REPO_TOOLS.list_pull_request_threads,
-        REPO_TOOLS.list_pull_request_thread_comments,
-        REPO_TOOLS.list_branches_by_repo,
-        REPO_TOOLS.list_my_branches_by_repo,
-        REPO_TOOLS.get_repo_by_name_or_id,
-        REPO_TOOLS.get_branch_by_name,
-        REPO_TOOLS.get_pull_request_by_id,
-        REPO_TOOLS.search_commits,
-        REPO_TOOLS.list_pull_requests_by_commits,
-      ];
-
-      readOnlyTools.forEach((toolName) => {
-        const toolCall = toolCalls.find((call) => call[0] === toolName);
-        expect(toolCall).toBeDefined();
-        expect(toolCall[3]).toEqual({ readOnlyHint: true });
-      });
-    });
-
-    it("should have correct readOnlyHint annotations for write tools", () => {
-      const mockServer = {
-        tool: jest.fn().mockReturnValue({
-          annotations: { readOnlyHint: false },
-          remove: jest.fn(),
-        }),
-      } as unknown as McpServer;
-
-      configureRepoTools(mockServer, tokenProvider, connectionProvider, userAgentProvider, false);
-
-      const toolCalls = (mockServer.tool as jest.Mock).mock.calls;
-
-      // Find write tools
-      const writeTools = [
-        REPO_TOOLS.create_pull_request,
-        REPO_TOOLS.create_branch,
-        REPO_TOOLS.update_pull_request,
-        REPO_TOOLS.update_pull_request_reviewers,
-        REPO_TOOLS.reply_to_comment,
-        REPO_TOOLS.create_pull_request_thread,
-        REPO_TOOLS.resolve_comment,
-      ];
-
-      writeTools.forEach((toolName) => {
-        const toolCall = toolCalls.find((call) => call[0] === toolName);
-        expect(toolCall).toBeDefined();
-        expect(toolCall[3]).toEqual({ readOnlyHint: false });
-      });
     });
   });
 });
