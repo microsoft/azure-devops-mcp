@@ -285,7 +285,6 @@ Add the `--read-only` argument to the server args in your `mcp.json`:
     }
   }
 }
-
 ```
 
 ## 📝 Troubleshooting
