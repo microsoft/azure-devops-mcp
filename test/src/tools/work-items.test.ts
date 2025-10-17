@@ -52,6 +52,7 @@ describe("configureWorkItemTools", () => {
   let mockConnection: MockConnection;
   let mockWorkApi: WorkApiMock;
   let mockWorkItemTrackingApi: WorkItemTrackingApiMock;
+  let isReadOnlyMode: boolean;
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
@@ -85,11 +86,13 @@ describe("configureWorkItemTools", () => {
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
 
     userAgentProvider = () => "Jest";
+
+    isReadOnlyMode = false;
   });
 
   describe("tool registration", () => {
     it("registers core tools on the server", () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
 
@@ -97,8 +100,9 @@ describe("configureWorkItemTools", () => {
       it("removes write tools when in read-only mode", () => {
         const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: false } };
         (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
 
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, true);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         expect(mockTool.remove).toHaveBeenCalled();
       });
@@ -106,8 +110,9 @@ describe("configureWorkItemTools", () => {
       it("keeps read-only tools when in read-only mode", () => {
         const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: true } };
         (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
 
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, true);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         expect(mockTool.remove).not.toHaveBeenCalled();
       });
@@ -116,7 +121,7 @@ describe("configureWorkItemTools", () => {
 
   describe("list_backlogs tool", () => {
     it("should call getBacklogs API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_backlogs");
       if (!call) throw new Error("wit_list_backlogs tool not registered");
@@ -142,7 +147,7 @@ describe("configureWorkItemTools", () => {
 
   describe("list_backlog_work_items tool", () => {
     it("should call getBacklogLevelWorkItems API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_backlog_work_items");
       if (!call) throw new Error("wit_list_backlog_work_items tool not registered");
@@ -210,7 +215,7 @@ describe("configureWorkItemTools", () => {
 
   describe("my_work_items tool", () => {
     it("should call getPredefinedQueryResults API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_my_work_items");
       if (!call) throw new Error("wit_my_work_items tool not registered");
@@ -285,7 +290,7 @@ describe("configureWorkItemTools", () => {
 
   describe("getWorkItemsBatch tool", () => {
     it("should call workItemApi.getWorkItemsBatch API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -313,7 +318,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should call workItemApi.getWorkItemsBatch API with custom fields when fields parameter is provided", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -352,7 +357,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should use default fields when an empty fields array is provided", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -381,7 +386,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should transform System.AssignedTo object to formatted string", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -435,7 +440,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle System.AssignedTo with only displayName", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -471,7 +476,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle System.AssignedTo with only uniqueName", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -507,7 +512,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should not transform System.AssignedTo if it's not an object", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -540,7 +545,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle work items without System.AssignedTo field", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -572,7 +577,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle null or undefined workitems response", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -592,7 +597,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should transform all user fields to formatted strings", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_batch_by_ids");
 
@@ -671,7 +676,7 @@ describe("configureWorkItemTools", () => {
 
   describe("get_work_item tool", () => {
     it("should call workItemApi.getWorkItem API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item");
 
@@ -698,7 +703,7 @@ describe("configureWorkItemTools", () => {
 
   describe("list_work_item_comments tool", () => {
     it("should call workItemApi.getComments API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_comments");
 
@@ -723,7 +728,7 @@ describe("configureWorkItemTools", () => {
 
   describe("add_work_item_comment tool", () => {
     it("should call Add Work Item Comments API with the correct parameters and return the expected result with no format specified", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
 
@@ -763,7 +768,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should call Add Work Item Comments API with the correct parameters and return the expected result with markdown format", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
 
@@ -804,7 +809,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle fetch failure response", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
 
@@ -833,7 +838,7 @@ describe("configureWorkItemTools", () => {
 
   describe("link_work_item_to_pull_request tool", () => {
     it("should call workItemApi.updateWorkItem API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
 
@@ -884,7 +889,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle errors from updateWorkItem and return a descriptive error", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
 
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
@@ -905,7 +910,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should encode special characters in projectId and repositoryId for vstfsUrl", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
 
@@ -938,7 +943,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should use pullRequestProjectId instead of projectId when provided", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
 
@@ -977,7 +982,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should fall back to projectId when pullRequestProjectId is empty", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
 
@@ -1016,7 +1021,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle link_work_item_to_pull_request unknown error type", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
@@ -1042,7 +1047,7 @@ describe("configureWorkItemTools", () => {
 
   describe("get_work_items_for_iteration tool", () => {
     it("should call workApi.getIterationWorkItems API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_items_for_iteration");
 
@@ -1073,7 +1078,7 @@ describe("configureWorkItemTools", () => {
 
   describe("update_work_item tool", () => {
     it("should call workItemApi.updateWorkItem API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_item");
 
@@ -1112,7 +1117,7 @@ describe("configureWorkItemTools", () => {
 
   describe("get_work_item_type tool", () => {
     it("should call workItemApi.getWorkItemType API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_type");
 
@@ -1136,7 +1141,7 @@ describe("configureWorkItemTools", () => {
 
   describe("create_work_item tool", () => {
     it("should call workItemApi.createWorkItem API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
 
@@ -1169,7 +1174,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle Markdown format for long fields", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
 
@@ -1203,7 +1208,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle null response from createWorkItem", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
 
@@ -1225,7 +1230,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle errors from createWorkItem", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
 
@@ -1247,7 +1252,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle unknown error types", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
 
@@ -1271,7 +1276,7 @@ describe("configureWorkItemTools", () => {
 
   describe("get_query tool", () => {
     it("should call workItemApi.getQuery API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_query");
 
@@ -1299,7 +1304,7 @@ describe("configureWorkItemTools", () => {
 
   describe("get_query_results_by_id tool", () => {
     it("should call workItemApi.getQueryById API with the correct parameters and return the expected result", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_query_results_by_id");
 
@@ -1326,7 +1331,7 @@ describe("configureWorkItemTools", () => {
 
   describe("getLinkTypeFromName function coverage", () => {
     it("should handle all link types through work_items_link tool", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_items_link");
       if (!call) throw new Error("wit_work_items_link tool not registered");
@@ -1367,7 +1372,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should throw error for unknown link type", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_items_link");
       if (!call) throw new Error("wit_work_items_link tool not registered");
@@ -1393,7 +1398,7 @@ describe("configureWorkItemTools", () => {
 
   describe("update_work_items_batch tool", () => {
     it("should update work items in batch successfully", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_items_batch");
       if (!call) throw new Error("wit_update_work_items_batch tool not registered");
@@ -1458,7 +1463,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle Markdown format for large text fields", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_items_batch");
       if (!call) throw new Error("wit_update_work_items_batch tool not registered");
@@ -1528,7 +1533,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle batch update failure", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_items_batch");
       if (!call) throw new Error("wit_update_work_items_batch tool not registered");
@@ -1559,7 +1564,7 @@ describe("configureWorkItemTools", () => {
 
   describe("work_items_link tool", () => {
     it("should link work items successfully", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_items_link");
       if (!call) throw new Error("wit_work_items_link tool not registered");
@@ -1602,7 +1607,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle linking failure", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_items_link");
       if (!call) throw new Error("wit_work_items_link tool not registered");
@@ -1634,7 +1639,7 @@ describe("configureWorkItemTools", () => {
 
   describe("work_item_unlink tool", () => {
     it("should unlink work items successfully", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1690,7 +1695,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should unlink all links of a specific type when no URL is provided", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1757,7 +1762,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle artifact link removal", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1810,7 +1815,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle when no matching relations are found", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1844,7 +1849,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle updateWorkItem API failure", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1878,7 +1883,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle getWorkItem API failure", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1899,7 +1904,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle work items with no relations", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1925,7 +1930,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle specific URL matching correctly", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -1977,7 +1982,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should throw error for unknown link type in work_item_unlink", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -2004,7 +2009,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle unknown error types in work_item_unlink", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
       if (!call) throw new Error("wit_work_item_unlink tool not registered");
@@ -2029,7 +2034,7 @@ describe("configureWorkItemTools", () => {
   // Add error handling tests for existing tools
   describe("error handling coverage", () => {
     it("should handle create_work_item errors", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
       if (!call) throw new Error("wit_create_work_item tool not registered");
@@ -2053,7 +2058,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle create_work_item null response", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
       if (!call) throw new Error("wit_create_work_item tool not registered");
@@ -2074,7 +2079,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle link_work_item_to_pull_request errors", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
@@ -2097,7 +2102,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle link_work_item_to_pull_request null response", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_link_work_item_to_pull_request");
       if (!call) throw new Error("wit_link_work_item_to_pull_request tool not registered");
@@ -2120,7 +2125,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle create_work_item unknown error type", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
       if (!call) throw new Error("wit_create_work_item tool not registered");
@@ -2142,7 +2147,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle work_items_link with empty comment", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_items_link");
       if (!call) throw new Error("wit_work_items_link tool not registered");
@@ -2178,7 +2183,7 @@ describe("configureWorkItemTools", () => {
   // Add tests for optional parameters and edge cases
   describe("optional parameters coverage", () => {
     it("should handle add_child_work_item with optional parameters", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
       if (!call) throw new Error("wit_add_child_work_items tool not registered");
@@ -2224,7 +2229,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle add_child_work_item with empty optional parameters", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
       if (!call) throw new Error("wit_add_child_work_items tool not registered");
@@ -2273,7 +2278,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should reject when more than 50 items are provided", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
       if (!call) throw new Error("wit_add_child_work_items tool not registered");
@@ -2302,7 +2307,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle Markdown format correctly", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
       if (!call) throw new Error("wit_add_child_work_items tool not registered");
@@ -2350,7 +2355,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle fetch failure response", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
       if (!call) throw new Error("wit_add_child_work_items tool not registered");
@@ -2385,7 +2390,7 @@ describe("configureWorkItemTools", () => {
     });
 
     it("should handle unknown error types in add_child_work_items", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
       if (!call) throw new Error("wit_add_child_work_items tool not registered");
@@ -2418,7 +2423,7 @@ describe("configureWorkItemTools", () => {
   describe("artifact link tools", () => {
     describe("wit_add_artifact_link", () => {
       it("should add artifact link to work item successfully", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2466,7 +2471,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should add artifact link without comment", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2508,7 +2513,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should handle errors when adding artifact link", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2531,7 +2536,7 @@ describe("configureWorkItemTools", () => {
 
       // Tests to cover lines 929-973: URI building switch statement logic
       it("should build Branch URI from components", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2575,7 +2580,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should return error for Branch link missing required parameters", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2596,7 +2601,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should build Fixed in Commit URI from components", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2642,7 +2647,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should return error for Fixed in Commit link missing required parameters", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2663,7 +2668,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should build Pull Request URI from components", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2707,7 +2712,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should return error for Pull Request link missing required parameters", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2729,7 +2734,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should build Build URI from components", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2771,7 +2776,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should build Found in build URI from components", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2813,7 +2818,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should build Integrated in build URI from components", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2855,7 +2860,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should return error for build link types missing buildId", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2875,7 +2880,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should return error for unsupported link type in URI building", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");
@@ -2894,7 +2899,7 @@ describe("configureWorkItemTools", () => {
       });
 
       it("should handle null response from updateWorkItem (line 1000 coverage)", async () => {
-        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, false);
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, isReadOnlyMode);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
         if (!call) throw new Error("wit_add_artifact_link tool not registered");

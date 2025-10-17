@@ -19,6 +19,7 @@ describe("configureAdvSecTools", () => {
   let connectionProvider: ConnectionProviderMock;
   let mockConnection: { getAlertApi: jest.Mock };
   let mockAlertApi: AlertApiMock;
+  let isReadOnlyMode: boolean;
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
@@ -34,11 +35,13 @@ describe("configureAdvSecTools", () => {
     };
 
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+
+    isReadOnlyMode = false;
   });
 
   describe("tool registration", () => {
     it("registers Advanced Security tools on the server", () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
 
@@ -46,8 +49,9 @@ describe("configureAdvSecTools", () => {
       it("removes write tools when in read-only mode", () => {
         const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: false } };
         (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
 
-        configureAdvSecTools(server, tokenProvider, connectionProvider, true);
+        configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
         expect(mockTool.remove).toHaveBeenCalled();
       });
@@ -55,8 +59,9 @@ describe("configureAdvSecTools", () => {
       it("keeps read-only tools when in read-only mode", () => {
         const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: true } };
         (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
 
-        configureAdvSecTools(server, tokenProvider, connectionProvider, true);
+        configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
         expect(mockTool.remove).not.toHaveBeenCalled();
       });
@@ -65,7 +70,7 @@ describe("configureAdvSecTools", () => {
 
   describe("advsec_get_alerts tool", () => {
     it("should call getAlerts API with correct parameters and return multiple alerts", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -161,7 +166,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle pagination with continuation token", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -321,7 +326,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle API errors gracefully", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -343,7 +348,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle null API results correctly", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -363,7 +368,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should conditionally include confidenceLevels and validity only for secret alerts", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -459,7 +464,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle optional parameters correctly when not provided", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -489,7 +494,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should include all optional parameters when provided", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -550,7 +555,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle onlyDefaultBranch parameter correctly", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -603,7 +608,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle secret alerts without confidenceLevels or validity", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -630,7 +635,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle non-Error exception types", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
@@ -653,7 +658,7 @@ describe("configureAdvSecTools", () => {
 
   describe("advsec_get_alert_details tool", () => {
     it("should fetch specific alert details", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
@@ -699,7 +704,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should fetch specific alert details with ref parameter", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
@@ -737,7 +742,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle API errors correctly", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
@@ -760,7 +765,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle non-Error exception types", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
@@ -782,7 +787,7 @@ describe("configureAdvSecTools", () => {
     });
 
     it("should handle null API results correctly", async () => {
-      configureAdvSecTools(server, tokenProvider, connectionProvider, false);
+      configureAdvSecTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");

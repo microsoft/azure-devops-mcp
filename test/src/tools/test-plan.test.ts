@@ -25,6 +25,7 @@ describe("configureTestPlanTools", () => {
   let mockTestResultsApi: ITestResultsApi;
   let mockWitApi: IWorkItemTrackingApi;
   let mockTestApi: ITestApi;
+  let isReadOnlyMode: boolean;
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
@@ -54,11 +55,12 @@ describe("configureTestPlanTools", () => {
       serverUrl: "https://dev.azure.com/testorg",
     };
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+    isReadOnlyMode = false;
   });
 
   describe("tool registration", () => {
     it("registers test plan tools on the server", () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       expect((server.tool as jest.Mock).mock.calls.map((call) => call[0])).toEqual(
         expect.arrayContaining([
           "testplan_list_test_plans",
@@ -77,8 +79,9 @@ describe("configureTestPlanTools", () => {
       it("removes write tools when in read-only mode", () => {
         const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: false } };
         (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
 
-        configureTestPlanTools(server, tokenProvider, connectionProvider, true);
+        configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
         expect(mockTool.remove).toHaveBeenCalled();
       });
@@ -86,8 +89,9 @@ describe("configureTestPlanTools", () => {
       it("keeps read-only tools when in read-only mode", () => {
         const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: true } };
         (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
 
-        configureTestPlanTools(server, tokenProvider, connectionProvider, true);
+        configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
         expect(mockTool.remove).not.toHaveBeenCalled();
       });
@@ -96,7 +100,7 @@ describe("configureTestPlanTools", () => {
 
   describe("list_test_plans tool", () => {
     it("should call getTestPlans with the correct parameters and return the expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_plans");
       if (!call) throw new Error("testplan_list_test_plans tool not registered");
       const [, , , , handler] = call;
@@ -117,7 +121,7 @@ describe("configureTestPlanTools", () => {
 
   describe("create_test_plan tool", () => {
     it("should call createTestPlan with the correct parameters and return the expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_plan");
       if (!call) throw new Error("testplan_create_test_plan tool not registered");
       const [, , , , handler] = call;
@@ -151,7 +155,7 @@ describe("configureTestPlanTools", () => {
 
   describe("create_test_suite tool", () => {
     it("should call createTestSuite with the correct parameters and return the expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
       if (!call) throw new Error("testplan_create_test_suite tool not registered");
       const [, , , , handler] = call;
@@ -181,7 +185,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle API errors when creating test suite", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
       if (!call) throw new Error("testplan_create_test_suite tool not registered");
       const [, , , , handler] = call;
@@ -199,7 +203,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should create test suite with different parent suite IDs", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
       if (!call) throw new Error("testplan_create_test_suite tool not registered");
       const [, , , , handler] = call;
@@ -243,7 +247,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle empty or null response from createTestSuite", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
       if (!call) throw new Error("testplan_create_test_suite tool not registered");
       const [, , , , handler] = call;
@@ -263,7 +267,7 @@ describe("configureTestPlanTools", () => {
 
   describe("list_test_cases tool", () => {
     it("should call getTestCaseList with the correct parameters and return the expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_cases");
       if (!call) throw new Error("testplan_list_test_cases tool not registered");
       const [, , , , handler] = call;
@@ -283,7 +287,7 @@ describe("configureTestPlanTools", () => {
 
   describe("test_results_from_build_id tool", () => {
     it("should call getTestResultDetailsForBuild with the correct parameters and return the expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
       const [, , , , handler] = call;
@@ -302,7 +306,7 @@ describe("configureTestPlanTools", () => {
 
   describe("create_test_case tool", () => {
     it("should create test case with proper parameters", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -339,7 +343,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should create test case & expected result with proper parameters", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -376,7 +380,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle multiple steps in test case", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -410,7 +414,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle API errors in test case creation", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -427,7 +431,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should create test case with all optional parameters", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -494,7 +498,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle non-numbered step formats", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -551,7 +555,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle empty lines in steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -586,7 +590,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should create test case without steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -631,7 +635,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle edge case XML characters", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -676,7 +680,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle empty string steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -710,7 +714,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle only whitespace steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -744,7 +748,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle steps with pipe delimiter for expected results", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -794,7 +798,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle steps without pipe delimiter using default expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -836,7 +840,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle mixed steps with and without pipe delimiter", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -890,7 +894,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle empty expected result after pipe delimiter", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -932,7 +936,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle multiple pipe characters in expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -974,7 +978,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle whitespace around pipe delimiter", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -1028,7 +1032,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle special characters in expected results", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -1078,7 +1082,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle non-numbered steps with pipe delimiter", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -1132,7 +1136,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should create test case with testsWorkItemId relationship", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -1198,7 +1202,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should create test case without testsWorkItemId when not provided", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -1248,7 +1252,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should create test case with testsWorkItemId and all other optional parameters", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_case");
       if (!call) throw new Error("testplan_create_test_case tool not registered");
       const [, , , , handler] = call;
@@ -1317,7 +1321,7 @@ describe("configureTestPlanTools", () => {
 
   describe("update_test_case_steps tool", () => {
     it("should update test case steps with proper parameters", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1355,7 +1359,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle steps with pipe delimiter for expected results", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1400,7 +1404,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle steps without pipe delimiter using default expected result", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1445,7 +1449,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle XML special characters in steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1482,7 +1486,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle empty or whitespace-only steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1519,7 +1523,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle API errors when updating test case steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1535,7 +1539,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle mixed numbered and non-numbered steps", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1584,7 +1588,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle multiple pipe characters in expected results", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1621,7 +1625,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle empty expected results after pipe delimiter", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
       if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
       const [, , , , handler] = call;
@@ -1664,7 +1668,7 @@ describe("configureTestPlanTools", () => {
 
   describe("add_test_cases_to_suite tool", () => {
     it("should add test cases to suite with array of IDs", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_add_test_cases_to_suite");
       if (!call) throw new Error("testplan_add_test_cases_to_suite tool not registered");
       const [, , , , handler] = call;
@@ -1684,7 +1688,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should add test cases to suite with comma-separated string", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_add_test_cases_to_suite");
       if (!call) throw new Error("testplan_add_test_cases_to_suite tool not registered");
       const [, , , , handler] = call;
@@ -1704,7 +1708,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle empty results when adding test cases", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_add_test_cases_to_suite");
       if (!call) throw new Error("testplan_add_test_cases_to_suite tool not registered");
       const [, , , , handler] = call;
@@ -1723,7 +1727,7 @@ describe("configureTestPlanTools", () => {
     });
 
     it("should handle API errors when adding test cases to suite", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider, false);
+      configureTestPlanTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_add_test_cases_to_suite");
       if (!call) throw new Error("testplan_add_test_cases_to_suite tool not registered");
       const [, , , , handler] = call;
