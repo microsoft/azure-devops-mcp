@@ -1,4 +1,3 @@
-import { AccessToken } from "@azure/identity";
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkTools } from "../../../src/tools/work";
@@ -24,6 +23,7 @@ describe("configureWorkTools", () => {
   let mockConnection: { getWorkApi: jest.Mock; getWorkItemTrackingApi: jest.Mock };
   let mockWorkApi: WorkApiMock;
   let mockWorkItemTrackingApi: WorkItemTrackingApiMock;
+  let isReadOnlyMode: boolean;
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
@@ -44,22 +44,46 @@ describe("configureWorkTools", () => {
     };
 
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+
+    isReadOnlyMode = false;
   });
 
   describe("tool registration", () => {
     it("registers core tools on the server", () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
+    });
+
+    describe("read-only mode", () => {
+      it("removes write tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: false } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
+
+        configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
+
+        expect(mockTool.remove).toHaveBeenCalled();
+      });
+
+      it("keeps read-only tools when in read-only mode", () => {
+        const mockTool = { remove: jest.fn(), annotations: { readOnlyHint: true } };
+        (server.tool as jest.Mock).mockReturnValue(mockTool);
+        isReadOnlyMode = true;
+
+        configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
+
+        expect(mockTool.remove).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("list_team_iterations tool", () => {
     it("should call getTeamIterations API with the correct parameters and return the expected result", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
       if (!call) throw new Error("work_list_team_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkApi.getTeamIterations as jest.Mock).mockResolvedValue([
         {
@@ -103,11 +127,11 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle API errors correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
       if (!call) throw new Error("work_list_team_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Failed to retrieve iterations");
       (mockWorkApi.getTeamIterations as jest.Mock).mockRejectedValue(testError);
@@ -126,11 +150,11 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle null API results correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
       if (!call) throw new Error("work_list_team_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkApi.getTeamIterations as jest.Mock).mockResolvedValue(null);
 
@@ -148,11 +172,11 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle unknown error type correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
       if (!call) throw new Error("work_list_team_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkApi.getTeamIterations as jest.Mock).mockRejectedValue("string error");
 
@@ -172,12 +196,12 @@ describe("configureWorkTools", () => {
 
   describe("assign_iterations", () => {
     it("should call postTeamIteration API with the correct parameters and return the expected result", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_assign_iterations");
 
       if (!call) throw new Error("work_assign_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkApi.postTeamIteration as jest.Mock).mockResolvedValue({
         id: "a589a806-bf11-4d4f-a031-c19813331553",
@@ -235,12 +259,12 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle API errors correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_assign_iterations");
 
       if (!call) throw new Error("work_assign_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Failed to assign iteration");
       (mockWorkApi.postTeamIteration as jest.Mock).mockRejectedValue(testError);
@@ -264,12 +288,12 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle null API results correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_assign_iterations");
 
       if (!call) throw new Error("work_assign_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkApi.postTeamIteration as jest.Mock).mockResolvedValue(null);
 
@@ -292,12 +316,12 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle unknown error type correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_assign_iterations");
 
       if (!call) throw new Error("work_assign_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkApi.postTeamIteration as jest.Mock).mockRejectedValue("string error");
 
@@ -322,12 +346,12 @@ describe("configureWorkTools", () => {
 
   describe("create_iterations", () => {
     it("should call createOrUpdateClassificationNode API with the correct parameters and return the expected result", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_create_iterations");
 
       if (!call) throw new Error("work_create_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkItemTrackingApi.createOrUpdateClassificationNode as jest.Mock).mockResolvedValue({
         id: 126391,
@@ -400,12 +424,12 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle API errors correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_create_iterations");
 
       if (!call) throw new Error("work_create_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Failed to create iteration");
       (mockWorkItemTrackingApi.createOrUpdateClassificationNode as jest.Mock).mockRejectedValue(testError);
@@ -429,12 +453,12 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle null API results correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_create_iterations");
 
       if (!call) throw new Error("work_create_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkItemTrackingApi.createOrUpdateClassificationNode as jest.Mock).mockResolvedValue(null);
 
@@ -457,12 +481,12 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle unknown error type correctly", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_create_iterations");
 
       if (!call) throw new Error("work_create_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkItemTrackingApi.createOrUpdateClassificationNode as jest.Mock).mockRejectedValue("string error");
 
@@ -485,12 +509,12 @@ describe("configureWorkTools", () => {
     });
 
     it("should handle iterations without start and finish dates", async () => {
-      configureWorkTools(server, tokenProvider, connectionProvider);
+      configureWorkTools(server, tokenProvider, connectionProvider, isReadOnlyMode);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_create_iterations");
 
       if (!call) throw new Error("work_create_iterations tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockWorkItemTrackingApi.createOrUpdateClassificationNode as jest.Mock).mockResolvedValue({
         id: 126391,
