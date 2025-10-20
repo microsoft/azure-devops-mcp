@@ -44,9 +44,9 @@ const argv = yargs(hideBin(process.argv))
   })
   .option("authentication", {
     alias: "a",
-    describe: "Type of authentication to use. Supported values are 'interactive', 'azcli' and 'env' (default: 'interactive')",
+    describe: "Type of authentication to use. Supported values are 'interactive', 'azcli', 'env', and 'pat' (default: 'interactive')",
     type: "string",
-    choices: ["interactive", "azcli", "env"],
+    choices: ["interactive", "azcli", "env", "pat"],
     default: defaultAuthenticationType,
   })
   .option("tenant", {
@@ -58,7 +58,9 @@ const argv = yargs(hideBin(process.argv))
   .parseSync();
 
 export const orgName = argv.organization as string;
-const orgUrl = "https://dev.azure.com/" + orgName;
+const orgUrl = process.env.SERVER_URL
+  ? `${process.env.SERVER_URL}/${orgName}`
+  : `https://dev.azure.com/${orgName}`;
 
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
@@ -66,7 +68,10 @@ export const enabledDomains = domainsManager.getEnabledDomains();
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<azdev.WebApi> {
   return async () => {
     const accessToken = await getAzureDevOpsToken();
-    const authHandler = azdev.getBearerHandler(accessToken);
+    // For PAT authentication, use Basic auth handler; for OAuth tokens, use Bearer handler
+    const authHandler = argv.authentication === "pat"
+      ? azdev.getBasicHandler("PAT", accessToken)
+      : azdev.getBearerHandler(accessToken);
     const connection = new azdev.WebApi(orgUrl, authHandler, undefined, {
       productName: "AzureDevOps.MCP",
       productVersion: packageVersion,

@@ -59,6 +59,15 @@ class OAuthAuthenticator {
 
 function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
   switch (type) {
+    case "pat":
+      return async () => {
+        const pat = process.env.AZURE_DEVOPS_PAT;
+        if (!pat) {
+          throw new Error("AZURE_DEVOPS_PAT environment variable is not set. Please set it with your Personal Access Token.");
+        }
+        return pat;
+      };
+
     case "azcli":
     case "env":
       if (type !== "env") {
