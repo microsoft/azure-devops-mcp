@@ -58,6 +58,22 @@ class OAuthAuthenticator {
 }
 
 function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
+  // Check for ENV_ prefix pattern for environment variable authentication
+  if (type.startsWith("ENV_")) {
+    const envVarName = type.substring(4); // Remove "ENV_" prefix
+    if (!envVarName) {
+      throw new Error("Environment variable name is required after ENV_ prefix. Example: ENV_ADO_MCP_TOKEN");
+    }
+
+    return async () => {
+      const token = process.env[envVarName];
+      if (!token) {
+        throw new Error(`Environment variable '${envVarName}' is not set or empty. Please set it with a valid Azure DevOps Personal Access Token.`);
+      }
+      return token;
+    };
+  }
+
   switch (type) {
     case "azcli":
     case "env":
