@@ -62,30 +62,28 @@ class OAuthAuthenticator {
 }
 
 function createAuthenticator(type: string, tenantId?: string, tokenCommand?: string): () => Promise<string> {
-  // Check for external credential type with token command
-  if (type === "external") {
-    if (!tokenCommand) {
-      throw new Error("Token command is required when using 'external' authentication type. Use --token-command option.");
-    }
-
-    return async () => {
-      try {
-        const { stdout, stderr } = await execAsync(tokenCommand);
-        if (stderr) {
-          throw new Error(`Token command failed with error: ${stderr}`);
-        }
-        const token = stdout.trim();
-        if (!token) {
-          throw new Error("Token command returned empty output. Please ensure the command returns a valid Azure DevOps Personal Access Token.");
-        }
-        return token;
-      } catch (error) {
-        throw new Error(`Failed to execute token command '${tokenCommand}': ${error instanceof Error ? error.message : String(error)}`);
-      }
-    };
-  }
-
   switch (type) {
+    case "external":
+      if (!tokenCommand) {
+        throw new Error("Token command is required when using 'external' authentication type. Use --token-command option.");
+      }
+
+      return async () => {
+        try {
+          const { stdout, stderr } = await execAsync(tokenCommand);
+          if (stderr) {
+            throw new Error(`Token command failed with error: ${stderr}`);
+          }
+          const token = stdout.trim();
+          if (!token) {
+            throw new Error("Token command returned empty output. Please ensure the command returns a valid Azure DevOps Personal Access Token.");
+          }
+          return token;
+        } catch (error) {
+          throw new Error(`Failed to execute token command '${tokenCommand}': ${error instanceof Error ? error.message : String(error)}`);
+        }
+      };
+
     case "azcli":
     case "env":
       if (type !== "env") {
@@ -105,6 +103,7 @@ function createAuthenticator(type: string, tenantId?: string, tokenCommand?: str
         return result.token;
       };
 
+    case "interactive":
     default:
       const authenticator = new OAuthAuthenticator(tenantId);
       return () => {
