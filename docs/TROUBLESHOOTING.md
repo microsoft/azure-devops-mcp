@@ -48,20 +48,22 @@
 
 ## Authentication Issues
 
-### Token Authentication via Environment Variables
+### External Token Command Authentication
 
-For automated scenarios or when you want to use a token stored in an environment variable, you can use the `ENV_` authentication pattern:
+For automated scenarios or when you want to use an external command to retrieve a token, you can use the `external` authentication type:
 
-1. **Set your token in an environment variable:**
+1. **Create a script or command that returns your Azure DevOps token:**
 
    ```bash
-   export ADO_TOKEN="your-azure-devops-token"
+   # Example: echo "your-azure-devops-token"
+   # Or: cat ~/.ado-token
+   # Or: aws secretsmanager get-secret-value --secret-id ado-token --query SecretString --output text
    ```
 
-2. **Use the ENV\_ authentication pattern:**
+2. **Use the external authentication pattern:**
 
    ```bash
-   npx @azure-devops/mcp myorg --authentication ENV_ADO_TOKEN
+   npx @azure-devops/mcp myorg --authentication external --token-command "echo your-azure-devops-token"
    ```
 
 3. **For MCP configuration files, update your `.vscode/mcp.json`:**
@@ -78,7 +80,7 @@ For automated scenarios or when you want to use a token stored in an environment
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "ENV_ADO_TOKEN"]
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "external", "--token-command", "echo your-azure-devops-token"]
        }
      }
    }

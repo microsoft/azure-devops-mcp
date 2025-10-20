@@ -1,6 +1,10 @@
 import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
 import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
+import { exec } from "child_process";
+import { promisify } from "util";
 import open from "open";
+
+const execAsync = promisify(exec);
 
 const scopes = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
 
@@ -57,20 +61,27 @@ class OAuthAuthenticator {
   }
 }
 
-function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
-  // Check for ENV_ prefix pattern for environment variable authentication
-  if (type.startsWith("ENV_")) {
-    const envVarName = type.substring(4); // Remove "ENV_" prefix
-    if (!envVarName) {
-      throw new Error("Environment variable name is required after ENV_ prefix. Example: ENV_ADO_MCP_TOKEN");
+function createAuthenticator(type: string, tenantId?: string, tokenCommand?: string): () => Promise<string> {
+  // Check for external credential type with token command
+  if (type === "external") {
+    if (!tokenCommand) {
+      throw new Error("Token command is required when using 'external' authentication type. Use --token-command option.");
     }
 
     return async () => {
-      const token = process.env[envVarName];
-      if (!token) {
-        throw new Error(`Environment variable '${envVarName}' is not set or empty. Please set it with a valid Azure DevOps Personal Access Token.`);
+      try {
+        const { stdout, stderr } = await execAsync(tokenCommand);
+        if (stderr) {
+          throw new Error(`Token command failed with error: ${stderr}`);
+        }
+        const token = stdout.trim();
+        if (!token) {
+          throw new Error("Token command returned empty output. Please ensure the command returns a valid Azure DevOps Personal Access Token.");
+        }
+        return token;
+      } catch (error) {
+        throw new Error(`Failed to execute token command '${tokenCommand}': ${error instanceof Error ? error.message : String(error)}`);
       }
-      return token;
     };
   }
 

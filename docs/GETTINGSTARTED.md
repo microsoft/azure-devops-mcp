@@ -88,17 +88,18 @@ Click "Select Tools" and choose the available tools.
 3. The server appears in the tools list.
 4. Try prompts like "List ADO projects".
 
-##### Using Token Authentication via Environment Variables
+##### Using an External Token Command Authentication
 
-For automated scenarios or when you want to use a token stored in an environment variable, you can use the `ENV_` authentication pattern:
+For automated scenarios or when you want to use an external command to retrieve a token, you can use the `external` authentication type:
 
-1. **Set your token in an environment variable:**
+1. **Example usinag [AzureAuth](https://aka.ms/azureauth)**
 
    ```bash
-   export ADO_TOKEN="your-azure-devops-token"
+   npx -y @azure-devops/mcp myorg --authentication external --token-command "azureauth ado token"
    ```
 
-2. **Update your `.vscode/mcp.json` to use token authentication:**
+2. **Update your `.vscode/mcp.json` to use external token authentication:**
+
    ```json
    {
      "inputs": [
@@ -112,13 +113,13 @@ For automated scenarios or when you want to use a token stored in an environment
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "ENV_ADO_TOKEN"]
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "external", "--token-command", "azureauth ado token"]
        }
      }
    }
    ```
 
-This approach is particularly useful for CI/pipeline scenarios or when you want to avoid interactive authentication and use another credential source.
+This approach is particularly useful for CI/pipeline scenarios, secret management systems, or when you want to avoid interactive authentication and use another credential source.
 
 #### 🛠️ Install from Source (Dev Mode)
 

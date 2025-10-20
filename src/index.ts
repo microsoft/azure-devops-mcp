@@ -44,9 +44,14 @@ const argv = yargs(hideBin(process.argv))
   })
   .option("authentication", {
     alias: "a",
-    describe: "Type of authentication to use. Supported values are 'interactive', 'azcli', 'env', or 'ENV_<VAR_NAME>' to read token from environment variable (default: 'interactive')",
+    describe: "Type of authentication to use. Supported values are 'interactive', 'azcli', 'env', or 'external' to use external token command (default: 'interactive')",
     type: "string",
+    choices: ["interactive", "azcli", "env", "external"],
     default: defaultAuthenticationType,
+  })
+  .option("token-command", {
+    describe: "Command to execute to get token when using 'external' authentication type",
+    type: "string",
   })
   .option("tenant", {
     alias: "t",
@@ -91,7 +96,7 @@ async function main() {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
   const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
+  const authenticator = createAuthenticator(argv.authentication, tenantId, argv["token-command"]);
 
   // removing prompts untill further notice
   // configurePrompts(server);
