@@ -63,6 +63,7 @@ function trimPullRequestThread(thread: GitPullRequestCommentThread) {
     lastUpdatedDate: thread.lastUpdatedDate,
     status: thread.status,
     comments: trimComments(thread.comments),
+    threadContext: thread.threadContext,
   };
 }
 
