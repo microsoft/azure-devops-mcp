@@ -88,6 +88,38 @@ Click "Select Tools" and choose the available tools.
 3. The server appears in the tools list.
 4. Try prompts like "List ADO projects".
 
+##### Using Token Authentication via Environment Variables
+
+For automated scenarios or when you want to use a token stored in an environment variable, you can use the `ENV_` authentication pattern:
+
+1. **Set your token in an environment variable:**
+
+   ```bash
+   export ADO_TOKEN="your-azure-devops-token"
+   ```
+
+2. **Update your `.vscode/mcp.json` to use token authentication:**
+   ```json
+   {
+     "inputs": [
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization name (e.g. 'contoso')"
+       }
+     ],
+     "servers": {
+       "ado": {
+         "type": "stdio",
+         "command": "npx",
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "ENV_ADO_TOKEN"]
+       }
+     }
+   }
+   ```
+
+This approach is particularly useful for CI/pipeline scenarios or when you want to avoid interactive authentication and use another credential source.
+
 #### 🛠️ Install from Source (Dev Mode)
 
 This installation method is recommended for advanced users and contributors who want immediate access to the latest updates from the main branch. It is ideal if you are developing new tools, enhancing existing features, or maintaining a custom fork.
