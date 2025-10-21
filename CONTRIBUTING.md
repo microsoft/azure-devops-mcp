@@ -34,6 +34,35 @@ Please include tests with your pull request. Pull requests will not be accepted 
 
 Code formatting is enforced by CI checks. Run `npm run format` to ensure your changes comply with the rules.
 
+### Testing
+
+This project uses Jest with `ts-jest` for testing TypeScript code. Tests are located in the `test/` directory and mirror the structure of the `src/` directory.
+
+#### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run specific test file
+npm test test/src/utils.test.ts
+
+# Run tests with coverage report
+npm test -- --coverage
+```
+
+#### Jest Configuration
+
+The project uses a modern Jest + ts-jest configuration:
+
+- **jest.config.cjs**: Main Jest configuration using the modern transform array syntax
+- **tsconfig.jest.json**: Test-specific TypeScript configuration that extends the base `tsconfig.json`
+
+Key features of our test configuration:
+
+- **isolatedModules: true** - Enabled in `tsconfig.jest.json` to eliminate ts-jest "hybrid module kind" warnings. This ensures each file is transpiled independently, which is more performant and aligns with how `ts-jest` processes files.
+- **CommonJS modules** - Tests use CommonJS (`module: "CommonJS"`) to ensure compatibility with Jest's test environment.
+
 ## 🖊️ Coding style
 
 Follow the established patterns and styles in the repository. If you have suggestions for improvements, please open a new issue for discussion.
