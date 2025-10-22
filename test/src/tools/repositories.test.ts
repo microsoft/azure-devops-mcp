@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AccessToken } from "@azure/identity";
 import { WebApi } from "azure-devops-node-api";
 import { configureRepoTools, REPO_TOOLS } from "../../../src/tools/repositories";
 import { PullRequestStatus, GitVersionType, GitPullRequestQueryType, CommentThreadStatus } from "azure-devops-node-api/interfaces/GitInterfaces.js";

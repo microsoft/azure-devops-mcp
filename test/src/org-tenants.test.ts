@@ -115,7 +115,6 @@ describe("getOrgTenant", () => {
   });
 
   it("should return undefined when fetch from API fails", async () => {
-    const fetchedTenantId = "fresh-tenant-guid";
     mockReadFile.mockResolvedValue("{}");
     mockFetch.mockResolvedValue({
       status: 500,
@@ -130,7 +129,6 @@ describe("getOrgTenant", () => {
   });
 
   it("should return undefined when fetch from API has no tenant ID in the headers", async () => {
-    const fetchedTenantId = "fresh-tenant-guid";
     mockReadFile.mockResolvedValue("{}");
     mockFetch.mockResolvedValue({
       status: 404,
