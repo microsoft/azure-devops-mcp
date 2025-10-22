@@ -5,7 +5,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import * as azdev from "azure-devops-node-api";
+import { getBearerHandler, WebApi } from "azure-devops-node-api";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -63,11 +63,11 @@ const orgUrl = "https://dev.azure.com/" + orgName;
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
 
-function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<azdev.WebApi> {
+function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<WebApi> {
   return async () => {
     const accessToken = await getAzureDevOpsToken();
-    const authHandler = azdev.getBearerHandler(accessToken);
-    const connection = new azdev.WebApi(orgUrl, authHandler, undefined, {
+    const authHandler = getBearerHandler(accessToken);
+    const connection = new WebApi(orgUrl, authHandler, undefined, {
       productName: "AzureDevOps.MCP",
       productVersion: packageVersion,
       userAgent: userAgentComposer.userAgent,
