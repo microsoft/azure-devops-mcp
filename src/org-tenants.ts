@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
