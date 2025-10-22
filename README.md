@@ -14,10 +14,11 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 3. [⚙️ Supported Tools](#️-supported-tools)
 4. [🔌 Installation & Getting Started](#-installation--getting-started)
 5. [🌏 Using Domains](#-using-domains)
-6. [📝 Troubleshooting](#-troubleshooting)
-7. [🎩 Examples & Best Practices](#-examples--best-practices)
-8. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-9. [📌 Contributing](#-contributing)
+6. [📖 Read-Only Mode](#-read-only-mode)
+7. [📝 Troubleshooting](#-troubleshooting)
+8. [🎩 Examples & Best Practices](#-examples--best-practices)
+9. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+10. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -260,6 +261,31 @@ Domains that are available are: `core`, `work`, `work-items`, `search`, `test-pl
 We recommend that you always enable `core` tools so that you can fetch project level information.
 
 > By default all domains are loaded
+
+## 📖 Read-Only Mode
+
+For environments where you want to prevent any modifications to your Azure DevOps resources, use the `--read-only` flag. This mode exposes only read-only tools (like listing projects, getting work items, viewing pull requests) while hiding all tools that create, update, or delete data.
+
+Add the `--read-only` argument to the server args in your `mcp.json`:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado_readonly": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--read-only"]
+    }
+  }
+}
+```
 
 ## 📝 Troubleshooting
 
