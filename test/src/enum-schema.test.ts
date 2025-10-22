@@ -5,10 +5,10 @@ import { getEnumKeys } from "../../src/utils.js";
 import { DefinitionQueryOrder, BuildQueryOrder, StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { ReleaseDefinitionExpands, ReleaseDefinitionQueryOrder, ReleaseStatus, ReleaseQueryOrder, ReleaseExpands } from "azure-devops-node-api/interfaces/ReleaseInterfaces.js";
 
-type EnumSchema = {
+interface EnumSchema {
   type: string;
   enum: string[];
-};
+}
 
 describe("Enum Schema Generation", () => {
   describe("getEnumKeys utility", () => {
