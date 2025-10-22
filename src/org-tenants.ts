@@ -18,7 +18,7 @@ async function loadCache(): Promise<OrgTenantCache> {
   try {
     const cacheData = await fs.readFile(CACHE_FILE, "utf-8");
     return JSON.parse(cacheData);
-  } catch (error) {
+  } catch {
     // Cache file doesn't exist or is invalid, return empty cache
     return {};
   }

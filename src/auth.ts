@@ -36,7 +36,7 @@ class OAuthAuthenticator {
           scopes,
           account: this.accountId,
         });
-      } catch (error) {
+      } catch {
         authResult = null;
       }
     }
