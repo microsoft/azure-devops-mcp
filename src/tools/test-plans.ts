@@ -5,6 +5,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
+import { parseTestCaseFile, validateParsedData, FileInput } from "../utils/csv-file-parser.js";
+import { mapTestCasesFromData, mapTestCasesFromDataDynamic, generatePreview, mapTestCasesUsingProvidedMapping } from "../utils/test-case-mapper.js";
+import { executeBulkTestCaseOperations } from "../utils/bulk-test-case-creation.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
@@ -14,6 +17,8 @@ const Test_Plan_Tools = {
   list_test_cases: "testplan_list_test_cases",
   list_test_plans: "testplan_list_test_plans",
   create_test_suite: "testplan_create_test_suite",
+  bulk_import_test_cases: "testplan_bulk_import_test_cases",
+  suggest_field_mapping: "testplan_suggest_field_mapping",
 };
 
 function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
@@ -40,6 +45,71 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       return {
         content: [{ type: "text", text: JSON.stringify(testPlans, null, 2) }],
       };
+    }
+  );
+
+  /*
+    Suggest unified field mapping (CSV headers -> ADO work item fields) without segregating core/custom fields.
+    This is a preview helper: Clients can review and optionally adjust the mapping, then pass the final
+    mapping to 'testplan_bulk_import_test_cases' via the 'fieldMapping' parameter.
+  */
+  server.tool(
+    Test_Plan_Tools.suggest_field_mapping,
+    "Suggest a mapping between CSV headers and Azure DevOps Test Case work item fields (includes custom fields).",
+    {
+      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      fileContent: z.string().describe("The base64 encoded content of the CSV file (first row used for headers)."),
+      fileName: z.string().describe("The name of the file being uploaded (used to determine file type)."),
+      workItemType: z.string().default('Test Case').describe("Work item type for which to fetch fields. Defaults to 'Test Case'."),
+    },
+    async ({ project, fileContent, fileName, workItemType }) => {
+      try {
+        const fileInput: FileInput = { content: fileContent, filename: fileName };
+        const parseResult = await parseTestCaseFile(fileInput);
+        const validated = validateParsedData(parseResult);
+        if (validated.errors.length > 0) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ success: false, stage: 'file_parsing', errors: validated.errors, warnings: validated.warnings }, null, 2) }]
+          };
+        }
+
+        // Fetch work item type fields using cached approach
+        const connection = await connectionProvider();
+        const { getCachedFieldMappings } = await import('../utils/dynamic-work-item-field-fetcher.js');
+        const dynamicFields = await getCachedFieldMappings(connection, project, workItemType);
+        const fields = dynamicFields.map(f => ({ referenceName: f.referenceName, name: f.field }));
+
+        // Dynamic suggestion using new unified mapper
+        const { suggestUnifiedFieldMapping } = await import('../utils/test-case-mapper.js');
+        const suggestion = suggestUnifiedFieldMapping(validated.headers, fields);
+
+        // Ensure System.Title is suggested if any header resembles it (fallback)
+        const hasTitle = Object.values(suggestion.suggestedMapping).some(ref => ref.toLowerCase() === 'system.title');
+        if (!hasTitle) {
+          const titleLikeHeader = validated.headers.find(h => /title|name|summary|test case/i.test(h));
+          if (titleLikeHeader) {
+            suggestion.suggestions.push({ header: titleLikeHeader, suggestedReferenceName: 'System.Title', confidence: 60, reason: 'Fallback title heuristic' });
+            suggestion.suggestedMapping[titleLikeHeader] = 'System.Title';
+          }
+        }
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            success: true,
+            stage: 'suggestion',
+            headers: suggestion.headers,
+            suggestedMapping: suggestion.suggestedMapping,
+            suggestions: suggestion.suggestions,
+            unmappedHeaders: suggestion.unmappedHeaders,
+            fieldCount: fields.length,
+            note: 'Review suggestedMapping; adjust as needed and pass to testplan_bulk_import_test_cases.fieldMapping to proceed.'
+          }, null, 2) }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: false, stage: 'fatal_error', error: error instanceof Error ? error.message : 'Unknown error' }, null, 2) }]
+        };
+      }
     }
   );
 
@@ -257,6 +327,206 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       return {
         content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
       };
+    }
+  );
+
+  /*
+    Bulk Import Test Cases from CSV
+  */
+  server.tool(
+    Test_Plan_Tools.bulk_import_test_cases,
+  "Bulk import test cases from CSV (.csv) files. Supports both creating new test cases and updating existing ones. Intelligently maps column headers to test case fields. Excel formats are not supported.",
+    {
+      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      planId: z.number().optional().describe("The ID of the test plan (required if adding to suite)."),
+      suiteId: z.number().optional().describe("The ID of the test suite (required if adding to suite)."),
+      fileContent: z.string().describe("The base64 encoded content of the Excel or CSV file."),
+      fileName: z.string().describe("The name of the file being uploaded (used to determine file type)."),
+      previewOnly: z.boolean().default(false).describe("If true, only shows a preview without creating/updating test cases."),
+      addToSuite: z.boolean().default(false).describe("Whether to add the test cases to the specified test suite after creation/update."),
+      batchSize: z.number().default(10).describe("Number of test cases to process in each batch (1-50)."),
+      ignoreIds: z.boolean().default(false).describe("If true, ignores any ID/TestCaseId columns and forces creation of new test cases."),
+      fieldMapping: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          "Optional explicit mapping from CSV header to Azure DevOps field reference name (e.g. { 'Title': 'System.Title', 'Custom.MyRiskLevel': 'Custom.MyRiskLevel' }). Overrides automatic header mapping."
+        ),
+    },
+  async ({ project, planId, suiteId, fileContent, fileName, previewOnly, addToSuite, batchSize, ignoreIds, fieldMapping }) => {
+      try {
+        // Validate inputs
+        if (addToSuite && (!planId || !suiteId)) {
+          return {
+            content: [{ 
+              type: "text", 
+              text: JSON.stringify({
+                error: "planId and suiteId are required when addToSuite is true"
+              }, null, 2)
+            }]
+          };
+        }
+
+        if (batchSize < 1 || batchSize > 50) {
+          return {
+            content: [{ 
+              type: "text", 
+              text: JSON.stringify({
+                error: "batchSize must be between 1 and 50"
+              }, null, 2)
+            }]
+          };
+        }
+
+        // Parse the uploaded file
+        const fileInput: FileInput = {
+          content: fileContent,
+          filename: fileName
+        };
+
+        const parseResult = await parseTestCaseFile(fileInput);
+        const validatedResult = validateParsedData(parseResult);
+
+        if (validatedResult.errors.length > 0) {
+          return {
+            content: [{ 
+              type: "text", 
+              text: JSON.stringify({
+                success: false,
+                stage: "file_parsing",
+                errors: validatedResult.errors,
+                warnings: validatedResult.warnings
+              }, null, 2)
+            }]
+          };
+        }
+
+        // Get connection for dynamic field mapping
+        const connection = await connectionProvider();
+
+        // Map the data to test case format (dynamic mapping if provided)
+        const mappingResult = fieldMapping
+          ? mapTestCasesUsingProvidedMapping(validatedResult.data, validatedResult.headers, fieldMapping)
+          : await mapTestCasesFromDataDynamic(validatedResult.data, validatedResult.headers, connection, project);
+
+        // Force pure create mode by removing IDs
+        if (ignoreIds) {
+          mappingResult.mappedTestCases.forEach(tc => { if (tc.id !== undefined) { delete tc.id; } });
+          mappingResult.warnings.push("ignoreIds=true: All IDs were removed; all rows will be created as new test cases.");
+        }
+
+        const headersLower = validatedResult.headers.map(h => h.toLowerCase());
+        const hasStepsHeader = headersLower.some(h => h.includes("steps"));
+        if (!hasStepsHeader) {
+          const stepActionHeader = validatedResult.headers.find(h => h.toLowerCase().includes("step action"));
+          const stepExpectedHeader = validatedResult.headers.find(h => h.toLowerCase().includes("step expected"));
+          if (stepActionHeader || stepExpectedHeader) {
+            let synthesizedCount = 0;
+            mappingResult.mappedTestCases.forEach(tc => {
+              if (!tc.steps) {
+                const original = tc.originalData;
+                const actionVal = stepActionHeader ? (original[stepActionHeader] as string | undefined)?.trim() : undefined;
+                const expectedVal = stepExpectedHeader ? (original[stepExpectedHeader] as string | undefined)?.trim() : undefined;
+                if ((actionVal && actionVal.length > 0) || (expectedVal && expectedVal.length > 0)) {
+                  const safeAction = actionVal ?? "";
+                  const safeExpected = expectedVal ?? "";
+                  tc.steps = `1. ${safeAction}|${safeExpected}`;
+                  synthesizedCount++;
+                }
+              }
+            });
+          }
+        }
+
+        if (mappingResult.errors.length > 0 && mappingResult.mappedTestCases.length === 0) {
+          return {
+            content: [{ 
+              type: "text", 
+              text: JSON.stringify({
+                success: false,
+                stage: "field_mapping",
+                errors: mappingResult.errors,
+                warnings: mappingResult.warnings,
+                stats: mappingResult.stats
+              }, null, 2)
+            }]
+          };
+        }
+
+        // Generate preview
+      const preview = generatePreview(mappingResult);
+
+        if (previewOnly) {
+          return {
+            content: [{ 
+              type: "text", 
+              text: JSON.stringify({
+                success: true,
+                stage: "preview",
+                preview: preview,
+                stats: mappingResult.stats,
+                errors: mappingResult.errors,
+                warnings: mappingResult.warnings,
+                mappedTestCases: mappingResult.mappedTestCases.map(tc => ({
+                  rowIndex: tc.rowIndex,
+                  title: tc.title,
+                  id: tc.id,
+                  hasSteps: !!tc.steps,
+                  priority: tc.priority,
+                  areaPath: tc.areaPath
+                }))
+              }, null, 2)
+            }]
+          };
+        }
+
+        // Execute bulk operations
+        const bulkResult = await executeBulkTestCaseOperations(
+          mappingResult.mappedTestCases,
+          {
+            project,
+            planId,
+            suiteId,
+            batchSize,
+            addToSuite
+          },
+          () => connectionProvider()
+        );
+
+        // Combine all results
+        const finalResult = {
+          success: bulkResult.success,
+          stage: "completed",
+          preview: preview,
+          bulkOperationResult: {
+            summary: bulkResult.summary,
+            created: bulkResult.created,
+            updated: bulkResult.updated,
+            errors: bulkResult.errors
+          },
+          fileParsingWarnings: validatedResult.warnings,
+          mappingWarnings: mappingResult.warnings,
+          mappingErrors: mappingResult.errors,
+          operationErrors: bulkResult.errors
+        };
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(finalResult, null, 2) }]
+        };
+
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify({
+              success: false,
+              stage: "fatal_error",
+              error: error instanceof Error ? error.message : "Unknown error occurred",
+              message: "An unexpected error occurred during bulk import. Please check your file format and try again."
+            }, null, 2)
+          }]
+        };
+      }
     }
   );
 }
