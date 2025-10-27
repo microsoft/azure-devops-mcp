@@ -1,6 +1,6 @@
 {
   "name": "@azure-devops/mcp",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "MCP server for interacting with Azure DevOps",
   "license": "MIT",
   "author": "Microsoft Corporation",
@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@azure/identity": "^4.10.0",
-    "@modelcontextprotocol/sdk": "1.17.0",
+    "@modelcontextprotocol/sdk": "1.20.1",
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
@@ -49,7 +49,7 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.16.1",
+    "@modelcontextprotocol/inspector": "^0.17.0",
     "@types/csv-parser": "^1.1.7",
     "@types/jest": "^30.0.0",
     "@types/mime-types": "^2.1.1",
@@ -63,7 +63,7 @@
     "shx": "^0.4.0",
     "ts-jest": "^29.4.0",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.32.1"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.45.0"
   }
 }

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
 import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
 import open from "open";
@@ -7,16 +10,23 @@ const scopes = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
 class OAuthAuthenticator {
   static clientId = "0d50963b-7bb9-4fe7-94c7-a99af00b5136";
   static defaultAuthority = "https://login.microsoftonline.com/common";
+  static zeroTenantId = "00000000-0000-0000-0000-000000000000";
 
   private accountId: AccountInfo | null;
   private publicClientApp: PublicClientApplication;
 
   constructor(tenantId?: string) {
     this.accountId = null;
+
+    let authority = OAuthAuthenticator.defaultAuthority;
+    if (tenantId && tenantId !== OAuthAuthenticator.zeroTenantId) {
+      authority = `https://login.microsoftonline.com/${tenantId}`;
+    }
+
     this.publicClientApp = new PublicClientApplication({
       auth: {
         clientId: OAuthAuthenticator.clientId,
-        authority: tenantId ? `https://login.microsoftonline.com/${tenantId}` : OAuthAuthenticator.defaultAuthority,
+        authority,
       },
     });
   }

@@ -4,7 +4,7 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 
 - [Prerequisites](#-prerequisites)
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
-- [Getting started with Visual Studio 2022 & GitHub Copilot](#-visual-studio-2022--github-copilot-1)
+- [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
 - [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
 - [Getting started with Cursor](#-using-mcp-server-with-cursor)
@@ -138,8 +138,6 @@ Click "Select Tools" and choose the available tools.
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will help you get the best experience using the Azure DevOps MCP Server in GitHub Copilot Chat.
 
 ### ➡️ Visual Studio 2022 & GitHub Copilot
-
-For the best experience, use Visual Studio Code and GitHub Copilot 👆.
 
 #### 🧨 Install from Public Feed (Recommended)
 

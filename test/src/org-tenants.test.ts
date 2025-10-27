@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { jest } from "@jest/globals";
 import * as fs from "fs/promises";
 import { getOrgTenant } from "../../src/org-tenants";

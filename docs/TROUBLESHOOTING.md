@@ -191,3 +191,18 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
 4. **When prompted**, enter:
    - Your Azure DevOps organization name
    - The tenant ID from step 1
+
+## Common Errors
+
+1. **Incorrect Organization Name Error**
+
+   ```
+   Error fetching projects: Failed to find api location for area: Location id: e81700f7-3be2-46de-8624-2eb35882fcaa
+   ```
+
+   **Cause:** This occurs when the Azure DevOps organization name is incorrect or doesn't exist.
+
+   **Solution:** Verify that:
+   - The organization name is spelled correctly (case-sensitive)
+   - The organization exists and you have access to it
+   - You're using just the organization name, not the full URL (e.g., use `contoso` not `https://dev.azure.com/contoso`)

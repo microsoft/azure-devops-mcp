@@ -15,6 +15,11 @@ import {
   GitPullRequestQueryType,
   CommentThreadContext,
   CommentThreadStatus,
+  GitPullRequestCompletionOptions,
+  GitPullRequestMergeStrategy,
+  GitPullRequest,
+  GitPullRequestCommentThread,
+  Comment,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -23,8 +28,7 @@ import { getEnumKeys } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
-  list_pull_requests_by_repo: "repo_list_pull_requests_by_repo",
-  list_pull_requests_by_project: "repo_list_pull_requests_by_project",
+  list_pull_requests_by_repo_or_project: "repo_list_pull_requests_by_repo_or_project",
   list_branches_by_repo: "repo_list_branches_by_repo",
   list_my_branches_by_repo: "repo_list_my_branches_by_repo",
   list_pull_request_threads: "repo_list_pull_request_threads",
@@ -52,12 +56,22 @@ function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) 
     .slice(0, top);
 }
 
+function trimPullRequestThread(thread: GitPullRequestCommentThread) {
+  return {
+    id: thread.id,
+    publishedDate: thread.publishedDate,
+    lastUpdatedDate: thread.lastUpdatedDate,
+    status: thread.status,
+    comments: trimComments(thread.comments),
+  };
+}
+
 /**
  * Trims comment data to essential properties, filtering out deleted comments
  * @param comments Array of comments to trim (can be undefined/null)
  * @returns Array of trimmed comment objects with essential properties only
  */
-function trimComments(comments: any[] | undefined | null) {
+function trimComments(comments: Comment[] | undefined | null) {
   return comments
     ?.filter((comment) => !comment.isDeleted) // Exclude deleted comments
     ?.map((comment) => ({
@@ -95,6 +109,25 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   const filteredByName = repositories?.filter((repo) => repo.name?.toLowerCase().includes(lowerCaseFilter));
 
   return filteredByName;
+}
+
+function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
+  return {
+    pullRequestId: pr.pullRequestId,
+    codeReviewId: pr.codeReviewId,
+    repository: pr.repository?.name,
+    status: pr.status,
+    createdBy: {
+      displayName: pr.createdBy?.displayName,
+      uniqueName: pr.createdBy?.uniqueName,
+    },
+    creationDate: pr.creationDate,
+    title: pr.title,
+    ...(includeDescription ? { description: pr.description ?? "" } : {}),
+    isDraft: pr.isDraft,
+    sourceRefName: pr.sourceRefName,
+    targetRefName: pr.targetRefName,
+  };
 }
 
 function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -137,8 +170,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         repositoryId
       );
 
+      const trimmedPullRequest = trimPullRequest(pullRequest, true);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
       };
     }
   );
@@ -238,7 +273,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.update_pull_request,
-    "Update a Pull Request by ID with specified fields.",
+    "Update a Pull Request by ID with specified fields, including setting autocomplete with various completion options.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
       pullRequestId: z.number().describe("The ID of the pull request to update."),
@@ -247,19 +282,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       isDraft: z.boolean().optional().describe("Whether the pull request should be a draft."),
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
       status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
+      autoComplete: z.boolean().optional().describe("Set the pull request to autocomplete when all requirements are met."),
+      mergeStrategy: z
+        .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
+        .optional()
+        .describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
+      deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
+      transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
+      bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
       // Build update object with only provided fields
-      const updateRequest: {
-        title?: string;
-        description?: string;
-        isDraft?: boolean;
-        targetRefName?: string;
-        status?: number;
-      } = {};
+      const updateRequest: Record<string, unknown> = {};
+
       if (title !== undefined) updateRequest.title = title;
       if (description !== undefined) updateRequest.description = description;
       if (isDraft !== undefined) updateRequest.isDraft = isDraft;
@@ -268,18 +306,46 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
       }
 
+      if (autoComplete !== undefined) {
+        if (autoComplete) {
+          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const autoCompleteUserId = data.authenticatedUser.id;
+          updateRequest.autoCompleteSetBy = { id: autoCompleteUserId };
+
+          const completionOptions: GitPullRequestCompletionOptions = {
+            deleteSourceBranch: deleteSourceBranch || false,
+            transitionWorkItems: transitionWorkItems !== false, // Default to true unless explicitly set to false
+            bypassPolicy: !!bypassReason, // Automatically set to true if bypassReason is provided
+          };
+
+          if (mergeStrategy) {
+            completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
+          }
+
+          if (bypassReason) {
+            completionOptions.bypassReason = bypassReason;
+          }
+
+          updateRequest.completionOptions = completionOptions;
+        } else {
+          updateRequest.autoCompleteSetBy = null;
+          updateRequest.completionOptions = null;
+        }
+      }
+
       // Validate that at least one field is provided for update
       if (Object.keys(updateRequest).length === 0) {
         return {
-          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, or status) must be provided for update." }],
+          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update." }],
           isError: true,
         };
       }
 
       const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+      const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
       };
     }
   );
@@ -305,8 +371,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           pullRequestId
         );
 
+        const trimmedResponse = updatedPullRequest.map((item) => ({
+          displayName: item.displayName,
+          id: item.id,
+          uniqueName: item.uniqueName,
+          vote: item.vote,
+          hasDeclined: item.hasDeclined,
+          isFlagged: item.isFlagged,
+        }));
+
         return {
-          content: [{ type: "text", text: JSON.stringify(updatedPullRequest, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }],
         };
       } else {
         for (const reviewerId of reviewerIds) {
@@ -356,10 +431,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   );
 
   server.tool(
-    REPO_TOOLS.list_pull_requests_by_repo,
-    "Retrieve a list of pull requests for a given repository.",
+    REPO_TOOLS.list_pull_requests_by_repo_or_project,
+    "Retrieve a list of pull requests for a given repository. Either repositoryId or project must be provided.",
     {
-      repositoryId: z.string().describe("The ID of the repository where the pull requests are located."),
+      repositoryId: z.string().optional().describe("The ID of the repository where the pull requests are located."),
+      project: z.string().optional().describe("The ID of the project where the pull requests are located."),
       top: z.number().default(100).describe("The maximum number of pull requests to return."),
       skip: z.number().default(0).describe("The number of pull requests to skip."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
@@ -376,22 +452,37 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
       targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
-    async ({ repositoryId, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
+    async ({ repositoryId, project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
       // Build the search criteria
       const searchCriteria: {
         status: number;
-        repositoryId: string;
+        repositoryId?: string;
         creatorId?: string;
         reviewerId?: string;
         sourceRefName?: string;
         targetRefName?: string;
       } = {
         status: pullRequestStatusStringToInt(status),
-        repositoryId: repositoryId,
       };
+
+      if (!repositoryId && !project) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Either repositoryId or project must be provided.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (repositoryId) {
+        searchCriteria.repositoryId = repositoryId;
+      }
 
       if (sourceRefName) {
         searchCriteria.sourceRefName = sourceRefName;
@@ -443,147 +534,39 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         searchCriteria.reviewerId = userId;
       }
 
-      const pullRequests = await gitApi.getPullRequests(
-        repositoryId,
-        searchCriteria,
-        undefined, // project
-        undefined, // maxCommentLength
-        skip,
-        top
-      );
-
-      // Filter out the irrelevant properties
-      const filteredPullRequests = pullRequests?.map((pr) => ({
-        pullRequestId: pr.pullRequestId,
-        codeReviewId: pr.codeReviewId,
-        status: pr.status,
-        createdBy: {
-          displayName: pr.createdBy?.displayName,
-          uniqueName: pr.createdBy?.uniqueName,
-        },
-        creationDate: pr.creationDate,
-        title: pr.title,
-        isDraft: pr.isDraft,
-        sourceRefName: pr.sourceRefName,
-        targetRefName: pr.targetRefName,
-      }));
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
-      };
-    }
-  );
-
-  server.tool(
-    REPO_TOOLS.list_pull_requests_by_project,
-    "Retrieve a list of pull requests for a given project Id or Name.",
-    {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      top: z.number().default(100).describe("The maximum number of pull requests to return."),
-      skip: z.number().default(0).describe("The number of pull requests to skip."),
-      created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
-      created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
-      i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      user_is_reviewer: z
-        .string()
-        .optional()
-        .describe("Filter pull requests where a specific user is a reviewer (provide email or unique name). Takes precedence over i_am_reviewer if both are provided."),
-      status: z
-        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
-        .default("Active")
-        .describe("Filter pull requests by status. Defaults to 'Active'."),
-      sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
-      targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
-    },
-    async ({ project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-
-      // Build the search criteria
-      const gitPullRequestSearchCriteria: {
-        status: number;
-        creatorId?: string;
-        reviewerId?: string;
-        sourceRefName?: string;
-        targetRefName?: string;
-      } = {
-        status: pullRequestStatusStringToInt(status),
-      };
-
-      if (sourceRefName) {
-        gitPullRequestSearchCriteria.sourceRefName = sourceRefName;
+      let pullRequests;
+      if (repositoryId) {
+        pullRequests = await gitApi.getPullRequests(
+          repositoryId,
+          searchCriteria,
+          project, // project
+          undefined, // maxCommentLength
+          skip,
+          top
+        );
+      } else if (project) {
+        // If only project is provided, use getPullRequestsByProject
+        pullRequests = await gitApi.getPullRequestsByProject(
+          project,
+          searchCriteria,
+          undefined, // maxCommentLength
+          skip,
+          top
+        );
+      } else {
+        // This case should not occur due to earlier validation, but added for completeness
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Either repositoryId or project must be provided.",
+            },
+          ],
+          isError: true,
+        };
       }
 
-      if (targetRefName) {
-        gitPullRequestSearchCriteria.targetRefName = targetRefName;
-      }
-
-      if (created_by_user) {
-        try {
-          const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
-          gitPullRequestSearchCriteria.creatorId = userId;
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error finding user with email ${created_by_user}: ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      } else if (created_by_me) {
-        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-        const userId = data.authenticatedUser.id;
-        gitPullRequestSearchCriteria.creatorId = userId;
-      }
-
-      if (user_is_reviewer) {
-        try {
-          const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
-          gitPullRequestSearchCriteria.reviewerId = reviewerUserId;
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error finding reviewer with email ${user_is_reviewer}: ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      } else if (i_am_reviewer) {
-        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-        const userId = data.authenticatedUser.id;
-        gitPullRequestSearchCriteria.reviewerId = userId;
-      }
-
-      const pullRequests = await gitApi.getPullRequestsByProject(
-        project,
-        gitPullRequestSearchCriteria,
-        undefined, // maxCommentLength
-        skip,
-        top
-      );
-
-      // Filter out the irrelevant properties
-      const filteredPullRequests = pullRequests?.map((pr) => ({
-        pullRequestId: pr.pullRequestId,
-        codeReviewId: pr.codeReviewId,
-        repository: pr.repository?.name,
-        status: pr.status,
-        createdBy: {
-          displayName: pr.createdBy?.displayName,
-          uniqueName: pr.createdBy?.uniqueName,
-        },
-        creationDate: pr.creationDate,
-        title: pr.title,
-        isDraft: pr.isDraft,
-        sourceRefName: pr.sourceRefName,
-        targetRefName: pr.targetRefName,
-      }));
+      const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
 
       return {
         content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
@@ -619,13 +602,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
 
       // Return trimmed thread data focusing on essential information
-      const trimmedThreads = paginatedThreads?.map((thread) => ({
-        id: thread.id,
-        publishedDate: thread.publishedDate,
-        lastUpdatedDate: thread.lastUpdatedDate,
-        status: thread.status,
-        comments: trimComments(thread.comments),
-      }));
+      const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
 
       return {
         content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
@@ -902,8 +879,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         project
       );
 
+      const trimmedThread = trimPullRequestThread(thread);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
       };
     }
   );
