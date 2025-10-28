@@ -10,6 +10,7 @@ const WORK_TOOLS = {
   list_team_iterations: "work_list_team_iterations",
   create_iterations: "work_create_iterations",
   assign_iterations: "work_assign_iterations",
+  get_team_capacity: "work_get_team_capacity",
 };
 
 function configureWorkTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
@@ -145,6 +146,59 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
 
         return {
           content: [{ type: "text", text: `Error assigning iterations: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORK_TOOLS.get_team_capacity,
+    "Get the team capacity of a specific team and iteration in a project.",
+    {
+      project: z.string().describe("The name or Id of the Azure DevOps project."),
+      team: z.string().describe("The name or Id of the Azure DevOps team."),
+      iterationId: z.string().describe("The Iteration Id to get capacity for."),
+    },
+    async ({ project, team, iterationId }) => {
+      try {
+        const connection = await connectionProvider();
+        const workApi = await connection.getWorkApi();
+        const teamContext = { project, team };
+
+        const rawResults = await workApi.getCapacitiesWithIdentityRefAndTotals(teamContext, iterationId);
+
+        if (!rawResults || rawResults.teamMembers?.length === 0) {
+          return { content: [{ type: "text", text: "No team capacity assigned to the team" }], isError: true };
+        }
+
+        // Remove unwanted fields from teamMember and url
+        const simplifiedResults = {
+          ...rawResults,
+          teamMembers: (rawResults.teamMembers || []).map((member) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { url, ...rest } = member;
+            return {
+              ...rest,
+              teamMember: member.teamMember
+          ? {
+              displayName: member.teamMember.displayName,
+              id: member.teamMember.id,
+              uniqueName: member.teamMember.uniqueName,
+            }
+          : undefined,
+            };
+          }),
+        };
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(simplifiedResults, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting team capacity: ${errorMessage}` }],
           isError: true,
         };
       }
