@@ -181,12 +181,12 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
             return {
               ...rest,
               teamMember: member.teamMember
-          ? {
-              displayName: member.teamMember.displayName,
-              id: member.teamMember.id,
-              uniqueName: member.teamMember.uniqueName,
-            }
-          : undefined,
+                ? {
+                    displayName: member.teamMember.displayName,
+                    id: member.teamMember.id,
+                    uniqueName: member.teamMember.uniqueName,
+                  }
+                : undefined,
             };
           }),
         };
