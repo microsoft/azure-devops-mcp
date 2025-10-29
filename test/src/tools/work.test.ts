@@ -13,6 +13,7 @@ type ConnectionProviderMock = () => Promise<WebApi>;
 interface WorkApiMock {
   getTeamIterations: jest.Mock;
   postTeamIteration: jest.Mock;
+  getCapacitiesWithIdentityRefAndTotals: jest.Mock;
 }
 
 interface WorkItemTrackingApiMock {
@@ -34,6 +35,7 @@ describe("configureWorkTools", () => {
     mockWorkApi = {
       getTeamIterations: jest.fn(),
       postTeamIteration: jest.fn(),
+      getCapacitiesWithIdentityRefAndTotals: jest.fn(),
     };
 
     mockWorkItemTrackingApi = {
@@ -542,6 +544,399 @@ describe("configureWorkTools", () => {
           2
         )
       );
+    });
+  });
+
+  describe("get_team_capacity tool", () => {
+    it("should call getCapacitiesWithIdentityRefAndTotals API with the correct parameters and return the expected result", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockResolvedValue({
+        teamMembers: [
+          {
+            teamMember: {
+              displayName: "Alex Thompson",
+              id: "b4754e26-7767-52c6-939g-21cc067ddc37",
+              uniqueName: "alex.thompson@example.com",
+              url: "https://spsprodeus24.vssps.visualstudio.com/A6ae0268e-4307-4135-87ef-285d5153a124/_apis/Identities/b4754e26-7767-52c6-939g-21cc067ddc37",
+              _links: {
+                avatar: {
+                  href: "https://dev.azure.com/testorg/_apis/GraphProfile/MemberAvatars/aad.N2NkZmE3NGUtOTk1Ny03OTVjLTliOWYtMWEzM2ZmMjkxZjQy",
+                },
+              },
+              imageUrl: "https://dev.azure.com/testorg/_apis/GraphProfile/MemberAvatars/aad.N2NkZmE3NGUtOTk1Ny03OTVjLTliOWYtMWEzM2ZmMjkxZjQy",
+              descriptor: "aad.ZjIzNGU3ZTEtODFhYy00NjIzLWI4ZjUtMzIxNzFmNmNhMjUy",
+            },
+            activities: [
+              {
+                capacityPerDay: 4,
+                name: "",
+              },
+            ],
+            daysOff: [],
+            url: "https://dev.azure.com/testorg/59e5c445-9b24-49c6-9d6c-adf2247ce589/914f4df1-d3cc-44a6-b38e-72ad06a58ea9/_apis/work/teamsettings/iterations/299567e9-f6e6-4a9b-89c8-7a9722e949d7/capacities/b4754e26-7767-52c6-939g-21cc067ddc37",
+          },
+          {
+            teamMember: {
+              displayName: "Sarah Wilson",
+              id: "9a53abc4-0cb4-40a1-ab5c-8a1fde9aa565",
+              uniqueName: "sarah.wilson@example.com",
+              url: "https://spsprodeus24.vssps.visualstudio.com/A6ae0268e-4307-4135-87ef-285d5153a124/_apis/Identities/9a53abc4-0cb4-40a1-ab5c-8a1fde9aa565",
+              _links: {
+                avatar: {
+                  href: "https://dev.azure.com/testorg/_apis/GraphProfile/MemberAvatars/aad.MTFiZGYzMTktNDI5Zi03MDYyLTliOTgtODdlYmJkNTY1NzU5",
+                },
+              },
+              imageUrl: "https://dev.azure.com/testorg/_apis/GraphProfile/MemberAvatars/aad.MTFiZGYzMTktNDI5Zi03MDYyLTliOTgtODdlYmJkNTY1NzU5",
+              descriptor: "aad.YjMxOGZkNDUtNzQ2Mi00Njk4LWFjMTEtZGJmOTgxZGVjNzYz",
+            },
+            activities: [
+              {
+                capacityPerDay: 6,
+                name: "",
+              },
+            ],
+            daysOff: [
+              {
+                start: "2025-10-29T00:00:00.000Z",
+                end: "2025-10-29T00:00:00.000Z",
+              },
+            ],
+            url: "https://dev.azure.com/testorg/59e5c445-9b24-49c6-9d6c-adf2247ce589/914f4df1-d3cc-44a6-b38e-72ad06a58ea9/_apis/work/teamsettings/iterations/299567e9-f6e6-4a9b-89c8-7a9722e949d7/capacities/9a53abc4-0cb4-40a1-ab5c-8a1fde9aa565",
+          },
+        ],
+        totalCapacityPerDay: 10,
+        totalDaysOff: 1,
+      });
+
+      const params = {
+        project: "SampleProject",
+        team: "SampleProject Team",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalledWith({ project: "SampleProject", team: "SampleProject Team" }, "299567e9-f6e6-4a9b-89c8-7a9722e949d7");
+
+      const expectedResult = {
+        teamMembers: [
+          {
+            teamMember: {
+              displayName: "Alex Thompson",
+              id: "b4754e26-7767-52c6-939g-21cc067ddc37",
+              uniqueName: "alex.thompson@example.com",
+            },
+            activities: [
+              {
+                capacityPerDay: 4,
+                name: "",
+              },
+            ],
+            daysOff: [],
+          },
+          {
+            teamMember: {
+              displayName: "Sarah Wilson",
+              id: "9a53abc4-0cb4-40a1-ab5c-8a1fde9aa565",
+              uniqueName: "sarah.wilson@example.com",
+            },
+            activities: [
+              {
+                capacityPerDay: 6,
+                name: "",
+              },
+            ],
+            daysOff: [
+              {
+                start: "2025-10-29T00:00:00.000Z",
+                end: "2025-10-29T00:00:00.000Z",
+              },
+            ],
+          },
+        ],
+        totalCapacityPerDay: 10,
+        totalDaysOff: 1,
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle team with no capacity assigned", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockResolvedValue({
+        teamMembers: [],
+        totalCapacityPerDay: 0,
+        totalDaysOff: 0,
+      });
+
+      const params = {
+        project: "SampleProject",
+        team: "SampleProject Team",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalledWith({ project: "SampleProject", team: "SampleProject Team" }, "299567e9-f6e6-4a9b-89c8-7a9722e949d7");
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No team capacity assigned to the team");
+    });
+
+    it("should handle null API results correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "SampleProject",
+        team: "SampleProject Team",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No team capacity assigned to the team");
+    });
+
+    it("should handle undefined teamMembers array correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockResolvedValue({
+        teamMembers: undefined,
+        totalCapacityPerDay: 0,
+        totalDaysOff: 0,
+      });
+
+      const params = {
+        project: "SampleProject",
+        team: "SampleProject Team",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalled();
+
+      // When teamMembers is undefined, the simplified results will have an empty array
+      const expectedResult = {
+        teamMembers: [],
+        totalCapacityPerDay: 0,
+        totalDaysOff: 0,
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle team member with undefined teamMember property", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockResolvedValue({
+        teamMembers: [
+          {
+            teamMember: undefined,
+            activities: [
+              {
+                capacityPerDay: 8,
+                name: "Development",
+              },
+            ],
+            daysOff: [],
+            url: "https://dev.azure.com/example/_apis/work/teamsettings/iterations/test-id/capacities/test-user",
+          },
+        ],
+        totalCapacityPerDay: 8,
+        totalDaysOff: 0,
+      });
+
+      const params = {
+        project: "SampleProject",
+        team: "SampleProject Team",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalled();
+
+      const expectedResult = {
+        teamMembers: [
+          {
+            teamMember: undefined,
+            activities: [
+              {
+                capacityPerDay: 8,
+                name: "Development",
+              },
+            ],
+            daysOff: [],
+          },
+        ],
+        totalCapacityPerDay: 8,
+        totalDaysOff: 0,
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Failed to retrieve team capacity");
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockRejectedValue(testError);
+
+      const params = {
+        project: "SampleProject",
+        team: "SampleProject Team",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error getting team capacity: Failed to retrieve team capacity");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "SampleProject",
+        team: "SampleProject Team",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error getting team capacity: Unknown error occurred");
+    });
+
+    it("should properly simplify team member data by removing unwanted fields", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockResolvedValue({
+        teamMembers: [
+          {
+            teamMember: {
+              displayName: "Michael Chen",
+              id: "test-id-123",
+              uniqueName: "michael.chen@example.com",
+              url: "https://example.com/api/identities/test-id-123",
+              _links: {
+                avatar: {
+                  href: "https://example.com/avatar",
+                },
+              },
+              imageUrl: "https://example.com/image",
+              descriptor: "aad.fake-descriptor-12345",
+              extraField: "this should be removed",
+            },
+            activities: [
+              {
+                capacityPerDay: 7.5,
+                name: "Development",
+              },
+            ],
+            daysOff: [
+              {
+                start: "2025-11-01T00:00:00.000Z",
+                end: "2025-11-01T00:00:00.000Z",
+              },
+            ],
+            url: "https://example.com/capacity",
+          },
+        ],
+        totalCapacityPerDay: 7.5,
+        totalDaysOff: 1,
+      });
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        iterationId: "test-iteration-id",
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      // Verify that only the allowed fields are present in teamMember
+      expect(parsedResult.teamMembers[0].teamMember).toEqual({
+        displayName: "Michael Chen",
+        id: "test-id-123",
+        uniqueName: "michael.chen@example.com",
+      });
+
+      // Verify that unwanted fields are removed
+      expect(parsedResult.teamMembers[0].teamMember.url).toBeUndefined();
+      expect(parsedResult.teamMembers[0].teamMember._links).toBeUndefined();
+      expect(parsedResult.teamMembers[0].teamMember.imageUrl).toBeUndefined();
+      expect(parsedResult.teamMembers[0].teamMember.descriptor).toBeUndefined();
+      expect(parsedResult.teamMembers[0].teamMember.extraField).toBeUndefined();
+
+      // Verify that daysOff property is preserved
+      expect(parsedResult.teamMembers[0].daysOff).toEqual([
+        {
+          start: "2025-11-01T00:00:00.000Z",
+          end: "2025-11-01T00:00:00.000Z",
+        },
+      ]);
+
+      // Verify that activities are preserved (not removed)
+      expect(parsedResult.teamMembers[0].activities).toEqual([
+        {
+          capacityPerDay: 7.5,
+          name: "Development",
+        },
+      ]);
+
+      // Verify that url is removed from the simplified result
+      expect(parsedResult.teamMembers[0].url).toBeUndefined();
+
+      // Verify that total fields are preserved (not removed)
+      expect(parsedResult.totalCapacityPerDay).toBe(7.5);
+      expect(parsedResult.totalDaysOff).toBe(1);
     });
   });
 });
