@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { UserAgentComposer } from "../../src/useragent";
 
 describe("UserAgentComposer", () => {

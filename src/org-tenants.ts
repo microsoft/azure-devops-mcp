@@ -1,22 +1,23 @@
-import * as fs from "fs/promises";
-import * as os from "os";
-import * as path from "path";
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+import { readFile, writeFile } from "fs/promises";
+import { homedir } from "os";
+import { join } from "path";
 
 interface OrgTenantCacheEntry {
   tenantId: string;
   refreshedOn: number;
 }
 
-interface OrgTenantCache {
-  [orgName: string]: OrgTenantCacheEntry;
-}
+type OrgTenantCache = Record<string, OrgTenantCacheEntry>;
 
-const CACHE_FILE = path.join(os.homedir(), ".ado_orgs.cache");
+const CACHE_FILE = join(homedir(), ".ado_orgs.cache");
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 
 async function loadCache(): Promise<OrgTenantCache> {
   try {
-    const cacheData = await fs.readFile(CACHE_FILE, "utf-8");
+    const cacheData = await readFile(CACHE_FILE, "utf-8");
     return JSON.parse(cacheData);
   } catch {
     // Cache file doesn't exist or is invalid, return empty cache
@@ -26,7 +27,7 @@ async function loadCache(): Promise<OrgTenantCache> {
 
 async function trySavingCache(cache: OrgTenantCache): Promise<void> {
   try {
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
+    await writeFile(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
   } catch (error) {
     console.error("Failed to save org tenants cache:", error);
   }

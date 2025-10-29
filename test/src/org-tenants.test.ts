@@ -1,5 +1,8 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { jest } from "@jest/globals";
-import * as fs from "fs/promises";
+import fs, { readFile, writeFile } from "fs/promises";
 import { getOrgTenant } from "../../src/org-tenants";
 
 jest.mock("fs/promises");
@@ -9,8 +12,8 @@ type FetchMock = jest.Mock<typeof fetch>;
 describe("getOrgTenant", () => {
   const orgName = "testorg";
   let mockFetch: FetchMock;
-  let mockReadFile: jest.SpiedFunction<typeof fs.readFile>;
-  let mockWriteFile: jest.SpiedFunction<typeof fs.writeFile>;
+  let mockReadFile: jest.SpiedFunction<typeof readFile>;
+  let mockWriteFile: jest.SpiedFunction<typeof writeFile>;
 
   beforeEach(() => {
     mockFetch = jest.fn() as FetchMock;
