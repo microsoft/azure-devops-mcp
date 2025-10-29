@@ -28,7 +28,7 @@ For reference, see [this example of a well-formed issue](https://github.com/micr
 
 ## 👩‍💻 Writing code
 
-We are accepting a limited number of pull requests during the public preview phase. If you notice something that should be changed or added, please create an issue first and provide details. Once reviewed, and if it makes sense to proceed, we will respond with a 👍.
+We’re currently accepting a limited number of pull requests, provided they follow the established process and remain simple in scope. If you notice something that should be changed or added, please **create an issue first** and provide details. Once reviewed, and if it makes sense to proceed, we will respond with a 👍.
 
 Please include tests with your pull request. Pull requests will not be accepted until all relevant tests are updated and passing.
 
