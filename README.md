@@ -55,6 +55,7 @@ Interact with these Azure DevOps services:
 - **work_list_team_iterations**: Retrieve a list of iterations for a specific team in a project.
 - **work_create_iterations**: Create new iterations in a specified Azure DevOps project.
 - **work_assign_iterations**: Assign existing iterations to a specific team in a project.
+- **work_get_team_capacity**: Get the team capacity of a specific team and iteration in a project.
 
 ### 📅 Work Items
 
