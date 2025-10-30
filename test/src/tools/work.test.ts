@@ -14,6 +14,8 @@ interface WorkApiMock {
   getTeamIterations: jest.Mock;
   postTeamIteration: jest.Mock;
   getCapacitiesWithIdentityRefAndTotals: jest.Mock;
+  updateCapacityWithIdentityRef: jest.Mock;
+  getTotalIterationCapacities: jest.Mock;
 }
 
 interface WorkItemTrackingApiMock {
@@ -36,6 +38,8 @@ describe("configureWorkTools", () => {
       getTeamIterations: jest.fn(),
       postTeamIteration: jest.fn(),
       getCapacitiesWithIdentityRefAndTotals: jest.fn(),
+      updateCapacityWithIdentityRef: jest.fn(),
+      getTotalIterationCapacities: jest.fn(),
     };
 
     mockWorkItemTrackingApi = {
@@ -937,6 +941,754 @@ describe("configureWorkTools", () => {
       // Verify that total fields are preserved (not removed)
       expect(parsedResult.totalCapacityPerDay).toBe(7.5);
       expect(parsedResult.totalDaysOff).toBe(1);
+    });
+  });
+
+  describe("update_team_capacity tool", () => {
+    it("should call updateCapacityWithIdentityRef API with the correct parameters and return the expected result", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockResolvedValue({
+        teamMember: {
+          displayName: "John Doe",
+          id: "test-user-id-123",
+          uniqueName: "john.doe@example.com",
+          url: "https://example.com/api/identities/test-user-id-123",
+          _links: {
+            avatar: {
+              href: "https://example.com/avatar",
+            },
+          },
+          imageUrl: "https://example.com/image",
+          descriptor: "aad.test-descriptor",
+        },
+        activities: [
+          {
+            capacityPerDay: 8,
+            name: "Development",
+          },
+        ],
+        daysOff: [
+          {
+            start: new Date("2025-12-25T00:00:00.000Z"),
+            end: new Date("2025-12-25T00:00:00.000Z"),
+          },
+        ],
+      });
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-123",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "Development",
+            capacityPerDay: 8,
+          },
+        ],
+        daysOff: [
+          {
+            start: "2025-12-25T00:00:00.000Z",
+            end: "2025-12-25T00:00:00.000Z",
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.updateCapacityWithIdentityRef).toHaveBeenCalledWith(
+        {
+          activities: [
+            {
+              name: "Development",
+              capacityPerDay: 8,
+            },
+          ],
+          daysOff: [
+            {
+              start: new Date("2025-12-25T00:00:00.000Z"),
+              end: new Date("2025-12-25T00:00:00.000Z"),
+            },
+          ],
+        },
+        { project: "TestProject", team: "TestTeam" },
+        "test-iteration-id",
+        "test-user-id-123"
+      );
+
+      const expectedResult = {
+        teamMember: {
+          displayName: "John Doe",
+          id: "test-user-id-123",
+          uniqueName: "john.doe@example.com",
+        },
+        activities: [
+          {
+            capacityPerDay: 8,
+            name: "Development",
+          },
+        ],
+        daysOff: [
+          {
+            start: new Date("2025-12-25T00:00:00.000Z"),
+            end: new Date("2025-12-25T00:00:00.000Z"),
+          },
+        ],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle updating capacity without daysOff", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockResolvedValue({
+        teamMember: {
+          displayName: "Jane Smith",
+          id: "test-user-id-456",
+          uniqueName: "jane.smith@example.com",
+        },
+        activities: [
+          {
+            capacityPerDay: 6,
+            name: "Testing",
+          },
+        ],
+        daysOff: [],
+      });
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-456",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "Testing",
+            capacityPerDay: 6,
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.updateCapacityWithIdentityRef).toHaveBeenCalledWith(
+        {
+          activities: [
+            {
+              name: "Testing",
+              capacityPerDay: 6,
+            },
+          ],
+          daysOff: [],
+        },
+        { project: "TestProject", team: "TestTeam" },
+        "test-iteration-id",
+        "test-user-id-456"
+      );
+
+      const expectedResult = {
+        teamMember: {
+          displayName: "Jane Smith",
+          id: "test-user-id-456",
+          uniqueName: "jane.smith@example.com",
+        },
+        activities: [
+          {
+            capacityPerDay: 6,
+            name: "Testing",
+          },
+        ],
+        daysOff: [],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle updating capacity with multiple activities", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockResolvedValue({
+        teamMember: {
+          displayName: "Multi Task User",
+          id: "test-user-id-789",
+          uniqueName: "multi.task@example.com",
+        },
+        activities: [
+          {
+            capacityPerDay: 4,
+            name: "Development",
+          },
+          {
+            capacityPerDay: 2,
+            name: "Code Review",
+          },
+          {
+            capacityPerDay: 2,
+            name: "Documentation",
+          },
+        ],
+        daysOff: [],
+      });
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-789",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "Development",
+            capacityPerDay: 4,
+          },
+          {
+            name: "Code Review",
+            capacityPerDay: 2,
+          },
+          {
+            name: "Documentation",
+            capacityPerDay: 2,
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.updateCapacityWithIdentityRef).toHaveBeenCalledWith(
+        {
+          activities: [
+            {
+              name: "Development",
+              capacityPerDay: 4,
+            },
+            {
+              name: "Code Review",
+              capacityPerDay: 2,
+            },
+            {
+              name: "Documentation",
+              capacityPerDay: 2,
+            },
+          ],
+          daysOff: [],
+        },
+        { project: "TestProject", team: "TestTeam" },
+        "test-iteration-id",
+        "test-user-id-789"
+      );
+
+      const expectedResult = {
+        teamMember: {
+          displayName: "Multi Task User",
+          id: "test-user-id-789",
+          uniqueName: "multi.task@example.com",
+        },
+        activities: [
+          {
+            capacityPerDay: 4,
+            name: "Development",
+          },
+          {
+            capacityPerDay: 2,
+            name: "Code Review",
+          },
+          {
+            capacityPerDay: 2,
+            name: "Documentation",
+          },
+        ],
+        daysOff: [],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle updating capacity with unassigned activity (empty name)", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockResolvedValue({
+        teamMember: {
+          displayName: "Unassigned User",
+          id: "test-user-id-000",
+          uniqueName: "unassigned.user@example.com",
+        },
+        activities: [
+          {
+            capacityPerDay: 4,
+            name: "",
+          },
+        ],
+        daysOff: [
+          {
+            start: new Date("2025-10-29T00:00:00.000Z"),
+            end: new Date("2025-10-29T00:00:00.000Z"),
+          },
+        ],
+      });
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-000",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "",
+            capacityPerDay: 4,
+          },
+        ],
+        daysOff: [
+          {
+            start: "2025-10-29T00:00:00.000Z",
+            end: "2025-10-29T00:00:00.000Z",
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.updateCapacityWithIdentityRef).toHaveBeenCalledWith(
+        {
+          activities: [
+            {
+              name: "",
+              capacityPerDay: 4,
+            },
+          ],
+          daysOff: [
+            {
+              start: new Date("2025-10-29T00:00:00.000Z"),
+              end: new Date("2025-10-29T00:00:00.000Z"),
+            },
+          ],
+        },
+        { project: "TestProject", team: "TestTeam" },
+        "test-iteration-id",
+        "test-user-id-000"
+      );
+
+      const expectedResult = {
+        teamMember: {
+          displayName: "Unassigned User",
+          id: "test-user-id-000",
+          uniqueName: "unassigned.user@example.com",
+        },
+        activities: [
+          {
+            capacityPerDay: 4,
+            name: "",
+          },
+        ],
+        daysOff: [
+          {
+            start: new Date("2025-10-29T00:00:00.000Z"),
+            end: new Date("2025-10-29T00:00:00.000Z"),
+          },
+        ],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle null API results correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-123",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "Development",
+            capacityPerDay: 8,
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.updateCapacityWithIdentityRef).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Failed to update team member capacity");
+    });
+
+    it("should handle undefined teamMember in API result", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockResolvedValue({
+        teamMember: undefined,
+        activities: [
+          {
+            capacityPerDay: 8,
+            name: "Development",
+          },
+        ],
+        daysOff: [],
+      });
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-123",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "Development",
+            capacityPerDay: 8,
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      const expectedResult = {
+        teamMember: undefined,
+        activities: [
+          {
+            capacityPerDay: 8,
+            name: "Development",
+          },
+        ],
+        daysOff: [],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Failed to update capacity");
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockRejectedValue(testError);
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-123",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "Development",
+            capacityPerDay: 8,
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.updateCapacityWithIdentityRef).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error updating team capacity: Failed to update capacity");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_update_team_capacity");
+      if (!call) throw new Error("work_update_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.updateCapacityWithIdentityRef as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "TestProject",
+        team: "TestTeam",
+        teamMemberId: "test-user-id-123",
+        iterationId: "test-iteration-id",
+        activities: [
+          {
+            name: "Development",
+            capacityPerDay: 8,
+          },
+        ],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.updateCapacityWithIdentityRef).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error updating team capacity: Unknown error occurred");
+    });
+  });
+
+  describe("get_iteration_capacities tool", () => {
+    it("should call getTotalIterationCapacities API with the correct parameters and return the expected result", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockResolvedValue({
+        teams: [
+          {
+            team: {
+              id: "blue-team-id",
+              name: "Blue Team",
+              url: "https://dev.azure.com/example/project/_apis/projects/project-id/teams/blue-team-id",
+            },
+            totalCapacity: {
+              totalCapacityPerDay: 16,
+              totalDaysOff: 2,
+            },
+          },
+          {
+            team: {
+              id: "yellow-team-id",
+              name: "Yellow Team",
+              url: "https://dev.azure.com/example/project/_apis/projects/project-id/teams/yellow-team-id",
+            },
+            totalCapacity: {
+              totalCapacityPerDay: 24,
+              totalDaysOff: 1,
+            },
+          },
+        ],
+        totalCapacityPerDay: 40,
+        totalDaysOff: 3,
+      });
+
+      const params = {
+        project: "SampleProject",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalledWith("SampleProject", "299567e9-f6e6-4a9b-89c8-7a9722e949d7");
+
+      const expectedResult = {
+        teams: [
+          {
+            team: {
+              id: "blue-team-id",
+              name: "Blue Team",
+              url: "https://dev.azure.com/example/project/_apis/projects/project-id/teams/blue-team-id",
+            },
+            totalCapacity: {
+              totalCapacityPerDay: 16,
+              totalDaysOff: 2,
+            },
+          },
+          {
+            team: {
+              id: "yellow-team-id",
+              name: "Yellow Team",
+              url: "https://dev.azure.com/example/project/_apis/projects/project-id/teams/yellow-team-id",
+            },
+            totalCapacity: {
+              totalCapacityPerDay: 24,
+              totalDaysOff: 1,
+            },
+          },
+        ],
+        totalCapacityPerDay: 40,
+        totalDaysOff: 3,
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle iteration with no teams assigned", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockResolvedValue({
+        teams: [],
+        totalCapacityPerDay: 0,
+        totalDaysOff: 0,
+      });
+
+      const params = {
+        project: "SampleProject",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalledWith("SampleProject", "299567e9-f6e6-4a9b-89c8-7a9722e949d7");
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iteration capacity assigned to the teams");
+    });
+
+    it("should handle null API results correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "SampleProject",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iteration capacity assigned to the teams");
+    });
+
+    it("should handle undefined teams array correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockResolvedValue({
+        teams: undefined,
+        totalCapacityPerDay: 0,
+        totalDaysOff: 0,
+      });
+
+      const params = {
+        project: "SampleProject",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iteration capacity assigned to the teams");
+    });
+
+    it("should handle single team with capacity", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockResolvedValue({
+        teams: [
+          {
+            team: {
+              id: "main-team-id",
+              name: "Main Development Team",
+              url: "https://dev.azure.com/example/project/_apis/projects/project-id/teams/main-team-id",
+            },
+            totalCapacity: {
+              totalCapacityPerDay: 32,
+              totalDaysOff: 0,
+            },
+          },
+        ],
+        totalCapacityPerDay: 32,
+        totalDaysOff: 0,
+      });
+
+      const params = {
+        project: "SingleTeamProject",
+        iterationId: "single-team-iteration-id",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalledWith("SingleTeamProject", "single-team-iteration-id");
+
+      const expectedResult = {
+        teams: [
+          {
+            team: {
+              id: "main-team-id",
+              name: "Main Development Team",
+              url: "https://dev.azure.com/example/project/_apis/projects/project-id/teams/main-team-id",
+            },
+            totalCapacity: {
+              totalCapacityPerDay: 32,
+              totalDaysOff: 0,
+            },
+          },
+        ],
+        totalCapacityPerDay: 32,
+        totalDaysOff: 0,
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Failed to retrieve iteration capacities");
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockRejectedValue(testError);
+
+      const params = {
+        project: "SampleProject",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error getting iteration capacities: Failed to retrieve iteration capacities");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "SampleProject",
+        iterationId: "299567e9-f6e6-4a9b-89c8-7a9722e949d7",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error getting iteration capacities: Unknown error occurred");
     });
   });
 });

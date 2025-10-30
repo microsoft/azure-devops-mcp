@@ -11,6 +11,8 @@ const WORK_TOOLS = {
   create_iterations: "work_create_iterations",
   assign_iterations: "work_assign_iterations",
   get_team_capacity: "work_get_team_capacity",
+  update_team_capacity: "work_update_team_capacity",
+  get_iteration_capacities: "work_get_iteration_capacities",
 };
 
 function configureWorkTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
@@ -199,6 +201,121 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
 
         return {
           content: [{ type: "text", text: `Error getting team capacity: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORK_TOOLS.update_team_capacity,
+    "Update the team capacity of a team member for a specific iteration in a project.",
+    {
+      project: z.string().describe("The name or Id of the Azure DevOps project."),
+      team: z.string().describe("The name or Id of the Azure DevOps team."),
+      teamMemberId: z.string().describe("The team member Id for the specific team member."),
+      iterationId: z.string().describe("The Iteration Id to update the capacity for."),
+      activities: z
+        .array(
+          z.object({
+            name: z.string().describe("The name of the activity (e.g., 'Development')."),
+            capacityPerDay: z.number().describe("The capacity per day for this activity."),
+          })
+        )
+        .describe("Array of activities and their daily capacities for the team member."),
+      daysOff: z
+        .array(
+          z.object({
+            start: z.string().describe("Start date of the day off in ISO format."),
+            end: z.string().describe("End date of the day off in ISO format."),
+          })
+        )
+        .optional()
+        .describe("Array of days off for the team member, each with a start and end date in ISO format."),
+    },
+    async ({ project, team, teamMemberId, iterationId, activities, daysOff }) => {
+      try {
+        const connection = await connectionProvider();
+        const workApi = await connection.getWorkApi();
+        const teamContext = { project, team };
+
+        // Define interface for capacity patch
+        interface CapacityPatch {
+          activities: { name: string; capacityPerDay: number }[];
+          daysOff?: { start: Date; end: Date }[];
+        }
+
+        // Prepare the capacity update object
+        const capacityPatch: CapacityPatch = {
+          activities: activities.map((a) => ({
+            name: a.name,
+            capacityPerDay: a.capacityPerDay,
+          })),
+          daysOff: (daysOff || []).map((d) => ({
+            start: new Date(d.start),
+            end: new Date(d.end),
+          })),
+        };
+
+        // Update the team member's capacity
+        const updatedCapacity = await workApi.updateCapacityWithIdentityRef(capacityPatch, teamContext, iterationId, teamMemberId);
+
+        if (!updatedCapacity) {
+          return { content: [{ type: "text", text: "Failed to update team member capacity" }], isError: true };
+        }
+
+        // Simplify output
+        const simplifiedResult = {
+          teamMember: updatedCapacity.teamMember
+            ? {
+                displayName: updatedCapacity.teamMember.displayName,
+                id: updatedCapacity.teamMember.id,
+                uniqueName: updatedCapacity.teamMember.uniqueName,
+              }
+            : undefined,
+          activities: updatedCapacity.activities,
+          daysOff: updatedCapacity.daysOff,
+        };
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(simplifiedResult, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error updating team capacity: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORK_TOOLS.get_iteration_capacities,
+    "Get an iteration's capacity for all teams in iteration and project.",
+    {
+      project: z.string().describe("The name or Id of the Azure DevOps project."),
+      iterationId: z.string().describe("The Iteration Id to get capacity for."),
+    },
+    async ({ project, iterationId }) => {
+      try {
+        const connection = await connectionProvider();
+        const workApi = await connection.getWorkApi();
+
+        const rawResults = await workApi.getTotalIterationCapacities(project, iterationId);
+
+        if (!rawResults || !rawResults.teams || rawResults.teams.length === 0) {
+          return { content: [{ type: "text", text: "No iteration capacity assigned to the teams" }], isError: true };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(rawResults, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting iteration capacities: ${errorMessage}` }],
           isError: true,
         };
       }
