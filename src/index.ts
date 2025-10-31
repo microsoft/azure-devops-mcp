@@ -5,7 +5,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { getBearerHandler, WebApi } from "azure-devops-node-api";
+import { getBearerHandler, getPersonalAccessTokenHandler, WebApi } from "azure-devops-node-api";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -23,6 +23,13 @@ function isGitHubCodespaceEnv(): boolean {
 
 const defaultAuthenticationType = isGitHubCodespaceEnv() ? "azcli" : "interactive";
 
+// Allow self-signed certificates for on-premise TFS/Azure DevOps Server
+// Only disable SSL verification if explicitly requested via environment variable
+if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === undefined &&
+    process.env.AZURE_DEVOPS_IGNORE_SSL_ERRORS === "true") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
@@ -30,10 +37,15 @@ const argv = yargs(hideBin(process.argv))
   .version(packageVersion)
   .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
     yargs.positional("organization", {
-      describe: "Azure DevOps organization name",
+      describe: "Azure DevOps organization name or full URL for on-premise installations",
       type: "string",
       demandOption: true,
     });
+  })
+  .option("url", {
+    alias: "u",
+    describe: "Full organization URL for on-premise TFS/Azure DevOps Server (e.g., 'https://tfs.company.com/DefaultCollection'). If not provided, uses cloud URL.",
+    type: "string",
   })
   .option("domains", {
     alias: "d",
@@ -57,8 +69,30 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .parseSync();
 
-export const orgName = argv.organization as string;
-const orgUrl = "https://dev.azure.com/" + orgName;
+// Determine organization URL based on input
+// Priority: --url option > auto-detect URL in organization param > construct cloud URL
+let orgUrl: string;
+let orgName: string;
+
+if (argv.url) {
+  // Explicit URL provided via --url option
+  orgUrl = argv.url as string;
+  // Extract org name from URL for display purposes
+  const urlParts = orgUrl.replace(/\/$/, '').split('/');
+  orgName = urlParts[urlParts.length - 1];
+} else if ((argv.organization as string).includes('://')) {
+  // Full URL provided in organization parameter (auto-detect)
+  orgUrl = argv.organization as string;
+  // Extract org name from URL
+  const urlParts = orgUrl.replace(/\/$/, '').split('/');
+  orgName = urlParts[urlParts.length - 1];
+} else {
+  // Organization name only - use cloud URL (backward compatible)
+  orgName = argv.organization as string;
+  orgUrl = "https://dev.azure.com/" + orgName;
+}
+
+export { orgName };
 
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
@@ -66,7 +100,14 @@ export const enabledDomains = domainsManager.getEnabledDomains();
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<WebApi> {
   return async () => {
     const accessToken = await getAzureDevOpsToken();
-    const authHandler = getBearerHandler(accessToken);
+
+    // Use PAT handler for on-premise or when PAT token is detected
+    // Otherwise use Bearer token for cloud OAuth scenarios
+    const isPAT = process.env.AZURE_DEVOPS_EXT_PAT || process.env.AZURE_DEVOPS_PAT;
+    const authHandler = isPAT
+      ? getPersonalAccessTokenHandler(accessToken)
+      : getBearerHandler(accessToken);
+
     const connection = new WebApi(orgUrl, authHandler, undefined, {
       productName: "AzureDevOps.MCP",
       productVersion: packageVersion,

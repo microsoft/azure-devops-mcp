@@ -1,0 +1,62 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/mcp.json",
+  "description": "Example MCP configuration for on-premise Azure DevOps Server / TFS",
+  "inputs": [
+    {
+      "id": "ado_onprem_url",
+      "type": "promptString",
+      "description": "Azure DevOps Server URL (e.g., 'https://tfs.company.com/DefaultCollection')"
+    }
+  ],
+  "servers": {
+    "ado-onprem-explicit": {
+      "description": "On-premise Azure DevOps using explicit --url flag",
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "DefaultCollection",
+        "--url",
+        "https://tfs.company.com/DefaultCollection",
+        "-a",
+        "env"
+      ]
+    },
+    "ado-onprem-autodetect": {
+      "description": "On-premise Azure DevOps using auto-detection",
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "https://tfs.company.com/DefaultCollection",
+        "-a",
+        "env"
+      ]
+    },
+    "ado-onprem-input": {
+      "description": "On-premise Azure DevOps using MCP input prompt",
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "--url",
+        "${input:ado_onprem_url}",
+        "-a",
+        "env"
+      ]
+    },
+    "ado-cloud": {
+      "description": "Azure DevOps Services (cloud) - backward compatible",
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "contoso"
+      ]
+    }
+  }
+}

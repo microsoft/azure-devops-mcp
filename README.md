@@ -14,10 +14,11 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 3. [⚙️ Supported Tools](#️-supported-tools)
 4. [🔌 Installation & Getting Started](#-installation--getting-started)
 5. [🌏 Using Domains](#-using-domains)
-6. [📝 Troubleshooting](#-troubleshooting)
-7. [🎩 Examples & Best Practices](#-examples--best-practices)
-8. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-9. [📌 Contributing](#-contributing)
+6. [🏢 On-Premise / TFS Support](#-on-premise--tfs-support)
+7. [📝 Troubleshooting](#-troubleshooting)
+8. [🎩 Examples & Best Practices](#-examples--best-practices)
+9. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+10. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -263,6 +264,102 @@ Domains that are available are: `core`, `work`, `work-items`, `search`, `test-pl
 We recommend that you always enable `core` tools so that you can fetch project level information.
 
 > By default all domains are loaded
+
+## 🏢 On-Premise / TFS Support
+
+The Azure DevOps MCP Server supports both **Azure DevOps Services (cloud)** and **on-premise installations** (Azure DevOps Server / Team Foundation Server).
+
+### Configuration for On-Premise Installations
+
+There are three ways to configure on-premise access:
+
+#### Option 1: Using the `--url` flag (Explicit)
+
+```json
+{
+  "servers": {
+    "ado_onprem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "DefaultCollection",
+        "--url",
+        "https://tfs.company.com/DefaultCollection"
+      ]
+    }
+  }
+}
+```
+
+#### Option 2: Full URL as organization parameter (Auto-detect)
+
+```json
+{
+  "servers": {
+    "ado_onprem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "https://tfs.company.com/DefaultCollection"
+      ]
+    }
+  }
+}
+```
+
+#### Option 3: Using MCP inputs for flexible configuration
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_url",
+      "type": "promptString",
+      "description": "Azure DevOps Server URL (e.g., 'https://tfs.company.com/DefaultCollection')"
+    }
+  ],
+  "servers": {
+    "ado_onprem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "--url",
+        "${input:ado_url}"
+      ]
+    }
+  }
+}
+```
+
+### Common On-Premise URL Formats
+
+- Azure DevOps Server: `https://devops.company.com/DefaultCollection`
+- TFS 2018/2017: `https://tfs.company.com/tfs/DefaultCollection`
+- TFS with custom port: `https://tfs.company.com:8080/tfs/DefaultCollection`
+
+### Backward Compatibility
+
+The server maintains full backward compatibility with cloud-only configurations. If you only provide an organization name (without `://`), it automatically uses the cloud URL format:
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "contoso"]
+    }
+  }
+}
+```
+
+This is equivalent to: `https://dev.azure.com/contoso`
 
 ## 📝 Troubleshooting
 
