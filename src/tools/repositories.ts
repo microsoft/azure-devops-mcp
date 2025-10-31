@@ -958,16 +958,16 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       commitIds: z.array(z.string()).optional().describe("Array of specific commit IDs to retrieve. When provided, other filters are ignored except top/skip."),
       historySimplificationMode: z.enum(["FirstParent", "SimplifyMerges", "FullHistory", "FullHistorySimplifyMerges"]).optional().describe("How to simplify the commit history"),
     },
-    async ({ 
-      project, 
-      repository, 
-      fromCommit, 
-      toCommit, 
-      version, 
-      versionType, 
-      skip, 
-      top, 
-      includeLinks, 
+    async ({
+      project,
+      repository,
+      fromCommit,
+      toCommit,
+      version,
+      versionType,
+      skip,
+      top,
+      includeLinks,
       includeWorkItems,
       searchText,
       author,
@@ -977,7 +977,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       fromDate,
       toDate,
       commitIds,
-      historySimplificationMode
+      historySimplificationMode,
     }) => {
       try {
         const connection = await connectionProvider();
@@ -989,10 +989,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           const batchSize = Math.min(top || 10, commitIds.length);
           const startIndex = skip || 0;
           const endIndex = Math.min(startIndex + batchSize, commitIds.length);
-          
+
           // Process commits in the requested range
           const requestedCommitIds = commitIds.slice(startIndex, endIndex);
-          
+
           // Use getCommits for each commit ID to maintain consistency
           for (const commitId of requestedCommitIds) {
             try {
@@ -1002,15 +1002,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                 fromCommitId: commitId,
                 toCommitId: commitId,
               };
-              
-              const commitResults = await gitApi.getCommits(
-                repository,
-                searchCriteria,
-                project,
-                0,
-                1
-              );
-              
+
+              const commitResults = await gitApi.getCommits(repository, searchCriteria, project, 0, 1);
+
               if (commitResults && commitResults.length > 0) {
                 commits.push(commitResults[0]);
               }
@@ -1020,7 +1014,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               // Add error information to result instead of failing completely
               commits.push({
                 commitId: commitId,
-                error: `Failed to retrieve: ${error instanceof Error ? error.message : String(error)}`
+                error: `Failed to retrieve: ${error instanceof Error ? error.message : String(error)}`,
               });
             }
           }
@@ -1065,44 +1059,31 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           searchCriteria.itemVersion = itemVersion;
         }
 
-        const commits = await gitApi.getCommits(
-          repository,
-          searchCriteria,
-          project,
-          skip,
-          top
-        );
+        const commits = await gitApi.getCommits(repository, searchCriteria, project, skip, top);
 
         // Additional client-side filtering for enhanced search capabilities
         let filteredCommits = commits;
 
         // Filter by search text in commit message if not handled by API
         if (searchText && filteredCommits) {
-          filteredCommits = filteredCommits.filter(commit => 
-            commit.comment?.toLowerCase().includes(searchText.toLowerCase())
-          );
+          filteredCommits = filteredCommits.filter((commit) => commit.comment?.toLowerCase().includes(searchText.toLowerCase()));
         }
 
         // Filter by author email if specified
         if (authorEmail && filteredCommits) {
-          filteredCommits = filteredCommits.filter(commit => 
-            commit.author?.email?.toLowerCase() === authorEmail.toLowerCase()
-          );
+          filteredCommits = filteredCommits.filter((commit) => commit.author?.email?.toLowerCase() === authorEmail.toLowerCase());
         }
 
         // Filter by committer if specified
         if (committer && filteredCommits) {
-          filteredCommits = filteredCommits.filter(commit => 
-            commit.committer?.name?.toLowerCase().includes(committer.toLowerCase()) ||
-            commit.committer?.email?.toLowerCase().includes(committer.toLowerCase())
+          filteredCommits = filteredCommits.filter(
+            (commit) => commit.committer?.name?.toLowerCase().includes(committer.toLowerCase()) || commit.committer?.email?.toLowerCase().includes(committer.toLowerCase())
           );
         }
 
         // Filter by committer email if specified
         if (committerEmail && filteredCommits) {
-          filteredCommits = filteredCommits.filter(commit => 
-            commit.committer?.email?.toLowerCase() === committerEmail.toLowerCase()
-          );
+          filteredCommits = filteredCommits.filter((commit) => commit.committer?.email?.toLowerCase() === committerEmail.toLowerCase());
         }
 
         return {
@@ -1169,8 +1150,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
     }
   );
-
-
 }
 
 export { REPO_TOOLS, configureRepoTools };

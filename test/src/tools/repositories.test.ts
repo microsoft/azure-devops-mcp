@@ -4302,10 +4302,8 @@ describe("repos tools", () => {
 
         const mockCommit1 = { commitId: "abc123", comment: "First commit" };
         const mockCommit2 = { commitId: "def456", comment: "Second commit" };
-        
-        mockGitApi.getCommits
-          .mockResolvedValueOnce([mockCommit1])
-          .mockResolvedValueOnce([mockCommit2]);
+
+        mockGitApi.getCommits.mockResolvedValueOnce([mockCommit1]).mockResolvedValueOnce([mockCommit2]);
 
         const params = {
           project: "test-project",
@@ -4317,14 +4315,26 @@ describe("repos tools", () => {
         const result = await handler(params);
 
         expect(mockGitApi.getCommits).toHaveBeenCalledTimes(2);
-        expect(mockGitApi.getCommits).toHaveBeenCalledWith("test-repo", expect.objectContaining({
-          fromCommitId: "abc123",
-          toCommitId: "abc123"
-        }), "test-project", 0, 1);
-        expect(mockGitApi.getCommits).toHaveBeenCalledWith("test-repo", expect.objectContaining({
-          fromCommitId: "def456", 
-          toCommitId: "def456"
-        }), "test-project", 0, 1);
+        expect(mockGitApi.getCommits).toHaveBeenCalledWith(
+          "test-repo",
+          expect.objectContaining({
+            fromCommitId: "abc123",
+            toCommitId: "abc123",
+          }),
+          "test-project",
+          0,
+          1
+        );
+        expect(mockGitApi.getCommits).toHaveBeenCalledWith(
+          "test-repo",
+          expect.objectContaining({
+            fromCommitId: "def456",
+            toCommitId: "def456",
+          }),
+          "test-project",
+          0,
+          1
+        );
 
         const expectedCommits = [mockCommit1, mockCommit2];
         expect(result.content[0].text).toBe(JSON.stringify(expectedCommits, null, 2));
