@@ -25,8 +25,7 @@ const defaultAuthenticationType = isGitHubCodespaceEnv() ? "azcli" : "interactiv
 
 // Allow self-signed certificates for on-premise TFS/Azure DevOps Server
 // Only disable SSL verification if explicitly requested via environment variable
-if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === undefined &&
-    process.env.AZURE_DEVOPS_IGNORE_SSL_ERRORS === "true") {
+if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === undefined && process.env.AZURE_DEVOPS_IGNORE_SSL_ERRORS === "true") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
@@ -78,13 +77,13 @@ if (argv.url) {
   // Explicit URL provided via --url option
   orgUrl = argv.url as string;
   // Extract org name from URL for display purposes
-  const urlParts = orgUrl.replace(/\/$/, '').split('/');
+  const urlParts = orgUrl.replace(/\/$/, "").split("/");
   orgName = urlParts[urlParts.length - 1];
-} else if ((argv.organization as string).includes('://')) {
+} else if ((argv.organization as string).includes("://")) {
   // Full URL provided in organization parameter (auto-detect)
   orgUrl = argv.organization as string;
   // Extract org name from URL
-  const urlParts = orgUrl.replace(/\/$/, '').split('/');
+  const urlParts = orgUrl.replace(/\/$/, "").split("/");
   orgName = urlParts[urlParts.length - 1];
 } else {
   // Organization name only - use cloud URL (backward compatible)
@@ -104,9 +103,7 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
     // Use PAT handler for on-premise or when PAT token is detected
     // Otherwise use Bearer token for cloud OAuth scenarios
     const isPAT = process.env.AZURE_DEVOPS_EXT_PAT || process.env.AZURE_DEVOPS_PAT;
-    const authHandler = isPAT
-      ? getPersonalAccessTokenHandler(accessToken)
-      : getBearerHandler(accessToken);
+    const authHandler = isPAT ? getPersonalAccessTokenHandler(accessToken) : getBearerHandler(accessToken);
 
     const connection = new WebApi(orgUrl, authHandler, undefined, {
       productName: "AzureDevOps.MCP",

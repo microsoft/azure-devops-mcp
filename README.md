@@ -281,13 +281,7 @@ There are three ways to configure on-premise access:
     "ado_onprem": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "DefaultCollection",
-        "--url",
-        "https://tfs.company.com/DefaultCollection"
-      ]
+      "args": ["-y", "@azure-devops/mcp", "DefaultCollection", "--url", "https://tfs.company.com/DefaultCollection"]
     }
   }
 }
@@ -301,11 +295,7 @@ There are three ways to configure on-premise access:
     "ado_onprem": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "https://tfs.company.com/DefaultCollection"
-      ]
+      "args": ["-y", "@azure-devops/mcp", "https://tfs.company.com/DefaultCollection"]
     }
   }
 }
@@ -326,12 +316,7 @@ There are three ways to configure on-premise access:
     "ado_onprem": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "--url",
-        "${input:ado_url}"
-      ]
+      "args": ["-y", "@azure-devops/mcp", "--url", "${input:ado_url}"]
     }
   }
 }

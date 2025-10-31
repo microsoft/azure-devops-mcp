@@ -11,6 +11,7 @@ The Microsoft Azure DevOps MCP Server now supports both **Azure DevOps Services 
 ### 1. Modified `src/index.ts`
 
 **Key Changes:**
+
 - Added new `--url` (`-u`) command-line option for explicit on-premise URLs
 - Updated `organization` parameter description to accept full URLs
 - Implemented URL detection logic with three modes:
@@ -19,6 +20,7 @@ The Microsoft Azure DevOps MCP Server now supports both **Azure DevOps Services 
   3. **Cloud mode**: Organization name only (backward compatible)
 
 **Code Changes:**
+
 ```typescript
 // Old implementation (lines 60-61)
 export const orgName = argv.organization as string;
@@ -31,12 +33,12 @@ let orgName: string;
 if (argv.url) {
   // Explicit URL provided via --url option
   orgUrl = argv.url as string;
-  const urlParts = orgUrl.replace(/\/$/, '').split('/');
+  const urlParts = orgUrl.replace(/\/$/, "").split("/");
   orgName = urlParts[urlParts.length - 1];
-} else if ((argv.organization as string).includes('://')) {
+} else if ((argv.organization as string).includes("://")) {
   // Full URL provided in organization parameter (auto-detect)
   orgUrl = argv.organization as string;
-  const urlParts = orgUrl.replace(/\/$/, '').split('/');
+  const urlParts = orgUrl.replace(/\/$/, "").split("/");
   orgName = urlParts[urlParts.length - 1];
 } else {
   // Organization name only - use cloud URL (backward compatible)
@@ -48,6 +50,7 @@ if (argv.url) {
 ### 2. Updated `README.md`
 
 **Additions:**
+
 - Added new section "🏢 On-Premise / TFS Support"
 - Updated table of contents
 - Provided three configuration examples:
@@ -62,6 +65,7 @@ if (argv.url) {
 **File:** `.vscode/mcp.onpremise.example.json`
 
 Provides ready-to-use examples for:
+
 - On-premise with explicit `--url` flag
 - On-premise with auto-detection
 - On-premise with MCP input prompts
@@ -70,17 +74,20 @@ Provides ready-to-use examples for:
 ## Usage Examples
 
 ### Cloud (Backward Compatible)
+
 ```bash
 npx -y @azure-devops/mcp contoso
 # Equivalent to: https://dev.azure.com/contoso
 ```
 
 ### On-Premise - Explicit URL Flag
+
 ```bash
 npx -y @azure-devops/mcp DefaultCollection --url https://tfs.company.com/DefaultCollection
 ```
 
 ### On-Premise - Auto-Detect
+
 ```bash
 npx -y @azure-devops/mcp https://tfs.company.com/DefaultCollection
 ```
@@ -103,14 +110,14 @@ npx -y @azure-devops/mcp https://tfs.company.com/DefaultCollection
 
 ## Comparison with Vortiago Implementation
 
-| Feature | Vortiago (Python) | Microsoft (TypeScript - Updated) |
-|---------|-------------------|----------------------------------|
-| Cloud support | ✅ Via env var | ✅ Via org name parameter |
-| On-premise support | ✅ Via env var | ✅ Via `--url` or auto-detect |
-| Configuration method | Environment variable | Command-line arguments |
-| Auto-detection | ❌ | ✅ Detects `://` in org param |
-| Backward compatible | N/A | ✅ Fully compatible |
-| Multiple methods | ❌ Single method | ✅ Three methods |
+| Feature              | Vortiago (Python)    | Microsoft (TypeScript - Updated) |
+| -------------------- | -------------------- | -------------------------------- |
+| Cloud support        | ✅ Via env var       | ✅ Via org name parameter        |
+| On-premise support   | ✅ Via env var       | ✅ Via `--url` or auto-detect    |
+| Configuration method | Environment variable | Command-line arguments           |
+| Auto-detection       | ❌                   | ✅ Detects `://` in org param    |
+| Backward compatible  | N/A                  | ✅ Fully compatible              |
+| Multiple methods     | ❌ Single method     | ✅ Three methods                 |
 
 ## Benefits
 
@@ -123,11 +130,13 @@ npx -y @azure-devops/mcp https://tfs.company.com/DefaultCollection
 ## Next Steps
 
 ### For Local Testing
+
 1. Build the project: `npm run build`
 2. Test with on-premise URL: `node dist/index.js https://your-tfs-server/DefaultCollection`
 3. Verify authentication works with your on-premise instance
 
 ### For Production
+
 1. Consider contributing this change upstream to Microsoft repository
 2. Request inclusion in the next release
 3. Update npm package documentation once merged
@@ -137,6 +146,7 @@ npx -y @azure-devops/mcp https://tfs.company.com/DefaultCollection
 ### From Vortiago to Microsoft MCP Server (On-Premise)
 
 **Vortiago Configuration:**
+
 ```bash
 # .env file
 AZURE_DEVOPS_PAT=your_pat_token
@@ -144,19 +154,14 @@ AZURE_DEVOPS_ORGANIZATION_URL=https://tfs.company.com/DefaultCollection
 ```
 
 **Microsoft MCP Configuration:**
+
 ```json
 {
   "servers": {
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "https://tfs.company.com/DefaultCollection",
-        "-a",
-        "env"
-      ]
+      "args": ["-y", "@azure-devops/mcp", "https://tfs.company.com/DefaultCollection", "-a", "env"]
     }
   }
 }
