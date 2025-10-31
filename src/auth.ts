@@ -64,6 +64,16 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
   switch (type) {
     case "azcli":
     case "env":
+      // Check for PAT token in environment variable (for on-premise support)
+      const patToken = process.env.AZURE_DEVOPS_EXT_PAT || process.env.AZURE_DEVOPS_PAT;
+      if (patToken) {
+        // Return PAT token directly for on-premise or cloud scenarios
+        return async () => {
+          return patToken;
+        };
+      }
+
+      // Fallback to Azure credentials for cloud scenarios
       if (type !== "env") {
         process.env.AZURE_TOKEN_CREDENTIALS = "dev";
       }
@@ -76,7 +86,7 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
       return async () => {
         const result = await credential.getToken(scopes);
         if (!result) {
-          throw new Error("Failed to obtain Azure DevOps token. Ensure you have Azure CLI logged or use interactive type of authentication.");
+          throw new Error("Failed to obtain Azure DevOps token. Ensure you have Azure CLI logged, set AZURE_DEVOPS_EXT_PAT environment variable, or use interactive type of authentication.");
         }
         return result.token;
       };
