@@ -15,7 +15,3 @@ When adding new tool, always prioritize using an Azure DevOps Typescript client 
 Only if the client or client method is not available, interact with the API directly.
 The tools are located in the `src/tools.ts` file.
 
-## Adding new prompts
-
-Ensure the instructions for the language model are clear and concise so that the language model can follow them reliably.
-The prompts are located in the `src/prompts.ts` file.
