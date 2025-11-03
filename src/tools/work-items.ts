@@ -64,7 +64,7 @@ function getLinkTypeFromName(name: string) {
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
-    "Revieve a list of backlogs for a given project and team.",
+    "Receive a list of backlogs for a given project and team.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team."),
