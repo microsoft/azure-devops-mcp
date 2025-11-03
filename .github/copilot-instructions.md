@@ -15,7 +15,6 @@ When adding new tool, always prioritize using an Azure DevOps Typescript client 
 Only if the client or client method is not available, interact with the API directly.
 The tools are located in the `src/tools.ts` file.
 
-## Adding new prompts
+## Using MCP Server for Azure DevOps
 
-Ensure the instructions for the language model are clear and concise so that the language model can follow them reliably.
-The prompts are located in the `src/prompts.ts` file.
+When getting work items using MCP Server for Azure DevOps, always try to use batch tools for updates instead of many individual single updates. For updates, try and update up to 200 updates in a single batch. When getting work items, once you get the list of IDs, use the tool `get_work_items_batch_by_ids` to get the work item details.
