@@ -73,7 +73,10 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
       };
 
     case "azcli":
-      process.env.AZURE_TOKEN_CREDENTIALS = "dev";
+    case "env":
+      if (type !== "env") {
+        process.env.AZURE_TOKEN_CREDENTIALS = "dev";
+      }
       let credential: TokenCredential = new DefaultAzureCredential(); // CodeQL [SM05138] resolved by explicitly setting AZURE_TOKEN_CREDENTIALS
       if (tenantId) {
         // Use Azure CLI credential if tenantId is provided for multi-tenant scenarios
