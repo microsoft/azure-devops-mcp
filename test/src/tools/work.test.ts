@@ -5,7 +5,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkTools } from "../../../src/tools/work";
 import { WebApi } from "azure-devops-node-api";
-import { TreeStructureGroup } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
+import { TreeStructureGroup, TreeNodeStructureType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -20,6 +20,7 @@ interface WorkApiMock {
 
 interface WorkItemTrackingApiMock {
   createOrUpdateClassificationNode: jest.Mock;
+  getRootNodes: jest.Mock;
 }
 
 describe("configureWorkTools", () => {
@@ -44,6 +45,7 @@ describe("configureWorkTools", () => {
 
     mockWorkItemTrackingApi = {
       createOrUpdateClassificationNode: jest.fn(),
+      getRootNodes: jest.fn(),
     };
 
     mockConnection = {
@@ -175,6 +177,442 @@ describe("configureWorkTools", () => {
       expect(mockWorkApi.getTeamIterations).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching team iterations: Unknown error occurred");
+    });
+  });
+
+  describe("list_iterations tool", () => {
+    it("should call getRootNodes API with the correct parameters and return the expected result", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126391,
+          identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
+          name: "Area",
+          structureType: TreeNodeStructureType.Area,
+          hasChildren: true,
+          path: "\\fabrikam\\area",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Areas",
+          children: [],
+        },
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "c7e8a591-5460-6f84-b93e-g8di4686f558",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+              attributes: {
+                startDate: "2025-01-01T00:00:00Z",
+                finishDate: "2025-01-14T23:59:59Z",
+              },
+            },
+            {
+              id: 126394,
+              identifier: "d8f9b6a2-6571-7g95-ca4f-h9ej5797g669",
+              name: "Sprint 2",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 2",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%202",
+              attributes: {
+                startDate: "2025-01-15T00:00:00Z",
+                finishDate: "2025-01-28T23:59:59Z",
+              },
+            },
+          ],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 2,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 2);
+
+      const expectedResult = [
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "c7e8a591-5460-6f84-b93e-g8di4686f558",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+              attributes: {
+                startDate: "2025-01-01T00:00:00Z",
+                finishDate: "2025-01-14T23:59:59Z",
+              },
+            },
+            {
+              id: 126394,
+              identifier: "d8f9b6a2-6571-7g95-ca4f-h9ej5797g669",
+              name: "Sprint 2",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 2",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%202",
+              attributes: {
+                startDate: "2025-01-15T00:00:00Z",
+                finishDate: "2025-01-28T23:59:59Z",
+              },
+            },
+          ],
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should use default depth of 1 when depth parameter is not provided", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+
+      const expectedResult = [
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [],
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should filter out non-iteration nodes and return only iteration nodes", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126391,
+          identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
+          name: "Area",
+          structureType: TreeNodeStructureType.Area,
+          hasChildren: true,
+          path: "\\fabrikam\\area",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Areas",
+          children: [],
+        },
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: false,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+
+      // Should only return the iteration node, filtering out the area node
+      const expectedResult = [
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: false,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [],
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle case when no iteration nodes are found", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126391,
+          identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
+          name: "Area",
+          structureType: TreeNodeStructureType.Area,
+          hasChildren: true,
+          path: "\\fabrikam\\area",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Areas",
+          children: [],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iterations were found");
+    });
+
+    it("should handle empty API response", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iterations were found");
+    });
+
+    it("should handle null API response", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iterations were found");
+    });
+
+    it("should handle iteration node with undefined children", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: false,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: undefined,
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+
+      const expectedResult = [
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: false,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [],
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should handle API errors correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Failed to retrieve iterations");
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockRejectedValue(testError);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching iterations: Failed to retrieve iterations");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockRejectedValue("string error");
+
+      const params = {
+        project: "Fabrikam",
+        depth: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching iterations: Unknown error occurred");
+    });
+
+    it("should properly map child iterations with all expected properties", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "c7e8a591-5460-6f84-b93e-g8di4686f558",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+              attributes: {
+                startDate: "2025-01-01T00:00:00Z",
+                finishDate: "2025-01-14T23:59:59Z",
+              },
+              extraProperty: "should be filtered out",
+            },
+          ],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 2,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      // Verify that child has all expected properties but no extra ones
+      expect(parsedResult[0].children[0]).toEqual({
+        id: 126393,
+        identifier: "c7e8a591-5460-6f84-b93e-g8di4686f558",
+        name: "Sprint 1",
+        structureType: TreeNodeStructureType.Iteration,
+        hasChildren: false,
+        path: "\\fabrikam\\iteration\\Sprint 1",
+        url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+        attributes: {
+          startDate: "2025-01-01T00:00:00Z",
+          finishDate: "2025-01-14T23:59:59Z",
+        },
+      });
+
+      // Verify that extraProperty is not included
+      expect(parsedResult[0].children[0].extraProperty).toBeUndefined();
     });
   });
 

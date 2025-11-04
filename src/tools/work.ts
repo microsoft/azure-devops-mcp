@@ -4,10 +4,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
-import { TreeStructureGroup } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { TreeStructureGroup, TreeNodeStructureType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 
 const WORK_TOOLS = {
   list_team_iterations: "work_list_team_iterations",
+  list_iterations: "work_list_iterations",
   create_iterations: "work_create_iterations",
   assign_iterations: "work_assign_iterations",
   get_team_capacity: "work_get_team_capacity",
@@ -100,6 +101,70 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
 
         return {
           content: [{ type: "text", text: `Error creating iterations: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORK_TOOLS.list_iterations,
+    "List all iterations in a specified Azure DevOps project.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      depth: z.number().default(2).describe("Depth of children to fetch."),
+    },
+    async ({ project, depth }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const results = [];
+
+        if (depth === undefined) {
+          depth = 1;
+        }
+
+        // Get all root nodes, then filter for the root node with structureType "iteration"
+        const rootNodes = await workItemTrackingApi.getRootNodes(project, depth);
+        const iterationRoot = Array.isArray(rootNodes) ? rootNodes.find((node) => node.structureType === TreeNodeStructureType.Iteration) : undefined;
+
+        if (iterationRoot) {
+          // Only return the root and its children (if any)
+          results.push({
+            id: iterationRoot.id,
+            identifier: iterationRoot.identifier,
+            name: iterationRoot.name,
+            structureType: iterationRoot.structureType,
+            hasChildren: iterationRoot.hasChildren,
+            path: iterationRoot.path,
+            url: iterationRoot.url,
+            children: iterationRoot.children
+              ? iterationRoot.children.map((child) => ({
+                  id: child.id,
+                  identifier: child.identifier,
+                  name: child.name,
+                  structureType: child.structureType,
+                  hasChildren: child.hasChildren,
+                  path: child.path,
+                  url: child.url,
+                  attributes: child.attributes,
+                }))
+              : [],
+          });
+        }
+
+        if (results.length === 0) {
+          return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching iterations: ${errorMessage}` }],
           isError: true,
         };
       }
