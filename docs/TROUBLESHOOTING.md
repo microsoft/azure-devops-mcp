@@ -50,18 +50,18 @@
 
 ### Token Authentication via Environment Variables
 
-For automated scenarios or when you want to use a token stored in an environment variable, you can use the `ENV_` authentication pattern:
+For automated scenarios or when you want to use a token stored in an environment variable, you can use the `envvar` authentication type:
 
-1. **Set your token in an environment variable:**
+1. **Set your token in the ADO_MCP_AUTH_TOKEN environment variable:**
 
    ```bash
-   export ADO_TOKEN="your-azure-devops-token"
+   export ADO_MCP_AUTH_TOKEN="your-azure-devops-token"
    ```
 
-2. **Use the ENV\_ authentication pattern:**
+2. **Use the envvar authentication type:**
 
    ```bash
-   npx @azure-devops/mcp myorg --authentication ENV_ADO_TOKEN
+   npx @azure-devops/mcp myorg --authentication envvar
    ```
 
 3. **For MCP configuration files, update your `.vscode/mcp.json`:**
@@ -78,7 +78,7 @@ For automated scenarios or when you want to use a token stored in an environment
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "ENV_ADO_TOKEN"]
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
        }
      }
    }
