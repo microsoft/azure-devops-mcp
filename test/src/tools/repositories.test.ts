@@ -588,6 +588,25 @@ describe("repos tools", () => {
       );
       expect(result.isError).toBeFalsy();
     });
+
+    it("should reject update pull request with description over 4000 characters", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const longDescription = "a".repeat(4001);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        description: longDescription,
+      };
+
+      // Validation should fail due to description being too long
+      await expect(handler(params)).rejects.toThrow();
+    });
   });
 
   describe("repo_create_pull_request", () => {
@@ -728,6 +747,27 @@ describe("repos tools", () => {
         targetRefName: "refs/heads/main",
       };
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
+    });
+
+    it("should reject pull request with description over 4000 characters", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      if (!call) throw new Error("repo_create_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const longDescription = "a".repeat(4001);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        title: "New Feature",
+        description: longDescription,
+      };
+
+      // Validation should fail due to description being too long
+      await expect(handler(params)).rejects.toThrow();
     });
   });
 
