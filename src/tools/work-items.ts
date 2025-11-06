@@ -630,23 +630,23 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_query_results_by_id,
-    "Retrieve the results of a work item query given the query ID. Supports full or IDs-only output modes.",
+    "Retrieve the results of a work item query given the query ID. Supports full or IDs-only response types.",
     {
       id: z.string().describe("The ID of the query to retrieve results for."),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, the default project will be used."),
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
       timePrecision: z.boolean().optional().describe("Whether to include time precision in the results. Defaults to false."),
       top: z.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
-      outputMode: z.enum(["full", "idsOnly"]).default("full").describe("Output mode: 'full' returns complete query results (default), 'idsOnly' returns only work item IDs for reduced payload size."),
+      responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete query results (default), 'ids' returns only work item IDs for reduced payload size."),
     },
-    async ({ id, project, team, timePrecision, top, outputMode }) => {
+    async ({ id, project, team, timePrecision, top, responseType }) => {
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
       const teamContext = { project, team };
       const queryResult = await workItemApi.queryById(id, teamContext, timePrecision, top);
 
-      // If idsOnly mode, extract and return only the IDs
-      if (outputMode === "idsOnly") {
+      // If ids mode, extract and return only the IDs
+      if (responseType === "ids") {
         const ids = queryResult.workItems?.map((workItem) => workItem.id).filter((id): id is number => id !== undefined) || [];
         return {
           content: [{ type: "text", text: JSON.stringify({ ids, count: ids.length }, null, 2) }],
