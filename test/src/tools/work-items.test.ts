@@ -1250,6 +1250,65 @@ describe("configureWorkItemTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error creating work item: Unknown error occurred");
     });
+
+    it("should use defaultProject when configured and project is not provided", async () => {
+      const defaultProject = "DefaultProject";
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, defaultProject);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
+
+      if (!call) throw new Error("wit_create_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      const params = {
+        // project parameter omitted
+        workItemType: "Task",
+        fields: [{ name: "System.Title", value: "Test" }],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(
+        null,
+        expect.any(Array),
+        defaultProject,
+        "Task"
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
+
+    it("should allow project override when defaultProject is configured", async () => {
+      const defaultProject = "DefaultProject";
+      const explicitProject = "ExplicitProject";
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider, defaultProject);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item");
+
+      if (!call) throw new Error("wit_create_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      const params = {
+        project: explicitProject, // explicitly provided project should override default
+        workItemType: "Task",
+        fields: [{ name: "System.Title", value: "Test" }],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(
+        null,
+        expect.any(Array),
+        explicitProject,
+        "Task"
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
   });
 
   describe("get_query tool", () => {

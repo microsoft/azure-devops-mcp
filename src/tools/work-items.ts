@@ -61,7 +61,8 @@ function getLinkTypeFromName(name: string) {
   }
 }
 
-function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, defaultProject?: string) {
+
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
     "Receive a list of backlogs for a given project and team.",
@@ -546,7 +547,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.create_work_item,
     "Create a new work item in a specified project and work item type.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: defaultProject
+        ? z.string().optional().default(defaultProject).describe("The name or ID of the Azure DevOps project.")
+        : z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The type of work item to create, e.g., 'Task', 'Bug', etc."),
       fields: z
         .array(
@@ -569,9 +572,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           value: encodeFormattedValue(value, format),
         }));
 
-        // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
-        // this should only happen for large text fields, but since we dont't know by field name, lets assume if the users
-        // passes a value longer than 50 characters, then we can set the format to Markdown
         fields.forEach(({ name, value, format }) => {
           if (value.length > 50 && format === "Markdown") {
             document.push({
@@ -593,7 +593,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
         return {
           content: [{ type: "text", text: `Error creating work item: ${errorMessage}` }],
           isError: true,

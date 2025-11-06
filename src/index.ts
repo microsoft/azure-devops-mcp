@@ -54,10 +54,16 @@ const argv = yargs(hideBin(process.argv))
     describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
     type: "string",
   })
+  .option("project", {
+    alias: "p",
+    describe: "Default Azure DevOps project name or ID (optional). When provided, tools will use this project by default.",
+    type: "string",
+  })
   .help()
   .parseSync();
 
 export const orgName = argv.organization as string;
+export const defaultProject = argv.project as string | undefined;
 const orgUrl = "https://dev.azure.com/" + orgName;
 
 const domainsManager = new DomainsManager(argv.domains);
@@ -97,7 +103,7 @@ async function main() {
   // removing prompts untill further notice
   // configurePrompts(server);
 
-  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
+  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains, defaultProject);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
