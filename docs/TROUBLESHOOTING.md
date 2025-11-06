@@ -48,6 +48,42 @@
 
 ## Authentication Issues
 
+### Token Authentication via Environment Variables
+
+For automated scenarios or when you want to use a token stored in an environment variable, you can use the `envvar` authentication type:
+
+1. **Set your token in the ADO_MCP_AUTH_TOKEN environment variable:**
+
+   ```bash
+   export ADO_MCP_AUTH_TOKEN="your-azure-devops-token"
+   ```
+
+2. **Use the envvar authentication type:**
+
+   ```bash
+   npx @azure-devops/mcp myorg --authentication envvar
+   ```
+
+3. **For MCP configuration files, update your `.vscode/mcp.json`:**
+   ```json
+   {
+     "inputs": [
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization name (e.g. 'contoso')"
+       }
+     ],
+     "servers": {
+       "ado": {
+         "type": "stdio",
+         "command": "npx",
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
+       }
+     }
+   }
+   ```
+
 ### GitHub Codespaces
 
 Due to limitations of the environment default OAuth option is not available in Codespace.
