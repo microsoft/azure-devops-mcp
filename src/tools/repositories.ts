@@ -24,6 +24,7 @@ import {
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
+import { WebApiTagDefinition, WebApiCreateTagRequestData } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { getEnumKeys } from "../utils.js";
 
 const REPO_TOOLS = {
@@ -86,6 +87,19 @@ function trimComments(comments: Comment[] | undefined | null) {
       lastUpdatedDate: comment.lastUpdatedDate,
       lastContentUpdatedDate: comment.lastContentUpdatedDate,
     }));
+}
+
+/**
+ * Trims pull request label data to essential properties
+ * @param labels Array of labels to trim (can be undefined/null)
+ * @returns Array of trimmed label objects with essential properties only
+ */
+function trimPullRequestLabels(labels: WebApiTagDefinition[] | undefined | null) {
+  return labels?.map((label) => ({
+    id: label.id,
+    name: label.name,
+    active: label.active,
+  }));
 }
 
 function pullRequestStatusStringToInt(status: string): number {
@@ -274,7 +288,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.update_pull_request,
-    "Update a Pull Request by ID with specified fields, including setting autocomplete with various completion options.",
+    "Update a Pull Request by ID with specified fields, including setting autocomplete with various completion options and managing labels.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
       pullRequestId: z.number().describe("The ID of the pull request to update."),
@@ -291,8 +305,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
+      addLabels: z.array(z.string()).optional().describe("Array of label names to add to the pull request."),
+      removeLabels: z.array(z.string()).optional().describe("Array of label names to remove from the pull request."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, addLabels, removeLabels }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -335,14 +351,36 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
 
       // Validate that at least one field is provided for update
-      if (Object.keys(updateRequest).length === 0) {
+      if (Object.keys(updateRequest).length === 0 && !addLabels && !removeLabels) {
         return {
-          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update." }],
+          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, autoComplete options, addLabels, or removeLabels) must be provided for update." }],
           isError: true,
         };
       }
 
-      const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+      // Update PR properties if any were provided
+      let updatedPullRequest;
+      if (Object.keys(updateRequest).length > 0) {
+        updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+      } else {
+        // If only labels are being updated, fetch the current PR
+        updatedPullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId);
+      }
+
+      // Handle label additions
+      if (addLabels && addLabels.length > 0) {
+        for (const labelName of addLabels) {
+          const labelRequest: WebApiCreateTagRequestData = { name: labelName };
+          await gitApi.createPullRequestLabel(labelRequest, repositoryId, pullRequestId);
+        }
+      }
+
+      // Handle label removals
+      if (removeLabels && removeLabels.length > 0) {
+        for (const labelName of removeLabels) {
+          await gitApi.deletePullRequestLabels(repositoryId, pullRequestId, labelName);
+        }
+      }
       const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
 
       return {
@@ -749,11 +787,19 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
+      includeLabels: z.boolean().optional().default(false).describe("Whether to include labels associated with the pull request."),
     },
-    async ({ repositoryId, pullRequestId, includeWorkItemRefs }) => {
+    async ({ repositoryId, pullRequestId, includeWorkItemRefs, includeLabels }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, undefined, undefined, undefined, undefined, undefined, includeWorkItemRefs);
+      
+      // Fetch labels separately if requested
+      if (includeLabels) {
+        const labels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId);
+        (pullRequest as any).labels = labels;
+      }
+      
       return {
         content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
       };
