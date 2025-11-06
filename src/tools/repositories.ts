@@ -89,19 +89,6 @@ function trimComments(comments: Comment[] | undefined | null) {
     }));
 }
 
-/**
- * Trims pull request label data to essential properties
- * @param labels Array of labels to trim (can be undefined/null)
- * @returns Array of trimmed label objects with essential properties only
- */
-function trimPullRequestLabels(labels: WebApiTagDefinition[] | undefined | null) {
-  return labels?.map((label) => ({
-    id: label.id,
-    name: label.name,
-    active: label.active,
-  }));
-}
-
 function pullRequestStatusStringToInt(status: string): number {
   switch (status) {
     case "Abandoned":

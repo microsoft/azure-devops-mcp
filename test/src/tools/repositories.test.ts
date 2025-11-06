@@ -24,6 +24,7 @@ describe("repos tools", () => {
   let mockGitApi: {
     updatePullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createPullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    createPullRequestLabel: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createPullRequestReviewers: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     deletePullRequestReviewer: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getRepositories: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
@@ -50,6 +51,7 @@ describe("repos tools", () => {
     mockGitApi = {
       updatePullRequest: jest.fn(),
       createPullRequest: jest.fn(),
+      createPullRequestLabel: jest.fn(),
       createPullRequestReviewers: jest.fn(),
       deletePullRequestReviewer: jest.fn(),
       getRepositories: jest.fn(),
@@ -728,6 +730,123 @@ describe("repos tools", () => {
         targetRefName: "refs/heads/main",
       };
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
+    });
+
+    it("should create pull request with labels", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      if (!call) throw new Error("repo_create_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreatedPR = {
+        pullRequestId: 789,
+        codeReviewId: 789,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "PR with labels",
+        description: "Testing label functionality",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.createPullRequest.mockResolvedValue(mockCreatedPR);
+
+      const mockLabel1 = { id: "label1", name: "bug", active: true };
+      const mockLabel2 = { id: "label2", name: "high-priority", active: true };
+      mockGitApi.createPullRequestLabel.mockResolvedValueOnce(mockLabel1).mockResolvedValueOnce(mockLabel2);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        title: "PR with labels",
+        description: "Testing label functionality",
+        labels: ["bug", "high-priority"],
+      };
+
+      const result = await handler(params);
+
+      // Verify PR was created
+      expect(mockGitApi.createPullRequest).toHaveBeenCalledWith(
+        {
+          sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+          title: "PR with labels",
+          description: "Testing label functionality",
+          isDraft: undefined,
+          workItemRefs: [],
+          forkSource: undefined,
+        },
+        "repo123"
+      );
+
+      // Verify labels were added
+      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledTimes(2);
+      expect(mockGitApi.createPullRequestLabel).toHaveBeenNthCalledWith(1, { name: "bug" }, "repo123", 789);
+      expect(mockGitApi.createPullRequestLabel).toHaveBeenNthCalledWith(2, { name: "high-priority" }, "repo123", 789);
+
+      // Verify the response contains the PR (labels are added after, not in response)
+      const expectedTrimmedPR = {
+        pullRequestId: 789,
+        codeReviewId: 789,
+        repository: "test-repo",
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "PR with labels",
+        description: "Testing label functionality",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
+    });
+
+    it("should create pull request without labels when labels array is empty", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      if (!call) throw new Error("repo_create_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreatedPR = {
+        pullRequestId: 999,
+        codeReviewId: 999,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "PR without labels",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.createPullRequest.mockResolvedValue(mockCreatedPR);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        title: "PR without labels",
+        labels: [],
+      };
+
+      await handler(params);
+
+      // Verify labels were not added
+      expect(mockGitApi.createPullRequestLabel).not.toHaveBeenCalled();
     });
   });
 
