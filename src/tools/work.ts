@@ -118,47 +118,27 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
       try {
         const connection = await connectionProvider();
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-        const results = [];
 
         if (depth === undefined) {
           depth = 1;
         }
 
-        // Get all root nodes, then filter for the root node with structureType "iteration"
-        const rootNodes = await workItemTrackingApi.getRootNodes(project, depth);
-        const iterationRoot = Array.isArray(rootNodes) ? rootNodes.find((node) => node.structureType === TreeNodeStructureType.Iteration) : undefined;
+        const results = await workItemTrackingApi.getClassificationNodes(project, [], depth);
 
-        if (iterationRoot) {
-          // Only return the root and its children (if any)
-          results.push({
-            id: iterationRoot.id,
-            identifier: iterationRoot.identifier,
-            name: iterationRoot.name,
-            structureType: iterationRoot.structureType,
-            hasChildren: iterationRoot.hasChildren,
-            path: iterationRoot.path,
-            url: iterationRoot.url,
-            children: iterationRoot.children
-              ? iterationRoot.children.map((child) => ({
-                  id: child.id,
-                  identifier: child.identifier,
-                  name: child.name,
-                  structureType: child.structureType,
-                  hasChildren: child.hasChildren,
-                  path: child.path,
-                  url: child.url,
-                  attributes: child.attributes,
-                }))
-              : [],
-          });
+        // Handle null or undefined results
+        if (!results) {
+          return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
         }
 
-        if (results.length === 0) {
+        // Filter out items with structureType=0 (Area nodes), only keep structureType=1 (Iteration nodes)
+        const filteredResults = results.filter((node) => node.structureType === TreeNodeStructureType.Iteration);
+
+        if (filteredResults.length === 0) {
           return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(filteredResults, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

@@ -20,7 +20,7 @@ interface WorkApiMock {
 
 interface WorkItemTrackingApiMock {
   createOrUpdateClassificationNode: jest.Mock;
-  getRootNodes: jest.Mock;
+  getClassificationNodes: jest.Mock;
 }
 
 describe("configureWorkTools", () => {
@@ -45,7 +45,7 @@ describe("configureWorkTools", () => {
 
     mockWorkItemTrackingApi = {
       createOrUpdateClassificationNode: jest.fn(),
-      getRootNodes: jest.fn(),
+      getClassificationNodes: jest.fn(),
     };
 
     mockConnection = {
@@ -181,14 +181,14 @@ describe("configureWorkTools", () => {
   });
 
   describe("list_iterations tool", () => {
-    it("should call getRootNodes API with the correct parameters and return the expected result", async () => {
+    it("should call getClassificationNodes API with the correct parameters and return the expected result", async () => {
       configureWorkTools(server, tokenProvider, connectionProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
         {
           id: 126391,
           identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
@@ -245,7 +245,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 2);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 2);
 
       const expectedResult = [
         {
@@ -297,7 +297,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
         {
           id: 126392,
           identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
@@ -316,7 +316,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 1);
 
       const expectedResult = [
         {
@@ -341,7 +341,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
         {
           id: 126391,
           identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
@@ -371,7 +371,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 1);
 
       // Should only return the iteration node, filtering out the area node
       const expectedResult = [
@@ -397,7 +397,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
         {
           id: 126391,
           identifier: "a5c68379-3258-4d62-971c-71c1c459336e",
@@ -417,7 +417,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 1);
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No iterations were found");
     });
@@ -429,7 +429,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([]);
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([]);
 
       const params = {
         project: "Fabrikam",
@@ -438,7 +438,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 1);
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No iterations were found");
     });
@@ -450,7 +450,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue(null);
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue(null);
 
       const params = {
         project: "Fabrikam",
@@ -459,7 +459,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 1);
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("No iterations were found");
     });
@@ -471,7 +471,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
         {
           id: 126392,
           identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
@@ -491,7 +491,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalledWith("Fabrikam", 1);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 1);
 
       const expectedResult = [
         {
@@ -502,7 +502,6 @@ describe("configureWorkTools", () => {
           hasChildren: false,
           path: "\\fabrikam\\iteration",
           url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
-          children: [],
         },
       ];
 
@@ -517,7 +516,7 @@ describe("configureWorkTools", () => {
       const [, , , handler] = call;
 
       const testError = new Error("Failed to retrieve iterations");
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockRejectedValue(testError);
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockRejectedValue(testError);
 
       const params = {
         project: "Fabrikam",
@@ -526,7 +525,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalled();
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching iterations: Failed to retrieve iterations");
     });
@@ -538,7 +537,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockRejectedValue("string error");
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockRejectedValue("string error");
 
       const params = {
         project: "Fabrikam",
@@ -547,7 +546,7 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRootNodes).toHaveBeenCalled();
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching iterations: Unknown error occurred");
     });
@@ -559,7 +558,7 @@ describe("configureWorkTools", () => {
       if (!call) throw new Error("work_list_iterations tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.getRootNodes as jest.Mock).mockResolvedValue([
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
         {
           id: 126392,
           identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
@@ -581,7 +580,6 @@ describe("configureWorkTools", () => {
                 startDate: "2025-01-01T00:00:00Z",
                 finishDate: "2025-01-14T23:59:59Z",
               },
-              extraProperty: "should be filtered out",
             },
           ],
         },
@@ -610,9 +608,6 @@ describe("configureWorkTools", () => {
           finishDate: "2025-01-14T23:59:59Z",
         },
       });
-
-      // Verify that extraProperty is not included
-      expect(parsedResult[0].children[0].extraProperty).toBeUndefined();
     });
   });
 
