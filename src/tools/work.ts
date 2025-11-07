@@ -4,7 +4,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
-import { TreeStructureGroup, TreeNodeStructureType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { TreeStructureGroup, TreeNodeStructureType, WorkItemClassificationNode } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import path from "path";
 
 const WORK_TOOLS = {
   list_team_iterations: "work_list_team_iterations",
@@ -113,17 +114,19 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       depth: z.number().default(2).describe("Depth of children to fetch."),
+      excludedIds: z.array(z.number()).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
     },
-    async ({ project, depth }) => {
+    async ({ project, depth, excludedIds: ids }) => {
       try {
         const connection = await connectionProvider();
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        let results = [];
 
         if (depth === undefined) {
           depth = 1;
         }
 
-        const results = await workItemTrackingApi.getClassificationNodes(project, [], depth);
+        results = await workItemTrackingApi.getClassificationNodes(project, [], depth);
 
         // Handle null or undefined results
         if (!results) {
@@ -131,7 +134,26 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         }
 
         // Filter out items with structureType=0 (Area nodes), only keep structureType=1 (Iteration nodes)
-        const filteredResults = results.filter((node) => node.structureType === TreeNodeStructureType.Iteration);
+        let filteredResults = results.filter((node) => node.structureType === TreeNodeStructureType.Iteration);
+
+        // If specific IDs are provided, filter them out recursively (exclude matching nodes and their children)
+        if (ids && ids.length > 0) {
+          const filterOutIds = (nodes: WorkItemClassificationNode[]): WorkItemClassificationNode[] => {
+            return nodes
+              .filter((node) => !node.id || !ids.includes(node.id))
+              .map((node) => {
+                if (node.children && node.children.length > 0) {
+                  return {
+                    ...node,
+                    children: filterOutIds(node.children),
+                  };
+                }
+                return node;
+              });
+          };
+
+          filteredResults = filterOutIds(filteredResults);
+        }
 
         if (filteredResults.length === 0) {
           return { content: [{ type: "text", text: "No iterations were found" }], isError: true };

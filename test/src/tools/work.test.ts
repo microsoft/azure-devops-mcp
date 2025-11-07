@@ -609,6 +609,376 @@ describe("configureWorkTools", () => {
         },
       });
     });
+
+    it("should filter out iterations by excludedIds parameter", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "c7e8a591-5460-6f84-b93e-g8di4686f558",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+              attributes: {
+                startDate: "2025-01-01T00:00:00Z",
+                finishDate: "2025-01-14T23:59:59Z",
+              },
+            },
+            {
+              id: 126394,
+              identifier: "d8f9b6a2-6571-7g95-ca4f-h9ej5797g669",
+              name: "Sprint 2",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 2",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%202",
+              attributes: {
+                startDate: "2025-01-15T00:00:00Z",
+                finishDate: "2025-01-28T23:59:59Z",
+              },
+            },
+          ],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 2,
+        excludedIds: [126394],
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 2);
+
+      const expectedResult = [
+        {
+          id: 126392,
+          identifier: "b6d79480-4359-5e73-a82d-f7cg3575e447",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "c7e8a591-5460-6f84-b93e-g8di4686f558",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+              attributes: {
+                startDate: "2025-01-01T00:00:00Z",
+                finishDate: "2025-01-14T23:59:59Z",
+              },
+            },
+          ],
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should recursively filter out iterations and their children by excludedIds", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "root-iteration",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "level-1-a",
+              name: "Level 1 A",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: true,
+              path: "\\fabrikam\\iteration\\Level 1 A",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Level%201%20A",
+              children: [
+                {
+                  id: 126395,
+                  identifier: "sprint-1",
+                  name: "Sprint 1",
+                  structureType: TreeNodeStructureType.Iteration,
+                  hasChildren: false,
+                  path: "\\fabrikam\\iteration\\Level 1 A\\Sprint 1",
+                  url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Level%201%20A/Sprint%201",
+                },
+                {
+                  id: 126396,
+                  identifier: "sprint-2",
+                  name: "Sprint 2",
+                  structureType: TreeNodeStructureType.Iteration,
+                  hasChildren: false,
+                  path: "\\fabrikam\\iteration\\Level 1 A\\Sprint 2",
+                  url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Level%201%20A/Sprint%202",
+                },
+              ],
+            },
+            {
+              id: 126394,
+              identifier: "archived-folder",
+              name: "Archived",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: true,
+              path: "\\fabrikam\\iteration\\Archived",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Archived",
+              children: [
+                {
+                  id: 126397,
+                  identifier: "old-sprint-1",
+                  name: "Old Sprint 1",
+                  structureType: TreeNodeStructureType.Iteration,
+                  hasChildren: false,
+                  path: "\\fabrikam\\iteration\\Archived\\Old Sprint 1",
+                  url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Archived/Old%20Sprint%201",
+                },
+                {
+                  id: 126398,
+                  identifier: "old-sprint-2",
+                  name: "Old Sprint 2",
+                  structureType: TreeNodeStructureType.Iteration,
+                  hasChildren: false,
+                  path: "\\fabrikam\\iteration\\Archived\\Old Sprint 2",
+                  url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Archived/Old%20Sprint%202",
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 3,
+        excludedIds: [126394], // Exclude "Archived" folder
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("Fabrikam", [], 3);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      // Root should still be present
+      expect(parsedResult[0].id).toBe(126392);
+      expect(parsedResult[0].name).toBe("Iteration");
+
+      // Level 1 A should still be present
+      expect(parsedResult[0].children).toHaveLength(1);
+      expect(parsedResult[0].children[0].id).toBe(126393);
+      expect(parsedResult[0].children[0].name).toBe("Level 1 A");
+
+      // Sprint 1 and Sprint 2 under Level 1 A should still be present
+      expect(parsedResult[0].children[0].children).toHaveLength(2);
+      expect(parsedResult[0].children[0].children[0].id).toBe(126395);
+      expect(parsedResult[0].children[0].children[0].name).toBe("Sprint 1");
+      expect(parsedResult[0].children[0].children[1].id).toBe(126396);
+      expect(parsedResult[0].children[0].children[1].name).toBe("Sprint 2");
+
+      // Archived folder and its children should be completely removed
+      const archivedFolder = parsedResult[0].children.find((child: { id: number }) => child.id === 126394);
+      expect(archivedFolder).toBeUndefined();
+    });
+
+    it("should handle multiple excludedIds filtering", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "root-iteration",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "sprint-1",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+            },
+            {
+              id: 126394,
+              identifier: "sprint-2",
+              name: "Sprint 2",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 2",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%202",
+            },
+            {
+              id: 126395,
+              identifier: "sprint-3",
+              name: "Sprint 3",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 3",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%203",
+            },
+          ],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 2,
+        excludedIds: [126393, 126395], // Exclude Sprint 1 and Sprint 3
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      // Root should still be present
+      expect(parsedResult[0].id).toBe(126392);
+
+      // Only Sprint 2 should remain
+      expect(parsedResult[0].children).toHaveLength(1);
+      expect(parsedResult[0].children[0].id).toBe(126394);
+      expect(parsedResult[0].children[0].name).toBe("Sprint 2");
+    });
+
+    it("should handle empty excludedIds array without filtering", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "root-iteration",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: 126393,
+              identifier: "sprint-1",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+            },
+          ],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 2,
+        excludedIds: [],
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      // All iterations should be present
+      expect(parsedResult[0].id).toBe(126392);
+      expect(parsedResult[0].children).toHaveLength(1);
+      expect(parsedResult[0].children[0].id).toBe(126393);
+    });
+
+    it("should handle excludedIds filtering with nodes that have no id property", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 126392,
+          identifier: "root-iteration",
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: true,
+          path: "\\fabrikam\\iteration",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations",
+          children: [
+            {
+              id: undefined, // Node with no id
+              identifier: "no-id-node",
+              name: "No ID Node",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\No ID Node",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/No%20ID%20Node",
+            },
+            {
+              id: 126394,
+              identifier: "sprint-1",
+              name: "Sprint 1",
+              structureType: TreeNodeStructureType.Iteration,
+              hasChildren: false,
+              path: "\\fabrikam\\iteration\\Sprint 1",
+              url: "https://dev.azure.com/fabrikam/_apis/wit/classificationNodes/Iterations/Sprint%201",
+            },
+          ],
+        },
+      ]);
+
+      const params = {
+        project: "Fabrikam",
+        depth: 2,
+        excludedIds: [126394],
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      // Root should be present
+      expect(parsedResult[0].id).toBe(126392);
+
+      // Only the node with no id should remain (it can't be filtered out)
+      expect(parsedResult[0].children).toHaveLength(1);
+      expect(parsedResult[0].children[0].id).toBeUndefined();
+      expect(parsedResult[0].children[0].name).toBe("No ID Node");
+    });
   });
 
   describe("assign_iterations", () => {
