@@ -1096,12 +1096,12 @@ describe("configureWorkItemTools", () => {
         workItemId: 299,
         top: 20,
         skip: 5,
-        expand: "relations",
+        expand: "Relations",
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.getRevisions).toHaveBeenCalledWith(params.workItemId, params.top, params.skip, "relations", params.project);
+      expect(mockWorkItemTrackingApi.getRevisions).toHaveBeenCalledWith(params.workItemId, params.top, params.skip, 1, params.project);
 
       expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemRevisions, null, 2));
     });

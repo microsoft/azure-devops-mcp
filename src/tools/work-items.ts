@@ -271,13 +271,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       skip: z.number().optional().describe("Optional number of revisions to skip for pagination. Defaults to 0."),
       expand: z
         .enum(getEnumKeys(WorkItemExpand) as [string, ...string[]])
+        .default("None")
         .optional()
-        .describe("Optional expand parameter to include additional details. Defaults to 'none'."),
+        .describe("Optional expand parameter to include additional details. Defaults to 'None'."),
     },
     async ({ project, workItemId, top, skip, expand }) => {
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
-      const revisions = await workItemApi.getRevisions(workItemId, top, skip, expand as unknown as WorkItemExpand, project);
+      const revisions = await workItemApi.getRevisions(workItemId, top, skip, safeEnumConvert(WorkItemExpand, expand), project);
 
       // Dynamically clean up identity objects in revision fields
       // Identity objects typically have properties like displayName, url, _links, id, uniqueName, imageUrl, descriptor
