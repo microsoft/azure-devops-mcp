@@ -1,6 +1,6 @@
 {
   "name": "@azure-devops/mcp",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "MCP server for interacting with Azure DevOps",
   "license": "MIT",
   "author": "Microsoft Corporation",
@@ -39,7 +39,7 @@
   "dependencies": {
     "@azure/identity": "^4.10.0",
     "@azure/msal-node": "^3.6.0",
-    "@modelcontextprotocol/sdk": "1.20.2",
+    "@modelcontextprotocol/sdk": "1.21.0",
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
@@ -55,7 +55,7 @@
     "eslint-plugin-header": "^3.1.1",
     "glob": "^11.0.3",
     "jest": "^30.0.2",
-    "jest-extended": "^6.0.0",
+    "jest-extended": "^7.0.0",
     "prettier": "3.6.2",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.0",

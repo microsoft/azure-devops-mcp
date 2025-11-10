@@ -62,6 +62,16 @@ class OAuthAuthenticator {
 
 function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
   switch (type) {
+    case "envvar":
+      // Read token from fixed environment variable
+      return async () => {
+        const token = process.env["ADO_MCP_AUTH_TOKEN"];
+        if (!token) {
+          throw new Error("Environment variable 'ADO_MCP_AUTH_TOKEN' is not set or empty. Please set it with a valid Azure DevOps Personal Access Token.");
+        }
+        return token;
+      };
+
     case "azcli":
     case "env":
       if (type !== "env") {
