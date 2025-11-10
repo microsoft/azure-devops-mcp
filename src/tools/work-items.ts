@@ -270,9 +270,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       top: z.number().default(50).describe("Optional number of revisions to retrieve. If not provided, all revisions will be returned."),
       skip: z.number().optional().describe("Optional number of revisions to skip for pagination. Defaults to 0."),
       expand: z
-        .enum(["all", "fields", "links", "none", "relations"])
+        .enum(getEnumKeys(WorkItemExpand) as [string, ...string[]])
         .optional()
-        .describe("Optional expand parameter to include additional details. Options: 'all', 'fields', 'links', 'none', 'relations'. Defaults to 'none'."),
+        .describe("Optional expand parameter to include additional details. Defaults to 'none'."),
     },
     async ({ project, workItemId, top, skip, expand }) => {
       const connection = await connectionProvider();
