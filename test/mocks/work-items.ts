@@ -589,3 +589,77 @@ export const _mockQueryResults = {
     },
   ],
 };
+
+export const _mockWorkItemRevisions = [
+  {
+    id: 299,
+    rev: 1,
+    fields: {
+      "System.Id": 299,
+      "System.WorkItemType": "Task",
+      "System.State": "New",
+      "System.Title": "JavaScript implementation for Microsoft Account",
+      "System.CreatedBy": {
+        displayName: "Jamal Hartnett",
+        url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        _links: {
+          avatar: {
+            href: "https://dev.azure.com/mseng/_apis/GraphProfile/MemberAvatars/aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+          },
+        },
+        id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        uniqueName: "fabrikamfiber4@hotmail.com",
+        imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+      },
+      "System.ChangedBy": {
+        displayName: "Jamal Hartnett",
+        url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        _links: {
+          avatar: {
+            href: "https://dev.azure.com/mseng/_apis/GraphProfile/MemberAvatars/aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+          },
+        },
+        id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        uniqueName: "fabrikamfiber4@hotmail.com",
+        imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        descriptor: "aad.YTkzODFkODYtNTYxYS03ZDdiLWJjM2QtZDUzMjllMjM5OTAz",
+      },
+      "System.CreatedDate": "2019-01-15T10:30:00.000Z",
+      "System.ChangedDate": "2019-01-15T10:30:00.000Z",
+    },
+    url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/299/revisions/1",
+  },
+  {
+    id: 299,
+    rev: 2,
+    fields: {
+      "System.Id": 299,
+      "System.WorkItemType": "Task",
+      "System.State": "Active",
+      "System.Title": "JavaScript implementation for Microsoft Account",
+      "System.AssignedTo": {
+        displayName: "Christie Church",
+        url: "https://vssps.dev.azure.com/fabrikam/_apis/Identities/8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        _links: {
+          avatar: {
+            href: "https://dev.azure.com/mseng/_apis/GraphProfile/MemberAvatars/aad.OGM4YzdkMzItNmIxYi00N2Y0LWIyZTktMzBiNDc3YjVhYjNk",
+          },
+        },
+        id: "8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        uniqueName: "fabrikamfiber5@hotmail.com",
+        imageUrl: "https://dev.azure.com/fabrikam/_api/_common/identityImage?id=8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        descriptor: "aad.OGM4YzdkMzItNmIxYi00N2Y0LWIyZTktMzBiNDc3YjVhYjNk",
+      },
+      "System.CreatedBy": {
+        displayName: "Jamal Hartnett",
+      },
+      "System.ChangedBy": {
+        displayName: "Jamal Hartnett",
+      },
+      "System.CreatedDate": "2019-01-15T10:30:00.000Z",
+      "System.ChangedDate": "2019-01-16T14:20:00.000Z",
+    },
+    url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/299/revisions/2",
+  },
+];

@@ -70,6 +70,7 @@ Interact with these Azure DevOps services:
 - **wit_update_work_item**: Update a work item by ID with specified fields.
 - **wit_create_work_item**: Create a new work item in a specified project and work item type.
 - **wit_list_work_item_comments**: Retrieve a list of comments for a work item by ID.
+- **wit_list_work_item_revisions**: Retrieve a list of revisions for a work item by ID.
 - **wit_get_work_items_for_iteration**: Retrieve a list of work items for a specified iteration.
 - **wit_add_work_item_comment**: Add a comment to a work item by ID.
 - **wit_add_child_work_items**: Create one or more child work items of a specific work item type for the given parent ID.
