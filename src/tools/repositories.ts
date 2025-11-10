@@ -24,7 +24,7 @@ import {
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
-import { WebApiTagDefinition, WebApiCreateTagRequestData } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
+import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { getEnumKeys } from "../utils.js";
 
 const REPO_TOOLS = {
@@ -160,6 +160,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           }
         : undefined;
 
+      const labelDefinitions: WebApiTagDefinition[] | undefined = labels
+        ? labels.map((label) => ({ name: label }))
+        : undefined;
+
       const pullRequest = await gitApi.createPullRequest(
         {
           sourceRefName,
@@ -169,17 +173,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           isDraft,
           workItemRefs: workItemRefs,
           forkSource,
+          labels: labelDefinitions,
         },
         repositoryId
       );
-
-      // Add labels if provided
-      if (labels && labels.length > 0 && pullRequest.pullRequestId) {
-        for (const labelName of labels) {
-          const labelRequest: WebApiCreateTagRequestData = { name: labelName };
-          await gitApi.createPullRequestLabel(labelRequest, repositoryId, pullRequest.pullRequestId);
-        }
-      }
 
       const trimmedPullRequest = trimPullRequest(pullRequest, true);
 

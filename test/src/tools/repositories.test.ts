@@ -24,7 +24,6 @@ describe("repos tools", () => {
   let mockGitApi: {
     updatePullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createPullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
-    createPullRequestLabel: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createPullRequestReviewers: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     deletePullRequestReviewer: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getRepositories: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
@@ -51,7 +50,6 @@ describe("repos tools", () => {
     mockGitApi = {
       updatePullRequest: jest.fn(),
       createPullRequest: jest.fn(),
-      createPullRequestLabel: jest.fn(),
       createPullRequestReviewers: jest.fn(),
       deletePullRequestReviewer: jest.fn(),
       getRepositories: jest.fn(),
@@ -683,10 +681,6 @@ describe("repos tools", () => {
       };
       mockGitApi.createPullRequest.mockResolvedValue(mockCreatedPR);
 
-      const mockLabel1 = { id: "label1", name: "enhancement", active: true };
-      const mockLabel2 = { id: "label2", name: "needs-review", active: true };
-      mockGitApi.createPullRequestLabel.mockResolvedValueOnce(mockLabel1).mockResolvedValueOnce(mockLabel2);
-
       const params = {
         repositoryId: "repo123",
         sourceRefName: "refs/heads/feature-branch",
@@ -714,14 +708,10 @@ describe("repos tools", () => {
               id: "fork-repo-123",
             },
           },
+          labels: [{ name: "enhancement" }, { name: "needs-review" }],
         },
         "repo123"
       );
-
-      // Verify labels were added after PR creation
-      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledTimes(2);
-      expect(mockGitApi.createPullRequestLabel).toHaveBeenNthCalledWith(1, { name: "enhancement" }, "repo123", 456);
-      expect(mockGitApi.createPullRequestLabel).toHaveBeenNthCalledWith(2, { name: "needs-review" }, "repo123", 456);
 
       const expectedTrimmedPR = {
         pullRequestId: 456,
