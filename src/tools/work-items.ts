@@ -17,6 +17,7 @@ const WORKITEM_TOOLS = {
   update_work_item: "wit_update_work_item",
   create_work_item: "wit_create_work_item",
   list_work_item_comments: "wit_list_work_item_comments",
+  list_work_item_revisions: "wit_list_work_item_revisions",
   get_work_items_for_iteration: "wit_get_work_items_for_iteration",
   add_work_item_comment: "wit_add_work_item_comment",
   add_child_work_items: "wit_add_child_work_items",
@@ -256,6 +257,59 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
       return {
         content: [{ type: "text", text: comments }],
+      };
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.list_work_item_revisions,
+    "Retrieve list of revisions for a work item by ID.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      workItemId: z.number().describe("The ID of the work item to retrieve revisions for."),
+      top: z.number().default(50).describe("Optional number of revisions to retrieve. If not provided, all revisions will be returned."),
+      skip: z.number().optional().describe("Optional number of revisions to skip for pagination. Defaults to 0."),
+      expand: z
+        .enum(getEnumKeys(WorkItemExpand) as [string, ...string[]])
+        .default("None")
+        .optional()
+        .describe("Optional expand parameter to include additional details. Defaults to 'None'."),
+    },
+    async ({ project, workItemId, top, skip, expand }) => {
+      const connection = await connectionProvider();
+      const workItemApi = await connection.getWorkItemTrackingApi();
+      const revisions = await workItemApi.getRevisions(workItemId, top, skip, safeEnumConvert(WorkItemExpand, expand), project);
+
+      // Dynamically clean up identity objects in revision fields
+      // Identity objects typically have properties like displayName, url, _links, id, uniqueName, imageUrl, descriptor
+      if (revisions && Array.isArray(revisions)) {
+        revisions.forEach((revision) => {
+          if (revision.fields) {
+            Object.keys(revision.fields).forEach((fieldName) => {
+              const fieldValue = revision.fields ? revision.fields[fieldName] : undefined;
+              // Check if this is an identity object by looking for common identity properties
+              if (
+                fieldValue &&
+                typeof fieldValue === "object" &&
+                !Array.isArray(fieldValue) &&
+                "displayName" in fieldValue &&
+                ("url" in fieldValue || "_links" in fieldValue || "uniqueName" in fieldValue)
+              ) {
+                // Remove unwanted properties from identity objects
+                delete fieldValue.url;
+                delete fieldValue._links;
+                delete fieldValue.id;
+                delete fieldValue.uniqueName;
+                delete fieldValue.imageUrl;
+                delete fieldValue.descriptor;
+              }
+            });
+          }
+        });
+      }
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(revisions, null, 2) }],
       };
     }
   );
@@ -630,20 +684,30 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_query_results_by_id,
-    "Retrieve the results of a work item query given the query ID.",
+    "Retrieve the results of a work item query given the query ID. Supports full or IDs-only response types.",
     {
       id: z.string().describe("The ID of the query to retrieve results for."),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, the default project will be used."),
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
       timePrecision: z.boolean().optional().describe("Whether to include time precision in the results. Defaults to false."),
       top: z.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
+      responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete query results (default), 'ids' returns only work item IDs for reduced payload size."),
     },
-    async ({ id, project, team, timePrecision, top }) => {
+    async ({ id, project, team, timePrecision, top, responseType }) => {
       const connection = await connectionProvider();
       const workItemApi = await connection.getWorkItemTrackingApi();
       const teamContext = { project, team };
       const queryResult = await workItemApi.queryById(id, teamContext, timePrecision, top);
 
+      // If ids mode, extract and return only the IDs
+      if (responseType === "ids") {
+        const ids = queryResult.workItems?.map((workItem) => workItem.id).filter((id): id is number => id !== undefined) || [];
+        return {
+          content: [{ type: "text", text: JSON.stringify({ ids, count: ids.length }, null, 2) }],
+        };
+      }
+
+      // Default: return full query results
       return {
         content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
       };
