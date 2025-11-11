@@ -13,6 +13,7 @@ import {
   _mockWorkItem,
   _mockWorkItemComment,
   _mockWorkItemComments,
+  _mockWorkItemRevisions,
   _mockWorkItems,
   _mockWorkItemsForIteration,
   _mockWorkItemType,
@@ -34,6 +35,7 @@ interface WorkItemTrackingApiMock {
   getWorkItem: jest.Mock;
   getComments: jest.Mock;
   addComment: jest.Mock;
+  getRevisions: jest.Mock;
   updateWorkItem: jest.Mock;
   createWorkItem: jest.Mock;
   getWorkItemType: jest.Mock;
@@ -73,6 +75,7 @@ describe("configureWorkItemTools", () => {
       getWorkItem: jest.fn(),
       getComments: jest.fn(),
       addComment: jest.fn(),
+      getRevisions: jest.fn(),
       updateWorkItem: jest.fn(),
       createWorkItem: jest.fn(),
       getWorkItemType: jest.fn(),
@@ -1051,6 +1054,145 @@ describe("configureWorkItemTools", () => {
       );
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemsForIteration], null, 2));
+    });
+  });
+
+  describe("list_work_item_revisions tool", () => {
+    it("should call workItemApi.getRevisions API with the correct parameters and return the expected result", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_revisions");
+
+      if (!call) throw new Error("wit_list_work_item_revisions tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRevisions as jest.Mock).mockResolvedValue(_mockWorkItemRevisions);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        top: 10,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRevisions).toHaveBeenCalledWith(params.workItemId, params.top, undefined, undefined, params.project);
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemRevisions, null, 2));
+    });
+
+    it("should call workItemApi.getRevisions API with expand parameter", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_revisions");
+
+      if (!call) throw new Error("wit_list_work_item_revisions tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRevisions as jest.Mock).mockResolvedValue(_mockWorkItemRevisions);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        top: 20,
+        skip: 5,
+        expand: "Relations",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRevisions).toHaveBeenCalledWith(params.workItemId, params.top, params.skip, 1, params.project);
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemRevisions, null, 2));
+    });
+
+    it("should clean up identity fields by removing unwanted properties", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_revisions");
+
+      if (!call) throw new Error("wit_list_work_item_revisions tool not registered");
+      const [, , , handler] = call;
+
+      // Create a deep copy of mock data to avoid mutating the original
+      const mockDataWithIdentities = JSON.parse(JSON.stringify(_mockWorkItemRevisions));
+
+      (mockWorkItemTrackingApi.getRevisions as jest.Mock).mockResolvedValue(mockDataWithIdentities);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        expand: "fields",
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      // Check that identity fields have been cleaned up
+      const firstRevisionCreatedBy = parsedResult[0].fields["System.CreatedBy"];
+      expect(firstRevisionCreatedBy).toHaveProperty("displayName");
+      expect(firstRevisionCreatedBy).not.toHaveProperty("url");
+      expect(firstRevisionCreatedBy).not.toHaveProperty("_links");
+      expect(firstRevisionCreatedBy).not.toHaveProperty("id");
+      expect(firstRevisionCreatedBy).not.toHaveProperty("uniqueName");
+      expect(firstRevisionCreatedBy).not.toHaveProperty("imageUrl");
+      expect(firstRevisionCreatedBy).not.toHaveProperty("descriptor");
+    });
+
+    it("should handle revisions with no identity fields without errors", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_revisions");
+
+      if (!call) throw new Error("wit_list_work_item_revisions tool not registered");
+      const [, , , handler] = call;
+
+      const mockRevisionsWithoutIdentities = [
+        {
+          id: 299,
+          rev: 1,
+          fields: {
+            "System.Id": 299,
+            "System.Title": "Test Task",
+            "System.State": "New",
+          },
+        },
+      ];
+
+      (mockWorkItemTrackingApi.getRevisions as jest.Mock).mockResolvedValue(mockRevisionsWithoutIdentities);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        top: 25,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRevisions).toHaveBeenCalledWith(params.workItemId, 25, undefined, undefined, params.project);
+      expect(result.content[0].text).toBe(JSON.stringify(mockRevisionsWithoutIdentities, null, 2));
+    });
+
+    it("should use default top value of 50 when not provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_revisions");
+
+      if (!call) throw new Error("wit_list_work_item_revisions tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getRevisions as jest.Mock).mockResolvedValue(_mockWorkItemRevisions);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        top: 50,
+      };
+
+      await handler(params);
+
+      expect(mockWorkItemTrackingApi.getRevisions).toHaveBeenCalledWith(299, 50, undefined, undefined, "Contoso");
     });
   });
 
