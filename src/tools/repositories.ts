@@ -160,9 +160,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           }
         : undefined;
 
-      const labelDefinitions: WebApiTagDefinition[] | undefined = labels
-        ? labels.map((label) => ({ name: label }))
-        : undefined;
+      const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
       const pullRequest = await gitApi.createPullRequest(
         {
