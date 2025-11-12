@@ -16,7 +16,7 @@ Currently, you need to fetch the list of projects so the LLM has context about t
 
 ## Are PAT's supported?
 
-Sorry, PAT's are currently not supported in this local MCP Sever.
+Yes, PATs are supported. Additionally, we offer four authentication methods: interactive (default, using MSAL with browser login), azcli (reusing the Azure CLI token), env (using DefaultAzureCredential for Azure AD authentication), and envvar (reading a token from `ADO_MCP_AUTH_TOKEN`).
 
 ## Is there a remote supported version of the MCP Server?
 
