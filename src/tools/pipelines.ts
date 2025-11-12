@@ -7,8 +7,10 @@ import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
+import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 
 const PIPELINE_TOOLS = {
+  pipelines_create_pipeline: "pipelines_create_pipeline",
   pipelines_get_builds: "pipelines_get_builds",
   pipelines_get_build_changes: "pipelines_get_build_changes",
   pipelines_get_build_definitions: "pipelines_get_build_definitions",
@@ -91,6 +93,70 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
       return {
         content: [{ type: "text", text: JSON.stringify(buildDefinitions, null, 2) }],
+      };
+    }
+  );
+
+  const variableSchema = z.object({
+    value: z.string().optional(),
+    isSecret: z.boolean().optional(),
+  });
+
+  server.tool(
+    PIPELINE_TOOLS.pipelines_create_pipeline,
+    "Creates a pipeline definition for a given project.",
+    {
+      project: z.string().describe("Project ID or name to run the build in."),
+      name: z.string().describe("Name of the new pipeline."),
+      folder: z.string().optional().describe("Folder path for the new pipeline. Defaults to '\\' if not specified."),
+      configurationType: z.enum(getEnumKeys(ConfigurationType) as [string, ...string[]]).describe("The type of pipeline configuration. Currently, only 'yaml' is supported."),
+      yamlPath: z.string().describe("The path to the pipeline's YAML file in the repository"),
+      repositoryType: z.enum(getEnumKeys(RepositoryType) as [string, ...string[]]).describe("The type of repository where the pipeline's YAML file is located."),
+      repositoryName: z.string().describe("The name of the repository. In case of GitHub repository, this is the full name (:owner/:repo) - e.g. octocat/Hello-World."),
+      repositoryId: z.string().optional().describe("The ID of the repository."),
+      repositoryConnectionId: z.string().optional().describe("The service connection ID for GitHub repositories. Not required for Azure Repos Git."),
+      variables: z.record(z.string(), variableSchema).optional().describe("A dictionary of variables to pass to the pipeline."),
+    },
+    async ({ project, name, folder, configurationType, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId, variables }) => {
+      const connection = await connectionProvider();
+      const pipelinesApi = await connection.getPipelinesApi();
+
+      // Only YAML pipelines are supported
+      let configurationTypeEnumValue = safeEnumConvert(ConfigurationType, configurationType);
+      if (configurationTypeEnumValue !== ConfigurationType.Yaml) {
+        throw new Error("Only 'yaml' pipeline configuration type is supported.");
+      }
+
+      let repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
+      let repositoryPayload: any = { 
+        type: repositoryType,
+        name: repositoryName
+      };
+      if (repositoryTypeEnumValue === RepositoryType.AzureReposGit) {
+        repositoryPayload.id = repositoryId;
+      } else if (repositoryTypeEnumValue === RepositoryType.GitHub) {
+        if (!repositoryConnectionId) {
+          throw new Error("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
+        }
+        repositoryPayload.connection = { id: repositoryConnectionId };
+      } else {
+        throw new Error("Unsupported repository type");
+      }
+
+      const createPipelineParams: any = {
+        name: name,
+        folder: folder || "\\",
+        configuration: {
+          type: configurationType,
+          path: yamlPath,
+          repository: repositoryPayload,
+          variables: variables,
+        },
+      };
+      
+      const newPipeline = await pipelinesApi.createPipeline(createPipelineParams, project);
+      return {
+        content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }],
       };
     }
   );
@@ -294,11 +360,6 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       };
     }
   );
-
-  const variableSchema = z.object({
-    value: z.string().optional(),
-    isSecret: z.boolean().optional(),
-  });
 
   const resourcesSchema = z.object({
     builds: z

@@ -114,6 +114,7 @@ Interact with these Azure DevOps services:
 - **pipelines_get_build_changes**: Get the changes associated with a specific build.
 - **pipelines_get_build_status**: Fetch the status of a specific build.
 - **pipelines_update_build_stage**: Update the stage of a specific build.
+- **pipelines_create_pipeline**: Create a pipeline definition for a given project.
 - **pipelines_get_run**: Gets a run for a particular pipeline.
 - **pipelines_list_runs**: Gets top 10000 runs for a particular pipeline.
 - **pipelines_run_pipeline**: Starts a new run of a pipeline.
