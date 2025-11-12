@@ -10,7 +10,6 @@ import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterface
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 
 const PIPELINE_TOOLS = {
-  pipelines_create_pipeline: "pipelines_create_pipeline",
   pipelines_get_builds: "pipelines_get_builds",
   pipelines_get_build_changes: "pipelines_get_build_changes",
   pipelines_get_build_definitions: "pipelines_get_build_definitions",
@@ -19,6 +18,7 @@ const PIPELINE_TOOLS = {
   pipelines_get_build_log_by_id: "pipelines_get_build_log_by_id",
   pipelines_get_build_status: "pipelines_get_build_status",
   pipelines_update_build_stage: "pipelines_update_build_stage",
+  pipelines_create_pipeline: "pipelines_create_pipeline",
   pipelines_get_run: "pipelines_get_run",
   pipelines_list_runs: "pipelines_list_runs",
   pipelines_run_pipeline: "pipelines_run_pipeline",
