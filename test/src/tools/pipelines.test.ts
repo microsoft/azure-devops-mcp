@@ -776,7 +776,7 @@ describe("configurePipelineTools", () => {
         configurationType: "Yaml" as const,
         yamlPath: "pipeline-definition.yml",
         repositoryType: "GitHub" as const,
-        repositoryName: "RepositoryName"
+        repositoryName: "RepositoryName",
       };
 
       await expect(handler(params)).rejects.toThrow("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
