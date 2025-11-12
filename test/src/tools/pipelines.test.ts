@@ -806,47 +806,6 @@ describe("configurePipelineTools", () => {
 
       await expect(handler(params)).rejects.toThrow("API failure");
     });
-
-    it("should forward variables (including secret) into the create request", async () => {
-      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
-      if (!call) throw new Error("pipelines_create_pipeline tool not registered");
-      const [, , , handler] = call;
-
-      const mockPipelinesApi = {
-        createPipeline: jest.fn().mockResolvedValue({ id: 101, name: "MK PRC" }),
-      };
-      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
-
-      const params = {
-        project: "ProjectName",
-        name: "Pipeline Definition Name",
-        folder: "\\",
-        configurationType: "Yaml" as const,
-        yamlPath: "pipeline-definition.yml",
-        repositoryType: "AzureReposGit" as const,
-        repositoryName: "RepositoryName",
-        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
-        variables: {
-          full_name: { value: "VariableValue", isSecret: true },
-        },
-      };
-
-      const result = await handler(params);
-
-      expect(mockPipelinesApi.createPipeline).toHaveBeenCalledWith(
-        expect.objectContaining({
-          configuration: expect.objectContaining({
-            variables: {
-              full_name: { value: "VariableValue", isSecret: true },
-            },
-          }),
-        }),
-        "ProjectName"
-      );
-
-      expect(result.content[0].text).toBe(JSON.stringify({ id: 101, name: "MK PRC" }, null, 2));
-    });
   });
 
   describe("pipelines_list_runs tool", () => {

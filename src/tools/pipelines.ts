@@ -115,9 +115,8 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       repositoryName: z.string().describe("The name of the repository. In case of GitHub repository, this is the full name (:owner/:repo) - e.g. octocat/Hello-World."),
       repositoryId: z.string().optional().describe("The ID of the repository."),
       repositoryConnectionId: z.string().optional().describe("The service connection ID for GitHub repositories. Not required for Azure Repos Git."),
-      variables: z.record(z.string(), variableSchema).optional().describe("A dictionary of variables to pass to the pipeline."),
     },
-    async ({ project, name, folder, configurationType, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId, variables }) => {
+    async ({ project, name, folder, configurationType, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId }) => {
       const connection = await connectionProvider();
       const pipelinesApi = await connection.getPipelinesApi();
 
@@ -151,7 +150,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
           type: configurationType,
           path: yamlPath,
           repository: repositoryPayload,
-          variables: variables,
+          variables: undefined,
         },
       };
 
