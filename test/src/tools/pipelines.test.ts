@@ -656,6 +656,26 @@ describe("configurePipelineTools", () => {
   });
 
   describe("pipelines_create_pipeline tool", () => {
+    it("should reject non-YAML configuration types", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
+      if (!call) throw new Error("pipelines_create_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "ProjectName",
+        name: "NonYaml Pipeline",
+        folder: "\\",
+        configurationType: "DesignerJson" as const, // non-Yaml
+        yamlPath: "pipeline-definition.yml",
+        repositoryType: "AzureReposGit" as const,
+        repositoryName: "RepositoryName",
+        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Only 'yaml' pipeline configuration type is supported.");
+    });
+
     it("should create a YAML pipeline for AzureReposGit and return created pipeline", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
@@ -701,24 +721,46 @@ describe("configurePipelineTools", () => {
       expect(result.content[0].text).toBe(JSON.stringify({ id: 100, name: "Pipeline Definition Name" }, null, 2));
     });
 
-    it("should reject non-YAML configuration types", async () => {
+    it("should create a YAML pipeline for GitHub and return created pipeline", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
       if (!call) throw new Error("pipelines_create_pipeline tool not registered");
       const [, , , handler] = call;
 
+      const mockPipelinesApi = {
+        createPipeline: jest.fn().mockResolvedValue({ id: 200, name: "GH Pipeline" }),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
       const params = {
         project: "ProjectName",
-        name: "NonYaml Pipeline",
+        name: "GH Pipeline",
         folder: "\\",
-        configurationType: "DesignerJson" as const, // non-Yaml
+        configurationType: "Yaml" as const,
         yamlPath: "pipeline-definition.yml",
-        repositoryType: "AzureReposGit" as const,
+        repositoryType: "GitHub" as const,
         repositoryName: "RepositoryName",
-        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+        repositoryConnectionId: "conn-id-123",
       };
 
-      await expect(handler(params)).rejects.toThrow("Only 'yaml' pipeline configuration type is supported.");
+      const result = await handler(params);
+
+      expect(mockPipelinesApi.createPipeline).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configuration: expect.objectContaining({
+            repository: expect.objectContaining({
+              type: "GitHub",
+              fullname: "RepositoryName",
+              connection: {
+                id: "conn-id-123",
+              },
+            }),
+          }),
+        }),
+        "ProjectName"
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 200, name: "GH Pipeline" }, null, 2));
     });
 
     it("should require repositoryConnectionId for GitHub repositories", async () => {

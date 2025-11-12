@@ -129,16 +129,17 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
       let repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
       let repositoryPayload: any = { 
-        type: repositoryType,
-        name: repositoryName
+        type: repositoryType
       };
       if (repositoryTypeEnumValue === RepositoryType.AzureReposGit) {
         repositoryPayload.id = repositoryId;
+        repositoryPayload.name = repositoryName;
       } else if (repositoryTypeEnumValue === RepositoryType.GitHub) {
         if (!repositoryConnectionId) {
           throw new Error("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
         }
         repositoryPayload.connection = { id: repositoryConnectionId };
+        repositoryPayload.fullname = repositoryName;
       } else {
         throw new Error("Unsupported repository type");
       }
