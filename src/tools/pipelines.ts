@@ -104,27 +104,20 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     PIPELINE_TOOLS.pipelines_create_pipeline,
-    "Creates a pipeline definition for a given project.",
+    "Creates a pipeline definition with YAML configuration for a given project.",
     {
       project: z.string().describe("Project ID or name to run the build in."),
       name: z.string().describe("Name of the new pipeline."),
       folder: z.string().optional().describe("Folder path for the new pipeline. Defaults to '\\' if not specified."),
-      configurationType: z.enum(getEnumKeys(ConfigurationType) as [string, ...string[]]).describe("The type of pipeline configuration. Currently, only 'yaml' is supported."),
       yamlPath: z.string().describe("The path to the pipeline's YAML file in the repository"),
       repositoryType: z.enum(getEnumKeys(RepositoryType) as [string, ...string[]]).describe("The type of repository where the pipeline's YAML file is located."),
       repositoryName: z.string().describe("The name of the repository. In case of GitHub repository, this is the full name (:owner/:repo) - e.g. octocat/Hello-World."),
       repositoryId: z.string().optional().describe("The ID of the repository."),
       repositoryConnectionId: z.string().optional().describe("The service connection ID for GitHub repositories. Not required for Azure Repos Git."),
     },
-    async ({ project, name, folder, configurationType, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId }) => {
+    async ({ project, name, folder, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId }) => {
       const connection = await connectionProvider();
       const pipelinesApi = await connection.getPipelinesApi();
-
-      // Only YAML pipelines are supported
-      let configurationTypeEnumValue = safeEnumConvert(ConfigurationType, configurationType);
-      if (configurationTypeEnumValue !== ConfigurationType.Yaml) {
-        throw new Error("Only 'yaml' pipeline configuration type is supported.");
-      }
 
       let repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
       let repositoryPayload: any = {
@@ -143,11 +136,13 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         throw new Error("Unsupported repository type");
       }
 
+      const yamlConfigurationType = getEnumKeys(ConfigurationType).find((k) => ConfigurationType[k as keyof typeof ConfigurationType] === ConfigurationType.Yaml);
+
       const createPipelineParams: any = {
         name: name,
         folder: folder || "\\",
         configuration: {
-          type: configurationType,
+          type: yamlConfigurationType,
           path: yamlPath,
           repository: repositoryPayload,
           variables: undefined,

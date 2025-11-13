@@ -656,26 +656,6 @@ describe("configurePipelineTools", () => {
   });
 
   describe("pipelines_create_pipeline tool", () => {
-    it("should reject non-YAML configuration types", async () => {
-      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
-      if (!call) throw new Error("pipelines_create_pipeline tool not registered");
-      const [, , , handler] = call;
-
-      const params = {
-        project: "ProjectName",
-        name: "NonYaml Pipeline",
-        folder: "\\",
-        configurationType: "DesignerJson" as const, // non-Yaml
-        yamlPath: "pipeline-definition.yml",
-        repositoryType: "AzureReposGit" as const,
-        repositoryName: "RepositoryName",
-        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
-      };
-
-      await expect(handler(params)).rejects.toThrow("Only 'yaml' pipeline configuration type is supported.");
-    });
-
     it("should create a YAML pipeline for AzureReposGit and return created pipeline", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
@@ -690,8 +670,6 @@ describe("configurePipelineTools", () => {
       const params = {
         project: "ProjectName",
         name: "Pipeline Definition Name",
-        folder: "\\",
-        configurationType: "Yaml" as const,
         yamlPath: "pipeline-definition.yml",
         repositoryType: "AzureReposGit" as const,
         repositoryName: "RepositoryName",
@@ -736,7 +714,6 @@ describe("configurePipelineTools", () => {
         project: "ProjectName",
         name: "GH Pipeline",
         folder: "\\",
-        configurationType: "Yaml" as const,
         yamlPath: "pipeline-definition.yml",
         repositoryType: "GitHub" as const,
         repositoryName: "RepositoryName",
@@ -773,7 +750,6 @@ describe("configurePipelineTools", () => {
         project: "ProjectName",
         name: "Pipeline Definition Name",
         folder: "\\",
-        configurationType: "Yaml" as const,
         yamlPath: "pipeline-definition.yml",
         repositoryType: "GitHub" as const,
         repositoryName: "RepositoryName",
@@ -797,7 +773,6 @@ describe("configurePipelineTools", () => {
         project: "ProjectName",
         name: "Pipeline Definition Name",
         folder: "\\",
-        configurationType: "Yaml" as const,
         yamlPath: "pipeline-definition.yml",
         repositoryType: "AzureReposGit" as const,
         repositoryName: "RepositoryName",
