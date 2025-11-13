@@ -813,7 +813,10 @@ describe("configureWorkItemTools", () => {
         workItemId: 299,
       };
 
-      await expect(handler(params)).rejects.toThrow("Failed to add a work item comment: Not Found");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error adding work item comment");
+      expect(result.content[0].text).toContain("Failed to add a work item comment: Not Found");
     });
   });
 
@@ -1512,7 +1515,10 @@ describe("configureWorkItemTools", () => {
         ],
       };
 
-      await expect(handler(params)).rejects.toThrow("Unknown link type: unknown_type");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error linking work items");
+      expect(result.content[0].text).toContain("Unknown link type: unknown_type");
     });
   });
 
@@ -1678,7 +1684,10 @@ describe("configureWorkItemTools", () => {
         ],
       };
 
-      await expect(handler(params)).rejects.toThrow("Failed to update work items in batch: Bad Request");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error updating work items in batch");
+      expect(result.content[0].text).toContain("Failed to update work items in batch: Bad Request");
     });
   });
 
@@ -1753,7 +1762,10 @@ describe("configureWorkItemTools", () => {
         ],
       };
 
-      await expect(handler(params)).rejects.toThrow("Failed to update work items in batch: Unauthorized");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error linking work items");
+      expect(result.content[0].text).toContain("Failed to update work items in batch: Unauthorized");
     });
   });
 
