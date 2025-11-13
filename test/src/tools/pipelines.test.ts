@@ -655,6 +655,134 @@ describe("configurePipelineTools", () => {
     });
   });
 
+  describe("pipelines_create_pipeline tool", () => {
+    it("should create a YAML pipeline for AzureReposGit and return created pipeline", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
+      if (!call) throw new Error("pipelines_create_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockPipelinesApi = {
+        createPipeline: jest.fn().mockResolvedValue({ id: 100, name: "Pipeline Definition Name" }),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
+      const params = {
+        project: "ProjectName",
+        name: "Pipeline Definition Name",
+        yamlPath: "pipeline-definition.yml",
+        repositoryType: "AzureReposGit" as const,
+        repositoryName: "RepositoryName",
+        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+      };
+
+      const result = await handler(params);
+
+      expect(mockPipelinesApi.createPipeline).toHaveBeenCalledWith(
+        {
+          name: "Pipeline Definition Name",
+          folder: "\\",
+          configuration: {
+            type: "Yaml",
+            path: "pipeline-definition.yml",
+            repository: {
+              type: "AzureReposGit",
+              name: "RepositoryName",
+              id: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+            },
+            variables: undefined,
+          },
+        },
+        "ProjectName"
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 100, name: "Pipeline Definition Name" }, null, 2));
+    });
+
+    it("should create a YAML pipeline for GitHub and return created pipeline", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
+      if (!call) throw new Error("pipelines_create_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockPipelinesApi = {
+        createPipeline: jest.fn().mockResolvedValue({ id: 200, name: "GH Pipeline" }),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
+      const params = {
+        project: "ProjectName",
+        name: "GH Pipeline",
+        folder: "\\",
+        yamlPath: "pipeline-definition.yml",
+        repositoryType: "GitHub" as const,
+        repositoryName: "RepositoryName",
+        repositoryConnectionId: "conn-id-123",
+      };
+
+      const result = await handler(params);
+
+      expect(mockPipelinesApi.createPipeline).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configuration: expect.objectContaining({
+            repository: expect.objectContaining({
+              type: "GitHub",
+              fullname: "RepositoryName",
+              connection: {
+                id: "conn-id-123",
+              },
+            }),
+          }),
+        }),
+        "ProjectName"
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 200, name: "GH Pipeline" }, null, 2));
+    });
+
+    it("should require repositoryConnectionId for GitHub repositories", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
+      if (!call) throw new Error("pipelines_create_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "ProjectName",
+        name: "Pipeline Definition Name",
+        folder: "\\",
+        yamlPath: "pipeline-definition.yml",
+        repositoryType: "GitHub" as const,
+        repositoryName: "RepositoryName",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
+    });
+
+    it("should propagate API errors from createPipeline", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
+      if (!call) throw new Error("pipelines_create_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockPipelinesApi = {
+        createPipeline: jest.fn().mockRejectedValue(new Error("API failure")),
+      };
+      mockConnection.getPipelinesApi.mockResolvedValue(mockPipelinesApi);
+
+      const params = {
+        project: "ProjectName",
+        name: "Pipeline Definition Name",
+        folder: "\\",
+        yamlPath: "pipeline-definition.yml",
+        repositoryType: "AzureReposGit" as const,
+        repositoryName: "RepositoryName",
+        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+      };
+
+      await expect(handler(params)).rejects.toThrow("API failure");
+    });
+  });
+
   describe("pipelines_list_runs tool", () => {
     it("should call listRuns with correct parameters", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
