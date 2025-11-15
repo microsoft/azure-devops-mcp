@@ -296,8 +296,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
+      labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels. Undefined = no change, empty array = remove all labels, array with values = replace labels."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
@@ -310,6 +311,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
       if (status !== undefined) {
         updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
+      }
+
+      if (labels !== undefined) {
+        updateRequest.labels = labels.map((label) => ({ name: label }));
       }
 
       if (autoComplete !== undefined) {
