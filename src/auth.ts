@@ -1,7 +1,16 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken, AzureCliCredential, ChainedTokenCredential, ClientAssertionCredential, DefaultAzureCredential, GetTokenOptions, ManagedIdentityCredential, TokenCredential } from "@azure/identity";
+import {
+  AccessToken,
+  AzureCliCredential,
+  ChainedTokenCredential,
+  ClientAssertionCredential,
+  DefaultAzureCredential,
+  GetTokenOptions,
+  ManagedIdentityCredential,
+  TokenCredential,
+} from "@azure/identity";
 import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
 import open from "open";
 
@@ -71,11 +80,7 @@ class FederatedApplicationCredential implements TokenCredential {
 
   constructor(tenantId: string, msiClientId: string, appClientId: string) {
     this.managedIdentity = new ManagedIdentityCredential(msiClientId);
-    this.clientAssertion = new ClientAssertionCredential(
-      tenantId,
-      appClientId,
-      this.computeAssertionAsync.bind(this)
-    );
+    this.clientAssertion = new ClientAssertionCredential(tenantId, appClientId, this.computeAssertionAsync.bind(this));
   }
 
   async getToken(scopes: string | string[], options?: GetTokenOptions): Promise<AccessToken | null> {
@@ -112,14 +117,14 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
       if (type !== "env") {
         process.env.AZURE_TOKEN_CREDENTIALS = "dev";
       }
-      
+
       let credential: TokenCredential;
-      
+
       // Check if federated identity configuration is available
       const federatedTenantId = tenantId || process.env["AZURE_FEDERATED_TENANT_ID"];
       const msiClientId = process.env["AZURE_MSI_CLIENT_ID"];
       const appClientId = process.env["AZURE_APP_CLIENT_ID"];
-      
+
       if (federatedTenantId && msiClientId && appClientId) {
         // Use federated application credential with managed identity
         credential = new FederatedApplicationCredential(federatedTenantId, msiClientId, appClientId);
@@ -132,7 +137,7 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
           credential = new ChainedTokenCredential(azureCliCredential, credential);
         }
       }
-      
+
       return async () => {
         const result = await credential.getToken(scopes);
         if (!result) {

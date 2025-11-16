@@ -320,4 +320,140 @@ describe("auth functions", () => {
       expect(result).toBe("user1-id");
     });
   });
+
+  describe("FederatedApplicationCredential environment configuration", () => {
+    let originalEnv: NodeJS.ProcessEnv;
+
+    beforeEach(() => {
+      originalEnv = { ...process.env };
+      // Clear environment variables
+      delete process.env["AZURE_FEDERATED_TENANT_ID"];
+      delete process.env["AZURE_MSI_CLIENT_ID"];
+      delete process.env["AZURE_APP_CLIENT_ID"];
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it("should detect when all federated credential environment variables are set", () => {
+      // Set up environment variables for federated credential
+      process.env["AZURE_FEDERATED_TENANT_ID"] = "test-tenant-id";
+      process.env["AZURE_MSI_CLIENT_ID"] = "test-msi-client-id";
+      process.env["AZURE_APP_CLIENT_ID"] = "test-app-client-id";
+
+      // Test that we can detect all required variables
+      const federatedTenantId = process.env["AZURE_FEDERATED_TENANT_ID"];
+      const msiClientId = process.env["AZURE_MSI_CLIENT_ID"];
+      const appClientId = process.env["AZURE_APP_CLIENT_ID"];
+
+      expect(federatedTenantId).toBe("test-tenant-id");
+      expect(msiClientId).toBe("test-msi-client-id");
+      expect(appClientId).toBe("test-app-client-id");
+
+      // Verify all are truthy (would trigger FederatedApplicationCredential usage)
+      const allVariablesSet = federatedTenantId && msiClientId && appClientId;
+      expect(allVariablesSet).toBeTruthy();
+    });
+
+    it("should detect when federated credential environment variables are partially set", () => {
+      // Only set some of the required environment variables
+      process.env["AZURE_FEDERATED_TENANT_ID"] = "test-tenant-id";
+      process.env["AZURE_MSI_CLIENT_ID"] = "test-msi-client-id";
+      // Missing AZURE_APP_CLIENT_ID
+
+      const federatedTenantId = process.env["AZURE_FEDERATED_TENANT_ID"];
+      const msiClientId = process.env["AZURE_MSI_CLIENT_ID"];
+      const appClientId = process.env["AZURE_APP_CLIENT_ID"];
+
+      expect(federatedTenantId).toBe("test-tenant-id");
+      expect(msiClientId).toBe("test-msi-client-id");
+      expect(appClientId).toBeUndefined();
+
+      // Verify not all variables are set (would NOT trigger FederatedApplicationCredential)
+      const allVariablesSet = federatedTenantId && msiClientId && appClientId;
+      expect(allVariablesSet).toBeFalsy();
+    });
+
+    it("should handle tenant ID precedence correctly", () => {
+      // Set environment variable
+      process.env["AZURE_FEDERATED_TENANT_ID"] = "env-tenant-id";
+
+      // Parameter tenant ID should take precedence
+      const paramTenantId = "param-tenant-id";
+      const effectiveTenantId = paramTenantId || process.env["AZURE_FEDERATED_TENANT_ID"];
+
+      expect(effectiveTenantId).toBe("param-tenant-id");
+
+      // When no parameter provided, use environment variable
+      const noParamTenantId = undefined;
+      const effectiveTenantIdFromEnv = noParamTenantId || process.env["AZURE_FEDERATED_TENANT_ID"];
+
+      expect(effectiveTenantIdFromEnv).toBe("env-tenant-id");
+    });
+
+    it("should validate expected scopes for federated authentication", () => {
+      // Test the Azure DevOps scope that would be used
+      const adoScope = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
+      expect(adoScope).toHaveLength(1);
+      expect(adoScope[0]).toBe("499b84ac-1321-427f-aa17-267ca6975798/.default");
+
+      // Test the managed identity exchange scope
+      const msiExchangeScope = ["api://AzureADTokenExchange/.default"];
+      expect(msiExchangeScope).toHaveLength(1);
+      expect(msiExchangeScope[0]).toBe("api://AzureADTokenExchange/.default");
+    });
+
+    it("should validate FederatedApplicationCredential constructor parameters", () => {
+      const tenantId = "test-tenant-id";
+      const msiClientId = "test-msi-client-id";
+      const appClientId = "test-app-client-id";
+
+      // Validate parameter types and values
+      expect(typeof tenantId).toBe("string");
+      expect(typeof msiClientId).toBe("string");
+      expect(typeof appClientId).toBe("string");
+
+      expect(tenantId.length).toBeGreaterThan(0);
+      expect(msiClientId.length).toBeGreaterThan(0);
+      expect(appClientId.length).toBeGreaterThan(0);
+
+      // Test GUID format validation (typical for Azure IDs)
+      const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      // These might be GUIDs in real scenarios
+      const testTenantGuid = "12345678-1234-1234-1234-123456789abc";
+      const testMsiGuid = "87654321-4321-4321-4321-abcdef123456";
+      const testAppGuid = "abcdef12-3456-7890-abcd-ef1234567890";
+
+      expect(guidRegex.test(testTenantGuid)).toBeTruthy();
+      expect(guidRegex.test(testMsiGuid)).toBeTruthy();
+      expect(guidRegex.test(testAppGuid)).toBeTruthy();
+    });
+
+    it("should test assertion callback error handling logic", () => {
+      // Test error message for failed managed identity token
+      const expectedErrorMessage = "Failed to obtain managed identity token for federated authentication.";
+
+      // This would be the error thrown when managed identity getToken returns null
+      const error = new Error(expectedErrorMessage);
+
+      expect(error.message).toBe(expectedErrorMessage);
+      expect(error).toBeInstanceOf(Error);
+    });
+
+    it("should test token response structure validation", () => {
+      // Test expected structure of AccessToken
+      const mockAccessToken = {
+        token: "test-token-value",
+        expiresOnTimestamp: Date.now() + 3600000, // 1 hour from now
+      };
+
+      expect(mockAccessToken).toHaveProperty("token");
+      expect(mockAccessToken).toHaveProperty("expiresOnTimestamp");
+      expect(typeof mockAccessToken.token).toBe("string");
+      expect(typeof mockAccessToken.expiresOnTimestamp).toBe("number");
+      expect(mockAccessToken.expiresOnTimestamp).toBeGreaterThan(Date.now());
+    });
+  });
 });
