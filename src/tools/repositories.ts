@@ -24,6 +24,7 @@ import {
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
+import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { getEnumKeys } from "../utils.js";
 
 const REPO_TOOLS = {
@@ -144,8 +145,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       isDraft: z.boolean().optional().default(false).describe("Indicates whether the pull request is a draft. Defaults to false."),
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
+      labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
     },
-    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId }) => {
+    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
@@ -158,6 +160,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           }
         : undefined;
 
+      const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
+
       const pullRequest = await gitApi.createPullRequest(
         {
           sourceRefName,
@@ -167,6 +171,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           isDraft,
           workItemRefs: workItemRefs,
           forkSource,
+          labels: labelDefinitions,
         },
         repositoryId
       );

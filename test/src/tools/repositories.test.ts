@@ -675,7 +675,7 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
-    it("should create pull request with all optional fields", async () => {
+    it("should create pull request with all optional fields including labels", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
@@ -709,6 +709,7 @@ describe("repos tools", () => {
         isDraft: true,
         workItems: "1234 5678",
         forkSourceRepositoryId: "fork-repo-123",
+        labels: ["enhancement", "needs-review"],
       };
 
       const result = await handler(params);
@@ -726,6 +727,7 @@ describe("repos tools", () => {
               id: "fork-repo-123",
             },
           },
+          labels: [{ name: "enhancement" }, { name: "needs-review" }],
         },
         "repo123"
       );
