@@ -51,6 +51,7 @@
     "@modelcontextprotocol/inspector": "^0.17.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-header": "^3.1.1",
     "glob": "^11.0.3",
@@ -62,5 +63,12 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4"
+  },
+  "overrides": {
+    "glob": "^11.0.3",
+    "rimraf": "^6.0.0",
+    "inflight": "npm:@elizaos/inflight@^2.0.0",
+    "js-yaml": "^4.1.0",
+    "test-exclude": "^7.0.1"
   }
 }
