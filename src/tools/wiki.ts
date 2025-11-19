@@ -324,6 +324,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           return { content: [{ type: "text", text: "Error creating/updating wiki page: You must provide either 'url' OR both 'wikiIdentifier' and 'path'." }], isError: true };
         }
 
+        if (!hasUrl && (!project || project.trim().length === 0)) {
+          return { content: [{ type: "text", text: "Error creating/updating wiki page: Project must be provided when url is not supplied." }], isError: true };
+        }
+
         const connection = await connectionProvider();
         const accessToken = await tokenProvider();
 
@@ -382,6 +386,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           return { content: [{ type: "text", text: "Error creating/updating wiki page: Could not determine wikiIdentifier or path." }], isError: true };
         }
 
+        if (!resolvedProject || resolvedProject.trim().length === 0) {
+          return { content: [{ type: "text", text: "Error creating/updating wiki page: Could not determine project." }], isError: true };
+        }
+
         // Normalize the path
         const normalizedPath = resolvedPath.startsWith("/") ? resolvedPath : `/${resolvedPath}`;
         const encodedPath = encodeURIComponent(normalizedPath);
@@ -391,7 +399,92 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         const projectParam = resolvedProject || "";
         const apiUrl = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${resolvedWiki}/pages?path=${encodedPath}&versionDescriptor.versionType=branch&versionDescriptor.version=${encodeURIComponent(resolvedBranch)}&api-version=7.1`;
 
-        // First, try to create a new page (PUT without ETag)
+        const sendUpdateRequest = async (etagToUse: string) => {
+          const updateResponse = await fetch(apiUrl, {
+            method: "PUT",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+              "User-Agent": userAgentProvider(),
+              "If-Match": etagToUse,
+            },
+            body: JSON.stringify({ content: content }),
+          });
+
+          if (updateResponse.ok) {
+            const result = await updateResponse.json();
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Successfully updated wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
+                },
+              ],
+            };
+          }
+
+          const errorText = await updateResponse.text();
+          throw new Error(`Failed to update page (${updateResponse.status}): ${errorText}`);
+        };
+
+        const fetchCurrentEtag = async (
+          notFoundHandler?: () => { content: { type: "text"; text: string }[]; isError: true }
+        ): Promise<{ etag?: string; errorResult?: { content: { type: "text"; text: string }[]; isError: true } }> => {
+          const getResponse = await fetch(apiUrl, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "User-Agent": userAgentProvider(),
+            },
+          });
+
+          if (getResponse.status === 404 && notFoundHandler) {
+            return { errorResult: notFoundHandler() };
+          }
+
+          if (!getResponse.ok) {
+            const errorText = await getResponse.text();
+            throw new Error(`Failed to retrieve wiki page (${getResponse.status}): ${errorText}`);
+          }
+
+          let currentEtag = getResponse.headers.get("etag") || getResponse.headers.get("ETag") || undefined;
+          if (!currentEtag) {
+            const pageData = await getResponse.json();
+            currentEtag = pageData?.eTag;
+          }
+
+          if (!currentEtag) {
+            throw new Error("Could not retrieve ETag for existing page");
+          }
+
+          return { etag: currentEtag };
+        };
+
+        if (hasUrl) {
+          const notFoundResult = (): { content: { type: "text"; text: string }[]; isError: true } => ({
+            content: [
+              {
+                type: "text",
+                text: "Error creating/updating wiki page: Page not found for provided url. To create a new page, omit the url parameter and provide wikiIdentifier, project, and path.",
+              },
+            ],
+            isError: true,
+          });
+
+          const { etag: fetchedEtag, errorResult } = await fetchCurrentEtag(notFoundResult);
+          if (errorResult) {
+            return errorResult;
+          }
+
+          const currentEtag = etag ?? fetchedEtag;
+          if (!currentEtag) {
+            throw new Error("Could not retrieve ETag for existing page");
+          }
+
+          return await sendUpdateRequest(currentEtag);
+        }
+
+        // First, try to create a new page (PUT without ETag) when url is not provided
         try {
           const createResponse = await fetch(apiUrl, {
             method: "PUT",
@@ -408,71 +501,30 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
             return {
               content: [
                 {
-                  type: "text",
+                  type: "text" as const,
                   text: `Successfully created wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
                 },
               ],
             };
           }
 
-          // If creation failed with 409 (Conflict) or 500 (Page exists), try to update it
           if (createResponse.status === 409 || createResponse.status === 500) {
-            // Page exists, we need to get the ETag and update it
             let currentEtag = etag;
 
             if (!currentEtag) {
-              // Fetch current page to get ETag
-              const getResponse = await fetch(apiUrl, {
-                method: "GET",
-                headers: {
-                  "Authorization": `Bearer ${accessToken}`,
-                  "User-Agent": userAgentProvider(),
-                },
-              });
-
-              if (getResponse.ok) {
-                currentEtag = getResponse.headers.get("etag") || getResponse.headers.get("ETag") || undefined;
-                if (!currentEtag) {
-                  const pageData = await getResponse.json();
-                  currentEtag = pageData.eTag;
-                }
-              }
-
-              if (!currentEtag) {
-                throw new Error("Could not retrieve ETag for existing page");
-              }
+              const { etag: fetchedEtag } = await fetchCurrentEtag();
+              currentEtag = fetchedEtag;
             }
 
-            // Now update the existing page with ETag
-            const updateResponse = await fetch(apiUrl, {
-              method: "PUT",
-              headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-                "User-Agent": userAgentProvider(),
-                "If-Match": currentEtag,
-              },
-              body: JSON.stringify({ content: content }),
-            });
-
-            if (updateResponse.ok) {
-              const result = await updateResponse.json();
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: `Successfully updated wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
-                  },
-                ],
-              };
-            } else {
-              const errorText = await updateResponse.text();
-              throw new Error(`Failed to update page (${updateResponse.status}): ${errorText}`);
+            if (!currentEtag) {
+              throw new Error("Could not retrieve ETag for existing page");
             }
-          } else {
-            const errorText = await createResponse.text();
-            throw new Error(`Failed to create page (${createResponse.status}): ${errorText}`);
+
+            return await sendUpdateRequest(currentEtag);
           }
+
+          const errorText = await createResponse.text();
+          throw new Error(`Failed to create page (${createResponse.status}): ${errorText}`);
         } catch (fetchError) {
           throw fetchError;
         }
