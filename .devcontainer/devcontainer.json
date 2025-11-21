@@ -17,7 +17,15 @@
       "openFiles": ["CONTRIBUTING.md"]
     },
     "vscode": {
-      "extensions": ["ms-azuretools.vscode-docker", "EditorConfig.EditorConfig", "GitHub.copilot", "dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"]
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "EditorConfig.EditorConfig",
+        "GitHub.copilot",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "matthiesen-technology.yaml-with-script"
+      ]
     }
   },
   "remoteUser": "node"

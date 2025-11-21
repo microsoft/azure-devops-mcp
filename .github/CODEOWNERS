@@ -1,5 +1,7 @@
 # Define code owners for the codeowners file
+
 .github/CODEOWNERS @microsoft/azure-devops-mcp-maintainers
 
-# Define maintainers as code owners for the entire repository
+## Maintainers
+
 * @microsoft/azure-devops-mcp-maintainers
