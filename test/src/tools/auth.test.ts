@@ -1,9 +1,11 @@
-import { AccessToken } from "@azure/identity";
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { WebApi } from "azure-devops-node-api";
 import { getCurrentUserDetails, getUserIdFromEmail, searchIdentities } from "../../../src/tools/auth";
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 describe("auth functions", () => {
@@ -33,7 +35,7 @@ describe("auth functions", () => {
   describe("getCurrentUserDetails", () => {
     it("should fetch current user details with correct parameters", async () => {
       // Mock token provider
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch response
       const mockUserData = {
@@ -64,7 +66,7 @@ describe("auth functions", () => {
     });
 
     it("should handle HTTP error responses correctly", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       const errorData = { message: "Unauthorized" };
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -77,7 +79,7 @@ describe("auth functions", () => {
     });
 
     it("should handle network errors correctly", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
 
@@ -88,7 +90,7 @@ describe("auth functions", () => {
   describe("searchIdentities", () => {
     it("should search identities with correct parameters and return expected result", async () => {
       // Mock token provider
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch response
       const mockIdentities = {
@@ -125,7 +127,7 @@ describe("auth functions", () => {
     });
 
     it("should handle HTTP error responses correctly", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock failed HTTP response
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -138,7 +140,7 @@ describe("auth functions", () => {
     });
 
     it("should handle network errors correctly", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       (global.fetch as jest.Mock).mockRejectedValue(new Error("Network timeout"));
 
@@ -146,7 +148,7 @@ describe("auth functions", () => {
     });
 
     it("should properly encode search filter in URL", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -165,7 +167,7 @@ describe("auth functions", () => {
   describe("getUserIdFromEmail", () => {
     it("should return user ID from email with correct parameters", async () => {
       // Mock token provider
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock fetch response with single user
       const mockIdentities = {
@@ -197,7 +199,7 @@ describe("auth functions", () => {
     });
 
     it("should return first user ID when multiple users found", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       const mockIdentities = {
         value: [
@@ -225,7 +227,7 @@ describe("auth functions", () => {
     });
 
     it("should throw error when no users found", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock empty response
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -237,7 +239,7 @@ describe("auth functions", () => {
     });
 
     it("should throw error when null response", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock null response
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -249,7 +251,7 @@ describe("auth functions", () => {
     });
 
     it("should throw error when user has no ID", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock response with user without ID
       const mockIdentities = {
@@ -273,7 +275,7 @@ describe("auth functions", () => {
     });
 
     it("should handle HTTP error responses correctly", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       // Mock failed HTTP response
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -286,7 +288,7 @@ describe("auth functions", () => {
     });
 
     it("should handle network errors correctly", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       (global.fetch as jest.Mock).mockRejectedValue(new Error("Connection refused"));
 
@@ -294,7 +296,7 @@ describe("auth functions", () => {
     });
 
     it("should work with unique names as well as emails", async () => {
-      (tokenProvider as jest.Mock).mockResolvedValue({ token: "fake-token" });
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 
       const mockIdentities = {
         value: [

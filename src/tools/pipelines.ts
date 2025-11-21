@@ -1,31 +1,32 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AccessToken } from "@azure/identity";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
+import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 
-const BUILD_TOOLS = {
-  get_builds: "build_get_builds",
-  get_changes: "build_get_changes",
-  get_definitions: "build_get_definitions",
-  get_definition_revisions: "build_get_definition_revisions",
-  get_log: "build_get_log",
-  get_log_by_id: "build_get_log_by_id",
-  get_status: "build_get_status",
+const PIPELINE_TOOLS = {
+  pipelines_get_builds: "pipelines_get_builds",
+  pipelines_get_build_changes: "pipelines_get_build_changes",
+  pipelines_get_build_definitions: "pipelines_get_build_definitions",
+  pipelines_get_build_definition_revisions: "pipelines_get_build_definition_revisions",
+  pipelines_get_build_log: "pipelines_get_build_log",
+  pipelines_get_build_log_by_id: "pipelines_get_build_log_by_id",
+  pipelines_get_build_status: "pipelines_get_build_status",
+  pipelines_update_build_stage: "pipelines_update_build_stage",
+  pipelines_create_pipeline: "pipelines_create_pipeline",
   pipelines_get_run: "pipelines_get_run",
   pipelines_list_runs: "pipelines_list_runs",
   pipelines_run_pipeline: "pipelines_run_pipeline",
-  update_build_stage: "build_update_build_stage",
 };
 
-function configureBuildTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
-    BUILD_TOOLS.get_definitions,
+    PIPELINE_TOOLS.pipelines_get_build_definitions,
     "Retrieves a list of build definitions for a given project.",
     {
       project: z.string().describe("Project ID or name to get build definitions for"),
@@ -96,8 +97,67 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
     }
   );
 
+  const variableSchema = z.object({
+    value: z.string().optional(),
+    isSecret: z.boolean().optional(),
+  });
+
   server.tool(
-    BUILD_TOOLS.get_definition_revisions,
+    PIPELINE_TOOLS.pipelines_create_pipeline,
+    "Creates a pipeline definition with YAML configuration for a given project.",
+    {
+      project: z.string().describe("Project ID or name to run the build in."),
+      name: z.string().describe("Name of the new pipeline."),
+      folder: z.string().optional().describe("Folder path for the new pipeline. Defaults to '\\' if not specified."),
+      yamlPath: z.string().describe("The path to the pipeline's YAML file in the repository"),
+      repositoryType: z.enum(getEnumKeys(RepositoryType) as [string, ...string[]]).describe("The type of repository where the pipeline's YAML file is located."),
+      repositoryName: z.string().describe("The name of the repository. In case of GitHub repository, this is the full name (:owner/:repo) - e.g. octocat/Hello-World."),
+      repositoryId: z.string().optional().describe("The ID of the repository."),
+      repositoryConnectionId: z.string().optional().describe("The service connection ID for GitHub repositories. Not required for Azure Repos Git."),
+    },
+    async ({ project, name, folder, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId }) => {
+      const connection = await connectionProvider();
+      const pipelinesApi = await connection.getPipelinesApi();
+
+      let repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
+      let repositoryPayload: any = {
+        type: repositoryType,
+      };
+      if (repositoryTypeEnumValue === RepositoryType.AzureReposGit) {
+        repositoryPayload.id = repositoryId;
+        repositoryPayload.name = repositoryName;
+      } else if (repositoryTypeEnumValue === RepositoryType.GitHub) {
+        if (!repositoryConnectionId) {
+          throw new Error("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
+        }
+        repositoryPayload.connection = { id: repositoryConnectionId };
+        repositoryPayload.fullname = repositoryName;
+      } else {
+        throw new Error("Unsupported repository type");
+      }
+
+      const yamlConfigurationType = getEnumKeys(ConfigurationType).find((k) => ConfigurationType[k as keyof typeof ConfigurationType] === ConfigurationType.Yaml);
+
+      const createPipelineParams: any = {
+        name: name,
+        folder: folder || "\\",
+        configuration: {
+          type: yamlConfigurationType,
+          path: yamlPath,
+          repository: repositoryPayload,
+          variables: undefined,
+        },
+      };
+
+      const newPipeline = await pipelinesApi.createPipeline(createPipelineParams, project);
+      return {
+        content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    PIPELINE_TOOLS.pipelines_get_build_definition_revisions,
     "Retrieves a list of revisions for a specific build definition.",
     {
       project: z.string().describe("Project ID or name to get the build definition revisions for"),
@@ -115,7 +175,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_builds,
+    PIPELINE_TOOLS.pipelines_get_builds,
     "Retrieves a list of builds for a given project.",
     {
       project: z.string().describe("Project ID or name to get builds for"),
@@ -200,7 +260,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_log,
+    PIPELINE_TOOLS.pipelines_get_build_log,
     "Retrieves the logs for a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build log for"),
@@ -218,7 +278,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_log_by_id,
+    PIPELINE_TOOLS.pipelines_get_build_log_by_id,
     "Get a specific build log by log ID.",
     {
       project: z.string().describe("Project ID or name to get the build log for"),
@@ -239,7 +299,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_changes,
+    PIPELINE_TOOLS.pipelines_get_build_changes,
     "Get the changes associated with a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build changes for"),
@@ -260,7 +320,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.pipelines_get_run,
+    PIPELINE_TOOLS.pipelines_get_run,
     "Gets a run for a particular pipeline.",
     {
       project: z.string().describe("Project ID or name to run the build in"),
@@ -279,7 +339,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.pipelines_list_runs,
+    PIPELINE_TOOLS.pipelines_list_runs,
     "Gets top 10000 runs for a particular pipeline.",
     {
       project: z.string().describe("Project ID or name to run the build in"),
@@ -295,11 +355,6 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
       };
     }
   );
-
-  const variableSchema = z.object({
-    value: z.string().optional(),
-    isSecret: z.boolean().optional(),
-  });
 
   const resourcesSchema = z.object({
     builds: z
@@ -347,7 +402,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   });
 
   server.tool(
-    BUILD_TOOLS.pipelines_run_pipeline,
+    PIPELINE_TOOLS.pipelines_run_pipeline,
     "Starts a new run of a pipeline.",
     {
       project: z.string().describe("Project ID or name to run the build in"),
@@ -392,7 +447,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.get_status,
+    PIPELINE_TOOLS.pipelines_get_build_status,
     "Fetches the status of a specific build.",
     {
       project: z.string().describe("Project ID or name to get the build status for"),
@@ -410,7 +465,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 
   server.tool(
-    BUILD_TOOLS.update_build_stage,
+    PIPELINE_TOOLS.pipelines_update_build_stage,
     "Updates the stage of a specific build.",
     {
       project: z.string().describe("Project ID or name to update the build stage for"),
@@ -434,7 +489,7 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token.token}`,
+          "Authorization": `Bearer ${token}`,
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(body),
@@ -454,4 +509,4 @@ function configureBuildTools(server: McpServer, tokenProvider: () => Promise<Acc
   );
 }
 
-export { BUILD_TOOLS, configureBuildTools };
+export { PIPELINE_TOOLS, configurePipelineTools };

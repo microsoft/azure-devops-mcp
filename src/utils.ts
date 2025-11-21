@@ -27,7 +27,7 @@ export function mapStringToEnum<T extends Record<string, string | number>>(value
  * @param enumObject The enum object to map to
  * @returns Array of valid enum values
  */
-export function mapStringArrayToEnum<T extends Record<string, string | number>>(values: string[] | undefined, enumObject: T): Array<T[keyof T]> {
+export function mapStringArrayToEnum<T extends Record<string, string | number>>(values: string[] | undefined, enumObject: T): T[keyof T][] {
   if (!values) return [];
   return values.map((value) => mapStringToEnum(value, enumObject)).filter((v): v is T[keyof T] => v !== undefined);
 }
@@ -58,4 +58,17 @@ export function safeEnumConvert<T extends Record<string, string | number>>(enumO
   }
 
   return enumObject[key as keyof T];
+}
+
+/**
+ * Encodes `>` and `<` for Markdown formatted fields.
+ *
+ * @param value The text value to encode
+ * @param format The format of the field ('Markdown' or 'Html')
+ * @returns The encoded text, or original text if format is not Markdown
+ */
+export function encodeFormattedValue(value: string, format?: "Markdown" | "Html"): string {
+  if (!value || format !== "Markdown") return value;
+  const result = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return result;
 }

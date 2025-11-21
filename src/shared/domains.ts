@@ -6,9 +6,8 @@
  */
 export enum Domain {
   ADVANCED_SECURITY = "advanced-security",
-  BUILDS = "builds",
+  PIPELINES = "pipelines",
   CORE = "core",
-  RELEASES = "releases",
   REPOSITORIES = "repositories",
   SEARCH = "search",
   TEST_PLANS = "test-plans",
@@ -29,8 +28,7 @@ export class DomainsManager {
 
   constructor(domainsInput?: string | string[]) {
     this.enabledDomains = new Set();
-    const normalizedInput = DomainsManager.parseDomainsInput(domainsInput);
-    this.parseDomains(normalizedInput);
+    this.parseDomains(domainsInput);
   }
 
   /**
@@ -57,11 +55,6 @@ export class DomainsManager {
       return;
     }
 
-    if (domainsInput.length === 1 && domainsInput[0] === ALL_DOMAINS) {
-      this.enableAllDomains();
-      return;
-    }
-
     const domains = domainsInput.map((d) => d.trim().toLowerCase());
     this.validateAndAddDomains(domains);
   }
@@ -72,7 +65,8 @@ export class DomainsManager {
       return;
     }
 
-    const domains = [domainsInput.trim().toLowerCase()];
+    // Handle comma-separated domains
+    const domains = domainsInput.split(",").map((d) => d.trim().toLowerCase());
     this.validateAndAddDomains(domains);
   }
 
@@ -128,8 +122,8 @@ export class DomainsManager {
    * @returns Normalized array of domain strings
    */
   public static parseDomainsInput(domainsInput?: string | string[]): string[] {
-    if (!domainsInput) {
-      return [];
+    if (!domainsInput || this.isEmptyDomainsInput(domainsInput)) {
+      return ["all"];
     }
 
     if (typeof domainsInput === "string") {
@@ -137,5 +131,11 @@ export class DomainsManager {
     }
 
     return domainsInput.map((d) => d.trim().toLowerCase());
+  }
+
+  private static isEmptyDomainsInput(domainsInput?: string | string[]): boolean {
+    if (typeof domainsInput === "string" && domainsInput.trim() === "") return true;
+    if (Array.isArray(domainsInput) && domainsInput.length === 0) return true;
+    return false;
   }
 }

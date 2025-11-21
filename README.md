@@ -7,8 +7,6 @@ Easily install the Azure DevOps MCP Server for VS Code or VS Code Insiders:
 
 This TypeScript project provides a **local** MCP server for Azure DevOps, enabling you to perform a wide range of Azure DevOps tasks directly from your code editor.
 
-> 🚨 **Public Preview:** This project is in public preview. Tools and features may change before general availability.
-
 ## 📄 Table of Contents
 
 1. [📺 Overview](#-overview)
@@ -27,7 +25,6 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 
 - "List my ADO projects"
 - "List ADO Builds for 'Contoso'"
-- "List ADO Releases for 'Contoso'"
 - "List ADO Repos for 'Contoso'"
 - "List test plans for 'Contoso'"
 - "List teams for project 'Contoso'"
@@ -45,110 +42,7 @@ The Azure DevOps MCP Server is built from tools that are concise, simple, focuse
 
 ## ⚙️ Supported Tools
 
-Interact with these Azure DevOps services:
-
-### 🧿 Core
-
-- **core_list_project_teams**: Retrieve a list of teams for the specified Azure DevOps project.
-- **core_list_projects**: Retrieve a list of projects in your Azure DevOps organization.
-- **core_get_identity_ids**: Retrieve Azure DevOps identity IDs for a list of unique names.
-
-### ⚒️ Work
-
-- **work_list_team_iterations**: Retrieve a list of iterations for a specific team in a project.
-- **work_create_iterations**: Create new iterations in a specified Azure DevOps project.
-- **work_assign_iterations**: Assign existing iterations to a specific team in a project.
-
-### 📅 Work Items
-
-- **wit_my_work_items**: Retrieve a list of work items relevant to the authenticated user.
-- **wit_list_backlogs**: Retrieve a list of backlogs for a given project and team.
-- **wit_list_backlog_work_items**: Retrieve a list of backlogs for a given project, team, and backlog category.
-- **wit_get_work_item**: Get a single work item by ID.
-- **wit_get_work_items_batch_by_ids**: Retrieve a list of work items by IDs in batch.
-- **wit_update_work_item**: Update a work item by ID with specified fields.
-- **wit_create_work_item**: Create a new work item in a specified project and work item type.
-- **wit_list_work_item_comments**: Retrieve a list of comments for a work item by ID.
-- **wit_get_work_items_for_iteration**: Retrieve a list of work items for a specified iteration.
-- **wit_add_work_item_comment**: Add a comment to a work item by ID.
-- **wit_add_child_work_items**: Create one or more child work items of a specific work item type for the given parent ID.
-- **wit_link_work_item_to_pull_request**: Link a single work item to an existing pull request.
-- **wit_get_work_item_type**: Get a specific work item type.
-- **wit_get_query**: Get a query by its ID or path.
-- **wit_get_query_results_by_id**: Retrieve the results of a work item query given the query ID.
-- **wit_update_work_items_batch**: Update work items in batch.
-- **wit_work_items_link**: Link work items together in batch.
-- **wit_work_item_unlink**: Unlink one or many links from a work item.
-- **wit_add_artifact_link**: Link to artifacts like branch, pull request, commit, and build.
-
-### 📁 Repositories
-
-- **repo_list_repos_by_project**: Retrieve a list of repositories for a given project.
-- **repo_list_pull_requests_by_repo**: Retrieve a list of pull requests for a given repository.
-- **repo_list_pull_requests_by_project**: Retrieve a list of pull requests for a given project ID or name.
-- **repo_list_branches_by_repo**: Retrieve a list of branches for a given repository.
-- **repo_list_my_branches_by_repo**: Retrieve a list of your branches for a given repository ID.
-- **repo_list_pull_requests_by_commits**: List pull requests associated with commits.
-- **repo_list_pull_request_threads**: Retrieve a list of comment threads for a pull request.
-- **repo_list_pull_request_thread_comments**: Retrieve a list of comments in a pull request thread.
-- **repo_get_repo_by_name_or_id**: Get the repository by project and repository name or ID.
-- **repo_get_branch_by_name**: Get a branch by its name.
-- **repo_get_pull_request_by_id**: Get a pull request by its ID.
-- **repo_create_pull_request**: Create a new pull request.
-- **repo_update_pull_request_status**: Update the status of an existing pull request to active or abandoned.
-- **repo_update_pull_request**: Update various fields of an existing pull request (title, description, draft status, target branch).
-- **repo_update_pull_request_reviewers**: Add or remove reviewers for an existing pull request.
-- **repo_reply_to_comment**: Replies to a specific comment on a pull request.
-- **repo_resolve_comment**: Resolves a specific comment thread on a pull request.
-- **repo_search_commits**: Searches for commits.
-- **repo_create_pull_request_thread**: Creates a new comment thread on a pull request.
-
-### 🛰️ Builds
-
-- **build_get_definitions**: Retrieve a list of build definitions for a given project.
-- **build_get_definition_revisions**: Retrieve a list of revisions for a specific build definition.
-- **build_get_builds**: Retrieve a list of builds for a given project.
-- **build_get_log**: Retrieve the logs for a specific build.
-- **build_get_log_by_id**: Get a specific build log by log ID.
-- **build_get_changes**: Get the changes associated with a specific build.
-- **build_get_status**: Fetch the status of a specific build.
-- **build_update_build_stage**: Update the stage of a specific build.
-- **pipelines_get_run**: Gets a run for a particular pipeline.
-- **pipelines_list_runs**: Gets top 10000 runs for a particular pipeline.
-- **pipelines_run_pipeline**: Starts a new run of a pipeline.
-
-### 🚀 Releases
-
-- **release_get_definitions**: Retrieve a list of release definitions for a given project.
-- **release_get_releases**: Retrieve a list of releases for a given project.
-
-### 🔒 Advanced Security
-
-- **advsec_get_alerts**: Retrieve Advanced Security alerts for a repository.
-- **advsec_get_alert_details**: Get detailed information about a specific Advanced Security alert.
-
-### 🧪 Test Plans
-
-- **testplan_create_test_plan**: Create a new test plan in the project.
-- **testplan_create_test_case**: Create a new test case work item.
-- **testplan_add_test_cases_to_suite**: Add existing test cases to a test suite.
-- **testplan_list_test_plans**: Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.
-- **testplan_list_test_cases**: Get a list of test cases in the test plan.
-- **testplan_show_test_results_from_build_id**: Get a list of test results for a given project and build ID.
-
-### 📖 Wiki
-
-- **wiki_list_wikis**: Retrieve a list of wikis for an organization or project.
-- **wiki_get_wiki**: Get the wiki by wikiIdentifier.
-- **wiki_list_pages**: Retrieve a list of wiki pages for a specific wiki and project.
-- **wiki_get_page_content**: Retrieve wiki page content by wikiIdentifier and path.
-- **wiki_create_or_update_page**: Create or update wiki pages with full content support.
-
-### 🔎 Search
-
-- **search_code**: Get code search results for a given search text.
-- **search_wiki**: Get wiki search results for a given search text.
-- **search_workitem**: Get work item search results for a given search text.
+See [TOOLSET.md](./docs/TOOLSET.md) for a comprehensive list.
 
 ## 🔌 Installation & Getting Started
 
@@ -158,16 +52,7 @@ For the best experience, use Visual Studio Code and GitHub Copilot. See the [get
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-4. Open VS Code in an empty folder
-
-### Azure Login
-
-Ensure you are logged in to Azure DevOps via the Azure CLI:
-
-```sh
-az login
-```
+3. Open VS Code in an empty folder
 
 ### Installation
 
@@ -238,7 +123,7 @@ Click "Select Tools" and choose the available tools.
 
 ![configure mcp server tools](./docs/media/configure-mcp-server-tools.gif)
 
-Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
+Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first time an ADO tool is executed browser will open prompting to login with your Microsoft account. Please ensure you are using credentials matching selected Azure DevOps organization.
 
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
@@ -261,16 +146,16 @@ For example, use `"-d", "core", "work", "work-items"` to load only Work Item rel
     }
   ],
   "servers": {
-    "ado": {
+    "ado_with_filtered_domains": {
       "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "-d", "core", "work", "work-items"]
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "-d", "core", "work", "work-items"]
     }
   }
 }
 ```
 
-Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `builds`, `releases`, `advanced-security`
+Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `pipelines`, `advanced-security`
 
 We recommend that you always enable `core` tools so that you can fetch project level information.
 

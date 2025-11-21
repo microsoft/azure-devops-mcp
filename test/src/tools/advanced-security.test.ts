@@ -1,4 +1,6 @@
-import { AccessToken } from "@azure/identity";
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
@@ -6,7 +8,7 @@ import { Alert, AlertType, AlertValidityStatus, Confidence, Severity, State } fr
 import { PagedList } from "azure-devops-node-api/interfaces/common/VSSInterfaces";
 import { configureAdvSecTools } from "../../../src/tools/advanced-security";
 
-type TokenProviderMock = () => Promise<AccessToken>;
+type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
 
 interface AlertApiMock {

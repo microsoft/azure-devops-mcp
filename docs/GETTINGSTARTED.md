@@ -4,7 +4,7 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 
 - [Prerequisites](#-prerequisites)
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
-- [Getting started with Visual Studio 2022 & GitHub Copilot](#-visual-studio-2022--github-copilot-1)
+- [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
 - [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
 - [Getting started with Cursor](#-using-mcp-server-with-cursor)
@@ -20,22 +20,12 @@ Before you begin, make sure you have:
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
 2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-4. Open VS Code in an empty folder
+3. Open VS Code in an empty folder
 
 ### For Visual Studio 2022
 
 1. Install [VS Studio 2022 version 17.14](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history) or later
-2. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
-3. Open a project in Visual Studio
-
-### Azure CLI Login
-
-Ensure you are logged in to Azure DevOps via the Azure CLI:
-
-```sh
-az login
-```
+2. Open a project in Visual Studio
 
 ## 🍕 Installation Options
 
@@ -98,6 +88,38 @@ Click "Select Tools" and choose the available tools.
 3. The server appears in the tools list.
 4. Try prompts like "List ADO projects".
 
+##### Using Token Authentication via Environment Variables
+
+For automated scenarios or when you want to use a token stored in an environment variable, you can use the `envvar` authentication type:
+
+1. **Set your token in the ADO_MCP_AUTH_TOKEN environment variable:**
+
+   ```bash
+   export ADO_MCP_AUTH_TOKEN="your-azure-devops-token"
+   ```
+
+2. **Update your `.vscode/mcp.json` to use token authentication:**
+   ```json
+   {
+     "inputs": [
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization name (e.g. 'contoso')"
+       }
+     ],
+     "servers": {
+       "ado": {
+         "type": "stdio",
+         "command": "npx",
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
+       }
+     }
+   }
+   ```
+
+This approach is particularly useful for CI/pipeline scenarios or when you want to avoid interactive authentication and use another credential source.
+
 #### 🛠️ Install from Source (Dev Mode)
 
 This installation method is recommended for advanced users and contributors who want immediate access to the latest updates from the main branch. It is ideal if you are developing new tools, enhancing existing features, or maintaining a custom fork.
@@ -148,8 +170,6 @@ Click "Select Tools" and choose the available tools.
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will help you get the best experience using the Azure DevOps MCP Server in GitHub Copilot Chat.
 
 ### ➡️ Visual Studio 2022 & GitHub Copilot
-
-For the best experience, use Visual Studio Code and GitHub Copilot 👆.
 
 #### 🧨 Install from Public Feed (Recommended)
 
@@ -218,12 +238,6 @@ claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
 Replace `Contoso` with your own organization name
 
 ### ✴️ Using MCP Server with Claude Desktop
-
-Ensure you are logged in to Azure DevOps using the Azure CLI:
-
-```sh
-az login
-```
 
 Open Claude Desktop and navigate to **File > Settings > Developer**. Click **Edit Config**.
 
