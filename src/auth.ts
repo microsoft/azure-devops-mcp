@@ -62,7 +62,7 @@ class OAuthAuthenticator {
           scopes,
           account: this.accountId,
         });
-        logger.info(`OAuthAuthenticator: Successfully acquired token silently`);
+        logger.debug(`OAuthAuthenticator: Successfully acquired token silently`);
       } catch (error) {
         logger.debug(`OAuthAuthenticator: Silent token acquisition failed: ${error instanceof Error ? error.message : String(error)}`);
         authResult = null;
@@ -71,7 +71,7 @@ class OAuthAuthenticator {
       logger.debug(`OAuthAuthenticator: No cached account available, interactive auth required`);
     }
     if (!authResult) {
-      logger.info(`OAuthAuthenticator: Starting interactive token acquisition`);
+      logger.debug(`OAuthAuthenticator: Starting interactive token acquisition`);
       authResult = await this.publicClientApp.acquireTokenInteractive({
         scopes,
         openBrowser: async (url) => {
@@ -80,7 +80,7 @@ class OAuthAuthenticator {
         },
       });
       this.accountId = authResult.account;
-      logger.info(`OAuthAuthenticator: Successfully acquired token interactively, account cached`);
+      logger.debug(`OAuthAuthenticator: Successfully acquired token interactively, account cached`);
     }
 
     if (!authResult.accessToken) {
