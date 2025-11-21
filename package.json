@@ -25,7 +25,7 @@
     "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write src/version.ts",
     "validate-tools": "tsc --noEmit && node scripts/build-validate-tools.js",
     "build": "tsc && shx chmod +x dist/*.js",
-    "prepare": "husky",
+    "prepare": "npm run build && husky",
     "watch": "tsc --watch",
     "inspect": "ALLOWED_ORIGINS=http://127.0.0.1:6274 npx @modelcontextprotocol/inspector node dist/index.js",
     "start": "node -r tsconfig-paths/register dist/index.js",

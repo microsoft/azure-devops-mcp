@@ -1,7 +1,7 @@
 ---
 agent: "agent"
 tools: ["edit/editFiles", "ado/*", "changes"]
-description: "Creates or updated TOOLSET.md file"
+description: "Creates or updates TOOLSET.md file"
 model: Claude Sonnet 4.5 (copilot)
 ---
 
