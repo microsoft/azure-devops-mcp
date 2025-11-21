@@ -3,26 +3,10 @@
 
 import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
 import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
-import { setLogLevel, AzureLogLevel } from "@azure/logger";
 import open from "open";
 import { logger } from "./logger.js";
 
 const scopes = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
-
-const logLevel = process.env.LOG_LEVEL?.toLowerCase();
-if (logLevel && ["verbose", "debug", "info", "warning", "error"].includes(logLevel)) {
-  // Map Winston log levels to Azure log levels
-  const logLevelMap: Record<string, AzureLogLevel> = {
-    verbose: "verbose",
-    debug: "info",
-    info: "info",
-    warning: "warning",
-    error: "error",
-  };
-
-  const azureLogLevel: AzureLogLevel = logLevelMap[logLevel];
-  setLogLevel(azureLogLevel);
-}
 
 class OAuthAuthenticator {
   static clientId = "0d50963b-7bb9-4fe7-94c7-a99af00b5136";

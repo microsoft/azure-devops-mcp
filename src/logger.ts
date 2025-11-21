@@ -2,6 +2,22 @@
 // Licensed under the MIT License.
 
 import winston from "winston";
+import { setLogLevel, AzureLogLevel } from "@azure/logger";
+
+const logLevel = process.env.LOG_LEVEL?.toLowerCase();
+if (logLevel && ["verbose", "debug", "info", "warning", "error"].includes(logLevel)) {
+  // Map Winston log levels to Azure log levels
+  const logLevelMap: Record<string, AzureLogLevel> = {
+    verbose: "verbose",
+    debug: "info",
+    info: "info",
+    warning: "warning",
+    error: "error",
+  };
+
+  const azureLogLevel: AzureLogLevel = logLevelMap[logLevel];
+  setLogLevel(azureLogLevel);
+}
 
 /**
  * Logger utility for MCP server
