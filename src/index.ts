@@ -78,7 +78,7 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
-  logger.debug("Starting Azure DevOps MCP Server with arguments:", {
+  logger.info("Starting Azure DevOps MCP Server", {
     organization: orgName,
     organizationUrl: orgUrl,
     authentication: argv.authentication,
