@@ -17,13 +17,12 @@ if (logLevel && ["verbose", "debug", "info", "warning", "error"].includes(logLev
     debug: "info",
     info: "info",
     warning: "warning",
-    error: "error"
+    error: "error",
   };
 
   const azureLogLevel: AzureLogLevel = logLevelMap[logLevel];
   setLogLevel(azureLogLevel);
 }
-
 
 class OAuthAuthenticator {
   static clientId = "0d50963b-7bb9-4fe7-94c7-a99af00b5136";
