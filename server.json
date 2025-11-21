@@ -3,7 +3,7 @@
   "name": "com.microsoft/azure-devops",
   "description": "The MCP server for Azure DevOps, bringing the power of Azure DevOps directly to your agents.",
   "version": "2.3.0",
-  "title": "Azure DevOps MCP",
+  "title": "Azure DevOps",
   "packages": [
     {
       "registryType": "npm",
