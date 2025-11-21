@@ -67,7 +67,7 @@
     "typescript-eslint": "^8.46.4"
   },
   "lint-staged": {
-    "**/*.(js|ts|jsx|tsx|json|css|md)": [
+    "**/*.{js,ts,jsx,tsx,json,css,md}": [
       "npm run format"
     ]
   },
