@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, GetTokenOptions, TokenCredential } from "@azure/identity";
+import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
 import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
 import open from "open";
 
@@ -78,17 +78,13 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
         process.env.AZURE_TOKEN_CREDENTIALS = "dev";
       }
       let credential: TokenCredential = new DefaultAzureCredential(); // CodeQL [SM05138] resolved by explicitly setting AZURE_TOKEN_CREDENTIALS
-      let options: GetTokenOptions = {};
-
       if (tenantId) {
         // Use Azure CLI credential if tenantId is provided for multi-tenant scenarios
         const azureCliCredential = new AzureCliCredential({ tenantId });
         credential = new ChainedTokenCredential(azureCliCredential, credential);
-        options = { tenantId };
       }
-
       return async () => {
-        const result = await credential.getToken(scopes, options);
+        const result = await credential.getToken(scopes);
         if (!result) {
           throw new Error("Failed to obtain Azure DevOps token. Ensure you have Azure CLI logged or use interactive type of authentication.");
         }
