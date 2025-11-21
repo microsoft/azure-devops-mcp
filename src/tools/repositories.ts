@@ -754,7 +754,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
-      includeLabels: z.boolean().optional().default(true).describe("Whether to include a summary of labels in the response."),
+      includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
     },
     async ({ repositoryId, pullRequestId, includeWorkItemRefs, includeLabels }) => {
       const connection = await connectionProvider();
