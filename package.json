@@ -22,7 +22,7 @@
   },
   "scripts": {
     "preinstall": "npm config set registry https://registry.npmjs.org/",
-    "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write src/version.ts",
+    "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n' \" > src/version.ts && prettier --write src/version.ts",
     "validate-tools": "tsc --noEmit && node scripts/build-validate-tools.js",
     "build": "tsc && shx chmod +x dist/*.js",
     "prepare": "npm run build && husky",
@@ -51,9 +51,10 @@
     "@modelcontextprotocol/inspector": "^0.17.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-header": "^3.1.1",
-    "glob": "^11.0.3",
+    "glob": "^11.1.0",
     "husky": "^9.1.7",
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
@@ -66,8 +67,15 @@
     "typescript-eslint": "^8.46.4"
   },
   "lint-staged": {
-    "**/*.(js|ts|jsx|tsx|json|css|md)": [
+    "**/*.{js,ts,jsx,tsx,json,css,md}": [
       "npm run format"
     ]
+  },
+  "overrides": {
+    "glob": "^11.1.0",
+    "rimraf": "^6.0.0",
+    "inflight": "npm:@elizaos/inflight@^2.0.0",
+    "js-yaml": "^4.1.0",
+    "test-exclude": "^7.0.1"
   }
 }
