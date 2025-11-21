@@ -10,6 +10,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
+import { logger } from "./logger.js";
 import { getOrgTenant } from "./org-tenants.js";
 //import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
@@ -77,6 +78,17 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
+  logger.debug("Starting Azure DevOps MCP Server with arguments:", {
+    organization: orgName,
+    organizationUrl: orgUrl,
+    authentication: argv.authentication,
+    tenant: argv.tenant,
+    domains: argv.domains,
+    enabledDomains: Array.from(enabledDomains),
+    version: packageVersion,
+    isCodespace: isGitHubCodespaceEnv(),
+  });
+
   const server = new McpServer({
     name: "Azure DevOps MCP Server",
     version: packageVersion,
@@ -104,6 +116,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("Fatal error in main():", error);
+  logger.error("Fatal error in main():", error);
   process.exit(1);
 });
