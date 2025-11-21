@@ -1331,22 +1331,11 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
     });
 
-    it("should handle missing project parameter", async () => {
+    it("should require project parameter when url is not provided", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
       const [, , , handler] = call;
-
-      const mockResponse = {
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          path: "/Home",
-          id: 123,
-          content: "# Welcome",
-        }),
-      };
-
-      mockFetch.mockResolvedValueOnce(mockResponse);
 
       const params = {
         wikiIdentifier: "wiki1",
@@ -1357,11 +1346,9 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://dev.azure.com/testorg//_apis/wiki/wikis/wiki1/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
-        expect.any(Object)
-      );
-      expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Project must be provided when url is not supplied");
     });
 
     it("should handle failed GET request for ETag", async () => {
@@ -1378,6 +1365,7 @@ describe("configureWikiTools", () => {
       const mockGetResponse = {
         ok: false, // GET fails
         status: 404,
+        text: jest.fn().mockResolvedValue("Not found"),
       };
 
       mockFetch
@@ -1394,7 +1382,7 @@ describe("configureWikiTools", () => {
       const result = await handler(params);
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Error creating/updating wiki page: Could not retrieve ETag for existing page");
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Failed to retrieve wiki page (404): Not found");
     });
 
     it("should use custom branch when specified", async () => {
@@ -1437,6 +1425,353 @@ describe("configureWikiTools", () => {
         }
       );
       expect(result.content[0].text).toContain("Successfully created wiki page at path: /Home");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should error when attempting to create page using URL", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+
+      const params = {
+        url: "https://dev.azure.com/org/myproject/_wiki/wikis/myWiki?pagePath=%2FDocs%2FGuide",
+        content: "# Guide Content",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Page not found for provided url");
+    });
+
+    it("should update page using URL with pagePath and branch", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue('W/"test-etag"'),
+        },
+      };
+
+      const mockUpdateResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Updated Home",
+        }),
+      };
+
+      mockFetch.mockResolvedValueOnce(mockGetResponse).mockResolvedValueOnce(mockUpdateResponse);
+
+      const params = {
+        url: "https://dev.azure.com/org/myproject/_wiki/wikis/myWiki?wikiVersion=GBmain&pagePath=%2FHome",
+        content: "# Updated Home",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        "https://dev.azure.com/testorg/myproject/_apis/wiki/wikis/myWiki/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=main&api-version=7.1",
+        expect.objectContaining({
+          method: "GET",
+        })
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        "https://dev.azure.com/testorg/myproject/_apis/wiki/wikis/myWiki/pages?path=%2FHome&versionDescriptor.versionType=branch&versionDescriptor.version=main&api-version=7.1",
+        expect.objectContaining({
+          method: "PUT",
+          headers: expect.objectContaining({ "If-Match": 'W/"test-etag"' }),
+        })
+      );
+      expect(result.content[0].text).toContain("Successfully updated wiki page at path: /Home");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should update page using URL with pageId", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      // Mock response for pageId resolution
+      const mockPageIdResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          id: 789,
+          path: "/Some/Page",
+        }),
+      };
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue('W/"etag-abc"'),
+        },
+      };
+
+      const mockUpdateResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Some/Page",
+          id: 789,
+          content: "# New Content",
+        }),
+      };
+
+      mockFetch.mockResolvedValueOnce(mockPageIdResponse).mockResolvedValueOnce(mockGetResponse).mockResolvedValueOnce(mockUpdateResponse);
+
+      const params = {
+        url: "https://dev.azure.com/org/myproject/_wiki/wikis/myWiki/789/Some-Page",
+        content: "# New Content",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        "https://dev.azure.com/testorg/myproject/_apis/wiki/wikis/myWiki/pages/789?api-version=7.1",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer test-token",
+          }),
+        })
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        "https://dev.azure.com/testorg/myproject/_apis/wiki/wikis/myWiki/pages?path=%2FSome%2FPage&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        expect.objectContaining({ method: "GET" })
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        3,
+        "https://dev.azure.com/testorg/myproject/_apis/wiki/wikis/myWiki/pages?path=%2FSome%2FPage&versionDescriptor.versionType=branch&versionDescriptor.version=wikiMaster&api-version=7.1",
+        expect.objectContaining({
+          method: "PUT",
+          headers: expect.objectContaining({ "If-Match": 'W/"etag-abc"' }),
+        })
+      );
+      expect(result.content[0].text).toContain("Successfully updated wiki page at path: /Some/Page");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should error when both url and wikiIdentifier provided", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1?pagePath=%2FHome",
+        wikiIdentifier: "wiki1",
+        path: "/Home",
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Provide either 'url' OR 'wikiIdentifier'");
+    });
+
+    it("should error when neither url nor identifiers provided", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("You must provide either 'url' OR both 'wikiIdentifier' and 'path'");
+    });
+
+    it("should error on malformed wiki URL", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        url: "https://dev.azure.com/org/project/notwiki/wiki1?pagePath=%2FHome",
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: URL does not match expected wiki pattern");
+    });
+
+    it("should error when pageId cannot be resolved", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockPageIdResponse = {
+        ok: false,
+        status: 404,
+      };
+
+      mockFetch.mockResolvedValueOnce(mockPageIdResponse);
+
+      const params = {
+        url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1/999/NonExistent",
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Could not resolve page with id 999");
+    });
+
+    it("should error when URL parsing extracts incomplete information", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        url: "https://dev.azure.com/org//_wiki/wikis/?pagePath=%2FHome",
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Could not extract project or wikiIdentifier from URL");
+    });
+
+    it("should handle URL with pageId that returns no path", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockPageIdResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          id: 123,
+          // No path in response
+        }),
+      };
+
+      mockFetch.mockResolvedValueOnce(mockPageIdResponse);
+
+      const params = {
+        url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1/123/Page-Title",
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating/updating wiki page: Could not resolve page with id 123");
+    });
+
+    it("should use wikiMaster as default branch when URL has no branch", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue('W/"etag-123"'),
+        },
+      };
+
+      const mockUpdateResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Welcome",
+        }),
+      };
+
+      mockFetch.mockResolvedValueOnce(mockGetResponse).mockResolvedValueOnce(mockUpdateResponse);
+
+      const params = {
+        url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1?pagePath=%2FHome",
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining("versionDescriptor.version=wikiMaster"),
+        expect.objectContaining({ method: "GET" })
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("versionDescriptor.version=wikiMaster"),
+        expect.objectContaining({ method: "PUT" })
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should extract and use branch from URL wikiVersion parameter", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
+      if (!call) throw new Error("wiki_create_or_update_page tool not registered");
+      const [, , , handler] = call;
+
+      const mockGetResponse = {
+        ok: true,
+        headers: {
+          get: jest.fn().mockReturnValue('W/"etag-456"'),
+        },
+      };
+
+      const mockUpdateResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          path: "/Home",
+          id: 123,
+          content: "# Welcome",
+        }),
+      };
+
+      mockFetch.mockResolvedValueOnce(mockGetResponse).mockResolvedValueOnce(mockUpdateResponse);
+
+      const params = {
+        url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1?wikiVersion=GBdevelop&pagePath=%2FHome",
+        content: "# Welcome",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining("versionDescriptor.version=develop"),
+        expect.objectContaining({ method: "GET" })
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("versionDescriptor.version=develop"),
+        expect.objectContaining({ method: "PUT" })
+      );
       expect(result.isError).toBeUndefined();
     });
   });
