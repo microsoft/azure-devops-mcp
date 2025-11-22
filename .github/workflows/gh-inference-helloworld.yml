@@ -19,6 +19,5 @@ jobs:
         uses: actions/ai-inference@v1
         with:
           model: gpt-4o-mini
-          system-prompt: "you are a helpful assistant"
+          system-prompt-file: .github/ai-automation/gh-inference-system-prompt.md
           prompt: "describe github in two short sentances"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
