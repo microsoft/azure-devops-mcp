@@ -1,0 +1,16 @@
+name: nikolapeja6 Hello World
+
+on:
+  push:
+    branches:
+      - users/nikolapeja6/automation
+  pull_request:
+    branches:
+      - users/nikolapeja6/automation
+
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Hello World
+        run: echo "Hello world"
