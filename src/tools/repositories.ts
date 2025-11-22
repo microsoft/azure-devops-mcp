@@ -582,7 +582,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_pull_request_threads,
-    "Retrieve a list of comment threads for a pull request with server-side filtering capabilities.",
+    "Retrieve a list of comment threads for a pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request for which to retrieve threads."),
