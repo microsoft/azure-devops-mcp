@@ -11,6 +11,14 @@ on:
 jobs:
   hello-world:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
     steps:
-      - name: Print Hello World
-        run: echo "Hello world"
+      - name: Call GitHub Model API
+        uses: actions/ai-inference@v1
+        with:
+          model: gpt-4o-mini
+          system-prompt: "you are a helpful assistant"
+          prompt: "describe github in two short sentances"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
