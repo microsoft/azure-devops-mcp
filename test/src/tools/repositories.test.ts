@@ -607,6 +607,131 @@ describe("repos tools", () => {
       // Validation should fail due to description being too long
       await expect(handler(params)).rejects.toThrow();
     });
+
+    it("should not update labels when labels parameter is undefined", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Updated Title",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        title: "Updated Title",
+        // labels is undefined (not provided)
+      };
+
+      await handler(params);
+
+      // Verify that labels field is not included in the update request
+      const updateRequestArg = mockGitApi.updatePullRequest.mock.calls[0][0];
+      expect(updateRequestArg).not.toHaveProperty("labels");
+      expect(updateRequestArg).toEqual({
+        title: "Updated Title",
+      });
+    });
+
+    it("should remove all labels when empty array is provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        labels: [],
+      };
+
+      await handler(params);
+
+      // Verify that labels field is included with empty array
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          labels: [],
+        },
+        "repo123",
+        123
+      );
+    });
+
+    it("should replace labels when array with values is provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        codeReviewId: 123,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        labels: ["bug", "urgent"],
+      };
+
+      await handler(params);
+
+      // Verify that labels are mapped to WebApiTagDefinition format
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          labels: [{ name: "bug" }, { name: "urgent" }],
+        },
+        "repo123",
+        123
+      );
+    });
   });
 
   describe("repo_create_pull_request", () => {
