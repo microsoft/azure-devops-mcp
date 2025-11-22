@@ -783,11 +783,45 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
+      includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
     },
-    async ({ repositoryId, pullRequestId, includeWorkItemRefs }) => {
+    async ({ repositoryId, pullRequestId, includeWorkItemRefs, includeLabels }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, undefined, undefined, undefined, undefined, undefined, includeWorkItemRefs);
+
+      if (includeLabels) {
+        try {
+          const projectId = pullRequest.repository?.project?.id;
+          const projectName = pullRequest.repository?.project?.name;
+          const labels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId, projectName, projectId);
+
+          const labelNames = labels.map((label) => label.name).filter((name) => name !== undefined);
+
+          const enhancedResponse = {
+            ...pullRequest,
+            labelSummary: {
+              labels: labelNames,
+              labelCount: labelNames.length,
+            },
+          };
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+          };
+        } catch (error) {
+          console.warn(`Error fetching PR labels: ${error instanceof Error ? error.message : "Unknown error"}`);
+          // Fall back to the original response without labels
+          const enhancedResponse = {
+            ...pullRequest,
+            labelSummary: {},
+          };
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+          };
+        }
+      }
       return {
         content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
       };
