@@ -1,4 +1,4 @@
-name: nikolapeja6 Hello World
+name: AI Issue Processing
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - users/nikolapeja6/automation
 
 jobs:
-  hello-world:
+  issue-processing:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,5 +22,5 @@ jobs:
         uses: actions/ai-inference@v1
         with:
           model: gpt-4o-mini
-          system-prompt-file: .github/ai-automation/gh-inference-system-prompt.md
-          prompt: "describe github in two short sentances"
+          system-prompt-file: .github/ai-automation/ai-issue-processing-system-prompt.md
+          prompt: "list_pull_request_by_repo tool isn't working"
