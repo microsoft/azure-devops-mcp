@@ -15,6 +15,9 @@ jobs:
       contents: read
       models: read
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Call GitHub Model API
         uses: actions/ai-inference@v1
         with:
