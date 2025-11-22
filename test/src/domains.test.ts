@@ -2,12 +2,22 @@
 // Licensed under the MIT License.
 
 import { DomainsManager } from "../../src/shared/domains";
+import { logger } from "../../src/logger";
+
+jest.mock("../../src/logger.js", () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
 
 describe("DomainsManager: backward compatibility and domain enabling", () => {
   let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    errorSpy = jest.spyOn(console, "error").mockImplementation();
+    errorSpy = jest.spyOn(logger, "error").mockImplementation();
   });
 
   afterEach(() => {

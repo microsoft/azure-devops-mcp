@@ -71,6 +71,34 @@ Follow the established patterns and styles in the repository. If you have sugges
 
 Update relevant documentation (e.g., README, existing code comments) to reflect new or altered functionality. Well-documented changes enable reviewers and future contributors to quickly understand the rationale and intended use of your code.
 
+## 🐛 Debugging
+
+MCP servers use `stdio` to communicate with the client. Logs must never appear in `stdout` (which would break the protocol contract) and should be directed to `stderr` instead.
+
+All `winston` logs in this project are automatically redirected to `stderr`. To view debug logs:
+
+1. Set the `LOG_LEVEL` environment variable in your MCP client configuration (e.g., in your `mcp.json` file):
+
+```json
+{
+  "mcpServers": {
+    "azure-devops": {
+      "command": "node",
+      "args": ["path/to/dist/index.js"],
+      "env": {
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}
+```
+
+2. Alternatively, set `LOG_LEVEL` as an environment variable in your shell before starting the MCP client.
+
+Available log levels: `error`, `warn`, `info`, `debug`.
+
+You can examine these logs at the `output` panel under `MCP:ado` (or whatever name you used in `mcp.json` file).
+
 ## 🤝 Code of conduct
 
 You can find our code of conduct at the [Code of Conduct](./CODE_OF_CONDUCT.md) as a guideline for expected behavior in also at the contributions here. Please take a moment to review it before contributing.
