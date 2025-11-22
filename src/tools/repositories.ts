@@ -124,6 +124,7 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
       uniqueName: pr.createdBy?.uniqueName,
     },
     creationDate: pr.creationDate,
+    closedDate: pr.closedDate,
     title: pr.title,
     ...(includeDescription ? { description: pr.description ?? "" } : {}),
     isDraft: pr.isDraft,
