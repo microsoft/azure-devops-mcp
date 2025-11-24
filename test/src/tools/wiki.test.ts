@@ -429,7 +429,7 @@ describe("configureWikiTools", () => {
         recursionLevel: "OneLevel" as const,
       };
 
-      const result = await handler(params);
+      await handler(params);
 
       const callUrl = mockFetch.mock.calls[0][0];
       expect(callUrl).toContain("recursionLevel=OneLevel");
@@ -1718,16 +1718,8 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining("versionDescriptor.version=wikiMaster"),
-        expect.objectContaining({ method: "GET" })
-      );
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining("versionDescriptor.version=wikiMaster"),
-        expect.objectContaining({ method: "PUT" })
-      );
+      expect(mockFetch).toHaveBeenNthCalledWith(1, expect.stringContaining("versionDescriptor.version=wikiMaster"), expect.objectContaining({ method: "GET" }));
+      expect(mockFetch).toHaveBeenNthCalledWith(2, expect.stringContaining("versionDescriptor.version=wikiMaster"), expect.objectContaining({ method: "PUT" }));
       expect(result.isError).toBeUndefined();
     });
 
@@ -1762,16 +1754,8 @@ describe("configureWikiTools", () => {
 
       const result = await handler(params);
 
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining("versionDescriptor.version=develop"),
-        expect.objectContaining({ method: "GET" })
-      );
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining("versionDescriptor.version=develop"),
-        expect.objectContaining({ method: "PUT" })
-      );
+      expect(mockFetch).toHaveBeenNthCalledWith(1, expect.stringContaining("versionDescriptor.version=develop"), expect.objectContaining({ method: "GET" }));
+      expect(mockFetch).toHaveBeenNthCalledWith(2, expect.stringContaining("versionDescriptor.version=develop"), expect.objectContaining({ method: "PUT" }));
       expect(result.isError).toBeUndefined();
     });
   });
