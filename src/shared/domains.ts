@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { logger } from "../logger.js";
+
 /**
  * Available Azure DevOps MCP domains
  */
@@ -78,7 +80,7 @@ export class DomainsManager {
       } else if (domain === ALL_DOMAINS) {
         this.enableAllDomains();
       } else {
-        console.error(`Error: Specified invalid domain '${domain}'. Please specify exactly as available domains: ${Object.values(Domain).join(", ")}`);
+        logger.error(`Error: Specified invalid domain '${domain}'. Please specify exactly as available domains: ${Object.values(Domain).join(", ")}`);
       }
     });
 

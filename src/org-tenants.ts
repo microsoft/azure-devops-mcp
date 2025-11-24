@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { readFile, writeFile } from "fs/promises";
+import { logger } from "./logger.js";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -29,7 +30,7 @@ async function trySavingCache(cache: OrgTenantCache): Promise<void> {
   try {
     await writeFile(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
   } catch (error) {
-    console.error("Failed to save org tenants cache:", error);
+    logger.error("Failed to save org tenants cache:", error);
   }
 }
 
@@ -83,12 +84,12 @@ export async function getOrgTenant(orgName: string): Promise<string | undefined>
   } catch (error) {
     // If we have an expired cache entry, return it as fallback
     if (cachedEntry) {
-      console.error(`Failed to fetch fresh tenant for ADO org ${orgName}, using expired cache entry:`, error);
+      logger.error(`Failed to fetch fresh tenant for ADO org ${orgName}, using expired cache entry:`, error);
       return cachedEntry.tenantId;
     }
 
     // No cache entry available, log and return empty result
-    console.error(`Failed to fetch tenant for ADO org ${orgName}:`, error);
+    logger.error(`Failed to fetch tenant for ADO org ${orgName}:`, error);
     return undefined;
   }
 }
