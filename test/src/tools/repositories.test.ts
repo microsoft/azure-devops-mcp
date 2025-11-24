@@ -33,6 +33,7 @@ describe("repos tools", () => {
     getComments: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getPullRequestLabels: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createComment: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createThread: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     updateThread: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
@@ -59,6 +60,7 @@ describe("repos tools", () => {
       getComments: jest.fn(),
       getRefs: jest.fn(),
       getPullRequest: jest.fn(),
+      getPullRequestLabels: jest.fn(),
       createComment: jest.fn(),
       createThread: jest.fn(),
       updateThread: jest.fn(),
@@ -3098,6 +3100,342 @@ describe("repos tools", () => {
       await handler(params);
 
       expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, true);
+    });
+
+    it("should include labels when includeLabels is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+        repository: {
+          project: {
+            id: "project123",
+            name: "testproject",
+          },
+        },
+      };
+      const mockLabels = [
+        { name: "bug", id: "label1" },
+        { name: "enhancement", id: "label2" },
+      ];
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestLabels.mockResolvedValue(mockLabels);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: true,
+        includeWorkItemRefs: false,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+
+      const expectedResponse = {
+        ...mockPR,
+        labelSummary: {
+          labels: ["bug", "enhancement"],
+          labelCount: 2,
+        },
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
+    });
+
+    it("should not include labels when includeLabels parameter is not specified and defaults are not applied", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+      };
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        // includeLabels not specified, in test environment doesn't get default
+        // includeWorkItemRefs not specified, doesn't get default
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, undefined);
+      expect(mockGitApi.getPullRequestLabels).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+    });
+
+    it("should include labels by default when includeLabels is explicitly set to default value true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+        repository: {
+          project: {
+            id: "project123",
+            name: "testproject",
+          },
+        },
+      };
+      const mockLabels = [{ name: "documentation", id: "label3" }];
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestLabels.mockResolvedValue(mockLabels);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: true, // explicitly set to default value
+        includeWorkItemRefs: false, // explicitly set to default value
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+
+      const expectedResponse = {
+        ...mockPR,
+        labelSummary: {
+          labels: ["documentation"],
+          labelCount: 1,
+        },
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
+    });
+
+    it("should not include labels when includeLabels is false", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+      };
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: false,
+        includeWorkItemRefs: false,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
+      expect(mockGitApi.getPullRequestLabels).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+    });
+
+    it("should handle empty labels array", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+        repository: {
+          project: {
+            id: "project123",
+            name: "testproject",
+          },
+        },
+      };
+      const mockLabels: any[] = [];
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestLabels.mockResolvedValue(mockLabels);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+
+      const expectedResponse = {
+        ...mockPR,
+        labelSummary: {
+          labels: [],
+          labelCount: 0,
+        },
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
+    });
+
+    it("should handle labels with undefined names", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+        repository: {
+          project: {
+            id: "project123",
+            name: "testproject",
+          },
+        },
+      };
+      const mockLabels = [
+        { name: "bug", id: "label1" },
+        { name: undefined, id: "label2" }, // undefined name should be filtered out
+        { name: "feature", id: "label3" },
+      ];
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestLabels.mockResolvedValue(mockLabels);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: true,
+      };
+
+      const result = await handler(params);
+
+      const expectedResponse = {
+        ...mockPR,
+        labelSummary: {
+          labels: ["bug", "feature"], // undefined name filtered out
+          labelCount: 2,
+        },
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
+    });
+
+    it("should handle getPullRequestLabels API error gracefully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+        repository: {
+          project: {
+            id: "project123",
+            name: "testproject",
+          },
+        },
+      };
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestLabels.mockRejectedValue(new Error("API Error: Labels not accessible"));
+
+      // Mock console.warn to verify warning is logged
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+      expect(consoleSpy).toHaveBeenCalledWith("Error fetching PR labels: API Error: Labels not accessible");
+
+      // Should fall back to empty labelSummary
+      const expectedResponse = {
+        ...mockPR,
+        labelSummary: {},
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should work with both includeLabels and includeWorkItemRefs enabled", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        status: 1,
+        repository: {
+          project: {
+            id: "project123",
+            name: "testproject",
+          },
+        },
+      };
+      const mockLabels = [{ name: "urgent", id: "label1" }];
+
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestLabels.mockResolvedValue(mockLabels);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: true,
+        includeWorkItemRefs: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, true);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+
+      const expectedResponse = {
+        ...mockPR,
+        labelSummary: {
+          labels: ["urgent"],
+          labelCount: 1,
+        },
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
     });
   });
 
