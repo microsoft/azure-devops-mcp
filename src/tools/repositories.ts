@@ -124,6 +124,7 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
       uniqueName: pr.createdBy?.uniqueName,
     },
     creationDate: pr.creationDate,
+    closedDate: pr.closedDate,
     title: pr.title,
     ...(includeDescription ? { description: pr.description ?? "" } : {}),
     isDraft: pr.isDraft,
@@ -589,17 +590,45 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or project name (optional)"),
       iteration: z.number().optional().describe("The iteration ID for which to retrieve threads. Optional, defaults to the latest iteration."),
       baseIteration: z.number().optional().describe("The base iteration ID for which to retrieve threads. Optional, defaults to the latest base iteration."),
-      top: z.number().default(100).describe("The maximum number of threads to return."),
-      skip: z.number().default(0).describe("The number of threads to skip."),
+      top: z.number().default(100).describe("The maximum number of threads to return after filtering."),
+      skip: z.number().default(0).describe("The number of threads to skip after filtering."),
       fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of trimmed data."),
+      status: z
+        .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
+        .optional()
+        .describe("Filter threads by status. If not specified, returns threads of all statuses."),
+      authorEmail: z.string().optional().describe("Filter threads by the email of the thread author (first comment author)."),
+      authorDisplayName: z.string().optional().describe("Filter threads by the display name of the thread author (first comment author). Case-insensitive partial matching."),
     },
-    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse }) => {
+    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
       const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
 
-      const paginatedThreads = threads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
+      let filteredThreads = threads;
+
+      if (status !== undefined) {
+        const statusValue = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
+        filteredThreads = filteredThreads?.filter((thread) => thread.status === statusValue);
+      }
+
+      if (authorEmail !== undefined) {
+        filteredThreads = filteredThreads?.filter((thread) => {
+          const firstComment = thread.comments?.[0];
+          return firstComment?.author?.uniqueName?.toLowerCase() === authorEmail.toLowerCase();
+        });
+      }
+
+      if (authorDisplayName !== undefined) {
+        const lowerAuthorName = authorDisplayName.toLowerCase();
+        filteredThreads = filteredThreads?.filter((thread) => {
+          const firstComment = thread.comments?.[0];
+          return firstComment?.author?.displayName?.toLowerCase().includes(lowerAuthorName);
+        });
+      }
+
+      const paginatedThreads = filteredThreads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
       if (fullResponse) {
         return {

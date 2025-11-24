@@ -43,6 +43,7 @@
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
+    "winston": "^3.18.3",
     "yargs": "^18.0.0",
     "zod": "^3.25.63",
     "zod-to-json-schema": "^3.24.5"
@@ -50,7 +51,7 @@
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.17.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22",
+    "@types/node": "^22.19.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-header": "^3.1.1",
     "glob": "^11.0.3",

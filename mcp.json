@@ -10,7 +10,10 @@
     "ado": {
       "type": "stdio",
       "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}"]
+      "args": ["${input:ado_org}"],
+      "env": {
+        "LOG_LEVEL": "debug"
+      }
     }
   }
 }
