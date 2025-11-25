@@ -44,6 +44,7 @@
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
 | Test Plans        | [mcp_ado_testplan_list_test_plans](#mcp_ado_testplan_list_test_plans)                                     | List test plans in a project                             |
 | Test Plans        | [mcp_ado_testplan_create_test_plan](#mcp_ado_testplan_create_test_plan)                                   | Create a new test plan                                   |
+| Test Plans        | [mcp_ado_testplan_list_test_suites](#mcp_ado_testplan_list_test_suites)                                   | List test suites in a test plan                          |
 | Test Plans        | [mcp_ado_testplan_create_test_suite](#mcp_ado_testplan_create_test_suite)                                 | Create a test suite within a test plan                   |
 | Test Plans        | [mcp_ado_testplan_add_test_cases_to_suite](#mcp_ado_testplan_add_test_cases_to_suite)                     | Add test cases to a test suite                           |
 | Test Plans        | [mcp_ado_testplan_list_test_cases](#mcp_ado_testplan_list_test_cases)                                     | List test cases in a test suite                          |
@@ -375,6 +376,13 @@ Creates a new test plan in the project.
 
 - **Required**: `project`, `name`, `iteration`
 - **Optional**: `areaPath`, `description`, `endDate`, `startDate`
+
+### mcp_ado_testplan_list_test_suites
+
+Retrieve a paginated list of test suites from an Azure DevOps project and Test Plan Id. Returns test suites in a properly nested hierarchical structure.
+
+- **Required**: `project`, `planId`
+- **Optional**: `continuationToken`
 
 ### mcp_ado_testplan_create_test_suite
 

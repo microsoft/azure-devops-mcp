@@ -3,7 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
 
 const Test_Plan_Tools = {
@@ -14,6 +14,7 @@ const Test_Plan_Tools = {
   test_results_from_build_id: "testplan_show_test_results_from_build_id",
   list_test_cases: "testplan_list_test_cases",
   list_test_plans: "testplan_list_test_plans",
+  list_test_suites: "testplan_list_test_suites",
   create_test_suite: "testplan_create_test_suite",
 };
 
@@ -347,6 +348,76 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [{ type: "text", text: `Error fetching test results: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    Test_Plan_Tools.list_test_suites,
+    "Retrieve a paginated list of test suites from an Azure DevOps project and Test Plan Id.",
+    {
+      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      planId: z.number().describe("The ID of the test plan."),
+      continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
+    },
+    async ({ project, planId, continuationToken }) => {
+      try {
+        const connection = await connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
+        const expand: SuiteExpand = SuiteExpand.Children;
+
+        const testSuites = await testPlanApi.getTestSuitesForPlan(project, planId, expand, continuationToken);
+
+        // The API returns a flat list where the root suite is first, followed by all nested suites
+        // We need to build a proper hierarchy by creating a map and assembling the tree
+
+        // Create a map of all suites by ID for quick lookup
+        const suiteMap = new Map();
+        testSuites.forEach((suite: any) => {
+          suiteMap.set(suite.id, {
+            id: suite.id,
+            name: suite.name,
+            parentSuiteId: suite.parentSuite?.id,
+            children: [] as any[],
+          });
+        });
+
+        // Build the hierarchy by linking children to parents
+        const roots: any[] = [];
+        suiteMap.forEach((suite: any) => {
+          if (suite.parentSuiteId && suiteMap.has(suite.parentSuiteId)) {
+            // This is a child suite, add it to its parent's children array
+            const parent = suiteMap.get(suite.parentSuiteId);
+            parent.children.push(suite);
+          } else {
+            // This is a root suite (no parent or parent not in map)
+            roots.push(suite);
+          }
+        });
+
+        // Clean up the output - remove parentSuiteId and empty children arrays
+        const cleanSuite = (suite: any): any => {
+          const cleaned: any = {
+            id: suite.id,
+            name: suite.name,
+          };
+          if (suite.children && suite.children.length > 0) {
+            cleaned.children = suite.children.map((child: any) => cleanSuite(child));
+          }
+          return cleaned;
+        };
+
+        const result = roots.map((root: any) => cleanSuite(root));
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error listing test suites: ${errorMessage}` }],
           isError: true,
         };
       }
