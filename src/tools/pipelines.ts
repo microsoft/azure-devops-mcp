@@ -119,8 +119,8 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const connection = await connectionProvider();
       const pipelinesApi = await connection.getPipelinesApi();
 
-      let repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
-      let repositoryPayload: any = {
+      const repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
+      const repositoryPayload: any = {
         type: repositoryType,
       };
       if (repositoryTypeEnumValue === RepositoryType.AzureReposGit) {
