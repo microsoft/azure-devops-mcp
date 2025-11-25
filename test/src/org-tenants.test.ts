@@ -6,6 +6,14 @@ import fs, { readFile, writeFile } from "fs/promises";
 import { getOrgTenant } from "../../src/org-tenants";
 
 jest.mock("fs/promises");
+jest.mock("../../src/logger.js", () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
 
 type FetchMock = jest.Mock<typeof fetch>;
 

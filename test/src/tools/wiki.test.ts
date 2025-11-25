@@ -429,7 +429,7 @@ describe("configureWikiTools", () => {
         recursionLevel: "OneLevel" as const,
       };
 
-      const result = await handler(params);
+      await handler(params);
 
       const callUrl = mockFetch.mock.calls[0][0];
       expect(callUrl).toContain("recursionLevel=OneLevel");

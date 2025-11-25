@@ -25,7 +25,7 @@
     "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write src/version.ts",
     "validate-tools": "tsc --noEmit && node scripts/build-validate-tools.js",
     "build": "tsc && shx chmod +x dist/*.js",
-    "prepare": "npm run build",
+    "prepare": "npm run build && husky",
     "watch": "tsc --watch",
     "inspect": "ALLOWED_ORIGINS=http://127.0.0.1:6274 npx @modelcontextprotocol/inspector node dist/index.js",
     "start": "node -r tsconfig-paths/register dist/index.js",
@@ -43,6 +43,7 @@
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
+    "winston": "^3.18.3",
     "yargs": "^18.0.0",
     "zod": "^3.25.63",
     "zod-to-json-schema": "^3.24.5"
@@ -50,17 +51,24 @@
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.17.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22",
+    "@types/node": "^22.19.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-header": "^3.1.1",
     "glob": "^11.0.3",
+    "husky": "^9.1.7",
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
+    "lint-staged": "^16.2.7",
     "prettier": "3.6.2",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4"
+  },
+  "lint-staged": {
+    "**/*.(js|ts|jsx|tsx|json|css|md)": [
+      "npm run format"
+    ]
   }
 }
