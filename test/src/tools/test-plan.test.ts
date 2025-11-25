@@ -72,6 +72,7 @@ describe("configureTestPlanTools", () => {
           "testplan_update_test_case_steps",
           "testplan_list_test_cases",
           "testplan_show_test_results_from_build_id",
+          "testplan_list_test_suites",
         ])
       );
     });
@@ -95,6 +96,269 @@ describe("configureTestPlanTools", () => {
 
       expect(mockTestPlanApi.getTestPlans).toHaveBeenCalledWith("proj1", "", undefined, false, true);
       expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Test Plan 1" }], null, 2));
+    });
+  });
+
+  describe("list_test_suites tool", () => {
+    beforeEach(() => {
+      (mockTestPlanApi as any).getTestSuitesForPlan = jest.fn();
+    });
+
+    it("should call getTestSuitesForPlan and return properly nested hierarchy", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      // Mock API response with flat list including nested suites
+      ((mockTestPlanApi as any).getTestSuitesForPlan as jest.Mock).mockResolvedValue([
+        {
+          id: 100,
+          name: "Root Suite",
+          hasChildren: true,
+          children: [
+            { id: 101, name: "Child Suite 1", parentSuite: { id: 100 } },
+            { id: 102, name: "Child Suite 2", parentSuite: { id: 100 } },
+          ],
+        },
+        {
+          id: 101,
+          name: "Child Suite 1",
+          hasChildren: true,
+          parentSuite: { id: 100 },
+          children: [{ id: 103, name: "Grandchild Suite", parentSuite: { id: 101 } }],
+        },
+        {
+          id: 102,
+          name: "Child Suite 2",
+          parentSuite: { id: 100 },
+        },
+        {
+          id: 103,
+          name: "Grandchild Suite",
+          parentSuite: { id: 101 },
+        },
+      ]);
+
+      const params = {
+        project: "proj1",
+        planId: 1,
+      };
+      const result = await handler(params);
+
+      expect((mockTestPlanApi as any).getTestSuitesForPlan).toHaveBeenCalledWith("proj1", 1, 1, undefined);
+
+      // Parse and validate the nested structure
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0]).toMatchObject({
+        id: 100,
+        name: "Root Suite",
+        children: [
+          {
+            id: 101,
+            name: "Child Suite 1",
+            children: [
+              {
+                id: 103,
+                name: "Grandchild Suite",
+              },
+            ],
+          },
+          {
+            id: 102,
+            name: "Child Suite 2",
+          },
+        ],
+      });
+    });
+
+    it("should handle test suite with no children", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      ((mockTestPlanApi as any).getTestSuitesForPlan as jest.Mock).mockResolvedValue([
+        {
+          id: 200,
+          name: "Single Suite",
+          hasChildren: false,
+        },
+      ]);
+
+      const params = {
+        project: "proj1",
+        planId: 2,
+      };
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0]).toEqual({
+        id: 200,
+        name: "Single Suite",
+      });
+    });
+
+    it("should handle empty test suite list", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      ((mockTestPlanApi as any).getTestSuitesForPlan as jest.Mock).mockResolvedValue([]);
+
+      const params = {
+        project: "proj1",
+        planId: 3,
+      };
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toEqual([]);
+    });
+
+    it("should handle deeply nested suite hierarchy", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      // Mock a deeply nested structure
+      ((mockTestPlanApi as any).getTestSuitesForPlan as jest.Mock).mockResolvedValue([
+        {
+          id: 300,
+          name: "Root",
+          hasChildren: true,
+          children: [{ id: 301, name: "Level 1", parentSuite: { id: 300 } }],
+        },
+        {
+          id: 301,
+          name: "Level 1",
+          hasChildren: true,
+          parentSuite: { id: 300 },
+          children: [{ id: 302, name: "Level 2", parentSuite: { id: 301 } }],
+        },
+        {
+          id: 302,
+          name: "Level 2",
+          hasChildren: true,
+          parentSuite: { id: 301 },
+          children: [{ id: 303, name: "Level 3", parentSuite: { id: 302 } }],
+        },
+        {
+          id: 303,
+          name: "Level 3",
+          parentSuite: { id: 302 },
+        },
+      ]);
+
+      const params = {
+        project: "proj1",
+        planId: 4,
+      };
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed[0]).toMatchObject({
+        id: 300,
+        name: "Root",
+        children: [
+          {
+            id: 301,
+            name: "Level 1",
+            children: [
+              {
+                id: 302,
+                name: "Level 2",
+                children: [
+                  {
+                    id: 303,
+                    name: "Level 3",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("should handle API errors when listing test suites", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      ((mockTestPlanApi as any).getTestSuitesForPlan as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        project: "proj1",
+        planId: 5,
+      };
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error listing test suites: API Error");
+    });
+
+    it("should pass continuation token when provided", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      ((mockTestPlanApi as any).getTestSuitesForPlan as jest.Mock).mockResolvedValue([
+        {
+          id: 400,
+          name: "Suite with Token",
+        },
+      ]);
+
+      const params = {
+        project: "proj1",
+        planId: 6,
+        continuationToken: "token123",
+      };
+      await handler(params);
+
+      expect((mockTestPlanApi as any).getTestSuitesForPlan).toHaveBeenCalledWith("proj1", 6, 1, "token123");
+    });
+
+    it("should not include empty children arrays in output", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      ((mockTestPlanApi as any).getTestSuitesForPlan as jest.Mock).mockResolvedValue([
+        {
+          id: 500,
+          name: "Parent",
+          hasChildren: true,
+          children: [{ id: 501, name: "Child with no children", parentSuite: { id: 500 } }],
+        },
+        {
+          id: 501,
+          name: "Child with no children",
+          parentSuite: { id: 500 },
+          hasChildren: false,
+        },
+      ]);
+
+      const params = {
+        project: "proj1",
+        planId: 7,
+      };
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed[0].children[0]).toEqual({
+        id: 501,
+        name: "Child with no children",
+      });
+      expect(parsed[0].children[0].children).toBeUndefined();
     });
   });
 
