@@ -28,15 +28,23 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
-      const owner = ""; //making owner an empty string untill we can figure out how to get owner id
-      const connection = await connectionProvider();
-      const testPlanApi = await connection.getTestPlanApi();
+      try {
+        const owner = ""; //making owner an empty string untill we can figure out how to get owner id
+        const connection = await connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
 
-      const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
+        const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(testPlans, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(testPlans, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error listing test plans: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -53,23 +61,31 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       areaPath: z.string().optional().describe("The area path for the test plan"),
     },
     async ({ project, name, iteration, description, startDate, endDate, areaPath }) => {
-      const connection = await connectionProvider();
-      const testPlanApi = await connection.getTestPlanApi();
+      try {
+        const connection = await connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
 
-      const testPlanToCreate: TestPlanCreateParams = {
-        name,
-        iteration,
-        description,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
-        areaPath,
-      };
+        const testPlanToCreate: TestPlanCreateParams = {
+          name,
+          iteration,
+          description,
+          startDate: startDate ? new Date(startDate) : undefined,
+          endDate: endDate ? new Date(endDate) : undefined,
+          areaPath,
+        };
 
-      const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, project);
+        const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, project);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(createdTestPlan, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(createdTestPlan, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error creating test plan: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -83,23 +99,31 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       name: z.string().describe("Name of the child test suite"),
     },
     async ({ project, planId, parentSuiteId, name }) => {
-      const connection = await connectionProvider();
-      const testPlanApi = await connection.getTestPlanApi();
+      try {
+        const connection = await connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
 
-      const testSuiteToCreate = {
-        name,
-        parentSuite: {
-          id: parentSuiteId,
-          name: "",
-        },
-        suiteType: 2,
-      };
+        const testSuiteToCreate = {
+          name,
+          parentSuite: {
+            id: parentSuiteId,
+            name: "",
+          },
+          suiteType: 2,
+        };
 
-      const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
+        const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error creating test suite: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -113,17 +137,25 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       testCaseIds: z.string().or(z.array(z.string())).describe("The ID(s) of the test case(s) to add. "),
     },
     async ({ project, planId, suiteId, testCaseIds }) => {
-      const connection = await connectionProvider();
-      const testApi = await connection.getTestApi();
+      try {
+        const connection = await connectionProvider();
+        const testApi = await connection.getTestApi();
 
-      // If testCaseIds is an array, convert it to comma-separated string
-      const testCaseIdsString = Array.isArray(testCaseIds) ? testCaseIds.join(",") : testCaseIds;
+        // If testCaseIds is an array, convert it to comma-separated string
+        const testCaseIdsString = Array.isArray(testCaseIds) ? testCaseIds.join(",") : testCaseIds;
 
-      const addedTestCases = await testApi.addTestCasesToSuite(project, planId, suiteId, testCaseIdsString);
+        const addedTestCases = await testApi.addTestCasesToSuite(project, planId, suiteId, testCaseIdsString);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error adding test cases to suite: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -145,71 +177,79 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       testsWorkItemId: z.number().optional().describe("Optional work item id that will be set as a Microsoft.VSTS.Common.TestedBy-Reverse link to the test case."),
     },
     async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId }) => {
-      const connection = await connectionProvider();
-      const witClient = await connection.getWorkItemTrackingApi();
+      try {
+        const connection = await connectionProvider();
+        const witClient = await connection.getWorkItemTrackingApi();
 
-      let stepsXml;
-      if (steps) {
-        stepsXml = convertStepsToXml(steps);
-      }
+        let stepsXml;
+        if (steps) {
+          stepsXml = convertStepsToXml(steps);
+        }
 
-      // Create JSON patch document for work item
-      const patchDocument = [];
+        // Create JSON patch document for work item
+        const patchDocument = [];
 
-      patchDocument.push({
-        op: "add",
-        path: "/fields/System.Title",
-        value: title,
-      });
-
-      if (testsWorkItemId) {
         patchDocument.push({
           op: "add",
-          path: "/relations/-",
-          value: {
-            rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
-            url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${testsWorkItemId}`,
-          },
+          path: "/fields/System.Title",
+          value: title,
         });
+
+        if (testsWorkItemId) {
+          patchDocument.push({
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+              url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${testsWorkItemId}`,
+            },
+          });
+        }
+
+        if (stepsXml) {
+          patchDocument.push({
+            op: "add",
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: stepsXml,
+          });
+        }
+
+        if (priority) {
+          patchDocument.push({
+            op: "add",
+            path: "/fields/Microsoft.VSTS.Common.Priority",
+            value: priority,
+          });
+        }
+
+        if (areaPath) {
+          patchDocument.push({
+            op: "add",
+            path: "/fields/System.AreaPath",
+            value: areaPath,
+          });
+        }
+
+        if (iterationPath) {
+          patchDocument.push({
+            op: "add",
+            path: "/fields/System.IterationPath",
+            value: iterationPath,
+          });
+        }
+
+        const workItem = await witClient.createWorkItem({}, patchDocument, project, "Test Case");
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error creating test case: ${errorMessage}` }],
+          isError: true,
+        };
       }
-
-      if (stepsXml) {
-        patchDocument.push({
-          op: "add",
-          path: "/fields/Microsoft.VSTS.TCM.Steps",
-          value: stepsXml,
-        });
-      }
-
-      if (priority) {
-        patchDocument.push({
-          op: "add",
-          path: "/fields/Microsoft.VSTS.Common.Priority",
-          value: priority,
-        });
-      }
-
-      if (areaPath) {
-        patchDocument.push({
-          op: "add",
-          path: "/fields/System.AreaPath",
-          value: areaPath,
-        });
-      }
-
-      if (iterationPath) {
-        patchDocument.push({
-          op: "add",
-          path: "/fields/System.IterationPath",
-          value: iterationPath,
-        });
-      }
-
-      const workItem = await witClient.createWorkItem({}, patchDocument, project, "Test Case");
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
-      };
     }
   );
 
@@ -225,30 +265,38 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         ),
     },
     async ({ id, steps }) => {
-      const connection = await connectionProvider();
-      const witClient = await connection.getWorkItemTrackingApi();
+      try {
+        const connection = await connectionProvider();
+        const witClient = await connection.getWorkItemTrackingApi();
 
-      let stepsXml;
-      if (steps) {
-        stepsXml = convertStepsToXml(steps);
+        let stepsXml;
+        if (steps) {
+          stepsXml = convertStepsToXml(steps);
+        }
+
+        // Create JSON patch document for work item
+        const patchDocument = [];
+
+        if (stepsXml) {
+          patchDocument.push({
+            op: "add",
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: stepsXml,
+          });
+        }
+
+        const workItem = await witClient.updateWorkItem({}, patchDocument, id);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error updating test case steps: ${errorMessage}` }],
+          isError: true,
+        };
       }
-
-      // Create JSON patch document for work item
-      const patchDocument = [];
-
-      if (stepsXml) {
-        patchDocument.push({
-          op: "add",
-          path: "/fields/Microsoft.VSTS.TCM.Steps",
-          value: stepsXml,
-        });
-      }
-
-      const workItem = await witClient.updateWorkItem({}, patchDocument, id);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
-      };
     }
   );
 
@@ -261,13 +309,21 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       suiteid: z.number().describe("The ID of the test suite."),
     },
     async ({ project, planid, suiteid }) => {
-      const connection = await connectionProvider();
-      const coreApi = await connection.getTestPlanApi();
-      const testcases = await coreApi.getTestCaseList(project, planid, suiteid);
+      try {
+        const connection = await connectionProvider();
+        const coreApi = await connection.getTestPlanApi();
+        const testcases = await coreApi.getTestCaseList(project, planid, suiteid);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(testcases, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(testcases, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error listing test cases: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -279,13 +335,21 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       buildid: z.number().describe("The ID of the build."),
     },
     async ({ project, buildid }) => {
-      const connection = await connectionProvider();
-      const coreApi = await connection.getTestResultsApi();
-      const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
+      try {
+        const connection = await connectionProvider();
+        const coreApi = await connection.getTestResultsApi();
+        const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error fetching test results: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 }

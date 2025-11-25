@@ -96,6 +96,26 @@ describe("configureTestPlanTools", () => {
       expect(mockTestPlanApi.getTestPlans).toHaveBeenCalledWith("proj1", "", undefined, false, true);
       expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Test Plan 1" }], null, 2));
     });
+
+    it("should handle API errors when listing test plans", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_plans");
+      if (!call) throw new Error("testplan_list_test_plans tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.getTestPlans as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        project: "proj1",
+        filterActivePlans: true,
+        includePlanDetails: false,
+      };
+
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error listing test plans");
+      expect(result.content[0].text).toContain("API Error");
+    });
   });
 
   describe("create_test_plan tool", () => {
@@ -129,6 +149,26 @@ describe("configureTestPlanTools", () => {
         "proj1"
       );
       expect(result.content[0].text).toBe(JSON.stringify({ id: 1, name: "New Test Plan" }, null, 2));
+    });
+
+    it("should handle API errors when creating test plan", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_plan");
+      if (!call) throw new Error("testplan_create_test_plan tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.createTestPlan as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        project: "proj1",
+        name: "Failed Plan",
+        iteration: "Iteration 1",
+      };
+
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating test plan");
+      expect(result.content[0].text).toContain("API Error");
     });
   });
 
@@ -178,7 +218,10 @@ describe("configureTestPlanTools", () => {
         name: "Failed Test Suite",
       };
 
-      await expect(handler(params)).rejects.toThrow("API Error");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating test suite");
+      expect(result.content[0].text).toContain("API Error");
     });
 
     it("should create test suite with different parent suite IDs", async () => {
@@ -262,6 +305,26 @@ describe("configureTestPlanTools", () => {
       expect(mockTestPlanApi.getTestCaseList).toHaveBeenCalledWith("proj1", 1, 2);
       expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Test Case 1" }], null, 2));
     });
+
+    it("should handle API errors when listing test cases", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_cases");
+      if (!call) throw new Error("testplan_list_test_cases tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.getTestCaseList as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        project: "proj1",
+        planid: 1,
+        suiteid: 2,
+      };
+
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error listing test cases");
+      expect(result.content[0].text).toContain("API Error");
+    });
   });
 
   describe("test_results_from_build_id tool", () => {
@@ -280,6 +343,25 @@ describe("configureTestPlanTools", () => {
 
       expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith("proj1", 123);
       expect(result.content[0].text).toBe(JSON.stringify({ results: ["Result 1"] }, null, 2));
+    });
+
+    it("should handle API errors when fetching test results", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
+      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        project: "proj1",
+        buildid: 123,
+      };
+
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching test results");
+      expect(result.content[0].text).toContain("API Error");
     });
   });
 
@@ -406,7 +488,10 @@ describe("configureTestPlanTools", () => {
         steps: "1. Test step",
       };
 
-      await expect(handler(params)).rejects.toThrow("API Error");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error creating test case");
+      expect(result.content[0].text).toContain("API Error");
     });
 
     it("should create test case with all optional parameters", async () => {
@@ -1514,7 +1599,10 @@ describe("configureTestPlanTools", () => {
         steps: "1. Test step that will fail",
       };
 
-      await expect(handler(params)).rejects.toThrow("API Error");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error updating test case steps");
+      expect(result.content[0].text).toContain("API Error");
     });
 
     it("should handle mixed numbered and non-numbered steps", async () => {
@@ -1720,7 +1808,10 @@ describe("configureTestPlanTools", () => {
         testCaseIds: [1001],
       };
 
-      await expect(handler(params)).rejects.toThrow("API Error");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error adding test cases to suite");
+      expect(result.content[0].text).toContain("API Error");
     });
   });
 });
