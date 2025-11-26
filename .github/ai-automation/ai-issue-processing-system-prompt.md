@@ -68,4 +68,8 @@ The `labels` array should contain strings representing the recommended label nam
 - Do not make assumptions beyond what is clearly stated or strongly implied
 - Ensure all recommended labels are meaningful and actionable
 - If uncertain about a label, exclude it rather than guessing
-- An issue may have multiple type labels and multiple area labels if appropriate
+
+## [📌] Additional Guidelines
+
+- Issues may warrant multiple type labels and/or multiple area labels when clearly justified by the content
+- **Test Plans Label Usage**: Only apply `Test Plans 🧪` when the issue directly relates to test management features, test case authoring, test suites, or the Test Plans API itself—not merely because testing or writing tests is mentioned as part of standard development practice
