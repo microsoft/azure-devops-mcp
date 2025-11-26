@@ -39,9 +39,9 @@ jobs:
           # Parse the JSON response to extract labels
           LABELS=$(echo "$AI_RESPONSE" | python3 -c "import sys, json; print(' '.join([f'--add-label \"{label}\"' for label in json.load(sys.stdin)['labels']]))")
 
-          # Add the recommended labels and remove the ai-issue-processing label
+          # Add the recommended labels, always add "Needs Review 👓", and remove the ai-issue-processing label
           if [ -n "$LABELS" ]; then
-            eval gh issue edit $ISSUE_NUMBER $LABELS --remove-label "ai-issue-processing" --repo ${{ github.repository }}
+            eval gh issue edit $ISSUE_NUMBER $LABELS --add-label "Needs Review 👓" --remove-label "ai-issue-processing" --repo ${{ github.repository }}
           else
-            gh issue edit $ISSUE_NUMBER --remove-label "ai-issue-processing" --repo ${{ github.repository }}
+            gh issue edit $ISSUE_NUMBER --add-label "Needs Review 👓" --remove-label "ai-issue-processing" --repo ${{ github.repository }}
           fi
