@@ -48,5 +48,4 @@ jobs:
 
           GH_COMMAND="$GH_COMMAND --add-label \"Needs Review 👓\" --remove-label \"ai-issue-processing\" --repo ${{ github.repository }}"
 
-          # Execute the command
           eval "$GH_COMMAND"
