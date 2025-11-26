@@ -36,12 +36,19 @@ jobs:
         run: |
           echo "AI Response: $AI_RESPONSE"
 
-          # Parse the JSON response to extract labels
-          LABELS=$(echo "$AI_RESPONSE" | python3 -c "import sys, json; print(' '.join([f'--add-label \"{label}\"' for label in json.load(sys.stdin)['labels']]))")
+          # Parse the JSON response to extract labels as a JSON array
+          LABELS_JSON=$(echo "$AI_RESPONSE" | python3 -c "import sys, json; print(json.dumps(json.load(sys.stdin)['labels']))")
 
-          # Add the recommended labels, always add "Needs Review 👓", and remove the ai-issue-processing label
-          if [ -n "$LABELS" ]; then
-            eval gh issue edit $ISSUE_NUMBER $LABELS --add-label "Needs Review 👓" --remove-label "ai-issue-processing" --repo ${{ github.repository }}
-          else
-            gh issue edit $ISSUE_NUMBER --add-label "Needs Review 👓" --remove-label "ai-issue-processing" --repo ${{ github.repository }}
-          fi
+          # Build the gh command with all labels
+          GH_COMMAND="gh issue edit $ISSUE_NUMBER"
+
+          # Add each label from the AI response
+          echo "$LABELS_JSON" | python3 -c "import sys, json; [print(label) for label in json.load(sys.stdin)]" | while read -r label; do
+            GH_COMMAND="$GH_COMMAND --add-label \"$label\""
+          done
+
+          # Always add "Needs Review 👓" and remove the trigger label
+          GH_COMMAND="$GH_COMMAND --add-label \"Needs Review 👓\" --remove-label \"ai-issue-processing\" --repo ${{ github.repository }}"
+
+          # Execute the command
+          eval "$GH_COMMAND"
