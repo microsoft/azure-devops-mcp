@@ -39,7 +39,6 @@ jobs:
           # Parse the JSON response to extract labels as a JSON array
           LABELS_JSON=$(echo "$AI_RESPONSE" | python3 -c "import sys, json; print(json.dumps(json.load(sys.stdin)['labels']))")
 
-          # Build the gh command with all labels
           GH_COMMAND="gh issue edit $ISSUE_NUMBER"
 
           # Add each label from the AI response
