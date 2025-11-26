@@ -45,3 +45,19 @@ jobs:
           else
             gh issue edit $ISSUE_NUMBER --remove-label "ai-issue-processing" --repo ${{ github.repository }}
           fi
+
+      - name: Set Issue Type
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          AI_RESPONSE: ${{ steps.ai-inference.outputs.response }}
+        run: |
+          # Parse the JSON response to extract issue type
+          ISSUE_TYPE=$(echo "$AI_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('issueType', ''))")
+
+          if [ -n "$ISSUE_TYPE" ]; then
+            echo "Setting issue type to: $ISSUE_TYPE"
+            gh issue edit $ISSUE_NUMBER --body "$(gh issue view $ISSUE_NUMBER --json body -q .body)" --add-project "${{ github.repository_owner }}/1" --field "Issue Type=$ISSUE_TYPE" --repo ${{ github.repository }}
+          else
+            echo "No issue type found in AI response"
+          fi

@@ -53,15 +53,23 @@ Your response must follow this exact structure:
 
 ```json
 {
+  "issueType": "Bug|Feature|Task",
   "labels": ["label1", "label2", "label3"]
 }
 ```
+
+The `issueType` field must be one of:
+
+- **Bug**: An unexpected problem or behaviour
+- **Feature**: A request, idea, or new functionality
+- **Task**: A specific piece of work
 
 The `labels` array should contain strings representing the recommended label names. The array may be empty if no labels are clearly justified.
 
 ## [⚠️] Important Rules
 
 - **CRITICAL**: Output ONLY valid JSON. Do not wrap it in markdown code blocks or add any other text.
+- Always specify an `issueType` - this is required and must be one of: Bug, Feature, or Task
 - Only recommend labels from the available labels list above
 - Use the exact label names including emojis as shown in the available labels list
 - Base your recommendations solely on the issue content provided
