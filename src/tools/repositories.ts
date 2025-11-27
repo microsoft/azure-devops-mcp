@@ -124,6 +124,7 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
       uniqueName: pr.createdBy?.uniqueName,
     },
     creationDate: pr.creationDate,
+    closedDate: pr.closedDate,
     title: pr.title,
     ...(includeDescription ? { description: pr.description ?? "" } : {}),
     isDraft: pr.isDraft,
@@ -643,18 +644,46 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or project name (optional)"),
       iteration: z.number().optional().describe("The iteration ID for which to retrieve threads. Optional, defaults to the latest iteration."),
       baseIteration: z.number().optional().describe("The base iteration ID for which to retrieve threads. Optional, defaults to the latest base iteration."),
-      top: z.number().default(100).describe("The maximum number of threads to return."),
-      skip: z.number().default(0).describe("The number of threads to skip."),
+      top: z.number().default(100).describe("The maximum number of threads to return after filtering."),
+      skip: z.number().default(0).describe("The number of threads to skip after filtering."),
       fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of trimmed data."),
+      status: z
+        .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
+        .optional()
+        .describe("Filter threads by status. If not specified, returns threads of all statuses."),
+      authorEmail: z.string().optional().describe("Filter threads by the email of the thread author (first comment author)."),
+      authorDisplayName: z.string().optional().describe("Filter threads by the display name of the thread author (first comment author). Case-insensitive partial matching."),
     },
-    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse }) => {
+    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
 
         const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
 
-        const paginatedThreads = threads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
+        let filteredThreads = threads;
+
+        if (status !== undefined) {
+          const statusValue = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
+          filteredThreads = filteredThreads?.filter((thread) => thread.status === statusValue);
+        }
+
+        if (authorEmail !== undefined) {
+          filteredThreads = filteredThreads?.filter((thread) => {
+            const firstComment = thread.comments?.[0];
+            return firstComment?.author?.uniqueName?.toLowerCase() === authorEmail.toLowerCase();
+          });
+        }
+
+        if (authorDisplayName !== undefined) {
+          const lowerAuthorName = authorDisplayName.toLowerCase();
+          filteredThreads = filteredThreads?.filter((thread) => {
+            const firstComment = thread.comments?.[0];
+            return firstComment?.author?.displayName?.toLowerCase().includes(lowerAuthorName);
+          });
+        }
+
+        const paginatedThreads = filteredThreads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
         if (fullResponse) {
           return {
@@ -865,13 +894,47 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
+      includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
     },
-    async ({ repositoryId, pullRequestId, includeWorkItemRefs }) => {
+    async ({ repositoryId, pullRequestId, includeWorkItemRefs, includeLabels }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
         const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, undefined, undefined, undefined, undefined, undefined, includeWorkItemRefs);
-        return {
+
+      if (includeLabels) {
+        try {
+          const projectId = pullRequest.repository?.project?.id;
+          const projectName = pullRequest.repository?.project?.name;
+          const labels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId, projectName, projectId);
+
+          const labelNames = labels.map((label) => label.name).filter((name) => name !== undefined);
+
+          const enhancedResponse = {
+            ...pullRequest,
+            labelSummary: {
+              labels: labelNames,
+              labelCount: labelNames.length,
+            },
+          };
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+          };
+        } catch (error) {
+          console.warn(`Error fetching PR labels: ${error instanceof Error ? error.message : "Unknown error"}`);
+          // Fall back to the original response without labels
+          const enhancedResponse = {
+            ...pullRequest,
+            labelSummary: {},
+          };
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+          };
+        }
+      }
+      return {
           content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
         };
       } catch (error) {

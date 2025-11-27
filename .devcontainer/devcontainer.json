@@ -1,13 +1,13 @@
 {
   "name": "Azure DevOps Local MCP Server",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:dev-24",
   "hostRequirements": {
     "cpus": 2,
     "memory": "8gb"
   },
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "20"
+      "version": "24"
     },
     "ghcr.io/devcontainers/features/azure-cli:1": {}
   },

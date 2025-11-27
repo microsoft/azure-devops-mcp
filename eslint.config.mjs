@@ -16,6 +16,13 @@ export default tseslint.config(
   tseslint.configs.strict,
   tseslint.configs.stylistic,
 
+  // Custom rule overrides
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+
   // Copyright
   {
     files: ["src/**/*.ts"],

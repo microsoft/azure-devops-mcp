@@ -1,0 +1,51 @@
+name: AI Issue Processing
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  issue-processing:
+    if: github.event.label.name == 'ai-issue-processing'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Call GitHub Model API
+        id: ai-inference
+        uses: actions/ai-inference@v1
+        with:
+          model: gpt-4o-mini
+          system-prompt-file: .github/ai-automation/ai-issue-processing-system-prompt.md
+          prompt: |
+            Issue Title: ${{ github.event.issue.title }}
+
+            Issue Description:
+            ${{ github.event.issue.body }}
+
+      - name: Parse and Apply Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          AI_RESPONSE: ${{ steps.ai-inference.outputs.response }}
+        run: |
+          echo "AI Response: $AI_RESPONSE"
+
+          # Parse the JSON response to extract labels as a JSON array
+          LABELS_JSON=$(echo "$AI_RESPONSE" | python3 -c "import sys, json; print(json.dumps(json.load(sys.stdin)['labels']))")
+
+          GH_COMMAND="gh issue edit $ISSUE_NUMBER"
+
+          # Add each label from the AI response
+          echo "$LABELS_JSON" | python3 -c "import sys, json; [print(label) for label in json.load(sys.stdin)]" | while read -r label; do
+            GH_COMMAND="$GH_COMMAND --add-label \"$label\""
+          done
+
+          GH_COMMAND="$GH_COMMAND --add-label \"Needs Review 👓\" --remove-label \"ai-issue-processing\" --repo ${{ github.repository }}"
+
+          eval "$GH_COMMAND"
