@@ -3754,6 +3754,333 @@ describe("repos tools", () => {
     });
   });
 
+  describe("repo_update_pull_request_thread", () => {
+    it("should update thread status to Active", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = {
+        id: 123,
+        status: CommentThreadStatus.Active,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-02T00:00:00Z",
+        comments: [{ id: 1, content: "Test comment", author: { displayName: "Test User", uniqueName: "test@example.com" } }],
+        threadContext: { filePath: "/src/test.ts" },
+      };
+      mockGitApi.updateThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        status: "Active" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Active }, "repo123", 456, 789);
+
+      const expectedTrimmedThread = {
+        id: 123,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-02T00:00:00Z",
+        status: CommentThreadStatus.Active,
+        comments: [
+          {
+            id: 1,
+            author: {
+              displayName: "Test User",
+              uniqueName: "test@example.com",
+            },
+            content: "Test comment",
+            publishedDate: undefined,
+            lastUpdatedDate: undefined,
+            lastContentUpdatedDate: undefined,
+          },
+        ],
+        threadContext: { filePath: "/src/test.ts" },
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedThread, null, 2));
+    });
+
+    it("should update thread status to Fixed", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = {
+        id: 456,
+        status: CommentThreadStatus.Fixed,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-03T00:00:00Z",
+        comments: [],
+        threadContext: null,
+      };
+      mockGitApi.updateThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        status: "Fixed" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Fixed }, "repo123", 456, 789);
+
+      const expectedTrimmedThread = {
+        id: 456,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-03T00:00:00Z",
+        status: CommentThreadStatus.Fixed,
+        comments: [],
+        threadContext: null,
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedThread, null, 2));
+    });
+
+    it("should update thread status to WontFix", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = {
+        id: 789,
+        status: CommentThreadStatus.WontFix,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-04T00:00:00Z",
+        comments: [],
+        threadContext: null,
+      };
+      mockGitApi.updateThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        status: "WontFix" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.WontFix }, "repo123", 456, 789);
+
+      const expectedTrimmedThread = {
+        id: 789,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-04T00:00:00Z",
+        status: CommentThreadStatus.WontFix,
+        comments: [],
+        threadContext: null,
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedThread, null, 2));
+    });
+
+    it("should update thread status to Closed", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = {
+        id: 100,
+        status: CommentThreadStatus.Closed,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-05T00:00:00Z",
+        comments: [],
+        threadContext: null,
+      };
+      mockGitApi.updateThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 100,
+        status: "Closed" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Closed }, "repo123", 456, 100);
+
+      const expectedTrimmedThread = {
+        id: 100,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-05T00:00:00Z",
+        status: CommentThreadStatus.Closed,
+        comments: [],
+        threadContext: null,
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedThread, null, 2));
+    });
+
+    it("should update thread status to ByDesign", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = {
+        id: 200,
+        status: CommentThreadStatus.ByDesign,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-06T00:00:00Z",
+        comments: [],
+        threadContext: null,
+      };
+      mockGitApi.updateThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 200,
+        status: "ByDesign" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.ByDesign }, "repo123", 456, 200);
+
+      const expectedTrimmedThread = {
+        id: 200,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-06T00:00:00Z",
+        status: CommentThreadStatus.ByDesign,
+        comments: [],
+        threadContext: null,
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedThread, null, 2));
+    });
+
+    it("should update thread status to Pending", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = {
+        id: 300,
+        status: CommentThreadStatus.Pending,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-07T00:00:00Z",
+        comments: [],
+        threadContext: null,
+      };
+      mockGitApi.updateThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 300,
+        status: "Pending" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Pending }, "repo123", 456, 300);
+
+      const expectedTrimmedThread = {
+        id: 300,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-07T00:00:00Z",
+        status: CommentThreadStatus.Pending,
+        comments: [],
+        threadContext: null,
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedThread, null, 2));
+    });
+
+    it("should return error when no fields provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updateThread).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: At least one field (status) must be provided for update.");
+    });
+
+    it("should return error when thread update fails", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.updateThread.mockResolvedValue(null);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        status: "Active" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Failed to update thread 789. The thread was not updated successfully.");
+    });
+
+    it("should filter deleted comments from response", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+      if (!call) throw new Error("repo_update_pull_request_thread tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = {
+        id: 123,
+        status: CommentThreadStatus.Active,
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-02T00:00:00Z",
+        comments: [
+          { id: 1, content: "Active comment", author: { displayName: "User 1", uniqueName: "user1@example.com" }, isDeleted: false },
+          { id: 2, content: "Deleted comment", author: { displayName: "User 2", uniqueName: "user2@example.com" }, isDeleted: true },
+          { id: 3, content: "Another active comment", author: { displayName: "User 3", uniqueName: "user3@example.com" }, isDeleted: false },
+        ],
+        threadContext: null,
+      };
+      mockGitApi.updateThread.mockResolvedValue(mockThread);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        status: "Active" as const,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.comments).toHaveLength(2);
+      expect(parsedResult.comments[0].id).toBe(1);
+      expect(parsedResult.comments[1].id).toBe(3);
+      expect(parsedResult.comments.find((c: any) => c.id === 2)).toBeUndefined();
+    });
+  });
+
   describe("repo_search_commits", () => {
     it("should search commits successfully", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
