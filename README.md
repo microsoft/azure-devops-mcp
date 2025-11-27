@@ -7,6 +7,10 @@ Easily install the Azure DevOps MCP Server for VS Code or VS Code Insiders:
 
 This TypeScript project provides a **local** MCP server for Azure DevOps, enabling you to perform a wide range of Azure DevOps tasks directly from your code editor.
 
+## WEB Marketing fork goals
+1. Add option to use on premise DevOps
+2. Add option to set DevOps API version
+
 ## 📄 Table of Contents
 
 1. [📺 Overview](#-overview)
