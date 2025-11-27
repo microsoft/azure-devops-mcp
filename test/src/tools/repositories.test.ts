@@ -597,7 +597,7 @@ describe("repos tools", () => {
       const [, , , handler] = call;
 
       const longDescription = "a".repeat(4001);
-      
+
       // Mock successful update
       mockGitApi.updatePullRequest.mockResolvedValue({
         pullRequestId: 123,
@@ -4519,9 +4519,7 @@ describe("repos tools", () => {
         const [, , , handler] = call;
 
         // Mock successful source branch lookup
-        mockGitApi.getRefs.mockResolvedValue([
-          { name: "refs/heads/main", objectId: "abc123" }
-        ]);
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "abc123" }]);
 
         // Mock updateRefs failure
         mockGitApi.updateRefs.mockRejectedValue(new Error("Branch already exists"));
@@ -4912,10 +4910,12 @@ describe("repos tools", () => {
         const result = await handler(params);
 
         expect(result).toEqual({
-          content: [{
-            type: "text",
-            text: "Error searching commits: Repository access denied",
-          }],
+          content: [
+            {
+              type: "text",
+              text: "Error searching commits: Repository access denied",
+            },
+          ],
           isError: true,
         });
       });
