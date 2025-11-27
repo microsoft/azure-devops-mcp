@@ -1123,36 +1123,45 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe("The new status for the comment thread. Common values: Active, Fixed, WontFix, Closed, ByDesign, Pending."),
     },
     async ({ repositoryId, pullRequestId, threadId, status }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      const updateRequest: Record<string, unknown> = {};
+        const updateRequest: Record<string, unknown> = {};
 
-      if (status !== undefined) {
-        updateRequest.status = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
-      }
+        if (status !== undefined) {
+          updateRequest.status = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
+        }
 
-      if (Object.keys(updateRequest).length === 0) {
+        if (Object.keys(updateRequest).length === 0) {
+          return {
+            content: [{ type: "text", text: "Error: At least one field (status) must be provided for update." }],
+            isError: true,
+          };
+        }
+
+        const thread = await gitApi.updateThread(updateRequest, repositoryId, pullRequestId, threadId);
+
+        if (!thread) {
+          return {
+            content: [{ type: "text", text: `Error: Failed to update thread ${threadId}. The thread was not updated successfully.` }],
+            isError: true,
+          };
+        }
+
+        const trimmedThread = trimPullRequestThread(thread);
+
         return {
-          content: [{ type: "text", text: "Error: At least one field (status) must be provided for update." }],
+          content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error updating pull request thread: ${errorMessage}` }],
           isError: true,
         };
       }
-
-      const thread = await gitApi.updateThread(updateRequest, repositoryId, pullRequestId, threadId);
-
-      if (!thread) {
-        return {
-          content: [{ type: "text", text: `Error: Failed to update thread ${threadId}. The thread was not updated successfully.` }],
-          isError: true,
-        };
-      }
-
-      const trimmedThread = trimPullRequestThread(thread);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
-      };
     }
   );
 

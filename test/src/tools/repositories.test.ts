@@ -6119,6 +6119,74 @@ describe("repos tools", () => {
       });
     });
 
+    describe("repo_update_pull_request_thread error handling", () => {
+      it("should handle thread update errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+        const [, , , handler] = call;
+
+        mockGitApi.updateThread.mockRejectedValue(new Error("Thread not found"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          threadId: 789,
+          status: "Active" as const,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error updating pull request thread: Thread not found" }],
+          isError: true,
+        });
+      });
+
+      it("should handle API connection errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+        const [, , , handler] = call;
+
+        mockGitApi.updateThread.mockRejectedValue(new Error("Network connection failed"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          threadId: 789,
+          status: "Fixed" as const,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error updating pull request thread: Network connection failed" }],
+          isError: true,
+        });
+      });
+
+      it("should handle non-Error thrown objects", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_thread);
+        const [, , , handler] = call;
+
+        mockGitApi.updateThread.mockRejectedValue("String error");
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          threadId: 789,
+          status: "Closed" as const,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error updating pull request thread: Unknown error occurred" }],
+          isError: true,
+        });
+      });
+    });
+
     describe("repo_search_commits error handling", () => {
       it("should handle commit search errors", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
