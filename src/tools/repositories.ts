@@ -1117,16 +1117,16 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
       threadId: z.number().describe("The ID of the thread to update."),
+      project: z.string().describe("Project ID or project name."),
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
         .describe("The new status for the comment thread. Common values: Active, Fixed, WontFix, Closed, ByDesign, Pending."),
     },
-    async ({ repositoryId, pullRequestId, threadId, status }) => {
+    async ({ repositoryId, pullRequestId, threadId, project, status }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
-
         const updateRequest: Record<string, unknown> = {};
 
         if (status !== undefined) {
@@ -1140,7 +1140,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           };
         }
 
-        const thread = await gitApi.updateThread(updateRequest, repositoryId, pullRequestId, threadId);
+        const thread = await gitApi.updateThread(updateRequest, repositoryId, pullRequestId, threadId, project);
 
         if (!thread) {
           return {

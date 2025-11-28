@@ -329,7 +329,7 @@ Creates a new comment thread on a pull request.
 
 Updates an existing comment thread on a pull request. Can update status and other thread properties.
 
-- **Required**: `repositoryId`, `pullRequestId`, `threadId`
+- **Required**: `repositoryId`, `pullRequestId`, `threadId`, `project`
 - **Optional**: `status`
 
 ### mcp_ado_repo_reply_to_comment

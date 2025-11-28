@@ -3776,12 +3776,13 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 789,
+        project: "TestProject",
         status: "Active" as const,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Active }, "repo123", 456, 789);
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Active }, "repo123", 456, 789, "TestProject");
 
       const expectedTrimmedThread = {
         id: 123,
@@ -3827,12 +3828,13 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 789,
+        project: "TestProject",
         status: "Fixed" as const,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Fixed }, "repo123", 456, 789);
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Fixed }, "repo123", 456, 789, "TestProject");
 
       const expectedTrimmedThread = {
         id: 456,
@@ -3866,12 +3868,13 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 789,
+        project: "TestProject",
         status: "WontFix" as const,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.WontFix }, "repo123", 456, 789);
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.WontFix }, "repo123", 456, 789, "TestProject");
 
       const expectedTrimmedThread = {
         id: 789,
@@ -3905,12 +3908,13 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 100,
+        project: "TestProject",
         status: "Closed" as const,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Closed }, "repo123", 456, 100);
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Closed }, "repo123", 456, 100, "TestProject");
 
       const expectedTrimmedThread = {
         id: 100,
@@ -3944,12 +3948,13 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 200,
+        project: "TestProject",
         status: "ByDesign" as const,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.ByDesign }, "repo123", 456, 200);
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.ByDesign }, "repo123", 456, 200, "TestProject");
 
       const expectedTrimmedThread = {
         id: 200,
@@ -3983,12 +3988,13 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 300,
+        project: "TestProject",
         status: "Pending" as const,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Pending }, "repo123", 456, 300);
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Pending }, "repo123", 456, 300, "TestProject");
 
       const expectedTrimmedThread = {
         id: 300,
@@ -4012,6 +4018,7 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 789,
+        project: "TestProject",
       };
 
       const result = await handler(params);
@@ -4034,6 +4041,7 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 789,
+        project: "TestProject",
         status: "Active" as const,
       };
 
@@ -4068,6 +4076,7 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 456,
         threadId: 789,
+        project: "TestProject",
         status: "Active" as const,
       };
 
@@ -6131,6 +6140,7 @@ describe("repos tools", () => {
           repositoryId: "repo123",
           pullRequestId: 456,
           threadId: 789,
+          project: "TestProject",
           status: "Active" as const,
         };
 
@@ -6153,6 +6163,7 @@ describe("repos tools", () => {
           repositoryId: "repo123",
           pullRequestId: 456,
           threadId: 789,
+          project: "TestProject",
           status: "Fixed" as const,
         };
 
@@ -6175,6 +6186,7 @@ describe("repos tools", () => {
           repositoryId: "repo123",
           pullRequestId: 456,
           threadId: 789,
+          project: "TestProject",
           status: "Closed" as const,
         };
 
