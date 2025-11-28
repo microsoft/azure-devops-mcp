@@ -17,6 +17,7 @@ import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
+import { getAzureDevOpsConfig } from "./utils.js";
 
 function isGitHubCodespaceEnv(): boolean {
   return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
@@ -59,7 +60,7 @@ const argv = yargs(hideBin(process.argv))
   .parseSync();
 
 export const orgName = argv.organization as string;
-const orgUrl = "https://dev.azure.com/" + orgName;
+const { orgUrl, mode: deploymentMode } = getAzureDevOpsConfig(orgName);
 
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
@@ -81,6 +82,7 @@ async function main() {
   logger.info("Starting Azure DevOps MCP Server", {
     organization: orgName,
     organizationUrl: orgUrl,
+    deploymentMode,
     authentication: argv.authentication,
     tenant: argv.tenant,
     domains: argv.domains,
@@ -90,7 +92,7 @@ async function main() {
   });
 
   const server = new McpServer({
-    name: "Azure DevOps MCP Server",
+    name: "Azure DevOps On Premise MCP Server",
     version: packageVersion,
     icons: [
       {
@@ -103,7 +105,7 @@ async function main() {
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
-  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
+  const tenantId = deploymentMode === "cloud" ? (await getOrgTenant(orgName)) ?? argv.tenant : undefined;
   const authenticator = createAuthenticator(argv.authentication, tenantId);
 
   // removing prompts untill further notice

@@ -35,7 +35,9 @@ async function trySavingCache(cache: OrgTenantCache): Promise<void> {
 }
 
 async function fetchTenantFromApi(orgName: string): Promise<string> {
-  const url = `https://vssps.dev.azure.com/${orgName}`;
+  const customUrl = process.env.ADO_MCP_VSSPS_URL;
+  const baseUrl = customUrl || "https://vssps.dev.azure.com";
+  const url = `${baseUrl}/${orgName}`;
 
   try {
     const response = await fetch(url, { method: "HEAD" });

@@ -11,6 +11,26 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 1. Add option to use on premise DevOps
 2. Add option to set DevOps API version
 
+### Added Environment variables
+- `apiVersion`:
+  - set DevOps API version
+  - default: `"7.2-preview.1"`
+  - env: `ADO_MCP_API_VERSION`
+- `batchApiVersion`:
+	- set DevOps Batch API version
+  - default: `"5.0"`
+  - env: `ADO_MCP_BATCH_API_VERSION`
+- `markdownCommentsApiVersion`:
+	- set DevOps Markdown API version
+  - default: `"7.2-preview.4"`
+  - env: `ADO_MCP_MARKDOWN_COMMENTS_API_VERSION`
+- `ADO_MCP_MODE`:
+	- set DevOps Server mode On Premise or on Azure
+  - `"cloud"` (default) ili `"onprem"`
+- `ADO_MCP_ORG_URL`:
+  - full URL of on premise instance, for example:
+    `https://my-server/tfs/MyCollection` ili `https://devops.moja-firma.hr/MyCollection`
+
 ## 📄 Table of Contents
 
 1. [📺 Overview](#-overview)

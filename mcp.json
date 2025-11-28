@@ -7,9 +7,9 @@
     }
   ],
   "servers": {
-    "ado": {
+    "ado_op": {
       "type": "stdio",
-      "command": "mcp-server-azuredevops",
+      "command": "mcp-server-azuredevops_op",
       "args": ["${input:ado_org}"],
       "env": {
         "LOG_LEVEL": "debug"

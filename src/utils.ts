@@ -1,9 +1,42 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-export const apiVersion = "7.2-preview.1";
-export const batchApiVersion = "5.0";
-export const markdownCommentsApiVersion = "7.2-preview.4";
+// API versions – overridable via environment for on-prem / older servers
+export const apiVersion = process.env.ADO_MCP_API_VERSION || "7.2-preview.1";
+export const batchApiVersion = process.env.ADO_MCP_BATCH_API_VERSION || "5.0";
+export const markdownCommentsApiVersion = process.env.ADO_MCP_MARKDOWN_COMMENTS_API_VERSION || "7.2-preview.4";
+
+export type AzureDevOpsDeploymentMode = "cloud" | "onprem";
+
+export interface AzureDevOpsConfig {
+  mode: AzureDevOpsDeploymentMode;
+  /** Base URL for Azure DevOps organization, e.g. https://dev.azure.com/myOrg or https://myserver/tfs/MyCollection */
+  orgUrl: string;
+}
+
+/**
+ * Resolve Azure DevOps base URL and deployment mode from environment.
+ *
+ * Env vars:
+ * - ADO_MCP_MODE: "cloud" (default) or "onprem"
+ * - ADO_MCP_ORG_URL: full base URL to use instead of constructing from org name
+ */
+export function getAzureDevOpsConfig(orgName: string): AzureDevOpsConfig {
+  const rawMode = (process.env.ADO_MCP_MODE || "cloud").toLowerCase();
+  const mode: AzureDevOpsDeploymentMode = rawMode === "onprem" ? "onprem" : "cloud";
+
+  let orgUrl: string;
+  if (process.env.ADO_MCP_ORG_URL) {
+    orgUrl = process.env.ADO_MCP_ORG_URL;
+  } else if (mode === "cloud") {
+    orgUrl = `https://dev.azure.com/${orgName}`;
+  } else {
+    // On-prem without explicit URL – fall back to cloud-style URL so behavior is predictable
+    orgUrl = `https://dev.azure.com/${orgName}`;
+  }
+
+  return { mode, orgUrl };
+}
 
 export function createEnumMapping<T extends Record<string, string | number>>(enumObject: T): Record<string, T[keyof T]> {
   const mapping: Record<string, T[keyof T]> = {};
