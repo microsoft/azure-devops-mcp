@@ -79,6 +79,7 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
   logger.debug(`Creating authenticator of type '${type}' with tenantId='${tenantId ?? "undefined"}'`);
   switch (type) {
     case "envvar":
+		case "envvar_basic":
       logger.debug(`Authenticator: Using environment variable authentication (ADO_MCP_AUTH_TOKEN)`);
       // Read token from fixed environment variable
       return async () => {

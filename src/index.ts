@@ -5,7 +5,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { getBearerHandler, WebApi } from "azure-devops-node-api";
+import { getBasicHandler, getBearerHandler, WebApi } from "azure-devops-node-api";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -48,7 +48,7 @@ const argv = yargs(hideBin(process.argv))
     alias: "a",
     describe: "Type of authentication to use",
     type: "string",
-    choices: ["interactive", "azcli", "env", "envvar"],
+    choices: ["interactive", "azcli", "env", "envvar", "envvar_basic"],
     default: defaultAuthenticationType,
   })
   .option("tenant", {
@@ -65,11 +65,12 @@ const { orgUrl, mode: deploymentMode } = getAzureDevOpsConfig(orgName);
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
 
-function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<WebApi> {
+function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer, authentication: string): () => Promise<WebApi> {
   return async () => {
-    const accessToken = await getAzureDevOpsToken();
-    const authHandler = getBearerHandler(accessToken);
-    const connection = new WebApi(orgUrl, authHandler, undefined, {
+
+		const accessToken = await getAzureDevOpsToken();
+		const authHandler = authentication == "envvar_basic" ? getBasicHandler("", accessToken) : getBearerHandler(accessToken);
+		const connection = new WebApi(orgUrl, authHandler, undefined, {
       productName: "AzureDevOps.MCP",
       productVersion: packageVersion,
       userAgent: userAgentComposer.userAgent,
@@ -111,10 +112,30 @@ async function main() {
   // removing prompts untill further notice
   // configurePrompts(server);
 
-  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
+	const connectionProvider = getAzureDevOpsClient(authenticator, userAgentComposer, argv.authentication);
 
+  configureAllTools(server, authenticator, connectionProvider, () => userAgentComposer.userAgent, enabledDomains);
+
+	// TESTING CONNECTION TO DevOps API
+	// await testApi(connectionProvider);
+	
   const transport = new StdioServerTransport();
   await server.connect(transport);
+}
+
+async function testApi(connectionProvider: () => Promise<WebApi>) {
+        const connection = await connectionProvider();
+        const coreApi = await connection.getCoreApi();
+        const teams = await coreApi.getTeams("WEM");
+
+        if (!teams) {
+          logger.info("No teams found");
+        }
+				else
+				{
+					logger.info(`Teams: ${JSON.stringify(teams, null, 2)}`);
+				}
+
 }
 
 main().catch((error) => {

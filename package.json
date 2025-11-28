@@ -1,7 +1,7 @@
 {
-  "name": "@azure-devops/mcp",
-  "version": "2.2.2",
-  "description": "MCP server for interacting with Azure DevOps",
+  "name": "@azure-devops-op/mcp",
+  "version": "2.3.1",
+  "description": "MCP server for interacting with Azure DevOps (on-premises)",
   "license": "MIT",
   "author": "Microsoft Corporation",
   "homepage": "https://github.com/microsoft/azure-devops-mcp",
@@ -12,7 +12,7 @@
   },
   "type": "module",
   "bin": {
-    "mcp-server-azuredevops": "dist/index.js"
+    "mcp-server-azuredevops-op": "dist/index.js"
   },
   "files": [
     "dist"
