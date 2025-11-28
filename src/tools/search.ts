@@ -51,7 +51,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       if (Object.keys(filters).length > 0) {
         requestBody.filters = filters;
       }
-
+			
+			// TODO: OnPremise check
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -108,6 +109,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         requestBody.filters = filters;
       }
 
+			// TODO: OnPremise check
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -165,6 +167,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         requestBody.filters = filters;
       }
 
+			// TODO: OnPremise check
       const response = await fetch(url, {
         method: "POST",
         headers: {

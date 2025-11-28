@@ -7,6 +7,7 @@ import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfac
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -288,11 +289,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           text: comment,
         };
 
+				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+
         const formatParameter = format === "markdown" ? 0 : 1;
         const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${accessToken}`,
+            "Authorization": authHeader,
             "Content-Type": "application/json",
             "User-Agent": userAgentProvider(),
           },
@@ -483,10 +487,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           };
         });
 
+				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+
         const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
           method: "PATCH",
           headers: {
-            "Authorization": `Bearer ${accessToken}`,
+            "Authorization": authHeader,
             "Content-Type": "application/json",
             "User-Agent": userAgentProvider(),
           },
@@ -873,10 +880,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           };
         });
 
+				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+
         const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
           method: "PATCH",
           headers: {
-            "Authorization": `Bearer ${accessToken}`,
+            "Authorization": authHeader,
             "Content-Type": "application/json",
             "User-Agent": userAgentProvider(),
           },
@@ -953,10 +963,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             })),
         }));
 
+				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+
         const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
           method: "PATCH",
           headers: {
-            "Authorization": `Bearer ${accessToken}`,
+            "Authorization": authHeader,
             "Content-Type": "application/json",
             "User-Agent": userAgentProvider(),
           },

@@ -10,10 +10,11 @@
     "ado_op": {
       "type": "stdio",
       "command": "mcp-server-azuredevops_op",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar_basic"],
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"],
       "env": {
         "LOG_LEVEL": "debug",
 				"ADO_MCP_MODE": "onprem",
+				"ADO_MCP_AUTH_TYPE": "basic",
         "ADO_MCP_ORG_URL": "",
 				"ADO_MCP_API_VERSION": "6.0",
 				"ADO_MCP_BATCH_API_VERSION": "4.1",

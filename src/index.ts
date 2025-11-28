@@ -20,44 +20,44 @@ import { DomainsManager } from "./shared/domains.js";
 import { getAzureDevOpsConfig } from "./utils.js";
 
 function isGitHubCodespaceEnv(): boolean {
-  return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
+	return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
 }
 
 const defaultAuthenticationType = isGitHubCodespaceEnv() ? "azcli" : "interactive";
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
-  .scriptName("mcp-server-azuredevops")
-  .usage("Usage: $0 <organization> [options]")
-  .version(packageVersion)
-  .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
-    yargs.positional("organization", {
-      describe: "Azure DevOps organization name",
-      type: "string",
-      demandOption: true,
-    });
-  })
-  .option("domains", {
-    alias: "d",
-    describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
-    type: "string",
-    array: true,
-    default: "all",
-  })
-  .option("authentication", {
-    alias: "a",
-    describe: "Type of authentication to use",
-    type: "string",
-    choices: ["interactive", "azcli", "env", "envvar", "envvar_basic"],
-    default: defaultAuthenticationType,
-  })
-  .option("tenant", {
-    alias: "t",
-    describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
-    type: "string",
-  })
-  .help()
-  .parseSync();
+	.scriptName("mcp-server-azuredevops")
+	.usage("Usage: $0 <organization> [options]")
+	.version(packageVersion)
+	.command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
+		yargs.positional("organization", {
+			describe: "Azure DevOps organization name",
+			type: "string",
+			demandOption: true,
+		});
+	})
+	.option("domains", {
+		alias: "d",
+		describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
+		type: "string",
+		array: true,
+		default: "all",
+	})
+	.option("authentication", {
+		alias: "a",
+		describe: "Type of authentication to use",
+		type: "string",
+		choices: ["interactive", "azcli", "env", "envvar"],
+		default: defaultAuthenticationType,
+	})
+	.option("tenant", {
+		alias: "t",
+		describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
+		type: "string",
+	})
+	.help()
+	.parseSync();
 
 export const orgName = argv.organization as string;
 const { orgUrl, mode: deploymentMode } = getAzureDevOpsConfig(orgName);
@@ -66,79 +66,92 @@ const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
 
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer, authentication: string): () => Promise<WebApi> {
-  return async () => {
+	return async () => {
 
 		const accessToken = await getAzureDevOpsToken();
-		const authHandler = authentication == "envvar_basic" ? getBasicHandler("", accessToken) : getBearerHandler(accessToken);
+		const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+		const authHandler = isBasicAuth ? getBasicHandler("", accessToken) : getBearerHandler(accessToken);
 		const connection = new WebApi(orgUrl, authHandler, undefined, {
-      productName: "AzureDevOps.MCP",
-      productVersion: packageVersion,
-      userAgent: userAgentComposer.userAgent,
-    });
-    return connection;
-  };
+			productName: "AzureDevOps.MCP",
+			productVersion: packageVersion,
+			userAgent: userAgentComposer.userAgent,
+		});
+		return connection;
+	};
 }
 
 async function main() {
-  logger.info("Starting Azure DevOps MCP Server", {
-    organization: orgName,
-    organizationUrl: orgUrl,
-    deploymentMode,
-    authentication: argv.authentication,
-    tenant: argv.tenant,
-    domains: argv.domains,
-    enabledDomains: Array.from(enabledDomains),
-    version: packageVersion,
-    isCodespace: isGitHubCodespaceEnv(),
-  });
+	logger.info("Starting Azure DevOps MCP Server", {
+		organization: orgName,
+		organizationUrl: orgUrl,
+		deploymentMode,
+		authentication: argv.authentication,
+		tenant: argv.tenant,
+		domains: argv.domains,
+		enabledDomains: Array.from(enabledDomains),
+		version: packageVersion,
+		isCodespace: isGitHubCodespaceEnv(),
+	});
 
-  const server = new McpServer({
-    name: "Azure DevOps On Premise MCP Server",
-    version: packageVersion,
-    icons: [
-      {
-        src: "https://cdn.vsassets.io/content/icons/favicon.ico",
-      },
-    ],
-  });
+	const server = new McpServer({
+		name: "Azure DevOps On Premise MCP Server",
+		version: packageVersion,
+		icons: [
+			{
+				src: "https://cdn.vsassets.io/content/icons/favicon.ico",
+			},
+		],
+	});
 
-  const userAgentComposer = new UserAgentComposer(packageVersion);
-  server.server.oninitialized = () => {
-    userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
-  };
-  const tenantId = deploymentMode === "cloud" ? (await getOrgTenant(orgName)) ?? argv.tenant : undefined;
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
+	const userAgentComposer = new UserAgentComposer(packageVersion);
+	server.server.oninitialized = () => {
+		userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
+	};
+	const tenantId = deploymentMode === "cloud" ? (await getOrgTenant(orgName)) ?? argv.tenant : undefined;
+	const authenticator = createAuthenticator(argv.authentication, tenantId);
 
-  // removing prompts untill further notice
-  // configurePrompts(server);
+	// removing prompts untill further notice
+	// configurePrompts(server);
 
 	const connectionProvider = getAzureDevOpsClient(authenticator, userAgentComposer, argv.authentication);
 
-  configureAllTools(server, authenticator, connectionProvider, () => userAgentComposer.userAgent, enabledDomains);
+	configureAllTools(server, authenticator, connectionProvider, () => userAgentComposer.userAgent, enabledDomains);
 
 	// TESTING CONNECTION TO DevOps API
-	// await testApi(connectionProvider);
-	
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+	await testApi(connectionProvider);
+
+	const transport = new StdioServerTransport();
+	await server.connect(transport);
 }
 
 async function testApi(connectionProvider: () => Promise<WebApi>) {
-        const connection = await connectionProvider();
-        const coreApi = await connection.getCoreApi();
-        const teams = await coreApi.getTeams("WEM");
+	const connection = await connectionProvider();
+	const coreApi = await connection.getCoreApi();
+	const teams = await coreApi.getTeams("WEM");
 
-        if (!teams) {
-          logger.info("No teams found");
-        }
-				else
-				{
-					logger.info(`Teams: ${JSON.stringify(teams, null, 2)}`);
-				}
+	if (!teams) {
+		logger.info("No teams found");
+	}
+	else {
+		logger.info(`Teams: ${JSON.stringify(teams, null, 2)}`);
+	}
+
+	// test work items API
+	const workItemApi = await connection.getWorkItemTrackingApi();
+	const workItems = await workItemApi.getWorkItems([71124, 67900]);
+
+	if (!workItems) {
+		logger.info("No work items found");
+	}
+	else {
+		logger.info(`Work Items: ${JSON.stringify(workItems, null, 2)}`);
+	}
+
+ 
 
 }
 
 main().catch((error) => {
-  logger.error("Fatal error in main():", error);
-  process.exit(1);
+	logger.error("Fatal error in main():", error);
+	process.exit(1);
 });

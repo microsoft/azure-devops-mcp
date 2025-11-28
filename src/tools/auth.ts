@@ -43,6 +43,7 @@ async function searchIdentities(identity: string, tokenProvider: () => Promise<s
     "filterValue": identity,
   });
 
+	// TODO: OnPremise check
   const response = await fetch(`${baseUrl}?${params}`, {
     headers: {
       "Authorization": `Bearer ${token}`,
