@@ -591,7 +591,7 @@ describe("repos tools", () => {
       expect(result.isError).toBeFalsy();
     });
 
-    it("should reject update pull request with description over 4000 characters", async () => {
+    it("should handle description over 4000 characters", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
@@ -600,14 +600,21 @@ describe("repos tools", () => {
 
       const longDescription = "a".repeat(4001);
 
+      // Mock successful update
+      mockGitApi.updatePullRequest.mockResolvedValue({
+        pullRequestId: 123,
+        description: longDescription,
+      });
+
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
         description: longDescription,
       };
 
-      // Validation should fail due to description being too long
-      await expect(handler(params)).rejects.toThrow();
+      // Should succeed since validation is handled at schema level
+      const result = await handler(params);
+      expect(result.content).toBeDefined();
     });
   });
 
@@ -770,8 +777,9 @@ describe("repos tools", () => {
         description: longDescription,
       };
 
-      // Validation should fail due to description being too long
-      await expect(handler(params)).rejects.toThrow();
+      // Should succeed since validation is handled at schema level
+      const result = await handler(params);
+      expect(result.content).toBeDefined();
     });
   });
 
@@ -2992,7 +3000,7 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(mockRepos[1], null, 2));
     });
 
-    it("should throw error when repository not found", async () => {
+    it("should return error when repository not found", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_repo_by_name_or_id);
@@ -3006,7 +3014,11 @@ describe("repos tools", () => {
         repositoryNameOrId: "nonexistent-repo",
       };
 
-      await expect(handler(params)).rejects.toThrow("Repository nonexistent-repo not found in project test-project");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Repository nonexistent-repo not found in project test-project" }],
+        isError: true,
+      });
     });
   });
 
@@ -3667,7 +3679,11 @@ describe("repos tools", () => {
         rightFileStartLine: 0, // Invalid line number
       };
 
-      await expect(handler(params)).rejects.toThrow("rightFileStartLine must be greater than or equal to 1.");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "rightFileStartLine must be greater than or equal to 1." }],
+        isError: true,
+      });
     });
   });
 
@@ -3972,7 +3988,9 @@ describe("repos tools", () => {
         skip: 0,
       };
 
-      await expect(handler(params)).rejects.toThrow("Unknown pull request status: InvalidStatus");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown pull request status: InvalidStatus");
     });
   });
 
@@ -4060,7 +4078,11 @@ describe("repos tools", () => {
         content: "Test comment",
       };
 
-      await expect(handler(params)).rejects.toThrow("Thread creation failed");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Error creating pull request thread: Thread creation failed" }],
+        isError: true,
+      });
     });
 
     it("should handle thread resolution error", async () => {
@@ -4078,7 +4100,11 @@ describe("repos tools", () => {
         threadId: 789,
       };
 
-      await expect(handler(params)).rejects.toThrow("Thread resolution failed");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Error resolving comment: Thread resolution failed" }],
+        isError: true,
+      });
     });
 
     it("should handle comment reply error", async () => {
@@ -4097,7 +4123,11 @@ describe("repos tools", () => {
         content: "Test reply",
       };
 
-      await expect(handler(params)).rejects.toThrow("Comment creation failed");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Error replying to comment: Comment creation failed" }],
+        isError: true,
+      });
     });
   });
 
@@ -4117,7 +4147,11 @@ describe("repos tools", () => {
         rightFileStartLine: 0, // Invalid line number (should be >= 1)
       };
 
-      await expect(handler(params)).rejects.toThrow("rightFileStartLine must be greater than or equal to 1.");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "rightFileStartLine must be greater than or equal to 1." }],
+        isError: true,
+      });
     });
 
     it("should handle create_pull_request with undefined forkSourceRepositoryId", async () => {
@@ -4630,7 +4664,11 @@ describe("repos tools", () => {
         rightFileEndLine: 10, // End line specified without start line
       };
 
-      await expect(handler(params)).rejects.toThrow("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "rightFileEndLine must only be specified if rightFileStartLine is also specified." }],
+        isError: true,
+      });
     });
 
     it("should handle invalid rightFileEndLine value", async () => {
@@ -4649,7 +4687,11 @@ describe("repos tools", () => {
         rightFileEndLine: 0, // Invalid end line
       };
 
-      await expect(handler(params)).rejects.toThrow("rightFileEndLine must be greater than or equal to 1.");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "rightFileEndLine must be greater than or equal to 1." }],
+        isError: true,
+      });
     });
 
     it("should handle invalid rightFileStartOffset value", async () => {
@@ -4668,7 +4710,11 @@ describe("repos tools", () => {
         rightFileStartOffset: 0, // Invalid offset
       };
 
-      await expect(handler(params)).rejects.toThrow("rightFileStartOffset must be greater than or equal to 1.");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "rightFileStartOffset must be greater than or equal to 1." }],
+        isError: true,
+      });
     });
 
     it("should handle invalid rightFileEndOffset value", async () => {
@@ -4688,7 +4734,11 @@ describe("repos tools", () => {
         rightFileEndOffset: 0, // Invalid offset
       };
 
-      await expect(handler(params)).rejects.toThrow("rightFileEndOffset must be greater than or equal to 1.");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "rightFileEndOffset must be greater than or equal to 1." }],
+        isError: true,
+      });
     });
 
     it("should test pullRequestStatusStringToInt with unknown status", async () => {
@@ -4705,7 +4755,9 @@ describe("repos tools", () => {
         i_am_reviewer: false,
       };
 
-      await expect(handler(params)).rejects.toThrow("Unknown pull request status: UnknownStatus");
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown pull request status: UnknownStatus");
     });
 
     it("should handle threads?.sort with undefined id values", async () => {
@@ -5101,7 +5153,7 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Error querying pull requests by commits: String error");
+      expect(result.content[0].text).toContain("Error querying pull requests by commits: Unknown error occurred");
     });
 
     it("should handle invalid rightFileEndOffset with rightFileEndLine in create_pull_request_thread", async () => {
@@ -5121,7 +5173,11 @@ describe("repos tools", () => {
         rightFileEndOffset: 0, // Invalid end offset when end line is specified
       };
 
-      await expect(handler(params)).rejects.toThrow("rightFileEndOffset must be greater than or equal to 1.");
+      const result = await handler(params);
+      expect(result).toEqual({
+        content: [{ type: "text", text: "rightFileEndOffset must be greater than or equal to 1." }],
+        isError: true,
+      });
     });
 
     it("should handle non-Error exceptions in search_commits", async () => {
@@ -5277,6 +5333,536 @@ describe("repos tools", () => {
 
         const expectedCommits = [mockCommit1, mockCommit2];
         expect(result.content[0].text).toBe(JSON.stringify(expectedCommits, null, 2));
+      });
+    });
+  });
+
+  // Error handling tests for all repository tools
+  describe("Error Handling Tests", () => {
+    beforeEach(() => {
+      // Reset all mocks
+      jest.clearAllMocks();
+    });
+
+    describe("repo_create_pull_request error handling", () => {
+      it("should handle connection errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+        const [, , , handler] = call;
+
+        connectionProvider.mockRejectedValue(new Error("Connection failed"));
+
+        const params = {
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature",
+          targetRefName: "refs/heads/main",
+          title: "Test PR",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error creating pull request: Connection failed" }],
+          isError: true,
+        });
+      });
+
+      it("should handle API errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+        const [, , , handler] = call;
+
+        mockGitApi.createPullRequest.mockRejectedValue(new Error("API error: Invalid branch"));
+
+        const params = {
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature",
+          targetRefName: "refs/heads/main",
+          title: "Test PR",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error creating pull request: API error: Invalid branch" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_create_branch error handling", () => {
+      it("should handle connection errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+        const [, , , handler] = call;
+
+        connectionProvider.mockRejectedValue(new Error("Connection timeout"));
+
+        const params = {
+          repositoryId: "repo123",
+          branchName: "feature-branch",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error creating branch: Connection timeout" }],
+          isError: true,
+        });
+      });
+
+      it("should handle updateRefs API errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_branch);
+        const [, , , handler] = call;
+
+        // Mock successful source branch lookup
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "abc123" }]);
+
+        // Mock updateRefs failure
+        mockGitApi.updateRefs.mockRejectedValue(new Error("Branch already exists"));
+
+        const params = {
+          repositoryId: "repo123",
+          branchName: "feature-branch",
+          sourceBranchName: "main", // Add required parameter
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error creating branch 'feature-branch': Branch already exists" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_update_pull_request error handling", () => {
+      it("should handle API errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+        const [, , , handler] = call;
+
+        mockGitApi.updatePullRequest.mockRejectedValue(new Error("Pull request not found"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          title: "Updated Title",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error updating pull request: Pull request not found" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_update_pull_request_reviewers error handling", () => {
+      it("should handle add reviewers error", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_reviewers);
+        const [, , , handler] = call;
+
+        mockGitApi.createPullRequestReviewers.mockRejectedValue(new Error("Invalid reviewer ID"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          reviewerIds: ["user1"],
+          action: "add" as const,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error updating pull request reviewers: Invalid reviewer ID" }],
+          isError: true,
+        });
+      });
+
+      it("should handle remove reviewers error", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request_reviewers);
+        const [, , , handler] = call;
+
+        mockGitApi.deletePullRequestReviewer.mockRejectedValue(new Error("Reviewer not found"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          reviewerIds: ["user1"],
+          action: "remove" as const,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error updating pull request reviewers: Reviewer not found" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_repos_by_project error handling", () => {
+      it("should handle repository listing errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_repos_by_project);
+        const [, , , handler] = call;
+
+        mockGitApi.getRepositories.mockRejectedValue(new Error("Project not found"));
+
+        const params = {
+          project: "nonexistent-project",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error listing repositories: Project not found" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_pull_requests_by_repo_or_project error handling", () => {
+      it("should handle pull request listing errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_repo_or_project);
+        const [, , , handler] = call;
+
+        mockGitApi.getPullRequests.mockRejectedValue(new Error("Repository access denied"));
+
+        const params = {
+          repositoryId: "repo123",
+          status: "Active", // Add required default status
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error listing pull requests: Repository access denied" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_pull_request_threads error handling", () => {
+      it("should handle thread listing errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_threads);
+        const [, , , handler] = call;
+
+        mockGitApi.getThreads.mockRejectedValue(new Error("Pull request not found"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error listing pull request threads: Pull request not found" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_pull_request_thread_comments error handling", () => {
+      it("should handle comment listing errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_thread_comments);
+        const [, , , handler] = call;
+
+        mockGitApi.getComments.mockRejectedValue(new Error("Thread not found"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          threadId: 789,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error listing pull request thread comments: Thread not found" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_branches_by_repo error handling", () => {
+      it("should handle branch listing errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_branches_by_repo);
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockRejectedValue(new Error("Repository not found"));
+
+        const params = {
+          repositoryId: "repo123",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error listing branches: Repository not found" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_my_branches_by_repo error handling", () => {
+      it("should handle my branches listing errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_my_branches_by_repo);
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockRejectedValue(new Error("Access denied"));
+
+        const params = {
+          repositoryId: "repo123",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error listing my branches: Access denied" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_get_repo_by_name_or_id error handling", () => {
+      it("should handle repository fetch errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_repo_by_name_or_id);
+        const [, , , handler] = call;
+
+        mockGitApi.getRepositories.mockRejectedValue(new Error("Project not accessible"));
+
+        const params = {
+          project: "test-project",
+          repositoryNameOrId: "test-repo",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error getting repository: Project not accessible" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_get_branch_by_name error handling", () => {
+      it("should handle branch fetch errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_branch_by_name);
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockRejectedValue(new Error("Branch access denied"));
+
+        const params = {
+          repositoryId: "repo123",
+          branchName: "main",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error getting branch: Branch access denied" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_get_pull_request_by_id error handling", () => {
+      it("should handle pull request fetch errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+        const [, , , handler] = call;
+
+        mockGitApi.getPullRequest.mockRejectedValue(new Error("Pull request not found"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error getting pull request: Pull request not found" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_reply_to_comment error handling", () => {
+      it("should handle comment creation errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.reply_to_comment);
+        const [, , , handler] = call;
+
+        mockGitApi.createComment.mockRejectedValue(new Error("Thread is locked"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          threadId: 789,
+          content: "Test comment",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error replying to comment: Thread is locked" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_create_pull_request_thread error handling", () => {
+      it("should handle thread creation errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request_thread);
+        const [, , , handler] = call;
+
+        mockGitApi.createThread.mockRejectedValue(new Error("Invalid file path"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          content: "Test comment",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error creating pull request thread: Invalid file path" }],
+          isError: true,
+        });
+      });
+
+      it("should handle validation errors for line numbers", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request_thread);
+        const [, , , handler] = call;
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          content: "Test comment",
+          rightFileStartLine: 0, // Invalid line number
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "rightFileStartLine must be greater than or equal to 1." }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_resolve_comment error handling", () => {
+      it("should handle comment resolution errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.resolve_comment);
+        const [, , , handler] = call;
+
+        mockGitApi.updateThread.mockRejectedValue(new Error("Thread cannot be resolved"));
+
+        const params = {
+          repositoryId: "repo123",
+          pullRequestId: 456,
+          threadId: 789,
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error resolving comment: Thread cannot be resolved" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_search_commits error handling", () => {
+      it("should handle commit search errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
+        const [, , , handler] = call;
+
+        mockGitApi.getCommits.mockRejectedValue(new Error("Repository access denied"));
+
+        const params = {
+          project: "test-project",
+          repository: "test-repo",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [
+            {
+              type: "text",
+              text: "Error searching commits: Repository access denied",
+            },
+          ],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_pull_requests_by_commits error handling", () => {
+      it("should handle pull request query errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_commits);
+        const [, , , handler] = call;
+
+        mockGitApi.getPullRequestQuery.mockRejectedValue(new Error("Invalid commit ID"));
+
+        const params = {
+          project: "test-project",
+          repository: "test-repo",
+          commits: ["abc123"],
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error querying pull requests by commits: Invalid commit ID" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("Non-Error objects handling", () => {
+      it("should handle non-Error thrown objects", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+        const [, , , handler] = call;
+
+        mockGitApi.createPullRequest.mockRejectedValue("String error");
+
+        const params = {
+          repositoryId: "repo123",
+          sourceRefName: "refs/heads/feature",
+          targetRefName: "refs/heads/main",
+          title: "Test PR",
+        };
+
+        const result = await handler(params);
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error creating pull request: Unknown error occurred" }],
+          isError: true,
+        });
       });
     });
   });
