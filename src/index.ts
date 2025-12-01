@@ -118,38 +118,62 @@ async function main() {
 	configureAllTools(server, authenticator, connectionProvider, () => userAgentComposer.userAgent, enabledDomains);
 
 	// TESTING CONNECTION TO DevOps API
-	await testApi(connectionProvider);
+	// await testApi(connectionProvider, authenticator);
 
 	const transport = new StdioServerTransport();
 	await server.connect(transport);
 }
 
-async function testApi(connectionProvider: () => Promise<WebApi>) {
-	const connection = await connectionProvider();
-	const coreApi = await connection.getCoreApi();
-	const teams = await coreApi.getTeams("WEM");
+// async function testApi(connectionProvider: () => Promise<WebApi>, tokenProvider: () => Promise<string>) {
+// 	const connection = await connectionProvider();
+// 	const coreApi = await connection.getCoreApi();
+// 	const workItemApi = await connection.getWorkItemTrackingApi();
 
-	if (!teams) {
-		logger.info("No teams found");
-	}
-	else {
-		logger.info(`Teams: ${JSON.stringify(teams, null, 2)}`);
-	}
+// 	const accessToken = await tokenProvider();
 
-	// test work items API
-	const workItemApi = await connection.getWorkItemTrackingApi();
-	const workItems = await workItemApi.getWorkItems([71124, 67900]);
+// 	const baseUrl = connection.serverUrl.replace(/\/$/, "");
+// 	const isOnPrem = process.env["ADO_MCP_MODE"] === "onprem";
+// 	const url = isOnPrem
+// 		? `${baseUrl}/${orgName}/_apis/search/workitemsearchresults?api-version=6.0-preview`
+// 		: `https://almsearch.dev.azure.com/${orgName}/_apis/search/workitemsearchresults?api-version=6.0`;
 
-	if (!workItems) {
-		logger.info("No work items found");
-	}
-	else {
-		logger.info(`Work Items: ${JSON.stringify(workItems, null, 2)}`);
-	}
+// 	const searchText = "Antonio";
+// 	const includeFacets = false;
+// 	const requestBody: Record<string, unknown> = {
+// 		searchText,
+// 		includeFacets,
+// 		$skip: 0,
+// 		$top: 10,
+// 	};
 
- 
+// 	const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] === "basic";
+// 	const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+// 	const response = await fetch(url, {
+// 		method: "POST",
+// 		headers: {
+// 			"Content-Type": "application/json",
+// 			"Authorization": authHeader,
+// 			"User-Agent": "AzureDevOps.MCP TestApi",
+// 		},
+// 		body: JSON.stringify(requestBody),
+// 	});
 
-}
+// 	if (!response.ok) {
+// 		const errorBody = await response.text();
+// 		logger.error("Azure DevOps Work Item Search API error", {
+// 			status: response.status,
+// 			statusText: response.statusText,
+// 			url,
+// 			requestBody,
+// 			responseBody: errorBody,
+// 		});
+// 		throw new Error(`Azure DevOps Work Item Search API error: ${response.status} ${response.statusText}`);
+// 	}
+
+// 	const result = await response.text();
+// 	logger.info("Test API Work Item Search result:", result);						
+
+// }
 
 main().catch((error) => {
 	logger.error("Fatal error in main():", error);

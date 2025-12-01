@@ -1,9 +1,9 @@
 {
   "name": "@azure-devops-op/mcp",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "MCP server for interacting with Azure DevOps (on-premises)",
   "license": "MIT",
-  "author": "Microsoft Corporation",
+  "author": "Microsoft Corporation, WEB Marketing d.o.o. Fork",
   "homepage": "https://github.com/microsoft/azure-devops-mcp",
   "bugs": "https://github.com/microsoft/azure-devops-mcp/issues",
   "repository": {

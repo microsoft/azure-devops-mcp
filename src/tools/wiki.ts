@@ -153,8 +153,8 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const url = `${baseUrl}/${project}/_apis/wiki/wikis/${wikiIdentifier}/pages?${params.toString()}`;
 
-			const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-			const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
         const response = await fetch(url, {
           headers: {
