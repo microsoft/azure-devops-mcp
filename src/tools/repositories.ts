@@ -43,6 +43,7 @@ const REPO_TOOLS = {
   update_pull_request_reviewers: "repo_update_pull_request_reviewers",
   reply_to_comment: "repo_reply_to_comment",
   create_pull_request_thread: "repo_create_pull_request_thread",
+  update_pull_request_thread: "repo_update_pull_request_thread",
   resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
@@ -1103,6 +1104,61 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         return {
           content: [{ type: "text", text: `Error creating pull request thread: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.update_pull_request_thread,
+    "Updates an existing comment thread on a pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
+      threadId: z.number().describe("The ID of the thread to update."),
+      project: z.string().optional().describe("Project ID or project name (optional)"),
+      status: z
+        .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
+        .optional()
+        .describe("The new status for the comment thread."),
+    },
+    async ({ repositoryId, pullRequestId, threadId, project, status }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const updateRequest: Record<string, unknown> = {};
+
+        if (status !== undefined) {
+          updateRequest.status = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
+        }
+
+        if (Object.keys(updateRequest).length === 0) {
+          return {
+            content: [{ type: "text", text: "Error: At least one field (status) must be provided for update." }],
+            isError: true,
+          };
+        }
+
+        const thread = await gitApi.updateThread(updateRequest, repositoryId, pullRequestId, threadId, project);
+
+        if (!thread) {
+          return {
+            content: [{ type: "text", text: `Error: Failed to update thread ${threadId}. The thread was not updated successfully.` }],
+            isError: true,
+          };
+        }
+
+        const trimmedThread = trimPullRequestThread(thread);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error updating pull request thread: ${errorMessage}` }],
           isError: true,
         };
       }

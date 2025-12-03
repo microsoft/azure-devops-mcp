@@ -37,6 +37,7 @@
 | Repositories      | [mcp_ado_repo_list_pull_request_threads](#mcp_ado_repo_list_pull_request_threads)                         | List comment threads on a pull request                   |
 | Repositories      | [mcp_ado_repo_list_pull_request_thread_comments](#mcp_ado_repo_list_pull_request_thread_comments)         | List comments in a specific thread                       |
 | Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request            |
+| Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
 | Repositories      | [mcp_ado_repo_resolve_comment](#mcp_ado_repo_resolve_comment)                                             | Mark a comment thread as resolved                        |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
@@ -323,6 +324,13 @@ Creates a new comment thread on a pull request.
 
 - **Required**: `repositoryId`, `pullRequestId`, `content`
 - **Optional**: `filePath`, `project`, `rightFileEndLine`, `rightFileEndOffset`, `rightFileStartLine`, `rightFileStartOffset`, `status`
+
+### mcp_ado_repo_update_pull_request_thread
+
+Updates an existing comment thread on a pull request.
+
+- **Required**: `repositoryId`, `pullRequestId`, `threadId`
+- **Optional**: `project`, `status`
 
 ### mcp_ado_repo_reply_to_comment
 
