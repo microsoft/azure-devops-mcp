@@ -149,39 +149,48 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
     },
     async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
 
-      const forkSource: GitForkRef | undefined = forkSourceRepositoryId
-        ? {
-            repository: {
-              id: forkSourceRepositoryId,
-            },
-          }
-        : undefined;
+        const forkSource: GitForkRef | undefined = forkSourceRepositoryId
+          ? {
+              repository: {
+                id: forkSourceRepositoryId,
+              },
+            }
+          : undefined;
 
-      const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
+        const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
-      const pullRequest = await gitApi.createPullRequest(
-        {
-          sourceRefName,
-          targetRefName,
-          title,
-          description,
-          isDraft,
-          workItemRefs: workItemRefs,
-          forkSource,
-          labels: labelDefinitions,
-        },
-        repositoryId
-      );
+        const pullRequest = await gitApi.createPullRequest(
+          {
+            sourceRefName,
+            targetRefName,
+            title,
+            description,
+            isDraft,
+            workItemRefs: workItemRefs,
+            forkSource,
+            labels: labelDefinitions,
+          },
+          repositoryId
+        );
 
-      const trimmedPullRequest = trimPullRequest(pullRequest, true);
+        const trimmedPullRequest = trimPullRequest(pullRequest, true);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error creating pull request: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -195,83 +204,92 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       sourceCommitId: z.string().optional().describe("The commit ID to create the branch from. If not provided, uses the latest commit of the source branch."),
     },
     async ({ repositoryId, branchName, sourceBranchName, sourceCommitId }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      let commitId = sourceCommitId;
+        let commitId = sourceCommitId;
 
-      // If no commit ID is provided, get the latest commit from the source branch
-      if (!commitId) {
-        const sourceRefName = `refs/heads/${sourceBranchName}`;
-        try {
-          const sourceBranch = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, sourceBranchName);
-          const branch = sourceBranch.find((b) => b.name === sourceRefName);
-          if (!branch || !branch.objectId) {
+        // If no commit ID is provided, get the latest commit from the source branch
+        if (!commitId) {
+          const sourceRefName = `refs/heads/${sourceBranchName}`;
+          try {
+            const sourceBranch = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, sourceBranchName);
+            const branch = sourceBranch.find((b) => b.name === sourceRefName);
+            if (!branch || !branch.objectId) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Error: Source branch '${sourceBranchName}' not found in repository ${repositoryId}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            commitId = branch.objectId;
+          } catch (error) {
             return {
               content: [
                 {
                   type: "text",
-                  text: `Error: Source branch '${sourceBranchName}' not found in repository ${repositoryId}`,
+                  text: `Error retrieving source branch '${sourceBranchName}': ${error instanceof Error ? error.message : String(error)}`,
                 },
               ],
               isError: true,
             };
           }
-          commitId = branch.objectId;
+        }
+
+        // Create the new branch using updateRefs
+        const newRefName = `refs/heads/${branchName}`;
+        const refUpdate = {
+          name: newRefName,
+          newObjectId: commitId,
+          oldObjectId: "0000000000000000000000000000000000000000", // All zeros indicates creating a new ref
+        };
+
+        try {
+          const result = await gitApi.updateRefs([refUpdate], repositoryId);
+
+          // Check if the branch creation was successful
+          if (result && result.length > 0 && result[0].success) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Branch '${branchName}' created successfully from '${sourceBranchName}' (${commitId})`,
+                },
+              ],
+            };
+          } else {
+            const errorMessage = result && result.length > 0 && result[0].customMessage ? result[0].customMessage : "Unknown error occurred during branch creation";
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error creating branch '${branchName}': ${errorMessage}`,
+                },
+              ],
+              isError: true,
+            };
+          }
         } catch (error) {
           return {
             content: [
               {
                 type: "text",
-                text: `Error retrieving source branch '${sourceBranchName}': ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
-
-      // Create the new branch using updateRefs
-      const newRefName = `refs/heads/${branchName}`;
-      const refUpdate = {
-        name: newRefName,
-        newObjectId: commitId,
-        oldObjectId: "0000000000000000000000000000000000000000", // All zeros indicates creating a new ref
-      };
-
-      try {
-        const result = await gitApi.updateRefs([refUpdate], repositoryId);
-
-        // Check if the branch creation was successful
-        if (result && result.length > 0 && result[0].success) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Branch '${branchName}' created successfully from '${sourceBranchName}' (${commitId})`,
-              },
-            ],
-          };
-        } else {
-          const errorMessage = result && result.length > 0 && result[0].customMessage ? result[0].customMessage : "Unknown error occurred during branch creation";
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error creating branch '${branchName}': ${errorMessage}`,
+                text: `Error creating branch '${branchName}': ${error instanceof Error ? error.message : String(error)}`,
               },
             ],
             isError: true,
           };
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
         return {
-          content: [
-            {
-              type: "text",
-              text: `Error creating branch '${branchName}': ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
+          content: [{ type: "text", text: `Error creating branch: ${errorMessage}` }],
           isError: true,
         };
       }
@@ -299,61 +317,70 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
     },
     async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      // Build update object with only provided fields
-      const updateRequest: Record<string, unknown> = {};
+        // Build update object with only provided fields
+        const updateRequest: Record<string, unknown> = {};
 
-      if (title !== undefined) updateRequest.title = title;
-      if (description !== undefined) updateRequest.description = description;
-      if (isDraft !== undefined) updateRequest.isDraft = isDraft;
-      if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
-      if (status !== undefined) {
-        updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
-      }
-
-      if (autoComplete !== undefined) {
-        if (autoComplete) {
-          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-          const autoCompleteUserId = data.authenticatedUser.id;
-          updateRequest.autoCompleteSetBy = { id: autoCompleteUserId };
-
-          const completionOptions: GitPullRequestCompletionOptions = {
-            deleteSourceBranch: deleteSourceBranch || false,
-            transitionWorkItems: transitionWorkItems !== false, // Default to true unless explicitly set to false
-            bypassPolicy: !!bypassReason, // Automatically set to true if bypassReason is provided
-          };
-
-          if (mergeStrategy) {
-            completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
-          }
-
-          if (bypassReason) {
-            completionOptions.bypassReason = bypassReason;
-          }
-
-          updateRequest.completionOptions = completionOptions;
-        } else {
-          updateRequest.autoCompleteSetBy = null;
-          updateRequest.completionOptions = null;
+        if (title !== undefined) updateRequest.title = title;
+        if (description !== undefined) updateRequest.description = description;
+        if (isDraft !== undefined) updateRequest.isDraft = isDraft;
+        if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
+        if (status !== undefined) {
+          updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
         }
-      }
 
-      // Validate that at least one field is provided for update
-      if (Object.keys(updateRequest).length === 0) {
+        if (autoComplete !== undefined) {
+          if (autoComplete) {
+            const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+            const autoCompleteUserId = data.authenticatedUser.id;
+            updateRequest.autoCompleteSetBy = { id: autoCompleteUserId };
+
+            const completionOptions: GitPullRequestCompletionOptions = {
+              deleteSourceBranch: deleteSourceBranch || false,
+              transitionWorkItems: transitionWorkItems !== false, // Default to true unless explicitly set to false
+              bypassPolicy: !!bypassReason, // Automatically set to true if bypassReason is provided
+            };
+
+            if (mergeStrategy) {
+              completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
+            }
+
+            if (bypassReason) {
+              completionOptions.bypassReason = bypassReason;
+            }
+
+            updateRequest.completionOptions = completionOptions;
+          } else {
+            updateRequest.autoCompleteSetBy = null;
+            updateRequest.completionOptions = null;
+          }
+        }
+
+        // Validate that at least one field is provided for update
+        if (Object.keys(updateRequest).length === 0) {
+          return {
+            content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update." }],
+            isError: true,
+          };
+        }
+
+        const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+        const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
+
         return {
-          content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update." }],
+          content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error updating pull request: ${errorMessage}` }],
           isError: true,
         };
       }
-
-      const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
-      const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
-      };
     }
   );
 
@@ -367,36 +394,45 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       action: z.enum(["add", "remove"]).describe("Action to perform on the reviewers. Can be 'add' or 'remove'."),
     },
     async ({ repositoryId, pullRequestId, reviewerIds, action }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      let updatedPullRequest;
-      if (action === "add") {
-        updatedPullRequest = await gitApi.createPullRequestReviewers(
-          reviewerIds.map((id) => ({ id: id })),
-          repositoryId,
-          pullRequestId
-        );
+        let updatedPullRequest;
+        if (action === "add") {
+          updatedPullRequest = await gitApi.createPullRequestReviewers(
+            reviewerIds.map((id) => ({ id: id })),
+            repositoryId,
+            pullRequestId
+          );
 
-        const trimmedResponse = updatedPullRequest.map((item) => ({
-          displayName: item.displayName,
-          id: item.id,
-          uniqueName: item.uniqueName,
-          vote: item.vote,
-          hasDeclined: item.hasDeclined,
-          isFlagged: item.isFlagged,
-        }));
+          const trimmedResponse = updatedPullRequest.map((item) => ({
+            displayName: item.displayName,
+            id: item.id,
+            uniqueName: item.uniqueName,
+            vote: item.vote,
+            hasDeclined: item.hasDeclined,
+            isFlagged: item.isFlagged,
+          }));
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }],
-        };
-      } else {
-        for (const reviewerId of reviewerIds) {
-          await gitApi.deletePullRequestReviewer(repositoryId, pullRequestId, reviewerId);
+          return {
+            content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }],
+          };
+        } else {
+          for (const reviewerId of reviewerIds) {
+            await gitApi.deletePullRequestReviewer(repositoryId, pullRequestId, reviewerId);
+          }
+
+          return {
+            content: [{ type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` }],
+          };
         }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
         return {
-          content: [{ type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` }],
+          content: [{ type: "text", text: `Error updating pull request reviewers: ${errorMessage}` }],
+          isError: true,
         };
       }
     }
@@ -412,28 +448,37 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."),
     },
     async ({ project, top, skip, repoNameFilter }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const repositories = await gitApi.getRepositories(project, false, false, false);
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const repositories = await gitApi.getRepositories(project, false, false, false);
 
-      const filteredRepositories = repoNameFilter ? filterReposByName(repositories, repoNameFilter) : repositories;
+        const filteredRepositories = repoNameFilter ? filterReposByName(repositories, repoNameFilter) : repositories;
 
-      const paginatedRepositories = filteredRepositories?.sort((a, b) => a.name?.localeCompare(b.name ?? "") ?? 0).slice(skip, skip + top);
+        const paginatedRepositories = filteredRepositories?.sort((a, b) => a.name?.localeCompare(b.name ?? "") ?? 0).slice(skip, skip + top);
 
-      // Filter out the irrelevant properties
-      const trimmedRepositories = paginatedRepositories?.map((repo) => ({
-        id: repo.id,
-        name: repo.name,
-        isDisabled: repo.isDisabled,
-        isFork: repo.isFork,
-        isInMaintenance: repo.isInMaintenance,
-        webUrl: repo.webUrl,
-        size: repo.size,
-      }));
+        // Filter out the irrelevant properties
+        const trimmedRepositories = paginatedRepositories?.map((repo) => ({
+          id: repo.id,
+          name: repo.name,
+          isDisabled: repo.isDisabled,
+          isFork: repo.isFork,
+          isInMaintenance: repo.isInMaintenance,
+          webUrl: repo.webUrl,
+          size: repo.size,
+        }));
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(trimmedRepositories, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(trimmedRepositories, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error listing repositories: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -460,124 +505,133 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
     },
     async ({ repositoryId, project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      // Build the search criteria
-      const searchCriteria: {
-        status: number;
-        repositoryId?: string;
-        creatorId?: string;
-        reviewerId?: string;
-        sourceRefName?: string;
-        targetRefName?: string;
-      } = {
-        status: pullRequestStatusStringToInt(status),
-      };
-
-      if (!repositoryId && !project) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Either repositoryId or project must be provided.",
-            },
-          ],
-          isError: true,
+        // Build the search criteria
+        const searchCriteria: {
+          status: number;
+          repositoryId?: string;
+          creatorId?: string;
+          reviewerId?: string;
+          sourceRefName?: string;
+          targetRefName?: string;
+        } = {
+          status: pullRequestStatusStringToInt(status),
         };
-      }
 
-      if (repositoryId) {
-        searchCriteria.repositoryId = repositoryId;
-      }
+        if (!repositoryId && !project) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Either repositoryId or project must be provided.",
+              },
+            ],
+            isError: true,
+          };
+        }
 
-      if (sourceRefName) {
-        searchCriteria.sourceRefName = sourceRefName;
-      }
+        if (repositoryId) {
+          searchCriteria.repositoryId = repositoryId;
+        }
 
-      if (targetRefName) {
-        searchCriteria.targetRefName = targetRefName;
-      }
+        if (sourceRefName) {
+          searchCriteria.sourceRefName = sourceRefName;
+        }
 
-      if (created_by_user) {
-        try {
-          const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
+        if (targetRefName) {
+          searchCriteria.targetRefName = targetRefName;
+        }
+
+        if (created_by_user) {
+          try {
+            const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
+            searchCriteria.creatorId = userId;
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error finding user with email ${created_by_user}: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        } else if (created_by_me) {
+          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const userId = data.authenticatedUser.id;
           searchCriteria.creatorId = userId;
-        } catch (error) {
+        }
+
+        if (user_is_reviewer) {
+          try {
+            const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+            searchCriteria.reviewerId = reviewerUserId;
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error finding reviewer with email ${user_is_reviewer}: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        } else if (i_am_reviewer) {
+          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const userId = data.authenticatedUser.id;
+          searchCriteria.reviewerId = userId;
+        }
+
+        let pullRequests;
+        if (repositoryId) {
+          pullRequests = await gitApi.getPullRequests(
+            repositoryId,
+            searchCriteria,
+            project, // project
+            undefined, // maxCommentLength
+            skip,
+            top
+          );
+        } else if (project) {
+          // If only project is provided, use getPullRequestsByProject
+          pullRequests = await gitApi.getPullRequestsByProject(
+            project,
+            searchCriteria,
+            undefined, // maxCommentLength
+            skip,
+            top
+          );
+        } else {
+          // This case should not occur due to earlier validation, but added for completeness
           return {
             content: [
               {
                 type: "text",
-                text: `Error finding user with email ${created_by_user}: ${error instanceof Error ? error.message : String(error)}`,
+                text: "Either repositoryId or project must be provided.",
               },
             ],
             isError: true,
           };
         }
-      } else if (created_by_me) {
-        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-        const userId = data.authenticatedUser.id;
-        searchCriteria.creatorId = userId;
-      }
 
-      if (user_is_reviewer) {
-        try {
-          const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
-          searchCriteria.reviewerId = reviewerUserId;
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error finding reviewer with email ${user_is_reviewer}: ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      } else if (i_am_reviewer) {
-        const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-        const userId = data.authenticatedUser.id;
-        searchCriteria.reviewerId = userId;
-      }
+        const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
 
-      let pullRequests;
-      if (repositoryId) {
-        pullRequests = await gitApi.getPullRequests(
-          repositoryId,
-          searchCriteria,
-          project, // project
-          undefined, // maxCommentLength
-          skip,
-          top
-        );
-      } else if (project) {
-        // If only project is provided, use getPullRequestsByProject
-        pullRequests = await gitApi.getPullRequestsByProject(
-          project,
-          searchCriteria,
-          undefined, // maxCommentLength
-          skip,
-          top
-        );
-      } else {
-        // This case should not occur due to earlier validation, but added for completeness
         return {
-          content: [
-            {
-              type: "text",
-              text: "Either repositoryId or project must be provided.",
-            },
-          ],
+          content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error listing pull requests: ${errorMessage}` }],
           isError: true,
         };
       }
-
-      const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
-      };
     }
   );
 
@@ -601,47 +655,56 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       authorDisplayName: z.string().optional().describe("Filter threads by the display name of the thread author (first comment author). Case-insensitive partial matching."),
     },
     async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
+        const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
 
-      let filteredThreads = threads;
+        let filteredThreads = threads;
 
-      if (status !== undefined) {
-        const statusValue = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
-        filteredThreads = filteredThreads?.filter((thread) => thread.status === statusValue);
-      }
+        if (status !== undefined) {
+          const statusValue = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
+          filteredThreads = filteredThreads?.filter((thread) => thread.status === statusValue);
+        }
 
-      if (authorEmail !== undefined) {
-        filteredThreads = filteredThreads?.filter((thread) => {
-          const firstComment = thread.comments?.[0];
-          return firstComment?.author?.uniqueName?.toLowerCase() === authorEmail.toLowerCase();
-        });
-      }
+        if (authorEmail !== undefined) {
+          filteredThreads = filteredThreads?.filter((thread) => {
+            const firstComment = thread.comments?.[0];
+            return firstComment?.author?.uniqueName?.toLowerCase() === authorEmail.toLowerCase();
+          });
+        }
 
-      if (authorDisplayName !== undefined) {
-        const lowerAuthorName = authorDisplayName.toLowerCase();
-        filteredThreads = filteredThreads?.filter((thread) => {
-          const firstComment = thread.comments?.[0];
-          return firstComment?.author?.displayName?.toLowerCase().includes(lowerAuthorName);
-        });
-      }
+        if (authorDisplayName !== undefined) {
+          const lowerAuthorName = authorDisplayName.toLowerCase();
+          filteredThreads = filteredThreads?.filter((thread) => {
+            const firstComment = thread.comments?.[0];
+            return firstComment?.author?.displayName?.toLowerCase().includes(lowerAuthorName);
+          });
+        }
 
-      const paginatedThreads = filteredThreads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
+        const paginatedThreads = filteredThreads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
-      if (fullResponse) {
+        if (fullResponse) {
+          return {
+            content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
+          };
+        }
+
+        // Return trimmed thread data focusing on essential information
+        const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
+
         return {
-          content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error listing pull request threads: ${errorMessage}` }],
+          isError: true,
         };
       }
-
-      // Return trimmed thread data focusing on essential information
-      const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
-      };
     }
   );
 
@@ -658,26 +721,35 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of trimmed data."),
     },
     async ({ repositoryId, pullRequestId, threadId, project, top, skip, fullResponse }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      // Get thread comments - GitApi uses getComments for retrieving comments from a specific thread
-      const comments = await gitApi.getComments(repositoryId, pullRequestId, threadId, project);
+        // Get thread comments - GitApi uses getComments for retrieving comments from a specific thread
+        const comments = await gitApi.getComments(repositoryId, pullRequestId, threadId, project);
 
-      const paginatedComments = comments?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
+        const paginatedComments = comments?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
-      if (fullResponse) {
+        if (fullResponse) {
+          return {
+            content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
+          };
+        }
+
+        // Return trimmed comment data focusing on essential information
+        const trimmedComments = trimComments(paginatedComments);
+
         return {
-          content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(trimmedComments, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error listing pull request thread comments: ${errorMessage}` }],
+          isError: true,
         };
       }
-
-      // Return trimmed comment data focusing on essential information
-      const trimmedComments = trimComments(paginatedComments);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(trimmedComments, null, 2) }],
-      };
     }
   );
 
@@ -690,15 +762,24 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
     async ({ repositoryId, top, filterContains }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, undefined, undefined, undefined, filterContains);
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, undefined, undefined, undefined, filterContains);
 
-      const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
+        const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error listing branches: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -711,15 +792,24 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
     async ({ repositoryId, top, filterContains }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, true, undefined, undefined, filterContains);
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, true, undefined, undefined, filterContains);
 
-      const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
+        const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
-      };
+        return {
+          content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error listing my branches: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -731,19 +821,31 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryNameOrId: z.string().describe("Repository name or ID."),
     },
     async ({ project, repositoryNameOrId }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const repositories = await gitApi.getRepositories(project);
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const repositories = await gitApi.getRepositories(project);
 
-      const repository = repositories?.find((repo) => repo.name === repositoryNameOrId || repo.id === repositoryNameOrId);
+        const repository = repositories?.find((repo) => repo.name === repositoryNameOrId || repo.id === repositoryNameOrId);
 
-      if (!repository) {
-        throw new Error(`Repository ${repositoryNameOrId} not found in project ${project}`);
+        if (!repository) {
+          return {
+            content: [{ type: "text", text: `Repository ${repositoryNameOrId} not found in project ${project}` }],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(repository, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting repository: ${errorMessage}` }],
+          isError: true,
+        };
       }
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(repository, null, 2) }],
-      };
     }
   );
 
@@ -755,24 +857,33 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
     },
     async ({ repositoryId, branchName }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, branchName);
-      const branch = branches.find((branch) => branch.name === `refs/heads/${branchName}` || branch.name === branchName);
-      if (!branch) {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, branchName);
+        const branch = branches.find((branch) => branch.name === `refs/heads/${branchName}` || branch.name === branchName);
+        if (!branch) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Branch ${branchName} not found in repository ${repositoryId}`,
+              },
+            ],
+            isError: true,
+          };
+        }
         return {
-          content: [
-            {
-              type: "text",
-              text: `Branch ${branchName} not found in repository ${repositoryId}`,
-            },
-          ],
+          content: [{ type: "text", text: JSON.stringify(branch, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting branch: ${errorMessage}` }],
           isError: true,
         };
       }
-      return {
-        content: [{ type: "text", text: JSON.stringify(branch, null, 2) }],
-      };
     }
   );
 
@@ -783,14 +894,57 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
+      includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
     },
-    async ({ repositoryId, pullRequestId, includeWorkItemRefs }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, undefined, undefined, undefined, undefined, undefined, includeWorkItemRefs);
-      return {
-        content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
-      };
+    async ({ repositoryId, pullRequestId, includeWorkItemRefs, includeLabels }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, undefined, undefined, undefined, undefined, undefined, includeWorkItemRefs);
+
+        if (includeLabels) {
+          try {
+            const projectId = pullRequest.repository?.project?.id;
+            const projectName = pullRequest.repository?.project?.name;
+            const labels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId, projectName, projectId);
+
+            const labelNames = labels.map((label) => label.name).filter((name) => name !== undefined);
+
+            const enhancedResponse = {
+              ...pullRequest,
+              labelSummary: {
+                labels: labelNames,
+                labelCount: labelNames.length,
+              },
+            };
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+            };
+          } catch (error) {
+            console.warn(`Error fetching PR labels: ${error instanceof Error ? error.message : "Unknown error"}`);
+            // Fall back to the original response without labels
+            const enhancedResponse = {
+              ...pullRequest,
+              labelSummary: {},
+            };
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+            };
+          }
+        }
+        return {
+          content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting pull request: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 
@@ -806,27 +960,36 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of a simple confirmation message."),
     },
     async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
 
-      // Check if the comment was successfully created
-      if (!comment) {
+        // Check if the comment was successfully created
+        if (!comment) {
+          return {
+            content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }],
+            isError: true,
+          };
+        }
+
+        if (fullResponse) {
+          return {
+            content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
+          };
+        }
+
         return {
-          content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }],
+          content: [{ type: "text", text: `Comment successfully added to thread ${threadId}.` }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error replying to comment: ${errorMessage}` }],
           isError: true,
         };
       }
-
-      if (fullResponse) {
-        return {
-          content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
-        };
-      }
-
-      return {
-        content: [{ type: "text", text: `Comment successfully added to thread ${threadId}.` }],
-      };
     }
   );
 
@@ -865,60 +1028,84 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         ),
     },
     async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      const normalizedFilePath = filePath && !filePath.startsWith("/") ? `/${filePath}` : filePath;
-      const threadContext: CommentThreadContext = { filePath: normalizedFilePath };
+        const normalizedFilePath = filePath && !filePath.startsWith("/") ? `/${filePath}` : filePath;
+        const threadContext: CommentThreadContext = { filePath: normalizedFilePath };
 
-      if (rightFileStartLine !== undefined) {
-        if (rightFileStartLine < 1) {
-          throw new Error("rightFileStartLine must be greater than or equal to 1.");
-        }
-
-        threadContext.rightFileStart = { line: rightFileStartLine };
-
-        if (rightFileStartOffset !== undefined) {
-          if (rightFileStartOffset < 1) {
-            throw new Error("rightFileStartOffset must be greater than or equal to 1.");
+        if (rightFileStartLine !== undefined) {
+          if (rightFileStartLine < 1) {
+            return {
+              content: [{ type: "text", text: "rightFileStartLine must be greater than or equal to 1." }],
+              isError: true,
+            };
           }
 
-          threadContext.rightFileStart.offset = rightFileStartOffset;
+          threadContext.rightFileStart = { line: rightFileStartLine };
+
+          if (rightFileStartOffset !== undefined) {
+            if (rightFileStartOffset < 1) {
+              return {
+                content: [{ type: "text", text: "rightFileStartOffset must be greater than or equal to 1." }],
+                isError: true,
+              };
+            }
+
+            threadContext.rightFileStart.offset = rightFileStartOffset;
+          }
         }
-      }
 
-      if (rightFileEndLine !== undefined) {
-        if (rightFileStartLine === undefined) {
-          throw new Error("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
-        }
-
-        if (rightFileEndLine < 1) {
-          throw new Error("rightFileEndLine must be greater than or equal to 1.");
-        }
-
-        threadContext.rightFileEnd = { line: rightFileEndLine };
-
-        if (rightFileEndOffset !== undefined) {
-          if (rightFileEndOffset < 1) {
-            throw new Error("rightFileEndOffset must be greater than or equal to 1.");
+        if (rightFileEndLine !== undefined) {
+          if (rightFileStartLine === undefined) {
+            return {
+              content: [{ type: "text", text: "rightFileEndLine must only be specified if rightFileStartLine is also specified." }],
+              isError: true,
+            };
           }
 
-          threadContext.rightFileEnd.offset = rightFileEndOffset;
+          if (rightFileEndLine < 1) {
+            return {
+              content: [{ type: "text", text: "rightFileEndLine must be greater than or equal to 1." }],
+              isError: true,
+            };
+          }
+
+          threadContext.rightFileEnd = { line: rightFileEndLine };
+
+          if (rightFileEndOffset !== undefined) {
+            if (rightFileEndOffset < 1) {
+              return {
+                content: [{ type: "text", text: "rightFileEndOffset must be greater than or equal to 1." }],
+                isError: true,
+              };
+            }
+
+            threadContext.rightFileEnd.offset = rightFileEndOffset;
+          }
         }
+
+        const thread = await gitApi.createThread(
+          { comments: [{ content: content }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
+          repositoryId,
+          pullRequestId,
+          project
+        );
+
+        const trimmedThread = trimPullRequestThread(thread);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error creating pull request thread: ${errorMessage}` }],
+          isError: true,
+        };
       }
-
-      const thread = await gitApi.createThread(
-        { comments: [{ content: content }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
-        repositoryId,
-        pullRequestId,
-        project
-      );
-
-      const trimmedThread = trimPullRequestThread(thread);
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
-      };
     }
   );
 
@@ -932,32 +1119,41 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of a simple confirmation message."),
     },
     async ({ repositoryId, pullRequestId, threadId, fullResponse }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      const thread = await gitApi.updateThread(
-        { status: 2 }, // 2 corresponds to "Resolved" status
-        repositoryId,
-        pullRequestId,
-        threadId
-      );
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const thread = await gitApi.updateThread(
+          { status: 2 }, // 2 corresponds to "Resolved" status
+          repositoryId,
+          pullRequestId,
+          threadId
+        );
 
-      // Check if the thread was successfully resolved
-      if (!thread) {
+        // Check if the thread was successfully resolved
+        if (!thread) {
+          return {
+            content: [{ type: "text", text: `Error: Failed to resolve thread ${threadId}. The thread status was not updated successfully.` }],
+            isError: true,
+          };
+        }
+
+        if (fullResponse) {
+          return {
+            content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
+          };
+        }
+
         return {
-          content: [{ type: "text", text: `Error: Failed to resolve thread ${threadId}. The thread status was not updated successfully.` }],
+          content: [{ type: "text", text: `Thread ${threadId} was successfully resolved.` }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error resolving comment: ${errorMessage}` }],
           isError: true,
         };
       }
-
-      if (fullResponse) {
-        return {
-          content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
-        };
-      }
-
-      return {
-        content: [{ type: "text", text: `Thread ${threadId} was successfully resolved.` }],
-      };
     }
   );
 
@@ -1083,7 +1279,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         if (historySimplificationMode) {
           // Note: This parameter might not be directly supported by all ADO API versions
           // but we'll include it in the criteria for forward compatibility
-          (searchCriteria as any).historySimplificationMode = historySimplificationMode;
+          const extendedCriteria = searchCriteria as GitQueryCommitsCriteria & { historySimplificationMode?: string };
+          extendedCriteria.historySimplificationMode = historySimplificationMode;
         }
 
         if (version) {
@@ -1173,13 +1370,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
         };
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
         return {
-          content: [
-            {
-              type: "text",
-              text: `Error querying pull requests by commits: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
+          content: [{ type: "text", text: `Error querying pull requests by commits: ${errorMessage}` }],
           isError: true,
         };
       }

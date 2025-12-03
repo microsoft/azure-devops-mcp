@@ -40,7 +40,7 @@
   "dependencies": {
     "@azure/identity": "^4.10.0",
     "@azure/msal-node": "^3.6.0",
-    "@modelcontextprotocol/sdk": "1.22.0",
+    "@modelcontextprotocol/sdk": "1.24.0",
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
@@ -55,17 +55,17 @@
     "@types/node": "^22.19.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-header": "^3.1.1",
-    "glob": "^11.0.3",
+    "glob": "^13.0.0",
     "husky": "^9.1.7",
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
     "lint-staged": "^16.2.7",
-    "prettier": "3.6.2",
+    "prettier": "3.7.3",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.4"
+    "typescript-eslint": "^8.48.0"
   },
   "lint-staged": {
     "**/*.(js|ts|jsx|tsx|json|css|md)": [

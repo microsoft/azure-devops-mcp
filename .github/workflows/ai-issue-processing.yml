@@ -1,0 +1,54 @@
+name: AI Issue Processing
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  issue-processing:
+    if: github.event.label.name == 'ai-issue-processing'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Add Needs Review Label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue edit $ISSUE_NUMBER --add-label "Needs Review 👓" --repo ${{ github.repository }}
+
+      - name: Call GitHub Model API
+        id: ai-inference
+        uses: actions/ai-inference@v1
+        with:
+          model: gpt-4o-mini
+          system-prompt-file: .github/ai-automation/ai-issue-processing-system-prompt.md
+          prompt: |
+            Issue Title: ${{ github.event.issue.title }}
+
+            Issue Description:
+            ${{ github.event.issue.body }}
+
+      - name: Parse and Apply Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          AI_RESPONSE: ${{ steps.ai-inference.outputs.response }}
+        run: |
+          echo "AI Response: $AI_RESPONSE"
+
+          # Parse the JSON response to extract labels
+          LABELS=$(echo "$AI_RESPONSE" | python3 -c "import sys, json; print(' '.join([f'--add-label \"{label}\"' for label in json.load(sys.stdin)['labels']]))")
+
+          # Add the recommended labels and remove the ai-issue-processing label
+          if [ -n "$LABELS" ]; then
+            eval gh issue edit $ISSUE_NUMBER $LABELS --remove-label "ai-issue-processing" --repo ${{ github.repository }}
+          else
+            gh issue edit $ISSUE_NUMBER --remove-label "ai-issue-processing" --repo ${{ github.repository }}
+          fi
