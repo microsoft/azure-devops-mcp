@@ -1112,16 +1112,16 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.update_pull_request_thread,
-    "Updates an existing comment thread on a pull request. Can update status and other thread properties.",
+    "Updates an existing comment thread on a pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
       pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
       threadId: z.number().describe("The ID of the thread to update."),
-      project: z.string().describe("Project ID or project name."),
+      project: z.string().optional().describe("Project ID or project name (optional)"),
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
-        .describe("The new status for the comment thread. Common values: Active, Fixed, WontFix, Closed, ByDesign, Pending."),
+        .describe("The new status for the comment thread."),
     },
     async ({ repositoryId, pullRequestId, threadId, project, status }) => {
       try {
