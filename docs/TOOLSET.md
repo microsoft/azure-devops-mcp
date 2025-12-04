@@ -39,7 +39,6 @@
 | Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request            |
 | Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
-| Repositories      | [mcp_ado_repo_resolve_comment](#mcp_ado_repo_resolve_comment)                                             | Mark a comment thread as resolved                        |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
 | Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                            |
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
@@ -338,13 +337,6 @@ Replies to a specific comment on a pull request.
 
 - **Required**: `repositoryId`, `pullRequestId`, `threadId`, `content`
 - **Optional**: `fullResponse`, `project`
-
-### mcp_ado_repo_resolve_comment
-
-Resolves a specific comment thread on a pull request.
-
-- **Required**: `repositoryId`, `pullRequestId`, `threadId`
-- **Optional**: `fullResponse`
 
 ## Search
 
