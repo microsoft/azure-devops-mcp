@@ -3687,73 +3687,6 @@ describe("repos tools", () => {
     });
   });
 
-  describe("repo_resolve_comment", () => {
-    it("should resolve comment thread successfully", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.resolve_comment);
-      if (!call) throw new Error("repo_resolve_comment tool not registered");
-      const [, , , handler] = call;
-
-      const mockThread = { id: 123, status: CommentThreadStatus.Fixed };
-      mockGitApi.updateThread.mockResolvedValue(mockThread);
-
-      const params = {
-        repositoryId: "repo123",
-        pullRequestId: 456,
-        threadId: 789,
-      };
-
-      const result = await handler(params);
-
-      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Fixed }, "repo123", 456, 789);
-      expect(result.content[0].text).toBe("Thread 789 was successfully resolved.");
-    });
-
-    it("should return full response when requested", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.resolve_comment);
-      if (!call) throw new Error("repo_resolve_comment tool not registered");
-      const [, , , handler] = call;
-
-      const mockThread = { id: 123, status: CommentThreadStatus.Fixed };
-      mockGitApi.updateThread.mockResolvedValue(mockThread);
-
-      const params = {
-        repositoryId: "repo123",
-        pullRequestId: 456,
-        threadId: 789,
-        fullResponse: true,
-      };
-
-      const result = await handler(params);
-
-      expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
-    });
-
-    it("should return error when thread resolution fails", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.resolve_comment);
-      if (!call) throw new Error("repo_resolve_comment tool not registered");
-      const [, , , handler] = call;
-
-      mockGitApi.updateThread.mockResolvedValue(null);
-
-      const params = {
-        repositoryId: "repo123",
-        pullRequestId: 456,
-        threadId: 789,
-      };
-
-      const result = await handler(params);
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Error: Failed to resolve thread 789");
-    });
-  });
-
   describe("repo_update_pull_request_thread", () => {
     it("should update thread status to Active", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
@@ -4417,28 +4350,6 @@ describe("repos tools", () => {
       const result = await handler(params);
       expect(result).toEqual({
         content: [{ type: "text", text: "Error creating pull request thread: Thread creation failed" }],
-        isError: true,
-      });
-    });
-
-    it("should handle thread resolution error", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
-
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.resolve_comment);
-      if (!call) throw new Error("repo_resolve_comment tool not registered");
-      const [, , , handler] = call;
-
-      mockGitApi.updateThread.mockRejectedValue(new Error("Thread resolution failed"));
-
-      const params = {
-        repositoryId: "repo123",
-        pullRequestId: 456,
-        threadId: 789,
-      };
-
-      const result = await handler(params);
-      expect(result).toEqual({
-        content: [{ type: "text", text: "Error resolving comment: Thread resolution failed" }],
         isError: true,
       });
     });
@@ -6100,29 +6011,6 @@ describe("repos tools", () => {
 
         expect(result).toEqual({
           content: [{ type: "text", text: "rightFileStartLine must be greater than or equal to 1." }],
-          isError: true,
-        });
-      });
-    });
-
-    describe("repo_resolve_comment error handling", () => {
-      it("should handle comment resolution errors", async () => {
-        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
-        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.resolve_comment);
-        const [, , , handler] = call;
-
-        mockGitApi.updateThread.mockRejectedValue(new Error("Thread cannot be resolved"));
-
-        const params = {
-          repositoryId: "repo123",
-          pullRequestId: 456,
-          threadId: 789,
-        };
-
-        const result = await handler(params);
-
-        expect(result).toEqual({
-          content: [{ type: "text", text: "Error resolving comment: Thread cannot be resolved" }],
           isError: true,
         });
       });
