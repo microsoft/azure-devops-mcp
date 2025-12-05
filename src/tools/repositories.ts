@@ -316,8 +316,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
+      labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -361,14 +362,34 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         // Validate that at least one field is provided for update
-        if (Object.keys(updateRequest).length === 0) {
+        if (Object.keys(updateRequest).length === 0 && !labels) {
           return {
-            content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update." }],
+            content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, autoComplete options, or labels) must be provided for update." }],
             isError: true,
           };
         }
 
-        const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+        // Update labels if provided
+        if (labels) {
+          const currentLabels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId);
+          for (const currentLabel of currentLabels) {
+            if (currentLabel.id) {
+              await gitApi.deletePullRequestLabels(repositoryId, pullRequestId, currentLabel.id);
+            }
+          }
+          for (const label of labels) {
+            await gitApi.createPullRequestLabel({ name: label }, repositoryId, pullRequestId);
+          }
+        }
+
+        let updatedPullRequest;
+        if (Object.keys(updateRequest).length > 0) {
+          updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+        } else {
+          // If only labels were updated, get the current pull request
+          updatedPullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId);
+        }
+
         const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
 
         return {
