@@ -44,7 +44,6 @@ const REPO_TOOLS = {
   reply_to_comment: "repo_reply_to_comment",
   create_pull_request_thread: "repo_create_pull_request_thread",
   update_pull_request_thread: "repo_update_pull_request_thread",
-  resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
 };
@@ -1180,54 +1179,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         return {
           content: [{ type: "text", text: `Error updating pull request thread: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    REPO_TOOLS.resolve_comment,
-    "Resolves a specific comment thread on a pull request.",
-    {
-      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
-      threadId: z.number().describe("The ID of the thread to be resolved."),
-      fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of a simple confirmation message."),
-    },
-    async ({ repositoryId, pullRequestId, threadId, fullResponse }) => {
-      try {
-        const connection = await connectionProvider();
-        const gitApi = await connection.getGitApi();
-        const thread = await gitApi.updateThread(
-          { status: 2 }, // 2 corresponds to "Resolved" status
-          repositoryId,
-          pullRequestId,
-          threadId
-        );
-
-        // Check if the thread was successfully resolved
-        if (!thread) {
-          return {
-            content: [{ type: "text", text: `Error: Failed to resolve thread ${threadId}. The thread status was not updated successfully.` }],
-            isError: true,
-          };
-        }
-
-        if (fullResponse) {
-          return {
-            content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
-          };
-        }
-
-        return {
-          content: [{ type: "text", text: `Thread ${threadId} was successfully resolved.` }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        return {
-          content: [{ type: "text", text: `Error resolving comment: ${errorMessage}` }],
           isError: true,
         };
       }
