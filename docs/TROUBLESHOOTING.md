@@ -17,7 +17,7 @@ Example
     "ado": {
       "type": "stdio",
       "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}", "azcli", "-d", "core", "work", "work-items", "test-plans"],
+      "args": ["${input:ado_org}"],
       "env": {
         "LOG_LEVEL": "debug"
       }
