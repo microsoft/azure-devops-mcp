@@ -186,7 +186,7 @@ See our [Contributions Guide](./CONTRIBUTING.md) for:
 - 📝 Code style & testing
 - 🔄 Pull request process
 
-> ⚠️ Please read [Contributions Guide](./CONTRIBUTING.md) before attempting to create a pull request.
+> ⚠️ Please read the [Contributions Guide](./CONTRIBUTING.md) before creating a pull request to understand our development setup, coding standards, and PR process.
 
 ## 🤝 Code of Conduct
 
