@@ -1,6 +1,6 @@
 # Troubleshooting
 
-To help you trouble shoot and debug issues, try adding the `LOG_LEVEL` to your `mcp.json`
+To help you troubleshoot and debug issues, try adding the `LOG_LEVEL` to your `mcp.json`
 
 Example
 
