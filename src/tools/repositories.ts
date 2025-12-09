@@ -44,7 +44,6 @@ const REPO_TOOLS = {
   reply_to_comment: "repo_reply_to_comment",
   create_pull_request_thread: "repo_create_pull_request_thread",
   update_pull_request_thread: "repo_update_pull_request_thread",
-  resolve_comment: "repo_resolve_comment",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
 };
@@ -316,8 +315,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
+      labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -361,14 +361,34 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         // Validate that at least one field is provided for update
-        if (Object.keys(updateRequest).length === 0) {
+        if (Object.keys(updateRequest).length === 0 && !labels) {
           return {
-            content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, or autoComplete options) must be provided for update." }],
+            content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, autoComplete options, or labels) must be provided for update." }],
             isError: true,
           };
         }
 
-        const updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+        // Update labels if provided
+        if (labels) {
+          const currentLabels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId);
+          for (const currentLabel of currentLabels) {
+            if (currentLabel.id) {
+              await gitApi.deletePullRequestLabels(repositoryId, pullRequestId, currentLabel.id);
+            }
+          }
+          for (const label of labels) {
+            await gitApi.createPullRequestLabel({ name: label }, repositoryId, pullRequestId);
+          }
+        }
+
+        let updatedPullRequest;
+        if (Object.keys(updateRequest).length > 0) {
+          updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId);
+        } else {
+          // If only labels were updated, get the current pull request
+          updatedPullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId);
+        }
+
         const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
 
         return {
@@ -1159,54 +1179,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         return {
           content: [{ type: "text", text: `Error updating pull request thread: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    REPO_TOOLS.resolve_comment,
-    "Resolves a specific comment thread on a pull request.",
-    {
-      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
-      threadId: z.number().describe("The ID of the thread to be resolved."),
-      fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of a simple confirmation message."),
-    },
-    async ({ repositoryId, pullRequestId, threadId, fullResponse }) => {
-      try {
-        const connection = await connectionProvider();
-        const gitApi = await connection.getGitApi();
-        const thread = await gitApi.updateThread(
-          { status: 2 }, // 2 corresponds to "Resolved" status
-          repositoryId,
-          pullRequestId,
-          threadId
-        );
-
-        // Check if the thread was successfully resolved
-        if (!thread) {
-          return {
-            content: [{ type: "text", text: `Error: Failed to resolve thread ${threadId}. The thread status was not updated successfully.` }],
-            isError: true,
-          };
-        }
-
-        if (fullResponse) {
-          return {
-            content: [{ type: "text", text: JSON.stringify(thread, null, 2) }],
-          };
-        }
-
-        return {
-          content: [{ type: "text", text: `Thread ${threadId} was successfully resolved.` }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        return {
-          content: [{ type: "text", text: `Error resolving comment: ${errorMessage}` }],
           isError: true,
         };
       }
