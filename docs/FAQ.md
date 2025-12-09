@@ -21,3 +21,9 @@ Sorry, PAT's are currently not supported in this local MCP Sever.
 ## Is there a remote supported version of the MCP Server?
 
 At this time, only the local version of the MCP Server is supported.
+
+## Are personal accounts supported?
+
+Unfortunately, personal accounts are not supported. To maintain a higher level of authentication and security, your account must be backed by Entra ID. If you receive an error message like this, it means you are using a personal account.
+
+![image of login error for personal accounts](./media/personal-accounts-error.png)

@@ -1,5 +1,31 @@
 # Troubleshooting
 
+To help you troubleshoot and debug issues, try adding the `LOG_LEVEL` to your `mcp.json`
+
+Example
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "mcp-server-azuredevops",
+      "args": ["${input:ado_org}"],
+      "env": {
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}
+```
+
 ## Common MCP Issues
 
 1. **Clearing VS Code Cache**
