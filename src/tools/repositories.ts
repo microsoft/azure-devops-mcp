@@ -26,6 +26,19 @@ import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { getEnumKeys } from "../utils.js";
+import { Readable } from "stream";
+
+/**
+ * Helper function to convert a Node.js ReadableStream to a string
+ */
+async function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
+  const chunks: Buffer[] = [];
+  return new Promise((resolve, reject) => {
+    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+  });
+}
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -37,6 +50,7 @@ const REPO_TOOLS = {
   get_repo_by_name_or_id: "repo_get_repo_by_name_or_id",
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
+  get_pull_request_changes: "repo_get_pull_request_changes",
   create_pull_request: "repo_create_pull_request",
   create_branch: "repo_create_branch",
   update_pull_request: "repo_update_pull_request",
@@ -963,6 +977,233 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         return {
           content: [{ type: "text", text: `Error getting pull request: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.get_pull_request_changes,
+    "Get the file changes (diff) for a pull request iteration with actual code diff content. Returns the code changes including line-by-line diffs made in the pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request to retrieve changes for."),
+      iterationId: z.number().optional().describe("The iteration ID to get changes for. If not specified, gets changes for the latest iteration."),
+      project: z.string().optional().describe("Project ID or project name (optional)"),
+      top: z.number().optional().describe("Maximum number of files to include diffs for. Default is 100."),
+      skip: z.number().optional().describe("Number of changes to skip for pagination."),
+      compareTo: z.number().optional().describe("Iteration ID to compare against. If specified, returns changes between two iterations."),
+      includeDiffs: z.boolean().optional().describe("Whether to include actual line-by-line diff content. Default is true. Set to false to get only file metadata."),
+      includeLineContent: z
+        .boolean()
+        .optional()
+        .describe(
+          "Whether to include the actual line content from the changed files. Default is true. When true, fetches file content and includes the actual code lines that were added/removed/modified."
+        ),
+    },
+    async ({ repositoryId, pullRequestId, iterationId, project, top, skip, compareTo, includeDiffs = true, includeLineContent = true }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        // If no iteration ID provided, get the latest iteration
+        let targetIterationId = iterationId;
+        let targetIteration;
+        if (!targetIterationId) {
+          const iterations = await gitApi.getPullRequestIterations(repositoryId, pullRequestId, project);
+          if (!iterations || iterations.length === 0) {
+            return {
+              content: [{ type: "text", text: "No iterations found for this pull request." }],
+              isError: true,
+            };
+          }
+          // Get the latest iteration
+          targetIteration = iterations[iterations.length - 1];
+          targetIterationId = targetIteration.id;
+        } else {
+          // Get the specific iteration
+          targetIteration = await gitApi.getPullRequestIteration(repositoryId, pullRequestId, targetIterationId, project);
+        }
+
+        // Get the file change metadata
+        const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, targetIterationId!, project, top, skip, compareTo);
+
+        // If includeDiffs is false, just return the metadata
+        if (!includeDiffs) {
+          return {
+            content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
+          };
+        }
+
+        // Get actual diff content using getFileDiffs
+        if (changes.changeEntries && changes.changeEntries.length > 0 && targetIteration) {
+          // Determine base and target commits
+          const baseCommitId = compareTo
+            ? (await gitApi.getPullRequestIteration(repositoryId, pullRequestId, compareTo, project)).sourceRefCommit?.commitId
+            : targetIteration.commonRefCommit?.commitId;
+          const targetCommitId = targetIteration.sourceRefCommit?.commitId;
+
+          if (baseCommitId && targetCommitId) {
+            // Build FileDiffsCriteria with paths from changeEntries
+            // Exclude added (1) and deleted (16) files as they don't have both versions to diff
+            const fileDiffParams = changes.changeEntries
+              .filter((entry) => entry.item?.path && entry.changeType !== 1 && entry.changeType !== 16) // Only modified files
+              .map((entry) => {
+                // Remove leading slash if present - Azure DevOps API expects relative paths
+                const itemPath = entry.item!.path!;
+                const path = itemPath.startsWith("/") ? itemPath.substring(1) : itemPath;
+                return {
+                  path: path,
+                  originalPath: path,
+                };
+              });
+
+            if (fileDiffParams.length > 0) {
+              try {
+                const fileDiffs = await gitApi.getFileDiffs(
+                  {
+                    baseVersionCommit: baseCommitId,
+                    targetVersionCommit: targetCommitId,
+                    fileDiffParams: fileDiffParams,
+                  },
+                  project || "",
+                  repositoryId
+                );
+
+                // Merge diff content with change metadata
+                const enrichedChanges = {
+                  ...changes,
+                  changeEntries: changes.changeEntries.map((entry) => {
+                    // Normalize path for comparison (remove leading slash)
+                    const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
+                    const matchingDiff = fileDiffs.find((diff) => diff.path === entryPath);
+                    return {
+                      ...entry,
+                      diff: matchingDiff || null,
+                    };
+                  }),
+                };
+
+                // If includeLineContent is true, fetch actual file content
+                if (includeLineContent && enrichedChanges.changeEntries) {
+                  const entriesWithContent = await Promise.all(
+                    enrichedChanges.changeEntries.map(async (entry) => {
+                      if (!entry.diff?.lineDiffBlocks || entry.diff.lineDiffBlocks.length === 0) {
+                        return entry;
+                      }
+
+                      const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
+
+                      if (!entryPath) {
+                        return entry;
+                      }
+
+                      try {
+                        // Fetch file content at both commits
+                        const [baseContent, targetContent] = await Promise.all([
+                          // Base version (original)
+                          gitApi
+                            .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
+                            .catch((err) => null),
+                          // Target version (modified)
+                          gitApi
+                            .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
+                            .catch((err) => null),
+                        ]);
+
+                        // Convert streams to text
+                        const baseText = baseContent ? await streamToString(baseContent) : "";
+                        const targetText = targetContent ? await streamToString(targetContent) : "";
+
+                        // Check if response is an error (Azure DevOps returns JSON error in stream)
+                        if (baseText.startsWith("{") && baseText.includes("innerException")) {
+                          throw new Error(`Failed to fetch base file content: ${baseText}`);
+                        }
+                        if (targetText.startsWith("{") && targetText.includes("innerException")) {
+                          throw new Error(`Failed to fetch target file content: ${targetText}`);
+                        }
+
+                        // Split into lines
+                        const baseLines = baseText.split(/\r?\n/);
+                        const targetLines = targetText.split(/\r?\n/);
+
+                        // Enrich each lineDiffBlock with actual line content
+                        const enrichedDiff = {
+                          ...entry.diff,
+                          lineDiffBlocks: entry.diff.lineDiffBlocks?.map((block) => {
+                            const enrichedBlock: any = { ...block };
+
+                            // Add original (base) lines if they exist
+                            if (block.originalLineNumberStart && block.originalLinesCount) {
+                              const startIdx = block.originalLineNumberStart - 1;
+                              const endIdx = startIdx + block.originalLinesCount;
+                              enrichedBlock.originalLines = baseLines.slice(startIdx, endIdx);
+                            }
+
+                            // Add modified (target) lines if they exist
+                            if (block.modifiedLineNumberStart && block.modifiedLinesCount) {
+                              const startIdx = block.modifiedLineNumberStart - 1;
+                              const endIdx = startIdx + block.modifiedLinesCount;
+                              enrichedBlock.modifiedLines = targetLines.slice(startIdx, endIdx);
+                            }
+
+                            return enrichedBlock;
+                          }),
+                        };
+
+                        return {
+                          ...entry,
+                          diff: enrichedDiff,
+                        };
+                      } catch (contentError) {
+                        // If content fetch fails, return entry with error
+                        return {
+                          ...entry,
+                          _contentFetchError: `Failed to fetch line content: ${contentError instanceof Error ? contentError.message : "Unknown error"}`,
+                        };
+                      }
+                    })
+                  );
+
+                  enrichedChanges.changeEntries = entriesWithContent;
+                }
+
+                return {
+                  content: [{ type: "text", text: JSON.stringify(enrichedChanges, null, 2) }],
+                };
+              } catch (diffError) {
+                // If diff fetching fails, return metadata with error info
+                return {
+                  content: [
+                    {
+                      type: "text",
+                      text: JSON.stringify(
+                        {
+                          ...changes,
+                          _diffError: `Failed to fetch diff content: ${diffError instanceof Error ? diffError.message : "Unknown error"}`,
+                          _note: "Returned metadata only",
+                        },
+                        null,
+                        2
+                      ),
+                    },
+                  ],
+                };
+              }
+            }
+          }
+        }
+
+        // Fallback: return metadata if we couldn't get diffs
+        return {
+          content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting pull request changes: ${errorMessage}` }],
           isError: true,
         };
       }
