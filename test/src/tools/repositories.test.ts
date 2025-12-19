@@ -4112,6 +4112,320 @@ describe("repos tools", () => {
       expect(diffBlock.originalLines).toEqual(["old line 10"]);
       expect(diffBlock.modifiedLines).toEqual(["new line 10", "new line 11"]);
     });
+
+    it("should skip line content for entries without diff blocks", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [
+          {
+            item: { path: "/src/file1.ts" },
+            changeType: 2, // Edit type
+          },
+          {
+            item: { path: "/src/file2.ts" },
+            changeType: 1, // Add type (filtered out from diffs)
+          },
+        ],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const mockFileDiffs = [
+        {
+          path: "src/file1.ts",
+          lineDiffBlocks: [], // Empty diff blocks
+        },
+      ];
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getFileDiffs.mockResolvedValue(mockFileDiffs);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      // getItemText should not be called for entries with empty diff blocks
+      expect(mockGitApi.getItemText).not.toHaveBeenCalled();
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.changeEntries[0].diff.lineDiffBlocks).toEqual([]);
+    });
+
+    it("should skip line content for entries without path", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [
+          {
+            item: { path: undefined }, // No path
+            changeType: 2,
+          },
+        ],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const mockFileDiffs = [
+        {
+          path: "",
+          lineDiffBlocks: [
+            {
+              changeType: 3,
+              modifiedLineNumberStart: 1,
+              modifiedLinesCount: 1,
+              originalLineNumberStart: 1,
+              originalLinesCount: 1,
+            },
+          ],
+        },
+      ];
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getFileDiffs.mockResolvedValue(mockFileDiffs);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      // getItemText should not be called for entries without path
+      expect(mockGitApi.getItemText).not.toHaveBeenCalled();
+    });
+
+    it("should handle getItemText errors gracefully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [
+          {
+            item: { path: "/src/file1.ts" },
+            changeType: 2,
+          },
+        ],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const mockFileDiffs = [
+        {
+          path: "src/file1.ts",
+          lineDiffBlocks: [
+            {
+              changeType: 3,
+              modifiedLineNumberStart: 10,
+              modifiedLinesCount: 1,
+              originalLineNumberStart: 10,
+              originalLinesCount: 1,
+            },
+          ],
+        },
+      ];
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getFileDiffs.mockResolvedValue(mockFileDiffs);
+      // Mock getItemText to return null (simulating catch returning null)
+      mockGitApi.getItemText.mockResolvedValue(null);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      // Should handle null content gracefully
+      expect(mockGitApi.getItemText).toHaveBeenCalledTimes(2);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      const diffBlock = parsedResult.changeEntries[0].diff.lineDiffBlocks[0];
+
+      // Empty strings split into array with single empty string
+      expect(diffBlock.originalLines).toEqual([]);
+      expect(diffBlock.modifiedLines).toEqual([]);
+    });
+
+    it("should detect and handle Azure DevOps error JSON in base file response", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [
+          {
+            item: { path: "/src/file1.ts" },
+            changeType: 2,
+          },
+        ],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const mockFileDiffs = [
+        {
+          path: "src/file1.ts",
+          lineDiffBlocks: [
+            {
+              changeType: 3,
+              modifiedLineNumberStart: 10,
+              modifiedLinesCount: 1,
+              originalLineNumberStart: 10,
+              originalLinesCount: 1,
+            },
+          ],
+        },
+      ];
+
+      // Mock error JSON response as stream
+      const errorJson = '{"$id":"1","innerException":null,"message":"TF401175: Version not found"}';
+      const { Readable } = await import("stream");
+      const errorStream = new Readable();
+      errorStream.push(errorJson);
+      errorStream.push(null);
+
+      const validStream = new Readable();
+      validStream.push("valid file content");
+      validStream.push(null);
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getFileDiffs.mockResolvedValue(mockFileDiffs);
+      mockGitApi.getItemText.mockResolvedValueOnce(errorStream).mockResolvedValueOnce(validStream);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("Failed to fetch base file content");
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("innerException");
+    });
+
+    it("should detect and handle Azure DevOps error JSON in target file response", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [
+          {
+            item: { path: "/src/file1.ts" },
+            changeType: 2,
+          },
+        ],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const mockFileDiffs = [
+        {
+          path: "src/file1.ts",
+          lineDiffBlocks: [
+            {
+              changeType: 3,
+              modifiedLineNumberStart: 10,
+              modifiedLinesCount: 1,
+              originalLineNumberStart: 10,
+              originalLinesCount: 1,
+            },
+          ],
+        },
+      ];
+
+      // Mock error JSON response as stream for target file
+      const errorJson = '{"$id":"1","innerException":null,"message":"TF401175: Version not found"}';
+      const { Readable } = await import("stream");
+      const validStream = new Readable();
+      validStream.push("valid base content");
+      validStream.push(null);
+
+      const errorStream = new Readable();
+      errorStream.push(errorJson);
+      errorStream.push(null);
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getFileDiffs.mockResolvedValue(mockFileDiffs);
+      mockGitApi.getItemText.mockResolvedValueOnce(validStream).mockResolvedValueOnce(errorStream);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("Failed to fetch target file content");
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("innerException");
+    });
   });
 
   describe("repo_reply_to_comment", () => {
