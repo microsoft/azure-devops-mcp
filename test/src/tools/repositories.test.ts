@@ -4081,11 +4081,12 @@ describe("repos tools", () => {
       const baseFileContent = "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nold line 10\nline 11\nline 12";
       const targetFileContent = "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nnew line 10\nnew line 11\nline 12";
 
-      const baseStream = new (require("stream").Readable)();
+      const { Readable } = await import("stream");
+      const baseStream = new Readable();
       baseStream.push(baseFileContent);
       baseStream.push(null);
 
-      const targetStream = new (require("stream").Readable)();
+      const targetStream = new Readable();
       targetStream.push(targetFileContent);
       targetStream.push(null);
 

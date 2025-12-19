@@ -26,7 +26,6 @@ import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { getEnumKeys } from "../utils.js";
-import { Readable } from "stream";
 
 /**
  * Helper function to convert a Node.js ReadableStream to a string
@@ -1027,7 +1026,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         // Get the file change metadata
-        const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, targetIterationId!, project, top, skip, compareTo);
+        const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, targetIterationId ?? 1, project, top, skip, compareTo);
 
         // If includeDiffs is false, just return the metadata
         if (!includeDiffs) {
@@ -1051,7 +1050,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               .filter((entry) => entry.item?.path && entry.changeType !== 1 && entry.changeType !== 16) // Only modified files
               .map((entry) => {
                 // Remove leading slash if present - Azure DevOps API expects relative paths
-                const itemPath = entry.item!.path!;
+                const itemPath = entry.item?.path ?? "";
                 const path = itemPath.startsWith("/") ? itemPath.substring(1) : itemPath;
                 return {
                   path: path,
@@ -1105,11 +1104,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                           // Base version (original)
                           gitApi
                             .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
-                            .catch((err) => null),
+                            .catch(() => null),
                           // Target version (modified)
                           gitApi
                             .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
-                            .catch((err) => null),
+                            .catch(() => null),
                         ]);
 
                         // Convert streams to text
