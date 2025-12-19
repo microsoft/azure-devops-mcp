@@ -130,6 +130,7 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
     isDraft: pr.isDraft,
     sourceRefName: pr.sourceRefName,
     targetRefName: pr.targetRefName,
+    project: pr.repository?.project?.name,
   };
 }
 
