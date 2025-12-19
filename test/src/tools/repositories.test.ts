@@ -4218,7 +4218,7 @@ describe("repos tools", () => {
         includeLineContent: true,
       };
 
-      const result = await handler(params);
+      await handler(params);
 
       // getItemText should not be called for entries without path
       expect(mockGitApi.getItemText).not.toHaveBeenCalled();
