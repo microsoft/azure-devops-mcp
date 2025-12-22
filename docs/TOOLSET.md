@@ -31,6 +31,7 @@
 | Repositories      | [mcp_ado_repo_list_pull_requests_by_repo_or_project](#mcp_ado_repo_list_pull_requests_by_repo_or_project) | List pull requests with optional filters                 |
 | Repositories      | [mcp_ado_repo_list_pull_requests_by_commits](#mcp_ado_repo_list_pull_requests_by_commits)                 | Find pull requests containing specific commits           |
 | Repositories      | [mcp_ado_repo_get_pull_request_by_id](#mcp_ado_repo_get_pull_request_by_id)                               | Get details of a specific pull request                   |
+| Repositories      | [mcp_ado_repo_get_pull_request_changes](#mcp_ado_repo_get_pull_request_changes)                           | Get file changes (diff) for a pull request               |
 | Repositories      | [mcp_ado_repo_create_pull_request](#mcp_ado_repo_create_pull_request)                                     | Create a new pull request                                |
 | Repositories      | [mcp_ado_repo_update_pull_request](#mcp_ado_repo_update_pull_request)                                     | Update pull request properties and settings              |
 | Repositories      | [mcp_ado_repo_update_pull_request_reviewers](#mcp_ado_repo_update_pull_request_reviewers)                 | Add or remove reviewers from a pull request              |
@@ -281,6 +282,24 @@ Get a pull request by its ID.
 
 - **Required**: `repositoryId`, `pullRequestId`
 - **Optional**: `includeWorkItemRefs`
+
+### mcp_ado_repo_get_pull_request_changes
+
+Get the file changes (diff) for a pull request iteration with actual code diff content. Returns the code changes including line-by-line diffs made in the pull request.
+
+- **Required**: `repositoryId`, `pullRequestId`
+- **Optional**: `iterationId`, `project`, `top`, `skip`, `compareTo`, `includeDiffs`, `includeLineContent`
+
+**Notes**:
+
+- If `iterationId` is not specified, returns changes for the latest iteration
+- Use `compareTo` to get changes between two specific iterations
+- Supports pagination with `top` and `skip` parameters
+- By default, includes line-by-line diff metadata (line numbers, change types) AND actual code content
+- Set `includeDiffs=false` to get only file metadata without diff information
+- Set `includeLineContent=false` to exclude actual code lines and get only diff metadata (line numbers, change types)
+- The diff content includes `lineDiffBlocks` showing line numbers and change types
+- By default, each `lineDiffBlock` includes `originalLines` (from base) and `modifiedLines` (from target) arrays with actual code content
 
 ### mcp_ado_repo_create_pull_request
 
