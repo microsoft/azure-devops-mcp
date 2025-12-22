@@ -62,7 +62,7 @@
     "lint-staged": "^16.2.7",
     "prettier": "3.7.3",
     "shx": "^0.4.0",
-    "ts-jest": "^29.4.0",
+    "ts-jest": "^29.4.6",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0"
