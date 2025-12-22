@@ -130,6 +130,7 @@ function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
     isDraft: pr.isDraft,
     sourceRefName: pr.sourceRefName,
     targetRefName: pr.targetRefName,
+    project: pr.repository?.project?.name,
   };
 }
 
@@ -1033,19 +1034,19 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .number()
         .optional()
         .describe(
-          "Position of first character of the thread's span in right file. The line number of a thread's position. The character offset of a thread's position inside of a line. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"
+          "Position of first character of the thread's span in right file. The line number of a thread's position. The character offset of a thread's position inside of a line. Starts at 1. Must be set if rightFileStartLine is also specified. (optional)"
         ),
       rightFileEndLine: z
         .number()
         .optional()
         .describe(
-          "Position of last character of the thread's span in right file. The line number of a thread's position. Starts at 1. Must only be set if rightFileStartLine is also specified. (optional)"
+          "Position of last character of the thread's span in right file. The line number of a thread's position. Starts at 1. Must be set if rightFileStartLine is also specified. (optional)"
         ),
       rightFileEndOffset: z
         .number()
         .optional()
         .describe(
-          "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must only be set if rightFileEndLine is also specified. (optional)"
+          "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must be set if rightFileEndLine is also specified. (optional)"
         ),
     },
     async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
@@ -1093,6 +1094,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             };
           }
 
+          if (rightFileEndOffset === undefined) {
+            return {
+              content: [{ type: "text", text: "rightFileEndOffset must be specified if rightFileEndLine is specified." }],
+              isError: true,
+            };
+          }
+
           threadContext.rightFileEnd = { line: rightFileEndLine };
 
           if (rightFileEndOffset !== undefined) {
@@ -1104,6 +1112,31 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             }
 
             threadContext.rightFileEnd.offset = rightFileEndOffset;
+          }
+        }
+
+        if (rightFileEndOffset !== undefined && rightFileEndLine === undefined) {
+          return {
+            content: [{ type: "text", text: "rightFileEndLine must be specified if rightFileEndOffset is specified." }],
+            isError: true,
+          };
+        }
+
+        if (rightFileStartLine !== undefined && rightFileStartOffset !== undefined) {
+          if (rightFileEndLine === undefined || rightFileEndOffset === undefined) {
+            return {
+              content: [{ type: "text", text: "rightFileEndLine and rightFileEndOffset must both be specified when rightFileStartLine and rightFileStartOffset are both specified." }],
+              isError: true,
+            };
+          }
+        }
+
+        if (rightFileStartLine !== undefined && rightFileEndLine !== undefined && rightFileStartLine === rightFileEndLine) {
+          if (rightFileEndOffset !== undefined && rightFileStartOffset !== undefined && rightFileEndOffset < rightFileStartOffset) {
+            return {
+              content: [{ type: "text", text: "rightFileEndOffset must be greater than or equal to rightFileStartOffset when both are on the same line." }],
+              isError: true,
+            };
           }
         }
 
