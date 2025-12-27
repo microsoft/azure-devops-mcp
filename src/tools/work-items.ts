@@ -70,6 +70,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team."),
     },
+    {
+      title: "List Backlogs",
+      readOnlyHint: true,
+    },
     async ({ project, team }) => {
       try {
         const connection = await connectionProvider();
@@ -97,6 +101,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team."),
       backlogId: z.string().describe("The ID of the backlog category to retrieve work items from."),
+    },
+    {
+      title: "List Backlog Work Items",
+      readOnlyHint: true,
     },
     async ({ project, team, backlogId }) => {
       try {
@@ -128,6 +136,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       top: z.number().default(50).describe("The maximum number of work items to return. Defaults to 50."),
       includeCompleted: z.boolean().default(false).describe("Whether to include completed work items. Defaults to false."),
     },
+    {
+      title: "My Work Items",
+      readOnlyHint: true,
+    },
     async ({ project, type, top, includeCompleted }) => {
       try {
         const connection = await connectionProvider();
@@ -155,6 +167,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       ids: z.array(z.number()).describe("The IDs of the work items to retrieve."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
+    },
+    {
+      title: "Get Work Items Batch",
+      readOnlyHint: true,
     },
     async ({ project, ids, fields }) => {
       try {
@@ -222,6 +238,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .optional()
         .describe("Expand options include 'all', 'fields', 'links', 'none', and 'relations'. Relations can be used to get child workitems. Defaults to 'none'."),
     },
+    {
+      title: "Get Work Item",
+      readOnlyHint: true,
+    },
     async ({ id, project, fields, asOf, expand }) => {
       try {
         const connection = await connectionProvider();
@@ -250,6 +270,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemId: z.number().describe("The ID of the work item to retrieve comments for."),
       top: z.number().default(50).describe("Optional number of comments to retrieve. Defaults to all comments."),
     },
+    {
+      title: "List Work Item Comments",
+      readOnlyHint: true,
+    },
     async ({ project, workItemId, top }) => {
       try {
         const connection = await connectionProvider();
@@ -277,6 +301,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemId: z.number().describe("The ID of the work item to add a comment to."),
       comment: z.string().describe("The text of the comment to add to the work item."),
       format: z.enum(["markdown", "html"]).optional().default("html"),
+    },
+    {
+      title: "Add Work Item Comment",
+      destructiveHint: true,
     },
     async ({ project, workItemId, comment, format }) => {
       try {
@@ -331,6 +359,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .default("None")
         .optional()
         .describe("Optional expand parameter to include additional details. Defaults to 'None'."),
+    },
+    {
+      title: "List Work Item Revisions",
+      readOnlyHint: true,
     },
     async ({ project, workItemId, top, skip, expand }) => {
       try {
@@ -395,6 +427,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
         })
       ),
+    },
+    {
+      title: "Add Child Work Items",
+      destructiveHint: true,
     },
     async ({ parentId, project, workItemType, items }) => {
       try {
@@ -523,6 +559,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemId: z.number().describe("The ID of the work item to link to the pull request."),
       pullRequestProjectId: z.string().optional().describe("The project ID containing the pull request. If not provided, defaults to the work item's project ID (for same-project linking)."),
     },
+    {
+      title: "Link Work Item to PR",
+      destructiveHint: true,
+    },
     async ({ projectId, repositoryId, pullRequestId, workItemId, pullRequestProjectId }) => {
       try {
         const connection = await connectionProvider();
@@ -591,6 +631,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
       iterationId: z.string().describe("The ID of the iteration to retrieve work items for."),
     },
+    {
+      title: "Get Work Items for Iteration",
+      readOnlyHint: true,
+    },
     async ({ project, team, iterationId }) => {
       try {
         const connection = await connectionProvider();
@@ -632,6 +676,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         )
         .describe("An array of field updates to apply to the work item."),
     },
+    {
+      title: "Update Work Item",
+      destructiveHint: true,
+    },
     async ({ id, updates }) => {
       try {
         const connection = await connectionProvider();
@@ -664,6 +712,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The name of the work item type to retrieve."),
+    },
+    {
+      title: "Get Work Item Type",
+      readOnlyHint: true,
     },
     async ({ project, workItemType }) => {
       try {
@@ -700,6 +752,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           })
         )
         .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
+    },
+    {
+      title: "Create Work Item",
+      destructiveHint: true,
     },
     async ({ project, workItemType, fields }) => {
       try {
@@ -759,6 +815,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       includeDeleted: z.boolean().default(false).describe("Whether to include deleted items in the query results. Defaults to false."),
       useIsoDateFormat: z.boolean().default(false).describe("Whether to use ISO date format in the response. Defaults to false."),
     },
+    {
+      title: "Get Query",
+      readOnlyHint: true,
+    },
     async ({ project, query, expand, depth, includeDeleted, useIsoDateFormat }) => {
       try {
         const connection = await connectionProvider();
@@ -789,6 +849,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       timePrecision: z.boolean().optional().describe("Whether to include time precision in the results. Defaults to false."),
       top: z.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
       responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete query results (default), 'ids' returns only work item IDs for reduced payload size."),
+    },
+    {
+      title: "Get Query Results",
+      readOnlyHint: true,
     },
     async ({ id, project, team, timePrecision, top, responseType }) => {
       try {
@@ -834,6 +898,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           })
         )
         .describe("An array of updates to apply to work items. Each update should include the operation (op), work item ID (id), field path (path), and new value (value)."),
+    },
+    {
+      title: "Update Work Items Batch",
+      destructiveHint: true,
     },
     async ({ updates }) => {
       try {
@@ -923,6 +991,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         )
         .describe(""),
     },
+    {
+      title: "Link Work Items",
+      destructiveHint: true,
+    },
     async ({ project, updates }) => {
       try {
         const connection = await connectionProvider();
@@ -995,6 +1067,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
         ),
       url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
+    },
+    {
+      title: "Unlink Work Item",
+      destructiveHint: true,
     },
     async ({ project, id, type, url }) => {
       try {
@@ -1099,6 +1175,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .default("Branch")
         .describe("Type of artifact link, defaults to 'Branch'. This determines both the link type and how to build the VSTFS URI from individual components."),
       comment: z.string().optional().describe("Comment to include with the artifact link."),
+    },
+    {
+      title: "Add Artifact Link",
+      destructiveHint: true,
     },
     async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, linkType, comment }) => {
       try {

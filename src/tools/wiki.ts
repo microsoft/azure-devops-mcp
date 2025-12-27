@@ -24,6 +24,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
     },
+    {
+      title: "Get Wiki",
+      readOnlyHint: true,
+    },
     async ({ wikiIdentifier, project }) => {
       try {
         const connection = await connectionProvider();
@@ -53,6 +57,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of wikis for an organization or project.",
     {
       project: z.string().optional().describe("The project name or ID to filter wikis. If not provided, all wikis in the organization will be returned."),
+    },
+    {
+      title: "List Wikis",
+      readOnlyHint: true,
     },
     async ({ project }) => {
       try {
@@ -87,6 +95,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().default(20).describe("The maximum number of pages to return. Defaults to 20."),
       continuationToken: z.string().optional().describe("Token for pagination to retrieve the next set of pages."),
       pageViewsForDays: z.number().optional().describe("Number of days to retrieve page views for. If not specified, page views are not included."),
+    },
+    {
+      title: "List Wiki Pages",
+      readOnlyHint: true,
     },
     async ({ wikiIdentifier, project, top = 20, continuationToken, pageViewsForDays }) => {
       try {
@@ -130,6 +142,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         .enum(["None", "OneLevel", "OneLevelPlusNestedEmptyFolders", "Full"])
         .optional()
         .describe("Recursion level for subpages. 'None' returns only the specified page. 'OneLevel' includes direct children. 'Full' includes all descendants."),
+    },
+    {
+      title: "Get Wiki Page",
+      readOnlyHint: true,
     },
     async ({ wikiIdentifier, project, path, recursionLevel }) => {
       try {
@@ -194,6 +210,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       wikiIdentifier: z.string().optional().describe("The unique identifier of the wiki. Required if url is not provided."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. Required if url is not provided."),
       path: z.string().optional().describe("The path of the wiki page to retrieve content for. Optional, defaults to root page if not provided."),
+    },
+    {
+      title: "Get Wiki Page Content",
+      readOnlyHint: true,
     },
     async ({ url, wikiIdentifier, project, path }: { url?: string; wikiIdentifier?: string; project?: string; path?: string }) => {
       try {
@@ -289,6 +309,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
       etag: z.string().optional().describe("ETag for editing existing pages (optional, will be fetched if not provided)."),
       branch: z.string().default("wikiMaster").describe("The branch name for the wiki repository. Defaults to 'wikiMaster' which is the default branch for Azure DevOps wikis."),
+    },
+    {
+      title: "Create or Update Wiki Page",
+      destructiveHint: true,
     },
     async ({ wikiIdentifier, path, content, project, etag, branch = "wikiMaster" }) => {
       try {

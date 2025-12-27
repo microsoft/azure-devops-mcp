@@ -25,6 +25,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
       team: z.string().describe("The name or ID of the Azure DevOps team."),
       timeframe: z.enum(["current"]).optional().describe("The timeframe for which to retrieve iterations. Currently, only 'current' is supported."),
     },
+    {
+      title: "List Team Iterations",
+      readOnlyHint: true,
+    },
     async ({ project, team, timeframe }) => {
       try {
         const connection = await connectionProvider();
@@ -63,6 +67,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
           })
         )
         .describe("An array of iterations to create. Each iteration must have a name and can optionally have start and finish dates in ISO format."),
+    },
+    {
+      title: "Create Iterations",
+      destructiveHint: true,
     },
     async ({ project, iterations }) => {
       try {
@@ -114,6 +122,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       depth: z.number().default(2).describe("Depth of children to fetch."),
       excludedIds: z.array(z.number()).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
+    },
+    {
+      title: "List Iterations",
+      readOnlyHint: true,
     },
     async ({ project, depth, excludedIds: ids }) => {
       try {
@@ -187,6 +199,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         )
         .describe("An array of iterations to assign. Each iteration must have an identifier and a path."),
     },
+    {
+      title: "Assign Iterations",
+      destructiveHint: true,
+    },
     async ({ project, team, iterations }) => {
       try {
         const connection = await connectionProvider();
@@ -227,6 +243,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
       project: z.string().describe("The name or Id of the Azure DevOps project."),
       team: z.string().describe("The name or Id of the Azure DevOps team."),
       iterationId: z.string().describe("The Iteration Id to get capacity for."),
+    },
+    {
+      title: "Get Team Capacity",
+      readOnlyHint: true,
     },
     async ({ project, team, iterationId }) => {
       try {
@@ -299,6 +319,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         .optional()
         .describe("Array of days off for the team member, each with a start and end date in ISO format."),
     },
+    {
+      title: "Update Team Capacity",
+      destructiveHint: true,
+    },
     async ({ project, team, teamMemberId, iterationId, activities, daysOff }) => {
       try {
         const connection = await connectionProvider();
@@ -362,6 +386,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     {
       project: z.string().describe("The name or Id of the Azure DevOps project."),
       iterationId: z.string().describe("The Iteration Id to get capacity for."),
+    },
+    {
+      title: "Get Iteration Capacities",
+      readOnlyHint: true,
     },
     async ({ project, iterationId }) => {
       try {

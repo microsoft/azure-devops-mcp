@@ -47,7 +47,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
       if (!call) throw new Error("pipelines_update_build_stage tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock the token provider
       (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
@@ -89,7 +89,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
       if (!call) throw new Error("pipelines_update_build_stage tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock the token provider
       (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
@@ -130,7 +130,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
       if (!call) throw new Error("pipelines_update_build_stage tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock the token provider
       (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
@@ -167,7 +167,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
       if (!call) throw new Error("pipelines_update_build_stage tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock token provider error
       const tokenError = new Error("Failed to get access token");
@@ -191,7 +191,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
       if (!call) throw new Error("pipelines_update_build_stage tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
 
@@ -228,7 +228,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
       if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getDefinitions: jest.fn().mockResolvedValue([
@@ -284,7 +284,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
       if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getDefinitions: jest.fn().mockRejectedValue(new Error("API Error")),
@@ -302,7 +302,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definition_revisions");
       if (!call) throw new Error("pipelines_get_build_definition_revisions tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getDefinitionRevisions: jest.fn().mockResolvedValue([
@@ -336,7 +336,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definition_revisions");
       if (!call) throw new Error("pipelines_get_build_definition_revisions tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getDefinitionRevisions: jest.fn().mockRejectedValue(new Error("Definition not found")),
@@ -357,7 +357,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_builds");
       if (!call) throw new Error("pipelines_get_builds tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuilds: jest.fn().mockResolvedValue([
@@ -416,7 +416,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_builds");
       if (!call) throw new Error("pipelines_get_builds tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuilds: jest.fn().mockRejectedValue(new Error("Project not found")),
@@ -434,7 +434,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log");
       if (!call) throw new Error("pipelines_get_build_log tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuildLogs: jest.fn().mockResolvedValue([
@@ -468,7 +468,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log");
       if (!call) throw new Error("pipelines_get_build_log tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuildLogs: jest.fn().mockRejectedValue(new Error("Build not found")),
@@ -489,7 +489,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log_by_id");
       if (!call) throw new Error("pipelines_get_build_log_by_id tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuildLogLines: jest.fn().mockResolvedValue(["2024-12-01T10:00:00.000Z Starting build...", "2024-12-01T10:01:00.000Z Build completed successfully"]),
@@ -514,7 +514,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_log_by_id");
       if (!call) throw new Error("pipelines_get_build_log_by_id tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuildLogLines: jest.fn().mockRejectedValue(new Error("Log not found")),
@@ -536,7 +536,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_changes");
       if (!call) throw new Error("pipelines_get_build_changes tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuildChanges: jest.fn().mockResolvedValue([
@@ -573,7 +573,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_changes");
       if (!call) throw new Error("pipelines_get_build_changes tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuildChanges: jest.fn().mockResolvedValue([]),
@@ -594,7 +594,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_changes");
       if (!call) throw new Error("pipelines_get_build_changes tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockBuildApi = {
         getBuildChanges: jest.fn().mockRejectedValue(new Error("Changes not available")),
@@ -615,7 +615,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_run");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         getRun: jest.fn().mockResolvedValue({ id: 1, name: "run-1" }),
@@ -638,7 +638,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_run");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         getRun: jest.fn().mockRejectedValue(new Error("Run not found")),
@@ -660,7 +660,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
       if (!call) throw new Error("pipelines_create_pipeline tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         createPipeline: jest.fn().mockResolvedValue({ id: 100, name: "Pipeline Definition Name" }),
@@ -703,7 +703,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
       if (!call) throw new Error("pipelines_create_pipeline tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         createPipeline: jest.fn().mockResolvedValue({ id: 200, name: "GH Pipeline" }),
@@ -744,7 +744,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
       if (!call) throw new Error("pipelines_create_pipeline tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const params = {
         project: "ProjectName",
@@ -762,7 +762,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_create_pipeline");
       if (!call) throw new Error("pipelines_create_pipeline tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         createPipeline: jest.fn().mockRejectedValue(new Error("API failure")),
@@ -788,7 +788,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_list_runs");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         listRuns: jest.fn().mockResolvedValue([{ id: 1, name: "run-1" }]),
@@ -810,7 +810,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_list_runs");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         listRuns: jest.fn().mockRejectedValue(new Error("Pipeline not found")),
@@ -831,7 +831,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         runPipeline: jest.fn().mockResolvedValue({ id: 456 }),
@@ -879,7 +879,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         runPipeline: jest.fn().mockResolvedValue({ id: 456, finalYaml: "final yaml" }),
@@ -908,7 +908,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const params = {
         project: "test-project",
@@ -924,7 +924,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         runPipeline: jest.fn().mockResolvedValue({}),
@@ -943,7 +943,7 @@ describe("configurePipelineTools", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run_pipeline");
       if (!call) fail("Tool not found");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPipelinesApi = {
         runPipeline: jest.fn().mockRejectedValue(new Error("API Error")),
