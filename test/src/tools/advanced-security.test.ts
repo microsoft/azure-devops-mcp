@@ -52,7 +52,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: PagedList<Alert> = [
         {
@@ -148,7 +148,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // First call - returns first page (simulating PagedList without continuation token in response)
       const firstPageMockResult: PagedList<Alert> = [
@@ -308,7 +308,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Failed to retrieve alerts");
       (mockAlertApi.getAlerts as jest.Mock).mockRejectedValue(testError);
@@ -330,7 +330,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue(null);
 
@@ -350,7 +350,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: PagedList<Alert> = [
         {
@@ -446,7 +446,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: PagedList<Alert> = [];
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue(mockResult);
@@ -476,7 +476,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: PagedList<Alert> = [];
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue(mockResult);
@@ -537,7 +537,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: PagedList<Alert> = [];
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue(mockResult);
@@ -590,7 +590,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: PagedList<Alert> = [];
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue(mockResult);
@@ -617,7 +617,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
       if (!call) throw new Error("advsec_get_alerts tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Test with non-Error exception (string)
       (mockAlertApi.getAlerts as jest.Mock).mockRejectedValue("String error");
@@ -640,7 +640,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: Alert = {
         alertId: 1,
@@ -686,7 +686,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResult: Alert = {
         alertId: 1,
@@ -724,7 +724,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Alert not found");
       (mockAlertApi.getAlert as jest.Mock).mockRejectedValue(testError);
@@ -747,7 +747,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Test with non-Error exception (string)
       (mockAlertApi.getAlert as jest.Mock).mockRejectedValue("String error");
@@ -769,7 +769,7 @@ describe("configureAdvSecTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alert_details");
       if (!call) throw new Error("advsec_get_alert_details tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockAlertApi.getAlert as jest.Mock).mockResolvedValue(null);
 

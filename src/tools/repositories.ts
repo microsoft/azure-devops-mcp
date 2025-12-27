@@ -149,6 +149,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
       labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
     },
+    {
+      title: "Create Pull Request",
+      destructiveHint: true,
+    },
     async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels }) => {
       try {
         const connection = await connectionProvider();
@@ -203,6 +207,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       branchName: z.string().describe("The name of the new branch to create, e.g., 'feature-branch'."),
       sourceBranchName: z.string().optional().default("main").describe("The name of the source branch to create the new branch from. Defaults to 'main'."),
       sourceCommitId: z.string().optional().describe("The commit ID to create the branch from. If not provided, uses the latest commit of the source branch."),
+    },
+    {
+      title: "Create Branch",
+      destructiveHint: true,
     },
     async ({ repositoryId, branchName, sourceBranchName, sourceCommitId }) => {
       try {
@@ -318,6 +326,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
       labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
     },
+    {
+      title: "Update Pull Request",
+      destructiveHint: true,
+    },
     async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels }) => {
       try {
         const connection = await connectionProvider();
@@ -415,6 +427,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       reviewerIds: z.array(z.string()).describe("List of reviewer ids to add or remove from the pull request."),
       action: z.enum(["add", "remove"]).describe("Action to perform on the reviewers. Can be 'add' or 'remove'."),
     },
+    {
+      title: "Update Pull Request Reviewers",
+      destructiveHint: true,
+    },
     async ({ repositoryId, pullRequestId, reviewerIds, action }) => {
       try {
         const connection = await connectionProvider();
@@ -468,6 +484,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().default(100).describe("The maximum number of repositories to return."),
       skip: z.number().default(0).describe("The number of repositories to skip. Defaults to 0."),
       repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."),
+    },
+    {
+      title: "List Repositories",
+      readOnlyHint: true,
     },
     async ({ project, top, skip, repoNameFilter }) => {
       try {
@@ -525,6 +545,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe("Filter pull requests by status. Defaults to 'Active'."),
       sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
       targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
+    },
+    {
+      title: "List Pull Requests",
+      readOnlyHint: true,
     },
     async ({ repositoryId, project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       try {
@@ -676,6 +700,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       authorEmail: z.string().optional().describe("Filter threads by the email of the thread author (first comment author)."),
       authorDisplayName: z.string().optional().describe("Filter threads by the display name of the thread author (first comment author). Case-insensitive partial matching."),
     },
+    {
+      title: "List Pull Request Threads",
+      readOnlyHint: true,
+    },
     async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName }) => {
       try {
         const connection = await connectionProvider();
@@ -742,6 +770,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       skip: z.number().default(0).describe("The number of comments to skip."),
       fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of trimmed data."),
     },
+    {
+      title: "List Thread Comments",
+      readOnlyHint: true,
+    },
     async ({ repositoryId, pullRequestId, threadId, project, top, skip, fullResponse }) => {
       try {
         const connection = await connectionProvider();
@@ -783,6 +815,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().default(100).describe("The maximum number of branches to return. Defaults to 100."),
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
+    {
+      title: "List Branches",
+      readOnlyHint: true,
+    },
     async ({ repositoryId, top, filterContains }) => {
       try {
         const connection = await connectionProvider();
@@ -813,6 +849,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().default(100).describe("The maximum number of branches to return."),
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
+    {
+      title: "List My Branches",
+      readOnlyHint: true,
+    },
     async ({ repositoryId, top, filterContains }) => {
       try {
         const connection = await connectionProvider();
@@ -841,6 +881,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       project: z.string().describe("Project name or ID where the repository is located."),
       repositoryNameOrId: z.string().describe("Repository name or ID."),
+    },
+    {
+      title: "Get Repository",
+      readOnlyHint: true,
     },
     async ({ project, repositoryNameOrId }) => {
       try {
@@ -877,6 +921,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       repositoryId: z.string().describe("The ID of the repository where the branch is located."),
       branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
+    },
+    {
+      title: "Get Branch",
+      readOnlyHint: true,
     },
     async ({ repositoryId, branchName }) => {
       try {
@@ -917,6 +965,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
+    },
+    {
+      title: "Get Pull Request",
+      readOnlyHint: true,
     },
     async ({ repositoryId, pullRequestId, includeWorkItemRefs, includeLabels }) => {
       try {
@@ -980,6 +1032,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       content: z.string().describe("The content of the comment to be added."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
       fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of a simple confirmation message."),
+    },
+    {
+      title: "Reply to Comment",
+      destructiveHint: true,
     },
     async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse }) => {
       try {
@@ -1048,6 +1104,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe(
           "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must be set if rightFileEndLine is also specified. (optional)"
         ),
+    },
+    {
+      title: "Create Comment Thread",
+      destructiveHint: true,
     },
     async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
       try {
@@ -1176,6 +1236,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .optional()
         .describe("The new status for the comment thread."),
     },
+    {
+      title: "Update Comment Thread",
+      destructiveHint: true,
+    },
     async ({ repositoryId, pullRequestId, threadId, project, status }) => {
       try {
         const connection = await connectionProvider();
@@ -1249,6 +1313,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       toDate: z.string().optional().describe("Filter commits to this date (ISO 8601 format, e.g., '2024-12-31T23:59:59Z')"),
       commitIds: z.array(z.string()).optional().describe("Array of specific commit IDs to retrieve. When provided, other filters are ignored except top/skip."),
       historySimplificationMode: z.enum(["FirstParent", "SimplifyMerges", "FullHistory", "FullHistorySimplifyMerges"]).optional().describe("How to simplify the commit history"),
+    },
+    {
+      title: "Search Commits",
+      readOnlyHint: true,
     },
     async ({
       project,
@@ -1410,6 +1478,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .optional()
         .default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit])
         .describe("Type of query to perform"),
+    },
+    {
+      title: "List Pull Requests by Commits",
+      readOnlyHint: true,
     },
     async ({ project, repository, commits, queryType }) => {
       try {

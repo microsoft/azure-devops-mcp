@@ -30,6 +30,10 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().optional().describe("The maximum number of teams to return. Defaults to 100."),
       skip: z.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),
     },
+    {
+      title: "List Project Teams",
+      readOnlyHint: true,
+    },
     async ({ project, mine, top, skip }) => {
       try {
         const connection = await connectionProvider();
@@ -64,6 +68,10 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
       continuationToken: z.number().optional().describe("Continuation token for pagination. Used to fetch the next set of results if available."),
       projectNameFilter: z.string().optional().describe("Filter projects by name. Supports partial matches."),
     },
+    {
+      title: "List Projects",
+      readOnlyHint: true,
+    },
     async ({ stateFilter, top, skip, continuationToken, projectNameFilter }) => {
       try {
         const connection = await connectionProvider();
@@ -95,6 +103,10 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve Azure DevOps identity IDs for a provided search filter.",
     {
       searchFilter: z.string().describe("Search filter (unique name, display name, email) to retrieve identity IDs for."),
+    },
+    {
+      title: "Get Identity IDs",
+      readOnlyHint: true,
     },
     async ({ searchFilter }) => {
       try {

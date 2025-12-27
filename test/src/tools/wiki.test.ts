@@ -55,7 +55,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
       if (!call) throw new Error("wiki_get_wiki tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockWiki = { id: "wiki1", name: "Test Wiki" };
       mockWikiApi.getWiki.mockResolvedValue(mockWiki);
@@ -76,7 +76,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
       if (!call) throw new Error("wiki_get_wiki tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Wiki not found");
       mockWikiApi.getWiki.mockRejectedValue(testError);
@@ -97,7 +97,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
       if (!call) throw new Error("wiki_get_wiki tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getWiki.mockResolvedValue(null);
 
@@ -117,7 +117,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_wiki");
       if (!call) throw new Error("wiki_get_wiki tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getWiki.mockRejectedValue("string error");
 
@@ -139,7 +139,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
       if (!call) throw new Error("wiki_list_wikis tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockWikis = [
         { id: "wiki1", name: "Wiki 1" },
@@ -162,7 +162,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
       if (!call) throw new Error("wiki_list_wikis tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Failed to fetch wikis");
       mockWikiApi.getAllWikis.mockRejectedValue(testError);
@@ -182,7 +182,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
       if (!call) throw new Error("wiki_list_wikis tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getAllWikis.mockResolvedValue(null);
 
@@ -201,7 +201,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_wikis");
       if (!call) throw new Error("wiki_list_wikis tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getAllWikis.mockRejectedValue("string error");
 
@@ -222,7 +222,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
       mockWikiApi.getPagesBatch.mockResolvedValue({ value: ["page1", "page2"] });
 
       const params = {
@@ -252,7 +252,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
       mockWikiApi.getPagesBatch.mockResolvedValue({ value: ["page1", "page2"] });
 
       const params = {
@@ -277,7 +277,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Failed to fetch wiki pages");
       mockWikiApi.getPagesBatch.mockRejectedValue(testError);
@@ -299,7 +299,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getPagesBatch.mockResolvedValue(null);
 
@@ -320,7 +320,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
       if (!call) throw new Error("wiki_list_pages tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getPagesBatch.mockRejectedValue("string error");
 
@@ -351,7 +351,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page");
       if (!call) throw new Error("wiki_get_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPageData = {
         id: 123,
@@ -390,7 +390,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page");
       if (!call) throw new Error("wiki_get_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockPageData = { id: 456, path: "/Documentation" };
 
@@ -415,7 +415,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page");
       if (!call) throw new Error("wiki_get_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockFetch.mockResolvedValue({
         ok: true,
@@ -439,7 +439,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page");
       if (!call) throw new Error("wiki_get_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockFetch.mockResolvedValue({
         ok: false,
@@ -464,7 +464,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page");
       if (!call) throw new Error("wiki_get_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockFetch.mockRejectedValue(new Error("Network error"));
 
@@ -486,7 +486,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock a stream-like object for getPageText
       const mockStream = {
@@ -520,7 +520,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Page not found");
       mockWikiApi.getPageText.mockRejectedValue(testError);
@@ -542,7 +542,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getPageText.mockResolvedValue(null);
 
@@ -563,7 +563,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock a stream that emits an error
       const mockStream = {
@@ -594,7 +594,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockWikiApi.getPageText.mockRejectedValue("string error");
 
@@ -615,7 +615,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockStream = {
         setEncoding: jest.fn(),
@@ -638,7 +638,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
       // Ensure token is returned
       (tokenProvider as jest.Mock).mockResolvedValueOnce("abc");
       const mockStream = {
@@ -672,7 +672,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
       (tokenProvider as jest.Mock).mockResolvedValueOnce("abc");
 
       const mockFetch = jest.fn();
@@ -704,7 +704,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
       const result = await handler({ url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1?pagePath=%2FHome", wikiIdentifier: "wiki1", project: "project" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Provide either 'url' OR 'wikiIdentifier'");
@@ -714,7 +714,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
       const result = await handler({ path: "/Home" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("You must provide either 'url' OR both 'wikiIdentifier' and 'project'");
@@ -724,7 +724,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const result = await handler({ url: "https://dev.azure.com/org/project/notwiki/wikis/wiki1?pagePath=%2FHome" });
       expect(result.isError).toBe(true);
@@ -735,7 +735,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const result = await handler({ url: "not-a-valid-url" });
       expect(result.isError).toBe(true);
@@ -746,7 +746,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValueOnce({ token: "abc", expiresOnTimestamp: Date.now() + 10000 });
 
@@ -768,7 +768,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const url = "https://dev.azure.com/org//_wiki/wikis/?pagePath=%2FHome";
       const result = await handler({ url });
@@ -781,7 +781,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockStream = {
         setEncoding: jest.fn(),
@@ -804,7 +804,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockStream = {
         setEncoding: jest.fn(),
@@ -827,7 +827,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValueOnce({ token: "abc", expiresOnTimestamp: Date.now() + 10000 });
 
@@ -873,7 +873,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResponse = {
         path: "/Home",
@@ -918,7 +918,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -964,7 +964,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -989,7 +989,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       mockFetch.mockRejectedValue(new Error("Network error"));
 
@@ -1010,7 +1010,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -1059,7 +1059,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -1109,7 +1109,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -1150,7 +1150,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -1200,7 +1200,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -1238,7 +1238,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -1280,7 +1280,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Throw a non-Error object
       mockFetch.mockRejectedValue("String error message");
@@ -1302,7 +1302,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResponse = {
         ok: true,
@@ -1335,7 +1335,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResponse = {
         ok: true,
@@ -1368,7 +1368,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockCreateResponse = {
         ok: false,
@@ -1401,7 +1401,7 @@ describe("configureWikiTools", () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_create_or_update_page");
       if (!call) throw new Error("wiki_create_or_update_page tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const mockResponse = {
         path: "/Home",

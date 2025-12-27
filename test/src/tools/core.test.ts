@@ -53,7 +53,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
 
       if (!call) throw new Error("core_list_projects tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
         {
@@ -126,7 +126,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
 
       if (!call) throw new Error("core_list_projects tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("API connection failed");
       (mockCoreApi.getProjects as jest.Mock).mockRejectedValue(testError);
@@ -151,7 +151,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
 
       if (!call) throw new Error("core_list_projects tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getProjects as jest.Mock).mockResolvedValue(null);
 
@@ -175,7 +175,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
 
       if (!call) throw new Error("core_list_projects tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getProjects as jest.Mock).mockRejectedValue("string error");
 
@@ -199,7 +199,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
 
       if (!call) throw new Error("core_list_projects tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
         {
@@ -248,7 +248,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
 
       if (!call) throw new Error("core_list_projects tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
         {
@@ -289,7 +289,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
 
       if (!call) throw new Error("core_list_project_teams tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([
         {
@@ -350,7 +350,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
 
       if (!call) throw new Error("core_list_project_teams tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       const testError = new Error("Team not found");
       (mockCoreApi.getTeams as jest.Mock).mockRejectedValue(testError);
@@ -375,7 +375,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
 
       if (!call) throw new Error("core_list_project_teams tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getTeams as jest.Mock).mockResolvedValue(null);
 
@@ -399,7 +399,7 @@ describe("configureCoreTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
 
       if (!call) throw new Error("core_list_project_teams tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (mockCoreApi.getTeams as jest.Mock).mockRejectedValue("string error");
 
@@ -433,7 +433,7 @@ describe("configureCoreTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
       if (!call) throw new Error("core_get_identity_ids tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock token provider
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
@@ -499,7 +499,7 @@ describe("configureCoreTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
       if (!call) throw new Error("core_get_identity_ids tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
       const mockConnectionWithUrl = {
@@ -527,7 +527,7 @@ describe("configureCoreTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
       if (!call) throw new Error("core_get_identity_ids tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
       const mockConnectionWithUrl = {
@@ -554,7 +554,7 @@ describe("configureCoreTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
       if (!call) throw new Error("core_get_identity_ids tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
       const mockConnectionWithUrl = {
@@ -581,7 +581,7 @@ describe("configureCoreTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
       if (!call) throw new Error("core_get_identity_ids tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
       const mockConnectionWithUrl = {
@@ -605,7 +605,7 @@ describe("configureCoreTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
       if (!call) throw new Error("core_get_identity_ids tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
       const mockConnectionWithUrl = {
@@ -629,7 +629,7 @@ describe("configureCoreTools", () => {
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_get_identity_ids");
       if (!call) throw new Error("core_get_identity_ids tool not registered");
-      const [, , , handler] = call;
+      const [, , , , handler] = call;
 
       // Mock token provider error
       (tokenProvider as jest.Mock).mockRejectedValue(new Error("Token acquisition failed"));

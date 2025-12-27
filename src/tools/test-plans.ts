@@ -28,6 +28,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       includePlanDetails: z.boolean().default(false).describe("Include detailed information about each test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
+    {
+      title: "List Test Plans",
+      readOnlyHint: true,
+    },
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
       try {
         const owner = ""; //making owner an empty string untill we can figure out how to get owner id
@@ -60,6 +64,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       startDate: z.string().optional().describe("The start date of the test plan"),
       endDate: z.string().optional().describe("The end date of the test plan"),
       areaPath: z.string().optional().describe("The area path for the test plan"),
+    },
+    {
+      title: "Create Test Plan",
+      destructiveHint: true,
     },
     async ({ project, name, iteration, description, startDate, endDate, areaPath }) => {
       try {
@@ -99,6 +107,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       parentSuiteId: z.number().describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
       name: z.string().describe("Name of the child test suite"),
     },
+    {
+      title: "Create Test Suite",
+      destructiveHint: true,
+    },
     async ({ project, planId, parentSuiteId, name }) => {
       try {
         const connection = await connectionProvider();
@@ -136,6 +148,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       planId: z.number().describe("The ID of the test plan."),
       suiteId: z.number().describe("The ID of the test suite."),
       testCaseIds: z.string().or(z.array(z.string())).describe("The ID(s) of the test case(s) to add. "),
+    },
+    {
+      title: "Add Test Cases to Suite",
+      destructiveHint: true,
     },
     async ({ project, planId, suiteId, testCaseIds }) => {
       try {
@@ -176,6 +192,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       areaPath: z.string().optional().describe("The area path for the test case."),
       iterationPath: z.string().optional().describe("The iteration path for the test case."),
       testsWorkItemId: z.number().optional().describe("Optional work item id that will be set as a Microsoft.VSTS.Common.TestedBy-Reverse link to the test case."),
+    },
+    {
+      title: "Create Test Case",
+      destructiveHint: true,
     },
     async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId }) => {
       try {
@@ -265,6 +285,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
           "The steps to reproduce the test case. Make sure to format each step as '1. Step one|Expected result one\n2. Step two|Expected result two. USE '|' as the delimiter between step and expected result. DO NOT use '|' in the description of the step or expected result."
         ),
     },
+    {
+      title: "Update Test Case Steps",
+      destructiveHint: true,
+    },
     async ({ id, steps }) => {
       try {
         const connection = await connectionProvider();
@@ -309,6 +333,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       planid: z.number().describe("The ID of the test plan."),
       suiteid: z.number().describe("The ID of the test suite."),
     },
+    {
+      title: "List Test Cases",
+      readOnlyHint: true,
+    },
     async ({ project, planid, suiteid }) => {
       try {
         const connection = await connectionProvider();
@@ -334,6 +362,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       buildid: z.number().describe("The ID of the build."),
+    },
+    {
+      title: "Get Test Results from Build",
+      readOnlyHint: true,
     },
     async ({ project, buildid }) => {
       try {
@@ -361,6 +393,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       planId: z.number().describe("The ID of the test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
+    },
+    {
+      title: "List Test Suites",
+      readOnlyHint: true,
     },
     async ({ project, planId, continuationToken }) => {
       try {

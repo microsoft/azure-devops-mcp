@@ -49,6 +49,10 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
       orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("severity").describe("Order results by specified field. Defaults to 'severity'."),
       continuationToken: z.string().optional().describe("Continuation token for pagination."),
     },
+    {
+      title: "Get Security Alerts",
+      readOnlyHint: true,
+    },
     async ({ project, repository, alertType, states, severities, ruleId, ruleName, toolName, ref, onlyDefaultBranch, confidenceLevels, validity, top, orderBy, continuationToken }) => {
       try {
         const connection = await connectionProvider();
@@ -105,6 +109,10 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
       repository: z.string().describe("The name or ID of the repository containing the alert."),
       alertId: z.number().describe("The ID of the alert to retrieve details for."),
       ref: z.string().optional().describe("Git reference (branch) to filter the alert."),
+    },
+    {
+      title: "Get Alert Details",
+      readOnlyHint: true,
     },
     async ({ project, repository, alertId, ref }) => {
       try {
