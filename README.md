@@ -1,37 +1,72 @@
-# ⭐ Azure DevOps MCP Server
+# ⭐ Azure DevOps MCP Server (WEM fork)
 
-Easily install the Azure DevOps MCP Server for VS Code or VS Code Insiders:
+Easily install the Azure DevOps MCP (WEM fork) Server for VS Code:
 
-[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install_AzureDevops_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
-[![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_AzureDevops_MCP_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&quality=insiders&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
+[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install_AzureDevops_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado_op&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40web-marketing-hr%2Fazure-devops-mcp%22%2C%20%22_DEVOPS_PROJECT_NAME_HERE_%22%2C%20%22--authentication%22%2C%20%22envvar%22%5D%7D)
 
-This TypeScript project provides a **local** MCP server for Azure DevOps, enabling you to perform a wide range of Azure DevOps tasks directly from your code editor.
+This TypeScript project provides an MCP server for Azure DevOps, enabling you to perform a wide range of Azure DevOps tasks directly from your code editor.
+This WEB Marketing fork adds support for Azure DevOps Server (on-premises).
 
 ## WEB Marketing fork goals
 
-1. Add option to use on premise DevOps
-2. Add option to set DevOps API version
+1. Add support for Azure DevOps Server (on-premises)
+2. Add support for configuring API versions to work with older Azure DevOps Server releases
 
 ### Added Environment variables
 
-- `apiVersion`:
-  - set DevOps API version
-  - default: `"7.2-preview.1"`
-  - env: `ADO_MCP_API_VERSION`
-- `batchApiVersion`:
-  - set DevOps Batch API version
-  - default: `"5.0"`
-  - env: `ADO_MCP_BATCH_API_VERSION`
-- `markdownCommentsApiVersion`:
-  - set DevOps Markdown API version
-  - default: `"7.2-preview.4"`
-  - env: `ADO_MCP_MARKDOWN_COMMENTS_API_VERSION`
+- `ADO_MCP_AUTH_TOKEN`:
+  - DevOps Personal Access Token (PAT)
 - `ADO_MCP_MODE`:
-  - set DevOps Server mode On Premise or on Azure
-  - `"cloud"` (default) ili `"onprem"`
+  - Whether Azure DevOps is on-premises or in the cloud
+  - `"cloud"` (default) or `"onprem"`
+- `ADO_MCP_AUTH_TYPE`
+  - DevOps authentication mode
+  - `"bearer"` (default) or `"basic"`
 - `ADO_MCP_ORG_URL`:
-  - full URL of on premise instance, for example:
-    `https://my-server/tfs/MyCollection` ili `https://devops.moja-firma.hr/MyCollection`
+  - Full URL of the on-premises instance, for example:
+    `https://my-server/tfs/MyCollection` or `https://devops.moja-firma.hr/MyCollection`
+- `ADO_MCP_API_VERSION`:
+  - Set Azure DevOps API version
+  - default: `"6.0-preview"`
+- `ADO_MCP_BATCH_API_VERSION`:
+  - Set Azure DevOps Batch API version
+  - default: `"6.0-preview"`
+- `ADO_MCP_MARKDOWN_COMMENTS_API_VERSION`:
+  - Set Azure DevOps Markdown API version
+  - default: `"5.0"`
+
+### Set environment variables in mcp.json
+
+You can set environment variables in `mcp.json`, for example:
+
+```json
+{
+  "servers": {
+    "ado_op": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "<your_devops_project_name>", "--authentication", "envvar"],
+      "env": {
+        "LOG_LEVEL": "info",
+        "ADO_MCP_MODE": "onprem",
+        "ADO_MCP_AUTH_TYPE": "basic",
+        "ADO_MCP_ORG_URL": "https://<on-prem-host>/tfs/<collection_name>",
+        "ADO_MCP_API_VERSION": "6.0-preview",
+        "ADO_MCP_BATCH_API_VERSION": "5.0",
+        "ADO_MCP_MARKDOWN_COMMENTS_API_VERSION": "5.0"
+      }
+    }
+  }
+}
+```
+
+It's recommended to set `ADO_MCP_AUTH_TOKEN` in your terminal or command line. Windows example:
+
+```
+setx ADO_MCP_AUTH_TOKEN "<pat_token>"
+```
+
+## Upstream README
 
 ## 📄 Table of Contents
 

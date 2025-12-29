@@ -80,20 +80,19 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
-  logger.info("Starting Azure DevOps MCP Server", {
+  logger.info("Starting Azure DevOps MCP Server v" + packageVersion);
+
+  logger.info("Used params and settings", {
     organization: orgName,
     organizationUrl: orgUrl,
-    deploymentMode,
+    deploymentMode: deploymentMode,
     authentication: argv.authentication,
-    tenant: argv.tenant,
-    domains: argv.domains,
     enabledDomains: Array.from(enabledDomains),
     version: packageVersion,
-    isCodespace: isGitHubCodespaceEnv(),
   });
 
   const server = new McpServer({
-    name: "Azure DevOps On Premise MCP Server",
+    name: "DevOps MCP Server - WEM Fork (On Premise)",
     version: packageVersion,
     icons: [
       {

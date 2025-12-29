@@ -2,9 +2,9 @@
 // Licensed under the MIT License.
 
 // API versions – overridable via environment for on-prem / older servers
-export const apiVersion = process.env.ADO_MCP_API_VERSION || "7.2-preview.1";
-export const batchApiVersion = process.env.ADO_MCP_BATCH_API_VERSION || "5.0";
-export const markdownCommentsApiVersion = process.env.ADO_MCP_MARKDOWN_COMMENTS_API_VERSION || "7.2-preview.4";
+export const apiVersion = process.env.ADO_MCP_API_VERSION || "6.0-preview";
+export const batchApiVersion = process.env.ADO_MCP_BATCH_API_VERSION || "6.0-preview";
+export const markdownCommentsApiVersion = process.env.ADO_MCP_MARKDOWN_COMMENTS_API_VERSION || "5.0";
 
 export type AzureDevOpsDeploymentMode = "cloud" | "onprem";
 

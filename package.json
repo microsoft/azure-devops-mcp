@@ -1,6 +1,6 @@
 {
   "name": "@web-marketing-hr/azure-devops-mcp",
-  "version": "2.3.6",
+  "version": "2.3.10",
   "description": "MCP server for interacting with Azure DevOps (on-premises) WEM fork",
   "license": "MIT",
   "author": "Microsoft Corporation, WEB Marketing d.o.o. Fork",
