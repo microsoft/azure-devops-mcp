@@ -485,8 +485,8 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         state: safeEnumConvert(StageUpdateType, status),
       };
 
-			const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-			const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + token).toString("base64")}` : `Bearer ${token}`;
+      const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+      const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + token).toString("base64")}` : `Bearer ${token}`;
 
       const response = await fetch(endpoint, {
         method: "PATCH",

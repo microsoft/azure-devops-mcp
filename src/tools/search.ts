@@ -33,11 +33,11 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     async ({ searchText, project, repository, path, branch, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const connection = await connectionProvider();
-			const baseUrl = connection.serverUrl.replace(/\/$/, "");
-			const isOnPrem = process.env["ADO_MCP_MODE"] === "onprem";
-			const url = isOnPrem
-				? `${baseUrl}/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`
-				:  `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
+      const baseUrl = connection.serverUrl.replace(/\/$/, "");
+      const isOnPrem = process.env["ADO_MCP_MODE"] === "onprem";
+      const url = isOnPrem
+        ? `${baseUrl}/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`
+        : `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -55,9 +55,9 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       if (Object.keys(filters).length > 0) {
         requestBody.filters = filters;
       }
-			
-			const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-			const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+
+      const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+      const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -97,12 +97,12 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     },
     async ({ searchText, project, wiki, includeFacets, skip, top }) => {
       const connection = await connectionProvider();
-			const accessToken = await tokenProvider();
-			const baseUrl = connection.serverUrl.replace(/\/$/, "");
-			const isOnPrem = process.env["ADO_MCP_MODE"] === "onprem";
-			const url = isOnPrem
-				? `${baseUrl}/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`
-				:  `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
+      const accessToken = await tokenProvider();
+      const baseUrl = connection.serverUrl.replace(/\/$/, "");
+      const isOnPrem = process.env["ADO_MCP_MODE"] === "onprem";
+      const url = isOnPrem
+        ? `${baseUrl}/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`
+        : `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -118,8 +118,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       if (Object.keys(filters).length > 0) {
         requestBody.filters = filters;
       }
-			const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-			const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+      const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+      const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -156,14 +156,13 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       top: z.number().default(10).describe("Number of results to return"),
     },
     async ({ searchText, project, areaPath, workItemType, state, assignedTo, includeFacets, skip, top }) => {
-
       const connection = await connectionProvider();
-			const accessToken = await tokenProvider();
-			const baseUrl = connection.serverUrl.replace(/\/$/, "");
-			const isOnPrem = process.env["ADO_MCP_MODE"] === "onprem";
-			const url = isOnPrem
-				? `${baseUrl}/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`
-				:  `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
+      const accessToken = await tokenProvider();
+      const baseUrl = connection.serverUrl.replace(/\/$/, "");
+      const isOnPrem = process.env["ADO_MCP_MODE"] === "onprem";
+      const url = isOnPrem
+        ? `${baseUrl}/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`
+        : `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -183,8 +182,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         requestBody.filters = filters;
       }
 
-			const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-			const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+      const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+      const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
       const response = await fetch(url, {
         method: "POST",
         headers: {

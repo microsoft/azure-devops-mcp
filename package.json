@@ -1,14 +1,16 @@
 {
-  "name": "@azure-devops-op/mcp",
-  "version": "2.3.4",
-  "description": "MCP server for interacting with Azure DevOps (on-premises)",
+  "name": "@web-marketing-hr/azure-devops-mcp",
+  "version": "2.3.5",
+  "description": "MCP server for interacting with Azure DevOps (on-premises) WEM fork",
   "license": "MIT",
   "author": "Microsoft Corporation, WEB Marketing d.o.o. Fork",
-  "homepage": "https://github.com/microsoft/azure-devops-mcp",
-  "bugs": "https://github.com/microsoft/azure-devops-mcp/issues",
+  "homepage": "https://github.com/WEB-Marketing-d-o-o/azure-devops-mcp",
+  "bugs": {
+    "url": "https://github.com/WEB-Marketing-d-o-o/azure-devops-mcp/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/microsoft/azure-devops-mcp.git"
+    "url": "git+https://github.com/WEB-Marketing-d-o-o/azure-devops-mcp.git"
   },
   "type": "module",
   "bin": {
@@ -39,7 +41,7 @@
   "dependencies": {
     "@azure/identity": "^4.10.0",
     "@azure/msal-node": "^3.6.0",
-    "@modelcontextprotocol/sdk": "1.23.0",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "azure-devops-extension-api": "^4.252.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.0",
@@ -70,5 +72,15 @@
     "**/*.(js|ts|jsx|tsx|json|css|md)": [
       "npm run format"
     ]
-  }
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "keywords": [
+    "DevOps",
+    "OnPremise",
+    "MCP"
+  ]
 }

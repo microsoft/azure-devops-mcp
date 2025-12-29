@@ -289,8 +289,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           text: comment,
         };
 
-				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+        const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+        const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
         const formatParameter = format === "markdown" ? 0 : 1;
         const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
@@ -487,8 +487,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           };
         });
 
-				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+        const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+        const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
         const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
           method: "PATCH",
@@ -880,8 +880,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           };
         });
 
-				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+        const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+        const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
         const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
           method: "PATCH",
@@ -963,8 +963,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             })),
         }));
 
-				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+        const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+        const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
         const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
           method: "PATCH",
