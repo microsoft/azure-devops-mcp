@@ -9,6 +9,8 @@ import { apiVersion } from "../utils.js";
 import { orgName } from "../index.js";
 import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { GitItem } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { log } from "console";
+import { logger } from "logger.js";
 
 const SEARCH_TOOLS = {
   search_code: "search_code",
@@ -58,6 +60,13 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
 
       const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
       const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+
+			logger.debug("Search Code Tool Request", {
+				IsBasicAuth: isBasicAuth,
+				Url: url,
+				Request: requestBody,
+			});
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -68,11 +77,18 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         body: JSON.stringify(requestBody),
       });
 
+      const resultText = await response.text();
+
+			logger.debug("Search Code Tool Response", {
+				Status: response.status,
+				StatusText: response.statusText,
+				ResponseText: resultText
+			});
+
       if (!response.ok) {
         throw new Error(`Azure DevOps Code Search API error: ${response.status} ${response.statusText}`);
       }
 
-      const resultText = await response.text();
       const resultJson = JSON.parse(resultText) as { results?: SearchResult[] };
 
       const gitApi = await connection.getGitApi();
@@ -120,7 +136,14 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       }
       const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
       const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
-      const response = await fetch(url, {
+
+			logger.debug("Search Wiki Tool Request", {
+				IsBasicAuth: isBasicAuth,
+				Url: url,
+				Request: requestBody,
+			});
+
+			const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -130,11 +153,17 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         body: JSON.stringify(requestBody),
       });
 
-      if (!response.ok) {
+      const result = await response.text();
+			logger.debug("Search Wiki Tool Response", {
+				Status: response.status,
+				StatusText: response.statusText,
+				ResponseText: result
+			});
+
+			if (!response.ok) {
         throw new Error(`Azure DevOps Wiki Search API error: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.text();
       return {
         content: [{ type: "text", text: result }],
       };
@@ -184,6 +213,13 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
 
       const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
       const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+
+			logger.debug("Search Work Item Tool Request", {
+				IsBasicAuth: isBasicAuth,
+				Url: url,
+				Request: requestBody,
+			});
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -193,12 +229,18 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         },
         body: JSON.stringify(requestBody),
       });
+      const result = await response.text();
 
-      if (!response.ok) {
+			logger.debug("Search Work Item Tool Response", {
+				Status: response.status,
+				StatusText: response.statusText,
+				ResponseText: result
+			});
+
+			if (!response.ok) {
         throw new Error(`Azure DevOps Work Item Search API error: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.text();
       return {
         content: [{ type: "text", text: result }],
       };
