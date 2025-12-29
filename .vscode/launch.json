@@ -9,7 +9,7 @@
       "runtimeArgs": ["tsx", "src/index.ts", "WEM", "--authentication", "envvar"],
       "cwd": "w:/Code/github/azure-devops-mcp",
       "env": {
-        "ADO_MCP_AUTH_TOKEN": "6tawxdh26ptixjs3z5c3ork5yi3qesng7cpvs3agpw3hwcztcnra",
+        "ADO_MCP_AUTH_TOKEN": "here_goes_a_devops_pat_token",
         "ADO_MCP_MODE": "onprem",
         "ADO_MCP_AUTH_TYPE": "basic",
         "ADO_MCP_ORG_URL": "https://tfs.wem.hr:10120/tfs/New",
