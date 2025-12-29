@@ -153,8 +153,8 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const url = `${baseUrl}/${project}/_apis/wiki/wikis/${wikiIdentifier}/pages?${params.toString()}`;
 
-				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+        const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+        const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
         const response = await fetch(url, {
           headers: {
@@ -237,10 +237,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
               const baseUrl = connection.serverUrl.replace(/\/$/, "");
               const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages/${parsed.pageId}?includeContent=true&api-version=7.1`;
 
-							const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-							const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+              const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+              const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
-							const resp = await fetch(restUrl, {
+              const resp = await fetch(restUrl, {
                 headers: {
                   "Authorization": authHeader,
                   "User-Agent": userAgentProvider(),
@@ -311,8 +311,8 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         const projectParam = project || "";
         const url = `${baseUrl}/${projectParam}/_apis/wiki/wikis/${wikiIdentifier}/pages?path=${encodedPath}&versionDescriptor.versionType=branch&versionDescriptor.version=${encodeURIComponent(branch)}&api-version=7.1`;
 
-				const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
-				const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
+        const isBasicAuth = process.env["ADO_MCP_AUTH_TYPE"] == "basic";
+        const authHeader = isBasicAuth ? `Basic ${Buffer.from(":" + accessToken).toString("base64")}` : `Bearer ${accessToken}`;
 
         // First, try to create a new page (PUT without ETag)
         try {

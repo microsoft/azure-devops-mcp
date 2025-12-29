@@ -1,0 +1,22 @@
+{
+  "version": "2.3.5",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug MCP (TS)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/index.ts", "WEM", "--authentication", "envvar"],
+      "cwd": "w:/Code/github/azure-devops-mcp",
+      "env": {
+        "ADO_MCP_MODE": "onprem",
+        "ADO_MCP_AUTH_TYPE": "basic",
+        "ADO_MCP_ORG_URL": "https://tfs.wem.hr:10120/tfs/New",
+        "ADO_MCP_API_VERSION": "6.0-preview",
+        "ADO_MCP_BATCH_API_VERSION": "4.1",
+        "ADO_MCP_MARKDOWN_COMMENTS_API_VERSION": "6.0-preview"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}
