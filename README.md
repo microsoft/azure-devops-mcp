@@ -39,7 +39,7 @@ This WEB Marketing fork adds support for Azure DevOps Server (on-premises).
 
 You can set environment variables in `mcp.json`, for example:
 
-```json
+````json
 {
   "servers": {
     "ado_op": {
@@ -58,13 +58,13 @@ You can set environment variables in `mcp.json`, for example:
     }
   }
 }
-```
+```json
 
 It's recommended to set `ADO_MCP_AUTH_TOKEN` in your terminal or command line. Windows example:
 
-```
+``` terminal
 setx ADO_MCP_AUTH_TOKEN "<pat_token>"
-```
+````
 
 ## Upstream README
 
