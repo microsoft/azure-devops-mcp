@@ -63,13 +63,11 @@ In your project, add a `.vscode\mcp.json` file with the following content:
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+      "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "${input:ado_org}"]
     }
   }
 }
 ```
-
-Save the file, then click 'Start'.
 
 ![start mcp server](../docs/media/start-mcp-server.gif)
 
@@ -112,7 +110,7 @@ For automated scenarios or when you want to use a token stored in an environment
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
+         "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "${input:ado_org}", "--authentication", "envvar"]
        }
      }
    }
@@ -194,7 +192,7 @@ Add a `.mcp.json` file to the solution folder with the following content:
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+      "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "${input:ado_org}"]
     }
   }
 }
@@ -232,7 +230,7 @@ See https://docs.anthropic.com/en/docs/claude-code/mcp for general guidance on a
 For the Azure DevOps MCP Server, use the following command:
 
 ```bash
-claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
+claude mcp add azure-devops -- npx -y @web-marketing-hr/azure-devops-mcp Contoso
 ```
 
 Replace `Contoso` with your own organization name
@@ -250,7 +248,7 @@ Open the configuration file in your preferred editor (e.g., VS Code) and add the
   "mcpServers": {
     "ado": {
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "{Contoso}"]
+      "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "{Contoso}"]
     }
   }
 }
@@ -275,7 +273,7 @@ To integrate the Azure DevOps MCP Server with Cursor, create a `.cursor\mcp.json
   "mcpServers": {
     "ado": {
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "{Contoso}"]
+      "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "{Contoso}"]
     }
   }
 }
@@ -292,7 +290,7 @@ Save the file, and when Cursor detects the MCP Server, click **Enable**.
 Open the terminal and start the MCP Server with:
 
 ```bash
-npx -y @azure-devops/mcp {Contoso}
+npx -y @web-marketing-hr/azure-devops-mcp {Contoso}
 ```
 
 Replace `Contoso` with your Azure DevOps organization.
