@@ -9,8 +9,8 @@
   "servers": {
     "ado_op": {
       "type": "stdio",
-      "command": "mcp-server-azuredevops_op",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"],
+      "command": "npx",
+      "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "${input:ado_org}", "--authentication", "envvar"],
       "env": {
         "LOG_LEVEL": "debug",
         "ADO_MCP_MODE": "onprem",
