@@ -3,10 +3,10 @@ name: Build MCP Server
 on:
   push:
     branches:
-      - main
+      - main_disabled
   pull_request:
     branches:
-      - "main"
+      - "main_disabled"
 
 permissions:
   contents: read
