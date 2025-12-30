@@ -61,7 +61,7 @@ For automated scenarios or when you want to use a token stored in an environment
 2. **Use the envvar authentication type:**
 
    ```bash
-   npx @azure-devops/mcp myorg --authentication envvar
+   npx @web-marketing-hr/azure-devops-mcp myorg --authentication envvar
    ```
 
 3. **For MCP configuration files, update your `.vscode/mcp.json`:**
@@ -78,7 +78,7 @@ For automated scenarios or when you want to use a token stored in an environment
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
+         "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "${input:ado_org}", "--authentication", "envvar"]
        }
      }
    }
@@ -136,7 +136,7 @@ Try using Azure login context instead:
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "azcli"]
+         "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "${input:ado_org}", "--authentication", "azcli"]
        }
      }
    }
@@ -190,7 +190,7 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "azcli", "--tenant", "${input:ado_tenant}"]
+         "args": ["-y", "@web-marketing-hr/azure-devops-mcp", "${input:ado_org}", "--authentication", "azcli", "--tenant", "${input:ado_tenant}"]
        }
      }
    }
