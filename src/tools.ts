@@ -6,6 +6,7 @@ import { WebApi } from "azure-devops-node-api";
 
 import { Domain } from "./shared/domains.js";
 import { configureAdvSecTools } from "./tools/advanced-security.js";
+import { configureArtifactTools } from "./tools/artifacts.js";
 import { configurePipelineTools } from "./tools/pipelines.js";
 import { configureCoreTools } from "./tools/core.js";
 import { configureRepoTools } from "./tools/repositories.js";
@@ -31,6 +32,7 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<strin
   configureIfDomainEnabled(Domain.TEST_PLANS, () => configureTestPlanTools(server, tokenProvider, connectionProvider));
   configureIfDomainEnabled(Domain.SEARCH, () => configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider));
   configureIfDomainEnabled(Domain.ADVANCED_SECURITY, () => configureAdvSecTools(server, tokenProvider, connectionProvider));
+  configureIfDomainEnabled(Domain.ARTIFACTS, () => configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider));
 }
 
 export { configureAllTools };
