@@ -61,9 +61,9 @@ function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<
         const fullDestinationPath = resolve(destinationPath);
 
         mkdirSync(fullDestinationPath, { recursive: true });
-        const tempFilePath = join(fullDestinationPath, `${artifactName}.zip`);
+        const fileDestinationPath = join(fullDestinationPath, `${artifactName}.zip`);
 
-        const writeStream = createWriteStream(tempFilePath);
+        const writeStream = createWriteStream(fileDestinationPath);
         await new Promise<void>((resolve, reject) => {
           fileStream.pipe(writeStream);
           fileStream.on("end", () => resolve());
