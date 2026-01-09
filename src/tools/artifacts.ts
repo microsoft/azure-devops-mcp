@@ -15,7 +15,7 @@ const ARTIFACT_TOOLS = {
   read_pipeline_artifact_file: "read_pipeline_artifact_file",
 };
 
-function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     ARTIFACT_TOOLS.list_pipeline_artifacts,
     "List artifacts for a given build.",
