@@ -101,6 +101,28 @@ Get detailed information about a specific Advanced Security alert.
 - **Required**: `project`, `repository`, `alertId`
 - **Optional**: `ref`
 
+## Artifacts
+
+### list_pipeline_artifacts
+
+List artifacts for a given build.
+
+- **Required**: `project`, `buildId`
+
+### download_pipeline_artifact
+
+Download a pipeline artifact.
+
+- **Required**: `project`, `buildId`, `artifactName`
+- **Optional**: `destinationPath`
+
+### read_pipeline_artifact_file
+
+Read a file from a pipeline artifact.
+
+- **Required**: `containerId`, `itemPath`
+- **Optional**: `isShallow`, `asText`
+
 ## Core
 
 ### mcp_ado_core_list_projects

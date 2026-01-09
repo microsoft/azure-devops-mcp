@@ -262,9 +262,7 @@ describe("configureArtifactTools", () => {
       const [, , , handler] = call;
       const params = {
         containerId: "123456",
-        itemPath: "/logs/build.log",
-        isShallow: false,
-        asText: true,
+        itemPath: "/logs/build.log"
       };
 
       const result = await handler(params);
