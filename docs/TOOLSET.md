@@ -116,13 +116,6 @@ Download a pipeline artifact.
 - **Required**: `project`, `buildId`, `artifactName`
 - **Optional**: `destinationPath`
 
-### read_pipeline_artifact_file
-
-Read a file from a pipeline artifact.
-
-- **Required**: `containerId`, `itemPath`
-- **Optional**: `isShallow`, `asText`
-
 ## Core
 
 ### mcp_ado_core_list_projects
