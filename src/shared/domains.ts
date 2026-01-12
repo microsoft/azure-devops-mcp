@@ -8,7 +8,6 @@ import { logger } from "../logger.js";
  */
 export enum Domain {
   ADVANCED_SECURITY = "advanced-security",
-  ARTIFACTS = "artifacts",
   PIPELINES = "pipelines",
   CORE = "core",
   REPOSITORIES = "repositories",

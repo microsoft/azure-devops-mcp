@@ -8,6 +8,8 @@ import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/int
 import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
+import { mkdirSync, createWriteStream } from "fs";
+import { join, resolve } from "path";
 
 const PIPELINE_TOOLS = {
   pipelines_get_builds: "pipelines_get_builds",
@@ -22,6 +24,8 @@ const PIPELINE_TOOLS = {
   pipelines_get_run: "pipelines_get_run",
   pipelines_list_runs: "pipelines_list_runs",
   pipelines_run_pipeline: "pipelines_run_pipeline",
+  pipelines_list_artifacts: "pipelines_list_artifacts",
+  pipelines_download_artifact: "pipelines_download_artifact",
 };
 
 function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -504,6 +508,91 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
       return {
         content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    PIPELINE_TOOLS.pipelines_list_artifacts,
+    "List artifacts for a given build.",
+    {
+      project: z.string().describe("The name or ID of the project."),
+      buildId: z.number().describe("The ID of the build."),
+    },
+    async ({ project, buildId }) => {
+      const connection = await connectionProvider();
+      const buildApi = await connection.getBuildApi();
+      const artifacts = await buildApi.getArtifacts(project, buildId);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(artifacts, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    PIPELINE_TOOLS.pipelines_download_artifact,
+    "Download a pipeline artifact.",
+    {
+      project: z.string().describe("The name or ID of the project."),
+      buildId: z.number().describe("The ID of the build."),
+      artifactName: z.string().describe("The name of the artifact to download."),
+      destinationPath: z.string().optional().describe("The local path to download the artifact to. If not provided, returns binary content as base64."),
+    },
+    async ({ project, buildId, artifactName, destinationPath }) => {
+      const connection = await connectionProvider();
+      const buildApi = await connection.getBuildApi();
+      const artifact = await buildApi.getArtifact(project, buildId, artifactName);
+
+      if (!artifact) {
+        return {
+          content: [{ type: "text", text: `Artifact ${artifactName} not found in build ${buildId}.` }],
+        };
+      }
+
+      const fileStream = await buildApi.getArtifactContentZip(project, buildId, artifactName);
+
+      // If destinationPath is provided, save to disk
+      if (destinationPath) {
+        const fullDestinationPath = resolve(destinationPath);
+
+        mkdirSync(fullDestinationPath, { recursive: true });
+        const fileDestinationPath = join(fullDestinationPath, `${artifactName}.zip`);
+
+        const writeStream = createWriteStream(fileDestinationPath);
+        await new Promise<void>((resolve, reject) => {
+          fileStream.pipe(writeStream);
+          fileStream.on("end", () => resolve());
+          fileStream.on("error", (err) => reject(err));
+        });
+
+        return {
+          content: [{ type: "text", text: `Artifact ${artifactName} downloaded to ${destinationPath}.` }],
+        };
+      }
+
+      // Otherwise, return binary content as base64
+      const chunks: Buffer[] = [];
+      await new Promise<void>((resolve, reject) => {
+        fileStream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        fileStream.on("end", () => resolve());
+        fileStream.on("error", (err) => reject(err));
+      });
+
+      const buffer = Buffer.concat(chunks);
+      const base64Data = buffer.toString("base64");
+
+      return {
+        content: [
+          {
+            type: "resource",
+            resource: {
+              uri: `data:application/zip;base64,${base64Data}`,
+              mimeType: "application/zip",
+              text: base64Data,
+            },
+          },
+        ],
       };
     }
   );
