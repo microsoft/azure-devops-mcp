@@ -101,21 +101,6 @@ Get detailed information about a specific Advanced Security alert.
 - **Required**: `project`, `repository`, `alertId`
 - **Optional**: `ref`
 
-## Artifacts
-
-### list_pipeline_artifacts
-
-List artifacts for a given build.
-
-- **Required**: `project`, `buildId`
-
-### download_pipeline_artifact
-
-Download a pipeline artifact.
-
-- **Required**: `project`, `buildId`, `artifactName`
-- **Optional**: `destinationPath`
-
 ## Core
 
 ### mcp_ado_core_list_projects
@@ -224,6 +209,19 @@ Updates the stage of a specific build.
 
 - **Required**: `project`, `buildId`, `stageName`, `status`
 - **Optional**: `forceRetryAllJobs`
+
+### mcp_ado_pipelines_list_artifacts
+
+Lists artifacts for a given build.
+
+- **Required**: `project`, `buildId`
+
+### mcp_ado_pipelines_download_artifact
+
+Downloads a pipeline artifact.
+
+- **Required**: `project`, `buildId`, `artifactName`
+- **Optional**: `destinationPath`
 
 ## Repositories
 
