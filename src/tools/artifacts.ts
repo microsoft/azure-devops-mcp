@@ -3,7 +3,6 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { apiVersion } from "../utils.js";
 import { z } from "zod";
 
 import { mkdirSync, createWriteStream } from "fs";
@@ -12,7 +11,6 @@ import { join, resolve } from "path";
 const ARTIFACT_TOOLS = {
   list_pipeline_artifacts: "list_pipeline_artifacts",
   download_pipeline_artifact: "download_pipeline_artifact",
-  read_pipeline_artifact_file: "read_pipeline_artifact_file",
 };
 
 function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
@@ -98,47 +96,6 @@ function configureArtifactTools(server: McpServer, tokenProvider: () => Promise<
           },
         ],
       };
-    }
-  );
-
-  server.tool(
-    ARTIFACT_TOOLS.read_pipeline_artifact_file,
-    "Read a file from a pipeline artifact.",
-    {
-      containerId: z.string().describe("The container ID of the artifact."),
-      itemPath: z.string().describe("The path of the file within the artifact."),
-      isShallow: z.boolean().optional().describe("Whether to perform a shallow read."),
-      asText: z.boolean().optional().describe("Whether to read the file as text."),
-    },
-    async ({ containerId, itemPath, isShallow = false, asText = true }) => {
-      const connection = await connectionProvider();
-      const orgUrl = connection.serverUrl;
-      const artifactUrl = `${orgUrl}/_apis/resources/Containers/${containerId}?itemPath=${encodeURIComponent(itemPath)}&isShallow=${isShallow}&api-version=${apiVersion}`;
-
-      const token = await tokenProvider();
-      const response = await fetch(artifactUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch artifact item: ${response.statusText}`);
-      }
-
-      if (asText) {
-        const text = await response.text();
-        return {
-          content: [{ type: "text", text }],
-        };
-      } else {
-        const buffer = await response.arrayBuffer();
-        const base64Data = Buffer.from(buffer).toString("base64");
-        return {
-          content: [{ type: "resource", resource: { uri: `data:application/octet-stream;base64,${base64Data}`, mimeType: "application/octet-stream", text: base64Data } }],
-        };
-      }
     }
   );
 }

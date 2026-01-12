@@ -9,7 +9,6 @@ import { Readable } from "stream";
 import { resolve } from "path";
 import { mkdirSync, createWriteStream } from "fs";
 import { mockArtifact, mockMultipleArtifacts } from "../../mocks/artifacts";
-import { apiVersion } from "../../../src/utils.js";
 
 jest.mock("fs");
 
@@ -23,13 +22,11 @@ describe("configureArtifactTools", () => {
   let server: McpServer;
   let tokenProvider: TokenProviderMock;
   let connectionProvider: ConnectionProviderMock;
-  let userAgentProvider: () => string;
   let mockConnection: { getBuildApi: jest.Mock; serverUrl: string };
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
     tokenProvider = jest.fn();
-    userAgentProvider = () => "Jest";
     mockConnection = {
       getBuildApi: jest.fn(),
       serverUrl: "https://dev.azure.com/test-org",
@@ -40,7 +37,7 @@ describe("configureArtifactTools", () => {
 
   describe("tool registration", () => {
     it("registers all artifact tools on the server", () => {
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
     });
   });
@@ -50,7 +47,7 @@ describe("configureArtifactTools", () => {
       const mockGetArtifacts = jest.fn().mockResolvedValue(mockMultipleArtifacts);
       mockConnection.getBuildApi.mockResolvedValue({ getArtifacts: mockGetArtifacts } as any);
 
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "list_pipeline_artifacts");
       if (!call) throw new Error("list_pipeline_artifacts tool not registered");
       const [, , , handler] = call;
@@ -68,7 +65,7 @@ describe("configureArtifactTools", () => {
       const mockGetArtifacts = jest.fn().mockResolvedValue([]);
       mockConnection.getBuildApi.mockResolvedValue({ getArtifacts: mockGetArtifacts } as any);
 
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "list_pipeline_artifacts");
       if (!call) throw new Error("list_pipeline_artifacts tool not registered");
       const [, , , handler] = call;
@@ -85,7 +82,7 @@ describe("configureArtifactTools", () => {
       const mockGetArtifacts = jest.fn().mockRejectedValue(new Error("Build not found"));
       mockConnection.getBuildApi.mockResolvedValue({ getArtifacts: mockGetArtifacts } as any);
 
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "list_pipeline_artifacts");
       if (!call) throw new Error("list_pipeline_artifacts tool not registered");
       const [, , , handler] = call;
@@ -128,7 +125,7 @@ describe("configureArtifactTools", () => {
         getArtifactContentZip: mockGetArtifactContentZip,
       } as any);
 
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "download_pipeline_artifact");
       if (!call) throw new Error("download_pipeline_artifact tool not registered");
       const [, , , handler] = call;
@@ -156,7 +153,7 @@ describe("configureArtifactTools", () => {
         getArtifact: mockGetArtifact,
       } as any);
 
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "download_pipeline_artifact");
       if (!call) throw new Error("download_pipeline_artifact tool not registered");
       const [, , , handler] = call;
@@ -182,7 +179,7 @@ describe("configureArtifactTools", () => {
         getArtifactContentZip: mockGetArtifactContentZip,
       } as any);
 
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "download_pipeline_artifact");
       if (!call) throw new Error("download_pipeline_artifact tool not registered");
       const [, , , handler] = call;
@@ -216,7 +213,7 @@ describe("configureArtifactTools", () => {
         getArtifactContentZip: mockGetArtifactContentZip,
       } as any);
 
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      configureArtifactTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "download_pipeline_artifact");
       if (!call) throw new Error("download_pipeline_artifact tool not registered");
       const [, , , handler] = call;
@@ -242,113 +239,6 @@ describe("configureArtifactTools", () => {
       const expectedBase64 = testContent.toString("base64");
       expect(result.content[0].resource.text).toBe(expectedBase64);
       expect(result.content[0].resource.uri).toContain(expectedBase64);
-    });
-  });
-
-  describe("read_pipeline_artifact_file", () => {
-    it("should read a text file from an artifact", async () => {
-      const mockFileContent = "This is the content of the file";
-      const mockResponse = {
-        ok: true,
-        text: jest.fn().mockResolvedValue(mockFileContent),
-        statusText: "OK",
-      };
-      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as any);
-      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
-
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
-      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
-      const [, , , handler] = call;
-      const params = {
-        containerId: "123456",
-        itemPath: "/logs/build.log",
-      };
-
-      const result = await handler(params);
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://dev.azure.com/test-org/_apis/resources/Containers/123456?itemPath=${encodeURIComponent("/logs/build.log")}&isShallow=false&api-version=${apiVersion}`,
-        expect.objectContaining({
-          method: "GET",
-          headers: expect.objectContaining({
-            Authorization: "Bearer test-token",
-          }),
-        })
-      );
-      expect(result.content[0].type).toBe("text");
-      expect(result.content[0].text).toBe(mockFileContent);
-    });
-
-    it("should read a binary file from an artifact", async () => {
-      const mockFileBuffer = Buffer.from("binary content");
-      const mockResponse = {
-        ok: true,
-        arrayBuffer: jest.fn().mockResolvedValue(mockFileBuffer.buffer),
-        statusText: "OK",
-      };
-      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as any);
-      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
-
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
-      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
-      const [, , , handler] = call;
-
-      const params = {
-        containerId: "123456",
-        itemPath: "/bin/app.exe",
-        isShallow: false,
-        asText: false,
-      };
-
-      const result = await handler(params);
-
-      expect(result.content[0].type).toBe("resource");
-      expect(result.content[0].resource.mimeType).toBe("application/octet-stream");
-      expect(result.content[0].resource.uri).toContain("data:application/octet-stream;base64,");
-    });
-
-    it("should handle fetch errors correctly", async () => {
-      const mockResponse = {
-        ok: false,
-        statusText: "Not Found",
-      };
-      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as any);
-      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
-
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
-      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
-      const [, , , handler] = call;
-
-      const params = {
-        containerId: "123456",
-        itemPath: "/missing.txt",
-        isShallow: false,
-        asText: true,
-      };
-
-      await expect(handler(params)).rejects.toThrow("Failed to fetch artifact item: Not Found");
-    });
-
-    it("should handle network errors correctly", async () => {
-      (global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValue(new Error("Network connection failed"));
-      (tokenProvider as jest.Mock).mockResolvedValue("test-token");
-
-      configureArtifactTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "read_pipeline_artifact_file");
-      if (!call) throw new Error("read_pipeline_artifact_file tool not registered");
-      const [, , , handler] = call;
-
-      const params = {
-        containerId: "123456",
-        itemPath: "/file.txt",
-        isShallow: false,
-        asText: true,
-      };
-
-      await expect(handler(params)).rejects.toThrow("Network connection failed");
     });
   });
 });
