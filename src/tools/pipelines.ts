@@ -514,7 +514,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     PIPELINE_TOOLS.pipelines_list_artifacts,
-    "List artifacts for a given build.",
+    "Lists artifacts for a given build.",
     {
       project: z.string().describe("The name or ID of the project."),
       buildId: z.number().describe("The ID of the build."),
@@ -532,7 +532,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     PIPELINE_TOOLS.pipelines_download_artifact,
-    "Download a pipeline artifact.",
+    "Downloads a pipeline artifact.",
     {
       project: z.string().describe("The name or ID of the project."),
       buildId: z.number().describe("The ID of the build."),
