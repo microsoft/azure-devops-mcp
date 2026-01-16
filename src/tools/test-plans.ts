@@ -102,6 +102,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     async ({ project, planId, parentSuiteId, name }) => {
       const maxRetries = 5;
       const baseDelay = 500; // milliseconds
+      const jitterMax = 200; // milliseconds
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
@@ -130,7 +131,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
 
           // If it's a concurrency error and we have retries left, wait and retry
           if (isConcurrencyError && attempt < maxRetries) {
-            const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 200; // Exponential backoff with jitter
+            const delay = baseDelay * Math.pow(2, attempt) + Math.random() * jitterMax; // Exponential backoff with jitter
             await new Promise((resolve) => setTimeout(resolve, delay));
             continue; // Retry
           }
