@@ -144,7 +144,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         }
       }
 
-      // This should never be reached, but TypeScript requires it
+      // This should never be reached, but TypeScript requires a return value
       return {
         content: [{ type: "text", text: "Error creating test suite: Maximum retries exceeded" }],
         isError: true,
