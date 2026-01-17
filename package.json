@@ -1,6 +1,6 @@
 {
   "name": "@azure-devops/mcp",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "mcpName": "microsoft.com/azure-devops",
   "description": "MCP server for interacting with Azure DevOps",
   "license": "MIT",
@@ -60,7 +60,7 @@
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
     "lint-staged": "^16.2.7",
-    "prettier": "3.7.3",
+    "prettier": "3.7.4",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.6",
     "tsconfig-paths": "^4.2.0",
