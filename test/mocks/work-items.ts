@@ -389,6 +389,53 @@ export const _mockWorkItemsForIteration = {
   },
 };
 
+export const _mockWorkItemAttachments = {
+  count: 3,
+  value: [
+    {
+      id: "8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+      name: "requirements-document.pdf",
+      size: 245760,
+      contentType: "application/pdf",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+      _links: {
+        self: {
+          href: "https://dev.azure.com/fabrikam/_apis/wit/attachments/8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        },
+      },
+    },
+    {
+      id: "d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      name: "bug-screenshot.png",
+      size: 153600,
+      contentType: "image/png",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+      _links: {
+        self: {
+          href: "https://dev.azure.com/fabrikam/_apis/wit/attachments/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+        },
+      },
+    },
+    {
+      id: "342f0f44-4069-46b1-a940-3d0468979ceb",
+      name: "architecture-diagram.vsdx",
+      size: 512000,
+      contentType: "application/vnd.ms-visio.drawing",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/342f0f44-4069-46b1-a940-3d0468979ceb",
+      _links: {
+        self: {
+          href: "https://dev.azure.com/fabrikam/_apis/wit/attachments/342f0f44-4069-46b1-a940-3d0468979ceb",
+        },
+      },
+    },
+  ],
+};
+
+export const _mockWorkItemAttachmentContent = {
+  text: "# Requirements Document\n\nThis document outlines the key requirements for the Microsoft Account integration feature.\n\n## Functional Requirements\n\n1. Users must be able to sign in using their Microsoft Account credentials\n2. The system must support OAuth 2.0 authentication flow\n3. User profile information should be retrieved from Microsoft Graph API\n\n## Technical Requirements\n\n- Implement using JavaScript/TypeScript\n- Support modern browsers (Chrome, Firefox, Edge, Safari)\n- Ensure secure token storage\n- Handle token refresh automatically\n",
+  base64: "IyBSZXF1aXJlbWVudHMgRG9jdW1lbnQKClRoaXMgZG9jdW1lbnQgb3V0bGluZXMgdGhlIGtleSByZXF1aXJlbWVudHMgZm9yIHRoZSBNaWNyb3NvZnQgQWNjb3VudCBpbnRlZ3JhdGlvbiBmZWF0dXJlLgoKIyMgRnVuY3Rpb25hbCBSZXF1aXJlbWVudHMKCjEuIFVzZXJzIG11c3QgYmUgYWJsZSB0byBzaWduIGluIHVzaW5nIHRoZWlyIE1pY3Jvc29mdCBBY2NvdW50IGNyZWRlbnRpYWxzCjIuIFRoZSBzeXN0ZW0gbXVzdCBzdXBwb3J0IE9BdXRoIDIuMCBhdXRoZW50aWNhdGlvbiBmbG93CjMuIFVzZXIgcHJvZmlsZSBpbmZvcm1hdGlvbiBzaG91bGQgYmUgcmV0cmlldmVkIGZyb20gTWljcm9zb2Z0IEdyYXBoIEFQSQoKIyMgVGVjaG5pY2FsIFJlcXVpcmVtZW50cwoKLSBJbXBsZW1lbnQgdXNpbmcgSmF2YVNjcmlwdC9UeXBlU2NyaXB0Ci0gU3VwcG9ydCBtb2Rlcm4gYnJvd3NlcnMgKENocm9tZSwgRmlyZWZveCwgRWRnZSwgU2FmYXJpKQotIEVuc3VyZSBzZWN1cmUgdG9rZW4gc3RvcmFnZQotIEhhbmRsZSB0b2tlbiByZWZyZXNoIGF1dG9tYXRpY2FsbHkK",
+};
+
 export const _mockWorkItemType = {
   name: "Bug",
   referenceName: "Microsoft.VSTS.WorkItemTypes.Bug",

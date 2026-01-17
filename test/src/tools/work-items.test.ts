@@ -5,12 +5,14 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
-import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { QueryExpand, WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import {
   _mockBacklogs,
   _mockQuery,
   _mockQueryResults,
   _mockWorkItem,
+  _mockWorkItemAttachments,
+  _mockWorkItemAttachmentContent,
   _mockWorkItemComment,
   _mockWorkItemComments,
   _mockWorkItemRevisions,
@@ -704,6 +706,243 @@ describe("configureWorkItemTools", () => {
       expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith(params.project, params.workItemId, params.top);
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemComments], null, 2));
+    });
+  });
+
+  describe("list_work_item_attachments tool", () => {
+    it("should call workItemApi.getWorkItem with Relations expand and return filtered attachments", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_attachments");
+
+      if (!call) throw new Error("wit_list_work_item_attachments tool not registered");
+      const [, , , handler] = call;
+
+      // Create a mock work item with attachment relations
+      const mockWorkItemWithAttachments = {
+        ..._mockWorkItem,
+        relations: [
+          {
+            rel: "AttachedFile",
+            url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+            attributes: {
+              name: "requirements-document.pdf",
+              resourceSize: 245760,
+            },
+          },
+          {
+            rel: "AttachedFile",
+            url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+            attributes: {
+              name: "bug-screenshot.png",
+              resourceSize: 153600,
+            },
+          },
+          {
+            rel: "System.LinkTypes.Hierarchy-Forward",
+            url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/300",
+            attributes: {},
+          },
+        ],
+      };
+
+      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue(mockWorkItemWithAttachments);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(params.workItemId, undefined, undefined, WorkItemExpand.Relations, params.project);
+
+      const expectedAttachments = {
+        count: 2,
+        value: [
+          {
+            url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+            attributes: {
+              name: "requirements-document.pdf",
+              resourceSize: 245760,
+            },
+          },
+          {
+            url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/d291b0c4-a05c-4ea6-8df1-4b41d5f39eff",
+            attributes: {
+              name: "bug-screenshot.png",
+              resourceSize: 153600,
+            },
+          },
+        ],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedAttachments, null, 2));
+    });
+
+    it("should return empty array when work item has no attachments", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_attachments");
+
+      if (!call) throw new Error("wit_list_work_item_attachments tool not registered");
+      const [, , , handler] = call;
+
+      const mockWorkItemNoAttachments = {
+        ..._mockWorkItem,
+        relations: [
+          {
+            rel: "System.LinkTypes.Hierarchy-Forward",
+            url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/300",
+            attributes: {},
+          },
+        ],
+      };
+
+      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue(mockWorkItemNoAttachments);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+      };
+
+      const result = await handler(params);
+
+      const expectedResult = {
+        count: 0,
+        value: [],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+  });
+
+  describe("read_work_item_attachment tool", () => {
+    it("should fetch attachment content and return it as UTF-8 text by default", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_read_work_item_attachment");
+
+      if (!call) throw new Error("wit_read_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockAttachmentContent = _mockWorkItemAttachmentContent.text;
+      const mockBuffer = Buffer.from(mockAttachmentContent, "utf-8");
+      const mockArrayBuffer = mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength);
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(mockArrayBuffer),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        attachmentId: "8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        asBase64: false,
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/_apis/wit/attachments/8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        expect.objectContaining({
+          method: "GET",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "User-Agent": "Jest",
+          }),
+        })
+      );
+
+      const expectedResponse = {
+        attachmentId: "8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        encoding: "utf-8",
+        content: mockAttachmentContent,
+        size: mockBuffer.length,
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
+    });
+
+    it("should fetch attachment content and return it as base64 when asBase64 is true", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_read_work_item_attachment");
+
+      if (!call) throw new Error("wit_read_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockAttachmentContent = _mockWorkItemAttachmentContent.text;
+      const mockBuffer = Buffer.from(mockAttachmentContent, "utf-8");
+      const mockArrayBuffer = mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength);
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(mockArrayBuffer),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        attachmentId: "8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        asBase64: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/_apis/wit/attachments/8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        expect.objectContaining({
+          method: "GET",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "User-Agent": "Jest",
+          }),
+        })
+      );
+
+      const expectedResponse = {
+        attachmentId: "8c8c7d32-6b1b-47f4-b2e9-30b477b5ab3d",
+        encoding: "base64",
+        content: _mockWorkItemAttachmentContent.base64,
+        size: mockBuffer.length,
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
+    });
+
+    it("should return an error when the attachment fetch fails", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_read_work_item_attachment");
+
+      if (!call) throw new Error("wit_read_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Not Found",
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        attachmentId: "non-existent-id",
+        asBase64: false,
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error reading work item attachment");
+      expect(result.content[0].text).toContain("Not Found");
     });
   });
 
@@ -2674,6 +2913,26 @@ describe("configureWorkItemTools", () => {
       const result = await handler(params);
 
       expect(result.content[0].text).toBe("Error listing work item comments: API Error");
+      expect(result.isError).toBe(true);
+    });
+
+    it("should handle list_work_item_attachments errors", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_list_work_item_attachments");
+      if (!call) throw new Error("wit_list_work_item_attachments tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+      };
+
+      const result = await handler(params);
+
+      expect(result.content[0].text).toBe("Error listing work item attachments: API Error");
       expect(result.isError).toBe(true);
     });
 

@@ -17,9 +17,12 @@ const WORKITEM_TOOLS = {
   update_work_item: "wit_update_work_item",
   create_work_item: "wit_create_work_item",
   list_work_item_comments: "wit_list_work_item_comments",
+  list_work_item_attachments: "wit_list_work_item_attachments",
+  read_work_item_attachment: "wit_read_work_item_attachment",
   list_work_item_revisions: "wit_list_work_item_revisions",
   get_work_items_for_iteration: "wit_get_work_items_for_iteration",
   add_work_item_comment: "wit_add_work_item_comment",
+  delete_work_item_comment: "wit_delete_work_item_comment",
   add_child_work_items: "wit_add_child_work_items",
   link_work_item_to_pull_request: "wit_link_work_item_to_pull_request",
   get_work_item_type: "wit_get_work_item_type",
@@ -312,6 +315,165 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [{ type: "text", text: `Error adding work item comment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.delete_work_item_comment,
+    "Delete a comment from a work item by ID.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      workItemId: z.number().describe("The ID of the work item containing the comment."),
+      commentId: z.number().describe("The ID of the comment to delete."),
+    },
+    async ({ project, workItemId, commentId }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+
+        await workItemApi.deleteComment(project, workItemId, commentId);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify({ success: true, message: `Comment ${commentId} deleted successfully from work item ${workItemId}` }, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error deleting work item comment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.list_work_item_attachments,
+    "Retrieve list of attachments for a work item by ID.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      workItemId: z.number().describe("The ID of the work item to retrieve attachments for."),
+    },
+    async ({ project, workItemId }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+
+        // Get work item with relations expanded to access attachments
+        const workItem = await workItemApi.getWorkItem(workItemId, undefined, undefined, WorkItemExpand.Relations, project);
+
+        if (!workItem || !workItem.relations) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ count: 0, value: [] }, null, 2) }],
+          };
+        }
+
+        // Filter relations to only include attachments
+        const attachments = workItem.relations
+          .filter((relation) => relation.rel === "AttachedFile")
+          .map((relation) => ({
+            url: relation.url,
+            attributes: relation.attributes,
+          }));
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  count: attachments.length,
+                  value: attachments,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error listing work item attachments: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.read_work_item_attachment,
+    "Download and read the content of a work item attachment by attachment ID.",
+    {
+      attachmentId: z.string().describe("The ID of the attachment to retrieve."),
+      asBase64: z.boolean().default(false).optional().describe("Optional flag to return the attachment content as base64-encoded string. Defaults to false (returns raw text)."),
+    },
+    async ({ attachmentId, asBase64 }) => {
+      try {
+        const connection = await connectionProvider();
+        const orgUrl = connection.serverUrl;
+        const accessToken = await tokenProvider();
+
+        const response = await fetch(`${orgUrl}/_apis/wit/attachments/${attachmentId}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to read work item attachment: ${response.statusText}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        if (asBase64) {
+          const base64Content = buffer.toString("base64");
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    attachmentId,
+                    encoding: "base64",
+                    content: base64Content,
+                    size: buffer.length,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        } else {
+          const textContent = buffer.toString("utf-8");
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    attachmentId,
+                    encoding: "utf-8",
+                    content: textContent,
+                    size: buffer.length,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error reading work item attachment: ${errorMessage}` }],
           isError: true,
         };
       }
