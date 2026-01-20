@@ -60,7 +60,7 @@
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
     "lint-staged": "^16.2.7",
-    "prettier": "3.7.3",
+    "prettier": "3.7.4",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.6",
     "tsconfig-paths": "^4.2.0",

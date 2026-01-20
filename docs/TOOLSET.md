@@ -210,6 +210,19 @@ Updates the stage of a specific build.
 - **Required**: `project`, `buildId`, `stageName`, `status`
 - **Optional**: `forceRetryAllJobs`
 
+### mcp_ado_pipelines_list_artifacts
+
+Lists artifacts for a given build.
+
+- **Required**: `project`, `buildId`
+
+### mcp_ado_pipelines_download_artifact
+
+Downloads a pipeline artifact.
+
+- **Required**: `project`, `buildId`, `artifactName`
+- **Optional**: `destinationPath`
+
 ## Repositories
 
 ### mcp_ado_repo_list_repos_by_project
