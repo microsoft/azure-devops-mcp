@@ -5,6 +5,7 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 - [Prerequisites](#-prerequisites)
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
 - [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
+- [Getting started with GitHub Copilot CLI](#-using-mcp-server-with-github-copilot-cli)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
 - [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
 - [Getting started with Cursor](#-using-mcp-server-with-cursor)
@@ -224,6 +225,31 @@ Click the "Tools" icon and choose the available tools.
 4. Try prompts like "List ADO projects".
 
 For more details, see [Visual Studio MCP Servers documentation](https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers?view=vs-2022) and the [Getting Started Video](https://www.youtube.com/watch?v=oPFecZHBCkg).
+
+### 💻 Using MCP Server with GitHub Copilot CLI
+
+Use the Copilot CLI to interactively add the MCP server:
+
+```bash
+/mcp add
+```
+
+Alternatively, create or edit the configuration file `~/.copilot/mcp-config.json` and add:
+
+```json
+{
+  "mcpServers": {
+    "ado": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "{Contoso}"]
+    }
+  }
+}
+```
+
+Replace `{Contoso}` with your Azure DevOps organization name.
+
+For more information, see the [Copilot CLI documentation](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli).
 
 ### 🤖 Using MCP Server with Claude Code
 
