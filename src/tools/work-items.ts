@@ -913,11 +913,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .array(
           z.object({
             id: z.number().describe("The ID of the work item to update."),
-            linkToId: z.number().optional().describe("The ID of the work item to link to."),
-            linkToUrl: z
-              .string()
-              .optional()
-              .describe("Optional full URL to the target work item. Use this for cross-organization 'remote related' links. If provided, this takes precedence over linkToId."),
+            linkToId: z.number().optional().describe("The ID of the work item to link to. Required for all link types except 'remote related'."),
+            linkToUrl: z.string().optional().describe("Full URL to the target work item in another Azure DevOps organization. Required for 'remote related' link type, unused for other types."),
             type: z
               .enum(["parent", "child", "duplicate", "duplicate of", "related", "remote related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
               .default("related")
