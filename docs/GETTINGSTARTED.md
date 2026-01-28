@@ -241,7 +241,8 @@ Alternatively, create or edit the configuration file `~/.copilot/mcp-config.json
   "mcpServers": {
     "ado": {
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "{Contoso}"]
+      "args": ["-y", "@azure-devops/mcp", "{Contoso}"],
+      "tools": []
     }
   }
 }
