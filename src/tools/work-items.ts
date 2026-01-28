@@ -43,6 +43,8 @@ function getLinkTypeFromName(name: string) {
       return "System.LinkTypes.Duplicate-Reverse";
     case "related":
       return "System.LinkTypes.Related";
+    case "remote related":
+      return "System.LinkTypes.Remote.Related";
     case "successor":
       return "System.LinkTypes.Dependency-Forward";
     case "predecessor":
@@ -911,12 +913,16 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .array(
           z.object({
             id: z.number().describe("The ID of the work item to update."),
-            linkToId: z.number().describe("The ID of the work item to link to."),
+            linkToId: z.number().optional().describe("The ID of the work item to link to."),
+            linkToUrl: z
+              .string()
+              .optional()
+              .describe("Optional full URL to the target work item. Use this for cross-organization 'remote related' links. If provided, this takes precedence over linkToId."),
             type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "remote related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
               .default("related")
               .describe(
-                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'remote related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
               ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
@@ -940,17 +946,30 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           },
           body: updates
             .filter((update) => update.id === id)
-            .map(({ linkToId, type, comment }) => ({
-              op: "add",
-              path: "/relations/-",
-              value: {
-                rel: `${getLinkTypeFromName(type)}`,
-                url: `${orgUrl}/${project}/_apis/wit/workItems/${linkToId}`,
-                attributes: {
-                  comment: comment || "",
+            .map(({ linkToId, linkToUrl, type, comment }) => {
+              // linkToId is required for all link types except remote related
+              // remote related requires linkToUrl to other ADO org
+              if (type != "remote related" && !linkToId) {
+                throw new Error(`Parameter linkToId is required for link type "${type}".`);
+              } else if (type == "remote related" && !linkToUrl) {
+                throw new Error(`Parameter linkToUrl is required for link type "remote related".`);
+              }
+
+              // For remote related with linkToUrl, use it; otherwise construct from linkToId
+              const targetUrl = linkToUrl || `${orgUrl}/${project}/_apis/wit/workItems/${linkToId}`;
+
+              return {
+                op: "add",
+                path: "/relations/-",
+                value: {
+                  rel: `${getLinkTypeFromName(type)}`,
+                  url: targetUrl,
+                  attributes: {
+                    comment: comment || "",
+                  },
                 },
-              },
-            })),
+              };
+            }),
         }));
 
         const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
@@ -989,10 +1008,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       id: z.number().describe("The ID of the work item to remove the links from."),
       type: z
-        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
+        .enum(["parent", "child", "duplicate", "duplicate of", "related", "remote related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
         .default("related")
         .describe(
-          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
+          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'remote related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
         ),
       url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
     },
