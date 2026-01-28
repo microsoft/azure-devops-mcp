@@ -956,7 +956,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               }
 
               // For remote related with linkToUrl, use it; otherwise construct from linkToId
-              const targetUrl = linkToUrl || `${orgUrl}/${project}/_apis/wit/workItems/${linkToId}`;
+              const targetUrl = type != "remote related" ? `${orgUrl}/${project}/_apis/wit/workItems/${linkToId}` : linkToUrl;
 
               return {
                 op: "add",
