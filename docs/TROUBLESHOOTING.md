@@ -254,6 +254,41 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
    - Your Azure DevOps organization name
    - The tenant ID from step 1
 
+## Corporate Proxy Configuration
+
+If you're behind a corporate proxy, you'll need to configure proxy settings using the `GLOBAL_AGENT_*` environment variables.
+
+### Why `GLOBAL_AGENT_*` instead of `HTTP_PROXY`?
+
+Neither Node.js native `fetch` nor `node-fetch` respect `HTTP_PROXY`/`HTTPS_PROXY` environment variables by default. The MCP server uses [`global-agent`](https://github.com/gajus/global-agent) to bootstrap proxy support for `node-fetch`, and [`undici`](https://github.com/nodejs/undici) for native `fetch`. The default for `global-agent` is to use a `GLOBAL_AGENT_` prefix on variable names.
+
+Set the following environment variables before starting the MCP server:
+
+```bash
+export GLOBAL_AGENT_HTTP_PROXY="http://your-proxy-server:port"
+export GLOBAL_AGENT_HTTPS_PROXY="http://your-proxy-server:port"
+export GLOBAL_AGENT_NO_PROXY=".internal.domain,localhost"
+```
+
+For VS Code, add these to your `mcp.json`:
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"],
+      "env": {
+        "GLOBAL_AGENT_HTTP_PROXY": "http://your-proxy-server:port",
+        "GLOBAL_AGENT_HTTPS_PROXY": "http://your-proxy-server:port",
+        "GLOBAL_AGENT_NO_PROXY": ".internal.domain,localhost"
+      }
+    }
+  }
+}
+```
+
 ## Common Errors
 
 1. **Incorrect Organization Name Error**
