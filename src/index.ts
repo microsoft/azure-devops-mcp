@@ -3,6 +3,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import "global-agent/bootstrap.js";
+import { setGlobalDispatcher, EnvHttpProxyAgent } from "undici";
+setGlobalDispatcher(new EnvHttpProxyAgent());
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getBearerHandler, WebApi } from "azure-devops-node-api";
