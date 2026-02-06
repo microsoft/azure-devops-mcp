@@ -20,6 +20,8 @@ import {
   GitPullRequest,
   GitPullRequestCommentThread,
   Comment,
+  VersionControlRecursionType,
+  GitItem,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
@@ -46,6 +48,9 @@ const REPO_TOOLS = {
   update_pull_request_thread: "repo_update_pull_request_thread",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
+  get_file_content: "repo_get_file_content",
+  list_directory: "repo_list_directory",
+  get_items_batch: "repo_get_items_batch",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -1435,6 +1440,272 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         return {
           content: [{ type: "text", text: `Error querying pull requests by commits: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Helper function to build a version descriptor from branch or commit
+  function buildVersionDescriptor(version?: string, versionType?: string): GitVersionDescriptor | undefined {
+    if (!version) {
+      return undefined;
+    }
+
+    const versionTypeMap: Record<string, GitVersionType> = {
+      Branch: GitVersionType.Branch,
+      Commit: GitVersionType.Commit,
+      Tag: GitVersionType.Tag,
+    };
+
+    return {
+      version: version,
+      versionType: versionTypeMap[versionType || "Branch"] ?? GitVersionType.Branch,
+    };
+  }
+
+  function isBinaryContent(content: string | undefined): boolean {
+    if (!content) return false;
+    return content.includes("\0");
+  }
+
+  function trimToMaxLines(content: string, maxLines?: number): { text: string; truncated: boolean; totalLines: number } {
+    if (!maxLines) {
+      return { text: content, truncated: false, totalLines: content.split("\n").length };
+    }
+
+    const lines = content.split("\n");
+    const totalLines = lines.length;
+
+    if (lines.length <= maxLines) {
+      return { text: content, truncated: false, totalLines };
+    }
+
+    return {
+      text: lines.slice(0, maxLines).join("\n"),
+      truncated: true,
+      totalLines,
+    };
+  }
+
+  function formatFileItemResponse(item: GitItem, includeContent: boolean, maxLines?: number): Record<string, unknown> {
+    const response: Record<string, unknown> = {
+      path: item.path,
+      commitId: item.commitId,
+      objectId: item.objectId,
+      gitObjectType: item.gitObjectType,
+    };
+
+    if (item.contentMetadata) {
+      response.contentMetadata = {
+        contentType: item.contentMetadata.contentType,
+        encoding: item.contentMetadata.encoding,
+        fileName: item.contentMetadata.fileName,
+      };
+    }
+
+    if (includeContent && item.content) {
+      if (isBinaryContent(item.content)) {
+        response.isBinary = true;
+        response.content = "[Binary content not displayed]";
+      } else {
+        const trimmed = trimToMaxLines(item.content, maxLines);
+        response.content = trimmed.text;
+        response.encoding = "utf-8";
+
+        if (trimmed.truncated) {
+          response.truncated = true;
+          response.totalLines = trimmed.totalLines;
+          response.returnedLines = maxLines;
+        }
+      }
+    }
+
+    return response;
+  }
+
+  server.tool(
+    REPO_TOOLS.get_file_content,
+    "Get the contents of a file from a repository. Useful for reading source code files, configuration files, or any text file from an Azure DevOps Git repository.",
+    {
+      repositoryId: z.string().describe("The ID or name of the repository."),
+      path: z.string().describe("The path to the file in the repository (e.g., '/src/index.ts' or 'README.md')."),
+      project: z.string().optional().describe("Project ID or name. Required if repositoryId is a name rather than a GUID."),
+      version: z.string().optional().describe("The version identifier - branch name (e.g., 'main'), tag name, or commit SHA. Defaults to the repository's default branch."),
+      versionType: z.enum(["Branch", "Commit", "Tag"]).optional().default("Branch").describe("The type of version identifier: 'Branch', 'Commit', or 'Tag'. Defaults to 'Branch'."),
+      maxLines: z.number().optional().describe("Maximum number of lines to return. If the file exceeds this limit, content will be truncated with a warning."),
+    },
+    async ({ repositoryId, path, project, version, versionType, maxLines }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        const versionDescriptor = buildVersionDescriptor(version, versionType);
+
+        const item = await gitApi.getItem(repositoryId, path, project, undefined, VersionControlRecursionType.None, true, false, false, versionDescriptor, true, true, true);
+
+        if (!item) {
+          return {
+            content: [{ type: "text", text: `File not found: ${path}` }],
+            isError: true,
+          };
+        }
+
+        const formattedResponse = formatFileItemResponse(item, true, maxLines);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(formattedResponse, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error retrieving file content: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.list_directory,
+    "List files and folders in a directory within a repository. Useful for exploring the structure of a codebase or finding related files.",
+    {
+      repositoryId: z.string().describe("The ID or name of the repository."),
+      path: z.string().optional().default("/").describe("The directory path to list (e.g., '/src' or '/src/components'). Defaults to repository root."),
+      project: z.string().optional().describe("Project ID or name. Required if repositoryId is a name rather than a GUID."),
+      version: z.string().optional().describe("The version identifier - branch name (e.g., 'main'), tag name, or commit SHA. Defaults to the repository's default branch."),
+      versionType: z.enum(["Branch", "Commit", "Tag"]).optional().default("Branch").describe("The type of version identifier: 'Branch', 'Commit', or 'Tag'. Defaults to 'Branch'."),
+      recursive: z.boolean().optional().default(false).describe("Whether to list items recursively. Defaults to false."),
+      recursionDepth: z.number().optional().default(1).describe("Maximum depth for recursive listing (1-10). Only applies when recursive is true. Defaults to 1."),
+    },
+    async ({ repositoryId, path, project, version, versionType, recursive, recursionDepth }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        const versionDescriptor = buildVersionDescriptor(version, versionType);
+        const clampedDepth = Math.min(Math.max(recursionDepth || 1, 1), 10);
+
+        let recursionType = VersionControlRecursionType.OneLevel;
+        if (recursive) {
+          recursionType = VersionControlRecursionType.Full;
+        }
+
+        const items = await gitApi.getItems(repositoryId, project, path, recursionType, true, false, false, false, versionDescriptor);
+
+        if (!items || items.length === 0) {
+          return {
+            content: [{ type: "text", text: `No items found at path: ${path}` }],
+          };
+        }
+
+        let filteredItems = items;
+        if (recursive && clampedDepth < 10) {
+          const basePath = path === "/" ? "" : path;
+          const baseDepth = basePath.split("/").filter((p) => p).length;
+
+          filteredItems = items.filter((item) => {
+            if (!item.path) return false;
+            const itemDepth = item.path.split("/").filter((p) => p).length;
+            return itemDepth <= baseDepth + clampedDepth;
+          });
+        }
+
+        const formattedItems = filteredItems.map((item) => ({
+          path: item.path,
+          isFolder: item.isFolder,
+          gitObjectType: item.gitObjectType,
+          commitId: item.commitId,
+          contentMetadata: item.contentMetadata
+            ? {
+                contentType: item.contentMetadata.contentType,
+                fileName: item.contentMetadata.fileName,
+              }
+            : undefined,
+        }));
+
+        const response = {
+          count: formattedItems.length,
+          path: path,
+          recursive: recursive,
+          recursionDepth: recursive ? clampedDepth : undefined,
+          items: formattedItems,
+        };
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error listing directory: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.get_items_batch,
+    "Get contents of multiple files from a repository in a single request. Efficient for retrieving several related files at once, such as when processing SARIF output with multiple file locations.",
+    {
+      repositoryId: z.string().describe("The ID or name of the repository."),
+      paths: z.array(z.string()).describe("Array of file paths to retrieve (e.g., ['/src/index.ts', '/src/utils.ts'])."),
+      project: z.string().optional().describe("Project ID or name. Required if repositoryId is a name rather than a GUID."),
+      version: z.string().optional().describe("The version identifier - branch name (e.g., 'main'), tag name, or commit SHA. Defaults to the repository's default branch."),
+      versionType: z.enum(["Branch", "Commit", "Tag"]).optional().default("Branch").describe("The type of version identifier: 'Branch', 'Commit', or 'Tag'. Defaults to 'Branch'."),
+      maxLines: z.number().optional().describe("Maximum number of lines to return per file. If a file exceeds this limit, content will be truncated."),
+      maxFiles: z.number().optional().default(20).describe("Maximum number of files to retrieve (1-50). Defaults to 20. Use to prevent excessive response sizes."),
+    },
+    async ({ repositoryId, paths, project, version, versionType, maxLines, maxFiles }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        const versionDescriptor = buildVersionDescriptor(version, versionType);
+        const clampedMaxFiles = Math.min(Math.max(maxFiles || 20, 1), 50);
+        const pathsToFetch = paths.slice(0, clampedMaxFiles);
+
+        const results: { path: string; success: boolean; data?: Record<string, unknown>; error?: string }[] = [];
+
+        const fetchPromises = pathsToFetch.map(async (filePath) => {
+          try {
+            const item = await gitApi.getItem(repositoryId, filePath, project, undefined, VersionControlRecursionType.None, true, false, false, versionDescriptor, true, true, true);
+
+            if (!item) {
+              return { path: filePath, success: false, error: "File not found" };
+            }
+
+            const formattedResponse = formatFileItemResponse(item, true, maxLines);
+            return { path: filePath, success: true, data: formattedResponse };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+            return { path: filePath, success: false, error: errorMessage };
+          }
+        });
+
+        const fetchResults = await Promise.all(fetchPromises);
+        results.push(...fetchResults);
+
+        const response = {
+          totalRequested: paths.length,
+          totalRetrieved: results.filter((r) => r.success).length,
+          totalFailed: results.filter((r) => !r.success).length,
+          truncatedPathList: paths.length > clampedMaxFiles,
+          maxFilesLimit: clampedMaxFiles,
+          items: results,
+        };
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error retrieving files batch: ${errorMessage}` }],
           isError: true,
         };
       }

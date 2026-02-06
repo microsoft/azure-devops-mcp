@@ -42,6 +42,8 @@ describe("repos tools", () => {
     getCommits: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestQuery: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     updateRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getItem: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getItems: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
   };
 
   beforeEach(() => {
@@ -71,6 +73,8 @@ describe("repos tools", () => {
       getCommits: jest.fn(),
       getPullRequestQuery: jest.fn(),
       updateRefs: jest.fn(),
+      getItem: jest.fn(),
+      getItems: jest.fn(),
     };
 
     connectionProvider = jest.fn().mockResolvedValue({
@@ -6585,6 +6589,488 @@ describe("repos tools", () => {
           isError: true,
         });
       });
+    });
+  });
+
+  describe("repo_get_file_content", () => {
+    it("should retrieve file content successfully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+      if (!call) throw new Error("repo_get_file_content tool not registered");
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/src/index.ts",
+        commitId: "abc123",
+        objectId: "def456",
+        gitObjectType: 3,
+        content: 'console.log("Hello World");',
+        contentMetadata: {
+          contentType: "text/plain",
+          encoding: 65001,
+          fileName: "index.ts",
+        },
+      };
+
+      mockGitApi.getItem.mockResolvedValue(mockItem);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src/index.ts",
+        project: "test-project",
+        version: "main",
+        versionType: "Branch",
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getItem).toHaveBeenCalledWith(
+        "test-repo",
+        "/src/index.ts",
+        "test-project",
+        undefined,
+        0, // VersionControlRecursionType.None
+        true,
+        false,
+        false,
+        { version: "main", versionType: 0 }, // GitVersionType.Branch
+        true,
+        true,
+        true
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.path).toBe("/src/index.ts");
+      expect(parsed.content).toBe('console.log("Hello World");');
+    });
+
+    it("should handle file not found", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+      const [, , , handler] = call;
+
+      mockGitApi.getItem.mockResolvedValue(null);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/nonexistent.ts",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("File not found");
+    });
+
+    it("should truncate content when maxLines is specified", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/src/large-file.ts",
+        commitId: "abc123",
+        objectId: "def456",
+        gitObjectType: 3,
+        content: "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10",
+        contentMetadata: {
+          contentType: "text/plain",
+          encoding: 65001,
+          fileName: "large-file.ts",
+        },
+      };
+
+      mockGitApi.getItem.mockResolvedValue(mockItem);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src/large-file.ts",
+        maxLines: 3,
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.truncated).toBe(true);
+      expect(parsed.totalLines).toBe(10);
+      expect(parsed.returnedLines).toBe(3);
+      expect(parsed.content).toBe("line1\nline2\nline3");
+    });
+
+    it("should detect binary content", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/images/logo.png",
+        commitId: "abc123",
+        objectId: "def456",
+        gitObjectType: 3,
+        content: "binary\0content\0with\0nulls",
+        contentMetadata: {
+          contentType: "image/png",
+          fileName: "logo.png",
+        },
+      };
+
+      mockGitApi.getItem.mockResolvedValue(mockItem);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/images/logo.png",
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.isBinary).toBe(true);
+      expect(parsed.content).toBe("[Binary content not displayed]");
+    });
+
+    it("should handle API errors", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+      const [, , , handler] = call;
+
+      mockGitApi.getItem.mockRejectedValue(new Error("API Error: 404"));
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src/index.ts",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error retrieving file content");
+    });
+
+    it("should support commit SHA version type", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/src/index.ts",
+        commitId: "abc123def456",
+        objectId: "def456",
+        gitObjectType: 3,
+        content: 'console.log("test");',
+      };
+
+      mockGitApi.getItem.mockResolvedValue(mockItem);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src/index.ts",
+        version: "abc123def456",
+        versionType: "Commit",
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getItem).toHaveBeenCalledWith(
+        "test-repo",
+        "/src/index.ts",
+        undefined,
+        undefined,
+        0,
+        true,
+        false,
+        false,
+        { version: "abc123def456", versionType: 2 }, // GitVersionType.Commit
+        true,
+        true,
+        true
+      );
+
+      expect(result.isError).toBeUndefined();
+    });
+  });
+
+  describe("repo_list_directory", () => {
+    it("should list directory contents successfully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+      if (!call) throw new Error("repo_list_directory tool not registered");
+      const [, , , handler] = call;
+
+      const mockItems = [
+        { path: "/src", isFolder: true, gitObjectType: 1, commitId: "abc123" },
+        { path: "/src/index.ts", isFolder: false, gitObjectType: 3, commitId: "abc123", contentMetadata: { contentType: "text/plain", fileName: "index.ts" } },
+        { path: "/src/utils.ts", isFolder: false, gitObjectType: 3, commitId: "abc123", contentMetadata: { contentType: "text/plain", fileName: "utils.ts" } },
+      ];
+
+      mockGitApi.getItems.mockResolvedValue(mockItems);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src",
+        project: "test-project",
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.count).toBe(3);
+      expect(parsed.path).toBe("/src");
+      expect(parsed.items).toHaveLength(3);
+    });
+
+    it("should list directory recursively with depth limit", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+      const [, , , handler] = call;
+
+      const mockItems = [
+        { path: "/src", isFolder: true, gitObjectType: 1, commitId: "abc123" },
+        { path: "/src/components", isFolder: true, gitObjectType: 1, commitId: "abc123" },
+        { path: "/src/components/Button", isFolder: true, gitObjectType: 1, commitId: "abc123" },
+        { path: "/src/components/Button/index.ts", isFolder: false, gitObjectType: 3, commitId: "abc123" },
+      ];
+
+      mockGitApi.getItems.mockResolvedValue(mockItems);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src",
+        recursive: true,
+        recursionDepth: 2,
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.recursive).toBe(true);
+      expect(parsed.recursionDepth).toBe(2);
+      // Items at depth > 2 from /src should be filtered out
+      // /src is depth 1, /src/components is depth 2, /src/components/Button is depth 3
+      expect(parsed.items.some((i: { path: string }) => i.path === "/src/components")).toBe(true);
+    });
+
+    it("should clamp recursion depth to 10", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+      const [, , , handler] = call;
+
+      mockGitApi.getItems.mockResolvedValue([{ path: "/src", isFolder: true }]);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src",
+        recursive: true,
+        recursionDepth: 100, // Should be clamped to 10
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.recursionDepth).toBe(10);
+    });
+
+    it("should handle empty directory", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+      const [, , , handler] = call;
+
+      mockGitApi.getItems.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/empty",
+      };
+
+      const result = await handler(params);
+
+      expect(result.content[0].text).toContain("No items found");
+    });
+
+    it("should handle API errors", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+      const [, , , handler] = call;
+
+      mockGitApi.getItems.mockRejectedValue(new Error("API Error: 404"));
+
+      const params = {
+        repositoryId: "test-repo",
+        path: "/src",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error listing directory");
+    });
+  });
+
+  describe("repo_get_items_batch", () => {
+    it("should retrieve multiple files successfully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_items_batch);
+      if (!call) throw new Error("repo_get_items_batch tool not registered");
+      const [, , , handler] = call;
+
+      const mockItem1 = {
+        path: "/src/index.ts",
+        commitId: "abc123",
+        content: 'import { foo } from "./utils";',
+      };
+      const mockItem2 = {
+        path: "/src/utils.ts",
+        commitId: "abc123",
+        content: 'export const foo = "bar";',
+      };
+
+      mockGitApi.getItem.mockResolvedValueOnce(mockItem1).mockResolvedValueOnce(mockItem2);
+
+      const params = {
+        repositoryId: "test-repo",
+        paths: ["/src/index.ts", "/src/utils.ts"],
+        project: "test-project",
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.totalRequested).toBe(2);
+      expect(parsed.totalRetrieved).toBe(2);
+      expect(parsed.totalFailed).toBe(0);
+      expect(parsed.items).toHaveLength(2);
+      expect(parsed.items[0].success).toBe(true);
+      expect(parsed.items[1].success).toBe(true);
+    });
+
+    it("should handle partial failures gracefully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_items_batch);
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/src/index.ts",
+        commitId: "abc123",
+        content: "content",
+      };
+
+      mockGitApi.getItem.mockResolvedValueOnce(mockItem).mockRejectedValueOnce(new Error("File not found"));
+
+      const params = {
+        repositoryId: "test-repo",
+        paths: ["/src/index.ts", "/src/nonexistent.ts"],
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.totalRequested).toBe(2);
+      expect(parsed.totalRetrieved).toBe(1);
+      expect(parsed.totalFailed).toBe(1);
+      expect(parsed.items[0].success).toBe(true);
+      expect(parsed.items[1].success).toBe(false);
+      expect(parsed.items[1].error).toContain("File not found");
+    });
+
+    it("should respect maxFiles limit", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_items_batch);
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/src/file.ts",
+        commitId: "abc123",
+        content: "content",
+      };
+
+      mockGitApi.getItem.mockResolvedValue(mockItem);
+
+      const paths = Array.from({ length: 10 }, (_, i) => `/src/file${i}.ts`);
+
+      const params = {
+        repositoryId: "test-repo",
+        paths: paths,
+        maxFiles: 3,
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.totalRequested).toBe(10);
+      expect(parsed.items).toHaveLength(3);
+      expect(parsed.truncatedPathList).toBe(true);
+      expect(parsed.maxFilesLimit).toBe(3);
+    });
+
+    it("should clamp maxFiles to 50", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_items_batch);
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/src/file.ts",
+        commitId: "abc123",
+        content: "content",
+      };
+
+      mockGitApi.getItem.mockResolvedValue(mockItem);
+
+      const paths = Array.from({ length: 100 }, (_, i) => `/src/file${i}.ts`);
+
+      const params = {
+        repositoryId: "test-repo",
+        paths: paths,
+        maxFiles: 100, // Should be clamped to 50
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.maxFilesLimit).toBe(50);
+      expect(parsed.items).toHaveLength(50);
+    });
+
+    it("should apply maxLines to each file", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_items_batch);
+      const [, , , handler] = call;
+
+      const mockItem = {
+        path: "/src/large.ts",
+        commitId: "abc123",
+        content: "line1\nline2\nline3\nline4\nline5",
+      };
+
+      mockGitApi.getItem.mockResolvedValue(mockItem);
+
+      const params = {
+        repositoryId: "test-repo",
+        paths: ["/src/large.ts"],
+        maxLines: 2,
+      };
+
+      const result = await handler(params);
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.items[0].data.truncated).toBe(true);
+      expect(parsed.items[0].data.content).toBe("line1\nline2");
+    });
+
+    it("should handle complete API failure", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_items_batch);
+      const [, , , handler] = call;
+
+      connectionProvider.mockRejectedValue(new Error("Connection failed"));
+
+      const params = {
+        repositoryId: "test-repo",
+        paths: ["/src/index.ts"],
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error retrieving files batch");
     });
   });
 });
