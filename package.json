@@ -41,10 +41,10 @@
   "dependencies": {
     "@azure/identity": "^4.10.0",
     "@azure/msal-node": "^3.6.0",
-    "@modelcontextprotocol/sdk": "^1.25.1",
-    "azure-devops-extension-api": "^4.252.0",
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "azure-devops-extension-api": "^4.264.0",
     "azure-devops-extension-sdk": "^4.0.2",
-    "azure-devops-node-api": "^15.1.0",
+    "azure-devops-node-api": "^15.1.2",
     "winston": "^3.18.3",
     "yargs": "^18.0.0",
     "zod": "^3.25.63",
@@ -61,12 +61,12 @@
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
     "lint-staged": "^16.2.7",
-    "prettier": "3.6.2",
+    "prettier": "3.8.1",
     "shx": "^0.4.0",
-    "ts-jest": "^29.4.0",
+    "ts-jest": "^29.4.6",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.4"
+    "typescript-eslint": "^8.54.0"
   },
   "lint-staged": {
     "**/*.(js|ts|jsx|tsx|json|css|md)": [

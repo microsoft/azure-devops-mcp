@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "com.microsoft/azure-devops",
+  "description": "The MCP server for Azure DevOps, bringing the power of Azure DevOps directly to your agents.",
+  "version": "2.4.0",
+  "title": "Azure DevOps",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@microsoft/azure-devops",
+      "version": "2.4.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/microsoft/azure-devops-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://learn.microsoft.com/en-us/azure/devops/mcp-server/mcp-server-overview"
+}

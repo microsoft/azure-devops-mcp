@@ -100,31 +100,54 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       name: z.string().describe("Name of the child test suite"),
     },
     async ({ project, planId, parentSuiteId, name }) => {
-      try {
-        const connection = await connectionProvider();
-        const testPlanApi = await connection.getTestPlanApi();
+      const maxRetries = 5;
+      const baseDelay = 500; // milliseconds
 
-        const testSuiteToCreate = {
-          name,
-          parentSuite: {
-            id: parentSuiteId,
-            name: "",
-          },
-          suiteType: 2,
-        };
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const connection = await connectionProvider();
+          const testPlanApi = await connection.getTestPlanApi();
 
-        const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
+          const testSuiteToCreate = {
+            name,
+            parentSuite: {
+              id: parentSuiteId,
+              name: "",
+            },
+            suiteType: 2,
+          };
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        return {
-          content: [{ type: "text", text: `Error creating test suite: ${errorMessage}` }],
-          isError: true,
-        };
+          const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+          // Check if it's a concurrency conflict error
+          const isConcurrencyError = errorMessage.includes("TF26071") || errorMessage.includes("got update") || errorMessage.includes("changed by someone else");
+
+          // If it's a concurrency error and we have retries left, wait and retry
+          if (isConcurrencyError && attempt < maxRetries) {
+            const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 200; // Exponential backoff with jitter
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue; // Retry
+          }
+
+          // If not a concurrency error or out of retries, return error
+          return {
+            content: [{ type: "text", text: `Error creating test suite: ${errorMessage}` }],
+            isError: true,
+          };
+        }
       }
+
+      // This should never be reached, but TypeScript requires a return value
+      return {
+        content: [{ type: "text", text: "Error creating test suite: Maximum retries exceeded" }],
+        isError: true,
+      };
     }
   );
 

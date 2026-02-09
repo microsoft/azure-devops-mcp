@@ -247,6 +247,8 @@ See our [Contributions Guide](./CONTRIBUTING.md) for:
 - 📝 Code style & testing
 - 🔄 Pull request process
 
+> ⚠️ Please read the [Contributions Guide](./CONTRIBUTING.md) before creating a pull request.
+
 ## 🤝 Code of Conduct
 
 This project follows the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).

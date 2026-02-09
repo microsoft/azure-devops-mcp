@@ -28,3 +28,5 @@ configuration:
       role: Write
     - member: mkonjikovac
       role: Write
+    - member: YevheniiKholodkov
+      role: Write

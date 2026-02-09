@@ -37,8 +37,8 @@
 | Repositories      | [mcp_ado_repo_list_pull_request_threads](#mcp_ado_repo_list_pull_request_threads)                         | List comment threads on a pull request                   |
 | Repositories      | [mcp_ado_repo_list_pull_request_thread_comments](#mcp_ado_repo_list_pull_request_thread_comments)         | List comments in a specific thread                       |
 | Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request            |
+| Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
-| Repositories      | [mcp_ado_repo_resolve_comment](#mcp_ado_repo_resolve_comment)                                             | Mark a comment thread as resolved                        |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
 | Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                            |
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
@@ -210,6 +210,19 @@ Updates the stage of a specific build.
 - **Required**: `project`, `buildId`, `stageName`, `status`
 - **Optional**: `forceRetryAllJobs`
 
+### mcp_ado_pipelines_list_artifacts
+
+Lists artifacts for a given build.
+
+- **Required**: `project`, `buildId`
+
+### mcp_ado_pipelines_download_artifact
+
+Downloads a pipeline artifact.
+
+- **Required**: `project`, `buildId`, `artifactName`
+- **Optional**: `destinationPath`
+
 ## Repositories
 
 ### mcp_ado_repo_list_repos_by_project
@@ -324,19 +337,19 @@ Creates a new comment thread on a pull request.
 - **Required**: `repositoryId`, `pullRequestId`, `content`
 - **Optional**: `filePath`, `project`, `rightFileEndLine`, `rightFileEndOffset`, `rightFileStartLine`, `rightFileStartOffset`, `status`
 
+### mcp_ado_repo_update_pull_request_thread
+
+Updates an existing comment thread on a pull request.
+
+- **Required**: `repositoryId`, `pullRequestId`, `threadId`
+- **Optional**: `project`, `status`
+
 ### mcp_ado_repo_reply_to_comment
 
 Replies to a specific comment on a pull request.
 
 - **Required**: `repositoryId`, `pullRequestId`, `threadId`, `content`
 - **Optional**: `fullResponse`, `project`
-
-### mcp_ado_repo_resolve_comment
-
-Resolves a specific comment thread on a pull request.
-
-- **Required**: `repositoryId`, `pullRequestId`, `threadId`
-- **Optional**: `fullResponse`
 
 ## Search
 
