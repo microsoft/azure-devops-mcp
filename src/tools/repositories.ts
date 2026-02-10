@@ -148,8 +148,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
       labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
+      supportsIterations: z.boolean().optional().default(false).describe("Whether to support iterations in the pull request. Defaults to false."),
     },
-    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels }) => {
+    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels, supportsIterations }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -175,6 +176,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             workItemRefs: workItemRefs,
             forkSource,
             labels: labelDefinitions,
+            supportsIterations: supportsIterations ?? false,
           },
           repositoryId
         );

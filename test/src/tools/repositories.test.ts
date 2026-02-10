@@ -898,6 +898,8 @@ describe("repos tools", () => {
           isDraft: undefined,
           workItemRefs: [],
           forkSource: undefined,
+          labels: undefined,
+          supportsIterations: false,
         },
         "repo123"
       );
@@ -974,6 +976,7 @@ describe("repos tools", () => {
             },
           },
           labels: [{ name: "enhancement" }, { name: "needs-review" }],
+          supportsIterations: false,
         },
         "repo123"
       );
@@ -4871,6 +4874,8 @@ describe("repos tools", () => {
           isDraft: undefined, // This is what actually gets passed when isDraft is not provided
           workItemRefs: [],
           forkSource: undefined, // This should be undefined when forkSourceRepositoryId is not provided
+          labels: undefined,
+          supportsIterations: false,
         },
         "repo123"
       );
