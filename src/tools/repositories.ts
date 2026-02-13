@@ -175,6 +175,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             workItemRefs: workItemRefs,
             forkSource,
             labels: labelDefinitions,
+            supportsIterations: true,
           },
           repositoryId
         );
