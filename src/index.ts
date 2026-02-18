@@ -55,6 +55,11 @@ const argv = yargs(hideBin(process.argv))
     describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
     type: "string",
   })
+  .option("read-only", {
+    describe: "Run in read-only mode. Only read-only tools will be available. Takes precedence over domain configuration.",
+    type: "boolean",
+    default: false,
+  })
   .help()
   .parseSync();
 
@@ -85,6 +90,7 @@ async function main() {
     tenant: argv.tenant,
     domains: argv.domains,
     enabledDomains: Array.from(enabledDomains),
+    readOnly: argv.readOnly,
     version: packageVersion,
     isCodespace: isGitHubCodespaceEnv(),
   });
@@ -109,7 +115,7 @@ async function main() {
   // removing prompts untill further notice
   // configurePrompts(server);
 
-  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains, orgName);
+  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains, orgName, argv.readOnly);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
