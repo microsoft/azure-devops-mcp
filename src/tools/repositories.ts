@@ -20,12 +20,13 @@ import {
   GitPullRequest,
   GitPullRequestCommentThread,
   Comment,
+  VersionControlChangeType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { getEnumKeys } from "../utils.js";
+import { getEnumKeys, streamToString } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -37,6 +38,7 @@ const REPO_TOOLS = {
   get_repo_by_name_or_id: "repo_get_repo_by_name_or_id",
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
+  get_pull_request_changes: "repo_get_pull_request_changes",
   create_pull_request: "repo_create_pull_request",
   create_branch: "repo_create_branch",
   update_pull_request: "repo_update_pull_request",
@@ -46,6 +48,7 @@ const REPO_TOOLS = {
   update_pull_request_thread: "repo_update_pull_request_thread",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
+  get_file_content: "repo_get_file_content",
 };
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -972,6 +975,360 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   );
 
   server.tool(
+    REPO_TOOLS.get_pull_request_changes,
+    "Get the file changes (diff) for a pull request iteration with actual code diff content. Returns the code changes including line-by-line diffs made in the pull request.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request to retrieve changes for."),
+      iterationId: z.number().optional().describe("The iteration ID to get changes for. If not specified, gets changes for the latest iteration."),
+      project: z.string().optional().describe("Project ID or project name (optional)"),
+      top: z.number().optional().describe("Maximum number of files to include diffs for. Default is 100."),
+      skip: z.number().optional().describe("Number of changes to skip for pagination."),
+      compareTo: z.number().optional().describe("Iteration ID to compare against. If specified, returns changes between two iterations."),
+      includeDiffs: z.boolean().optional().describe("Whether to include actual line-by-line diff content. Default is true. Set to false to get only file metadata."),
+      includeLineContent: z
+        .boolean()
+        .optional()
+        .describe(
+          "Whether to include the actual line content from the changed files. Default is true. When true, fetches file content and includes the actual code lines that were added/removed/modified."
+        ),
+    },
+    async ({ repositoryId, pullRequestId, iterationId, project, top, skip, compareTo, includeDiffs = true, includeLineContent = true }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        // If repositoryId is a name (not a GUID), we need a project to resolve it.
+        // GUID pattern: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repositoryId);
+        if (!isGuid && !project) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Error: When using a repository name instead of a GUID for repositoryId, the 'project' parameter is required. Please either provide the project name/ID, or use repo_get_repo_by_name_or_id to resolve the repository GUID first.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // If no iteration ID provided, get the latest iteration
+        let targetIterationId = iterationId;
+        let targetIteration;
+        if (targetIterationId == null) {
+          const iterations = await gitApi.getPullRequestIterations(repositoryId, pullRequestId, project);
+          if (!iterations || iterations.length === 0) {
+            return {
+              content: [{ type: "text", text: "No iterations found for this pull request." }],
+              isError: true,
+            };
+          }
+          // Get the latest iteration
+          targetIteration = iterations[iterations.length - 1];
+          targetIterationId = targetIteration.id;
+        } else {
+          // Get the specific iteration
+          targetIteration = await gitApi.getPullRequestIteration(repositoryId, pullRequestId, targetIterationId, project);
+        }
+
+        // Get the file change metadata
+        const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, targetIterationId ?? 1, project, top, skip, compareTo);
+
+        // If includeDiffs is false, just return the metadata
+        if (!includeDiffs) {
+          return {
+            content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
+          };
+        }
+
+        // Get actual diff content using getFileDiffs
+        if (changes.changeEntries && changes.changeEntries.length > 0 && targetIteration) {
+          // Determine base and target commits
+          const baseCommitId = compareTo
+            ? (await gitApi.getPullRequestIteration(repositoryId, pullRequestId, compareTo, project)).sourceRefCommit?.commitId
+            : targetIteration.commonRefCommit?.commitId;
+          const targetCommitId = targetIteration.sourceRefCommit?.commitId;
+
+          if (baseCommitId && targetCommitId) {
+            // Build FileDiffsCriteria with paths from changeEntries
+            // Exclude added and deleted files as they don't have both versions to diff
+            // changeType is a flags enum so use bitwise AND to check
+            const fileDiffParams = changes.changeEntries
+              .filter((entry) => {
+                const ct = entry.changeType ?? 0;
+                return entry.item?.path && !(ct & VersionControlChangeType.Add) && !(ct & VersionControlChangeType.Delete);
+              })
+              .map((entry) => {
+                // Remove leading slash if present - Azure DevOps API expects relative paths
+                const itemPath = entry.item?.path ?? "";
+                const path = itemPath.startsWith("/") ? itemPath.substring(1) : itemPath;
+                // For renamed/moved files, use the original path from the change entry
+                const origPath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : path;
+                return {
+                  path: path,
+                  originalPath: origPath,
+                };
+              });
+
+            if (fileDiffParams.length > 0) {
+              try {
+                // Azure DevOps getFileDiffs API accepts max 10 files per request
+                const FILE_DIFF_BATCH_SIZE = 10;
+                let fileDiffs: any[] = [];
+                for (let i = 0; i < fileDiffParams.length; i += FILE_DIFF_BATCH_SIZE) {
+                  const batch = fileDiffParams.slice(i, i + FILE_DIFF_BATCH_SIZE);
+                  const batchDiffs = await gitApi.getFileDiffs(
+                    {
+                      baseVersionCommit: baseCommitId,
+                      targetVersionCommit: targetCommitId,
+                      fileDiffParams: batch,
+                    },
+                    project || "",
+                    repositoryId
+                  );
+                  fileDiffs = fileDiffs.concat(batchDiffs);
+                }
+
+                // Merge diff content with change metadata
+                const enrichedChanges = {
+                  ...changes,
+                  changeEntries: changes.changeEntries.map((entry) => {
+                    // Normalize path for comparison (remove leading slash)
+                    const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
+                    const matchingDiff = fileDiffs.find((diff) => diff.path === entryPath);
+                    return {
+                      ...entry,
+                      diff: matchingDiff || null,
+                    };
+                  }),
+                };
+
+                // If includeLineContent is true, fetch actual file content with concurrency limit
+                if (includeLineContent && enrichedChanges.changeEntries) {
+                  const CONCURRENCY_LIMIT = 10;
+                  const entriesWithContent = [...enrichedChanges.changeEntries];
+                  for (let i = 0; i < entriesWithContent.length; i += CONCURRENCY_LIMIT) {
+                    const batch = entriesWithContent.slice(i, i + CONCURRENCY_LIMIT);
+                    const batchResults = await Promise.all(
+                      batch.map(async (entry) => {
+                        const ct = entry.changeType ?? 0;
+                        const isAdd = !!(ct & VersionControlChangeType.Add);
+                        const isDelete = !!(ct & VersionControlChangeType.Delete);
+
+                        const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
+
+                        if (!entryPath) {
+                          return entry;
+                        }
+
+                        // Handle added files: fetch full content at target commit and create synthetic diff
+                        if (isAdd && !entry.diff) {
+                          try {
+                            const targetStream = await gitApi
+                              .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
+                              .catch(() => null);
+                            if (targetStream) {
+                              const targetText = await streamToString(targetStream);
+                              const targetLines = targetText.split(/\r?\n/);
+                              return {
+                                ...entry,
+                                diff: {
+                                  path: entryPath,
+                                  originalPath: entryPath,
+                                  lineDiffBlocks: [
+                                    {
+                                      changeType: 1, // Add
+                                      originalLineNumberStart: 0,
+                                      originalLinesCount: 0,
+                                      modifiedLineNumberStart: 1,
+                                      modifiedLinesCount: targetLines.length,
+                                      modifiedLines: targetLines,
+                                    },
+                                  ],
+                                },
+                              };
+                            }
+                          } catch (addError) {
+                            return {
+                              ...entry,
+                              _contentFetchError: `Failed to fetch added file content: ${addError instanceof Error ? addError.message : "Unknown error"}`,
+                            };
+                          }
+                          return entry;
+                        }
+
+                        // Handle deleted files: fetch full content at base commit and create synthetic diff
+                        if (isDelete && !entry.diff) {
+                          try {
+                            const basePath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : entryPath;
+                            const baseStream = await gitApi
+                              .getItemText(repositoryId, basePath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
+                              .catch(() => null);
+                            if (baseStream) {
+                              const baseText = await streamToString(baseStream);
+                              const baseLines = baseText.split(/\r?\n/);
+                              return {
+                                ...entry,
+                                diff: {
+                                  path: entryPath,
+                                  originalPath: basePath,
+                                  lineDiffBlocks: [
+                                    {
+                                      changeType: 2, // Delete
+                                      originalLineNumberStart: 1,
+                                      originalLinesCount: baseLines.length,
+                                      modifiedLineNumberStart: 0,
+                                      modifiedLinesCount: 0,
+                                      originalLines: baseLines,
+                                    },
+                                  ],
+                                },
+                              };
+                            }
+                          } catch (delError) {
+                            return {
+                              ...entry,
+                              _contentFetchError: `Failed to fetch deleted file content: ${delError instanceof Error ? delError.message : "Unknown error"}`,
+                            };
+                          }
+                          return entry;
+                        }
+
+                        // For modified/renamed files, skip if no diff blocks
+                        if (!entry.diff?.lineDiffBlocks || entry.diff.lineDiffBlocks.length === 0) {
+                          return entry;
+                        }
+
+                        // For renamed/moved files, the base version is at the original path
+                        const basePath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : entryPath;
+
+                        try {
+                          // Fetch file content at both commits
+                          const [baseContent, targetContent] = await Promise.all([
+                            // Base version (original) - use basePath for renamed files
+                            gitApi
+                              .getItemText(repositoryId, basePath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
+                              .catch(() => null),
+                            // Target version (modified)
+                            gitApi
+                              .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
+                              .catch(() => null),
+                          ]);
+
+                          // Convert streams to text
+                          const baseText = baseContent ? await streamToString(baseContent) : "";
+                          const targetText = targetContent ? await streamToString(targetContent) : "";
+
+                          // Check if response is an Azure DevOps error (returned as JSON in the stream)
+                          const checkForApiError = (text: string, label: string) => {
+                            if (text.startsWith("{")) {
+                              try {
+                                const parsed = JSON.parse(text);
+                                if (parsed.$id && parsed.innerException !== undefined) {
+                                  throw new Error(`Failed to fetch ${label} file content: ${parsed.message || text}`);
+                                }
+                              } catch (e) {
+                                if (e instanceof Error && e.message.startsWith("Failed to fetch")) throw e;
+                                // Not valid JSON or not an error response — treat as legitimate content
+                              }
+                            }
+                          };
+                          checkForApiError(baseText, "base");
+                          checkForApiError(targetText, "target");
+
+                          // Split into lines
+                          const baseLines = baseText.split(/\r?\n/);
+                          const targetLines = targetText.split(/\r?\n/);
+
+                          // Enrich each lineDiffBlock with actual line content
+                          const enrichedDiff = {
+                            ...entry.diff,
+                            lineDiffBlocks: entry.diff.lineDiffBlocks?.map((block: any) => {
+                              const enrichedBlock: any = { ...block };
+
+                              // Add original (base) lines if they exist
+                              if (block.originalLineNumberStart && block.originalLinesCount) {
+                                const startIdx = block.originalLineNumberStart - 1;
+                                const endIdx = startIdx + block.originalLinesCount;
+                                enrichedBlock.originalLines = baseLines.slice(startIdx, endIdx);
+                              }
+
+                              // Add modified (target) lines if they exist
+                              if (block.modifiedLineNumberStart && block.modifiedLinesCount) {
+                                const startIdx = block.modifiedLineNumberStart - 1;
+                                const endIdx = startIdx + block.modifiedLinesCount;
+                                enrichedBlock.modifiedLines = targetLines.slice(startIdx, endIdx);
+                              }
+
+                              return enrichedBlock;
+                            }),
+                          };
+
+                          return {
+                            ...entry,
+                            diff: enrichedDiff,
+                          };
+                        } catch (contentError) {
+                          // If content fetch fails, return entry with error
+                          return {
+                            ...entry,
+                            _contentFetchError: `Failed to fetch line content: ${contentError instanceof Error ? contentError.message : "Unknown error"}`,
+                          };
+                        }
+                      })
+                    );
+                    // Write batch results back into the array
+                    for (let j = 0; j < batchResults.length; j++) {
+                      entriesWithContent[i + j] = batchResults[j];
+                    }
+                  }
+
+                  enrichedChanges.changeEntries = entriesWithContent;
+                }
+
+                return {
+                  content: [{ type: "text", text: JSON.stringify(enrichedChanges, null, 2) }],
+                };
+              } catch (diffError) {
+                // If diff fetching fails, return metadata with error info
+                return {
+                  content: [
+                    {
+                      type: "text",
+                      text: JSON.stringify(
+                        {
+                          ...changes,
+                          _diffError: `Failed to fetch diff content: ${diffError instanceof Error ? diffError.message : "Unknown error"}`,
+                          _note: "Returned metadata only",
+                        },
+                        null,
+                        2
+                      ),
+                    },
+                  ],
+                };
+              }
+            }
+          }
+        }
+
+        // Fallback: return metadata if we couldn't get diffs
+        return {
+          content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting pull request changes: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
     REPO_TOOLS.reply_to_comment,
     "Replies to a specific comment on a pull request.",
     {
@@ -1436,6 +1793,75 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         return {
           content: [{ type: "text", text: `Error querying pull requests by commits: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ── Get file content at a specific version (branch, tag, or commit) ──
+  const fileVersionTypeStrings = getEnumKeys(GitVersionType);
+
+  server.tool(
+    REPO_TOOLS.get_file_content,
+    "Get the content of a file from a Git repository at a specific version (branch, tag, or commit SHA). " +
+      "Useful for reading source files from PR branches, specific commits, or tags without having them checked out locally.",
+    {
+      repositoryId: z.string().describe("The ID (GUID) or name of the repository."),
+      path: z.string().describe("The full path to the file in the repository, e.g., '/src/main.ts' or 'src/main.ts'."),
+      project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name."),
+      version: z
+        .string()
+        .optional()
+        .describe("Version string: branch name (e.g. 'main'), tag name, or commit SHA. " + "Defaults to the repository's default branch if not specified."),
+      versionType: z
+        .enum(fileVersionTypeStrings as [string, ...string[]])
+        .optional()
+        .default("Commit")
+        .describe("How to interpret the 'version' parameter. Defaults to 'Commit'."),
+    },
+    async ({ repositoryId, path, project, version, versionType }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        // Build the version descriptor if a version was specified
+        const versionDescriptor: GitVersionDescriptor | undefined = version
+          ? {
+              version: version,
+              versionType: GitVersionType[versionType as keyof typeof GitVersionType],
+            }
+          : undefined;
+
+        // getItemText returns a ReadableStream of the file content as text
+        const stream = await gitApi.getItemText(
+          repositoryId,
+          path,
+          project,
+          undefined, // scopePath
+          undefined, // recursionLevel
+          undefined, // includeContentMetadata
+          undefined, // latestProcessedChange
+          false, // download
+          versionDescriptor,
+          true // includeContent
+        );
+
+        const content = await streamToString(stream);
+
+        return {
+          content: [{ type: "text", text: content }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error getting file content for '${path}': ${errorMessage}`,
+            },
+          ],
           isError: true,
         };
       }

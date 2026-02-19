@@ -72,3 +72,19 @@ export function encodeFormattedValue(value: string, format?: "Markdown" | "Html"
   const result = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return result;
 }
+
+/**
+ * Convert a Node.js ReadableStream to a string.
+ * Shared utility for consistent stream handling across tools.
+ */
+export function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    stream.setEncoding("utf8");
+    stream.on("data", (chunk: string) => {
+      data += chunk;
+    });
+    stream.on("error", reject);
+    stream.on("end", () => resolve(data));
+  });
+}
