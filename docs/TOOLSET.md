@@ -352,6 +352,13 @@ Replies to a specific comment on a pull request.
 - **Required**: `repositoryId`, `pullRequestId`, `threadId`, `content`
 - **Optional**: `fullResponse`, `project`
 
+### mcp_ado_repo_list_directory
+
+List files and folders in a directory within a repository.
+
+- **Required**: `repositoryId`
+- **Optional**: `path`, `project`, `version`, `versionType`, `recursive`, `recursionDepth`
+
 ## Search
 
 ### mcp_ado_search_code
