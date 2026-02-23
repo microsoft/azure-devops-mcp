@@ -34,6 +34,7 @@
 | Repositories      | [mcp_ado_repo_create_pull_request](#mcp_ado_repo_create_pull_request)                                     | Create a new pull request                                |
 | Repositories      | [mcp_ado_repo_update_pull_request](#mcp_ado_repo_update_pull_request)                                     | Update pull request properties and settings              |
 | Repositories      | [mcp_ado_repo_update_pull_request_reviewers](#mcp_ado_repo_update_pull_request_reviewers)                 | Add or remove reviewers from a pull request              |
+| Repositories      | [mcp_ado_repo_vote_pull_request](#mcp_ado_repo_vote_pull_request)                                         | Cast a vote on a pull request                            |
 | Repositories      | [mcp_ado_repo_list_pull_request_threads](#mcp_ado_repo_list_pull_request_threads)                         | List comment threads on a pull request                   |
 | Repositories      | [mcp_ado_repo_list_pull_request_thread_comments](#mcp_ado_repo_list_pull_request_thread_comments)         | List comments in a specific thread                       |
 | Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request            |
@@ -314,6 +315,13 @@ Update a Pull Request by ID with specified fields.
 Add or remove reviewers for an existing pull request.
 
 - **Required**: `repositoryId`, `pullRequestId`, `reviewerIds`, `action`
+- **Optional**: None
+
+### mcp_ado_repo_vote_pull_request
+
+Cast a vote on a pull request.
+
+- **Required**: `repositoryId`, `pullRequestId`, `vote`
 - **Optional**: None
 
 ### mcp_ado_repo_list_pull_request_threads
