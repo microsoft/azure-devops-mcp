@@ -40,6 +40,7 @@
 | Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request            |
 | Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
+| Repositories      | [mcp_ado_repo_list_directory](#mcp_ado_repo_list_directory)                                               | List files and folders in a directory                    |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
 | Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                            |
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
@@ -358,6 +359,13 @@ Replies to a specific comment on a pull request.
 
 - **Required**: `repositoryId`, `pullRequestId`, `threadId`, `content`
 - **Optional**: `fullResponse`, `project`
+
+### mcp_ado_repo_list_directory
+
+List files and folders in a directory within a repository.
+
+- **Required**: `repositoryId`
+- **Optional**: `path`, `project`, `version`, `versionType`, `recursive`, `recursionDepth`
 
 ## Search
 
