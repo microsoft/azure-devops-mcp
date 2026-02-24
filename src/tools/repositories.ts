@@ -1500,7 +1500,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           },
         ],
       };
-   )
+    }
+  );
 
   server.tool(
     REPO_TOOLS.list_directory,
@@ -1583,7 +1584,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
     }
   );
-
 }
 
 export { REPO_TOOLS, configureRepoTools };
