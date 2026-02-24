@@ -34,11 +34,13 @@
 | Repositories      | [mcp_ado_repo_create_pull_request](#mcp_ado_repo_create_pull_request)                                     | Create a new pull request                                |
 | Repositories      | [mcp_ado_repo_update_pull_request](#mcp_ado_repo_update_pull_request)                                     | Update pull request properties and settings              |
 | Repositories      | [mcp_ado_repo_update_pull_request_reviewers](#mcp_ado_repo_update_pull_request_reviewers)                 | Add or remove reviewers from a pull request              |
+| Repositories      | [mcp_ado_repo_vote_pull_request](#mcp_ado_repo_vote_pull_request)                                         | Cast a vote on a pull request                            |
 | Repositories      | [mcp_ado_repo_list_pull_request_threads](#mcp_ado_repo_list_pull_request_threads)                         | List comment threads on a pull request                   |
 | Repositories      | [mcp_ado_repo_list_pull_request_thread_comments](#mcp_ado_repo_list_pull_request_thread_comments)         | List comments in a specific thread                       |
 | Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request            |
 | Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
+| Repositories      | [mcp_ado_repo_list_directory](#mcp_ado_repo_list_directory)                                               | List files and folders in a directory                    |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
 | Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                            |
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
@@ -316,6 +318,13 @@ Add or remove reviewers for an existing pull request.
 - **Required**: `repositoryId`, `pullRequestId`, `reviewerIds`, `action`
 - **Optional**: None
 
+### mcp_ado_repo_vote_pull_request
+
+Cast a vote on a pull request.
+
+- **Required**: `repositoryId`, `pullRequestId`, `vote`
+- **Optional**: None
+
 ### mcp_ado_repo_list_pull_request_threads
 
 Retrieve a list of comment threads for a pull request.
@@ -350,6 +359,13 @@ Replies to a specific comment on a pull request.
 
 - **Required**: `repositoryId`, `pullRequestId`, `threadId`, `content`
 - **Optional**: `fullResponse`, `project`
+
+### mcp_ado_repo_list_directory
+
+List files and folders in a directory within a repository.
+
+- **Required**: `repositoryId`
+- **Optional**: `path`, `project`, `version`, `versionType`, `recursive`, `recursionDepth`
 
 ## Search
 

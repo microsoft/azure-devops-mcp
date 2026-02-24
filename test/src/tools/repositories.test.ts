@@ -4,7 +4,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureRepoTools, REPO_TOOLS } from "../../../src/tools/repositories";
-import { PullRequestStatus, GitVersionType, GitPullRequestQueryType, CommentThreadStatus } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { PullRequestStatus, GitVersionType, GitPullRequestQueryType, CommentThreadStatus, VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "../../../src/tools/auth";
 
 // Mock the auth module
@@ -25,6 +25,7 @@ describe("repos tools", () => {
     updatePullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createPullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createPullRequestReviewers: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    createPullRequestReviewer: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     deletePullRequestReviewer: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getRepositories: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequests: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
@@ -42,6 +43,7 @@ describe("repos tools", () => {
     getCommits: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestQuery: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     updateRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getItems: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
   };
 
   beforeEach(() => {
@@ -54,6 +56,7 @@ describe("repos tools", () => {
       updatePullRequest: jest.fn(),
       createPullRequest: jest.fn(),
       createPullRequestReviewers: jest.fn(),
+      createPullRequestReviewer: jest.fn(),
       deletePullRequestReviewer: jest.fn(),
       getRepositories: jest.fn(),
       getPullRequests: jest.fn(),
@@ -71,6 +74,7 @@ describe("repos tools", () => {
       getCommits: jest.fn(),
       getPullRequestQuery: jest.fn(),
       updateRefs: jest.fn(),
+      getItems: jest.fn(),
     };
 
     connectionProvider = jest.fn().mockResolvedValue({
@@ -4394,6 +4398,87 @@ describe("repos tools", () => {
     });
   });
 
+  describe("repo_vote_pull_request", () => {
+    it("should cast an Approved vote", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.vote_pull_request);
+      if (!call) throw new Error("repo_vote_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createPullRequestReviewer.mockResolvedValue({});
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 427,
+        vote: "Approved" as const,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123" }, "repo123", 427, "user123");
+      expect(result.content[0].text).toBe("Successfully cast vote 'Approved' on PR #427.");
+    });
+
+    it("should cast a Rejected vote", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.vote_pull_request);
+      if (!call) throw new Error("repo_vote_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createPullRequestReviewer.mockResolvedValue({});
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 427,
+        vote: "Rejected" as const,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: -10, id: "user123" }, "repo123", 427, "user123");
+    });
+
+    it("should throw when authenticated user ID is missing", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.vote_pull_request);
+      if (!call) throw new Error("repo_vote_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      mockGetCurrentUserDetails.mockResolvedValue({ authenticatedUser: { id: undefined } } as any);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 427,
+        vote: "NoVote" as const,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Could not determine authenticated user ID.");
+      expect(mockGitApi.createPullRequestReviewer).not.toHaveBeenCalled();
+    });
+
+    it("should propagate API errors from createPullRequestReviewer", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.vote_pull_request);
+      if (!call) throw new Error("repo_vote_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createPullRequestReviewer.mockRejectedValue(new Error("Reviewer update failed"));
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 427,
+        vote: "WaitingForAuthor" as const,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Reviewer update failed");
+    });
+  });
+
   describe("pullRequestStatusStringToInt function coverage", () => {
     it("should handle Completed status", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
@@ -6563,6 +6648,145 @@ describe("repos tools", () => {
 
         expect(result).toEqual({
           content: [{ type: "text", text: "Error querying pull requests by commits: Invalid commit ID" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_list_directory", () => {
+      it("should list directory with default options", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        const items = [
+          {
+            path: "/",
+            isFolder: true,
+            gitObjectType: 2,
+            commitId: "abc123",
+            contentMetadata: { contentType: undefined, fileName: "" },
+          },
+          {
+            path: "/README.md",
+            isFolder: false,
+            gitObjectType: 3,
+            commitId: "abc123",
+            contentMetadata: { contentType: "text/markdown", fileName: "README.md" },
+          },
+        ];
+
+        mockGitApi.getItems.mockResolvedValue(items);
+
+        const result = await handler({ repositoryId: "repo123", path: "/", recursive: false, recursionDepth: 1 });
+
+        expect(mockGitApi.getItems).toHaveBeenCalledWith("repo123", undefined, "/", VersionControlRecursionType.OneLevel, true, false, false, false, undefined);
+
+        expect(result.content[0].text).toBe(
+          JSON.stringify(
+            {
+              count: 2,
+              path: "/",
+              recursive: false,
+              items: [
+                {
+                  path: "/",
+                  isFolder: true,
+                  gitObjectType: 2,
+                  commitId: "abc123",
+                  contentMetadata: { contentType: undefined, fileName: "" },
+                },
+                {
+                  path: "/README.md",
+                  isFolder: false,
+                  gitObjectType: 3,
+                  commitId: "abc123",
+                  contentMetadata: { contentType: "text/markdown", fileName: "README.md" },
+                },
+              ],
+            },
+            null,
+            2
+          )
+        );
+      });
+
+      it("should recursively list and filter by recursion depth", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        const items = [
+          { path: "/src", isFolder: true, gitObjectType: 2, commitId: "def456" },
+          { path: "/src/index.ts", isFolder: false, gitObjectType: 3, commitId: "def456" },
+          { path: "/src/components", isFolder: true, gitObjectType: 2, commitId: "def456" },
+          { path: "/src/components/Button.tsx", isFolder: false, gitObjectType: 3, commitId: "def456" },
+          { path: "/src/components/deep/Nested.tsx", isFolder: false, gitObjectType: 3, commitId: "def456" },
+        ];
+
+        mockGitApi.getItems.mockResolvedValue(items);
+
+        const result = await handler({
+          repositoryId: "repo123",
+          path: "/src",
+          recursive: true,
+          recursionDepth: 2,
+          version: "main",
+          versionType: "Branch",
+        });
+
+        expect(mockGitApi.getItems).toHaveBeenCalledWith("repo123", undefined, "/src", VersionControlRecursionType.Full, true, false, false, false, {
+          version: "main",
+          versionType: GitVersionType.Branch,
+        });
+
+        expect(result.content[0].text).toBe(
+          JSON.stringify(
+            {
+              count: 4,
+              path: "/src",
+              recursive: true,
+              recursionDepth: 2,
+              items: [
+                { path: "/src", isFolder: true, gitObjectType: 2, commitId: "def456", contentMetadata: undefined },
+                { path: "/src/index.ts", isFolder: false, gitObjectType: 3, commitId: "def456", contentMetadata: undefined },
+                { path: "/src/components", isFolder: true, gitObjectType: 2, commitId: "def456", contentMetadata: undefined },
+                { path: "/src/components/Button.tsx", isFolder: false, gitObjectType: 3, commitId: "def456", contentMetadata: undefined },
+              ],
+            },
+            null,
+            2
+          )
+        );
+      });
+
+      it("should return no items found message", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        mockGitApi.getItems.mockResolvedValue([]);
+
+        const result = await handler({ repositoryId: "repo123", path: "/missing" });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "No items found at path: /missing" }],
+        });
+      });
+    });
+
+    describe("repo_list_directory error handling", () => {
+      it("should handle directory list errors", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        mockGitApi.getItems.mockRejectedValue(new Error("Repository access denied"));
+
+        const result = await handler({ repositoryId: "repo123", path: "/" });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error listing directory: Repository access denied" }],
           isError: true,
         });
       });

@@ -39,8 +39,8 @@
   },
   "dependencies": {
     "@azure/identity": "^4.10.0",
-    "@azure/msal-node": "^3.6.0",
-    "@modelcontextprotocol/sdk": "1.26.0",
+    "@azure/msal-node": "^5.0.4",
+    "@modelcontextprotocol/sdk": "1.27.0",
     "azure-devops-extension-api": "^4.264.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.2",
@@ -50,7 +50,7 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.19.0",
+    "@modelcontextprotocol/inspector": "^0.20.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.19.1",
     "eslint-config-prettier": "10.1.8",
