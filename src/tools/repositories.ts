@@ -47,6 +47,7 @@ const REPO_TOOLS = {
   update_pull_request_thread: "repo_update_pull_request_thread",
   search_commits: "repo_search_commits",
   list_pull_requests_by_commits: "repo_list_pull_requests_by_commits",
+  vote_pull_request: "repo_vote_pull_request",
   list_directory: "repo_list_directory",
 };
 
@@ -1459,6 +1460,46 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           isError: true,
         };
       }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.vote_pull_request,
+    "Cast a vote on a pull request. Automatically adds the current user as a reviewer if they are not already one.",
+    {
+      repositoryId: z.string().describe("The ID of the repository."),
+      pullRequestId: z.number().describe("The ID of the pull request."),
+      vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).describe("The vote to cast: Approved(10), Suggestions(5), None(0), Waiting(-5), Rejected(-10)."),
+    },
+    async ({ repositoryId, pullRequestId, vote }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+
+      const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+      const userId = userDetails.authenticatedUser.id;
+
+      if (!userId) {
+        throw new Error("Could not determine authenticated user ID.");
+      }
+
+      const voteMap: Record<string, number> = {
+        Approved: 10,
+        ApprovedWithSuggestions: 5,
+        NoVote: 0,
+        WaitingForAuthor: -5,
+        Rejected: -10,
+      };
+
+      await gitApi.createPullRequestReviewer({ vote: voteMap[vote], id: userId } as any, repositoryId, pullRequestId, userId);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully cast vote '${vote}' on PR #${pullRequestId}.`,
+          },
+        ],
+      };
     }
   );
 
