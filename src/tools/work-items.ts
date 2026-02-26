@@ -26,6 +26,8 @@ const WORKITEM_TOOLS = {
   get_query: "wit_get_query",
   get_query_results_by_id: "wit_get_query_results_by_id",
   update_work_items_batch: "wit_update_work_items_batch",
+  update_work_item_comment: "wit_update_work_item_comment",
+  delete_work_item_comment: "wit_delete_work_item_comment",
   work_items_link: "wit_work_items_link",
   work_item_unlink: "wit_work_item_unlink",
   add_artifact_link: "wit_add_artifact_link",
@@ -312,6 +314,89 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [{ type: "text", text: `Error adding work item comment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.update_work_item_comment,
+    "Update an existing comment on a work item. Requires the comment ID which can be obtained from list_work_item_comments.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      workItemId: z.number().describe("The ID of the work item that owns the comment."),
+      commentId: z.number().describe("The ID of the comment to update."),
+      text: z.string().describe("The updated text for the comment."),
+    },
+    async ({ project, workItemId, commentId, text }) => {
+      try {
+        const connection = await connectionProvider();
+        const orgUrl = connection.serverUrl;
+        const accessToken = await tokenProvider();
+
+        const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments/${commentId}?api-version=${markdownCommentsApiVersion}`, {
+          method: "PATCH",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "User-Agent": userAgentProvider(),
+          },
+          body: JSON.stringify({ text }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to update work item comment: ${response.statusText}`);
+        }
+
+        const result = await response.text();
+
+        return {
+          content: [{ type: "text", text: result }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error updating work item comment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.delete_work_item_comment,
+    "Delete an existing comment from a work item. Requires the comment ID which can be obtained from list_work_item_comments.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      workItemId: z.number().describe("The ID of the work item that owns the comment."),
+      commentId: z.number().describe("The ID of the comment to delete."),
+    },
+    async ({ project, workItemId, commentId }) => {
+      try {
+        const connection = await connectionProvider();
+        const orgUrl = connection.serverUrl;
+        const accessToken = await tokenProvider();
+
+        const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments/${commentId}?api-version=${markdownCommentsApiVersion}`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "User-Agent": userAgentProvider(),
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to delete work item comment: ${response.statusText}`);
+        }
+
+        return {
+          content: [{ type: "text", text: `Comment ${commentId} deleted from work item ${workItemId}.` }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error deleting work item comment: ${errorMessage}` }],
           isError: true,
         };
       }

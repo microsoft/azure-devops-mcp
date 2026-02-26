@@ -820,6 +820,145 @@ describe("configureWorkItemTools", () => {
     });
   });
 
+  describe("update_work_item_comment tool", () => {
+    it("should send a PATCH request with the correct parameters", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_item_comment");
+
+      if (!call) throw new Error("wit_update_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const updatedComment = { ...(_mockWorkItemComment as object), text: "updated text" };
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(updatedComment)),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        commentId: 42,
+        text: "updated text",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/Contoso/_apis/wit/workItems/299/comments/42?api-version=7.2-preview.4",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "Content-Type": "application/json",
+          }),
+        })
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(updatedComment));
+    });
+
+    it("should handle fetch failure response", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_item_comment");
+
+      if (!call) throw new Error("wit_update_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Not Found",
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        commentId: 42,
+        text: "wont work",
+      };
+
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error updating work item comment");
+      expect(result.content[0].text).toContain("Failed to update work item comment: Not Found");
+    });
+  });
+
+  describe("delete_work_item_comment tool", () => {
+    it("should send a DELETE request with the correct parameters", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_delete_work_item_comment");
+
+      if (!call) throw new Error("wit_delete_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        commentId: 42,
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/Contoso/_apis/wit/workItems/299/comments/42?api-version=7.2-preview.4",
+        expect.objectContaining({
+          method: "DELETE",
+          headers: expect.objectContaining({
+            Authorization: "Bearer fake-token",
+          }),
+        })
+      );
+
+      expect(result.content[0].text).toBe("Comment 42 deleted from work item 299.");
+    });
+
+    it("should handle fetch failure response", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_delete_work_item_comment");
+
+      if (!call) throw new Error("wit_delete_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Forbidden",
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        commentId: 42,
+      };
+
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error deleting work item comment");
+      expect(result.content[0].text).toContain("Failed to delete work item comment: Forbidden");
+    });
+  });
+
   describe("link_work_item_to_pull_request tool", () => {
     it("should call workItemApi.updateWorkItem API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
