@@ -78,10 +78,21 @@ const argv = yargs(hideBin(process.argv))
     default: 3000,
     nargs: 1,
   })
+  .option("http-token", {
+    describe: "Token to protect the HTTP endpoint (for http transport). If provided, clients must send this in the 'x-mcp-token' header.",
+    type: "string",
+  })
+  .option("allowed-origins", {
+    describe: "Allowed origins for CORS (for http transport). Defaults to restricted. Use '*' to allow all (not recommended for production).",
+    type: "string",
+    array: true,
+  })
   .help()
   .parseSync();
 
 const defaultOrgName = argv.organization as string | undefined;
+const httpToken = argv["http-token"] as string | undefined;
+const allowedOrigins = argv["allowed-origins"] as string[] | undefined;
 
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer, orgUrl: string): () => Promise<WebApi> {
   return async () => {
@@ -109,7 +120,8 @@ async function main() {
     // If a token is provided directly via CLI or header, use it.
     let authenticator;
     if (config.token) {
-      authenticator = async () => config.token!;
+      const tokenValue = config.token;
+      authenticator = async () => tokenValue;
     } else {
       authenticator = createAuthenticator(config.authentication, tenantId);
     }
@@ -167,20 +179,35 @@ async function main() {
     await server.connect(transport);
   } else {
     const app = createMcpExpressApp();
-    app.use(cors());
+
+    if (allowedOrigins) {
+      app.use(cors({ origin: allowedOrigins.includes("*") ? true : allowedOrigins }));
+    } else {
+      app.use(cors());
+    }
 
     const transports = new Map<string, StreamableHTTPServerTransport>();
 
     app.all("/mcp", async (req, res) => {
+      // Endpoint protection check
+      if (httpToken) {
+        const clientToken = req.headers["x-mcp-token"];
+        if (clientToken !== httpToken) {
+          logger.warn("Unauthorized access attempt to MCP endpoint");
+          res.status(401).send("Unauthorized: Invalid or missing x-mcp-token");
+          return;
+        }
+      }
+
       const sessionId = req.headers["mcp-session-id"] as string;
       let transport = sessionId ? transports.get(sessionId) : undefined;
 
       if (!transport) {
         // Extract configuration from headers or fallback to CLI defaults
-        const organization = (req.headers["x-ado-organization"] as string) || defaultOrgName;
-        const authentication = (req.headers["x-ado-authentication"] as string) || (argv.authentication as string);
-        const token = (req.headers["x-ado-token"] as string) || (argv.token as string);
-        const tenant = (req.headers["x-ado-tenant"] as string) || argv.tenant;
+        const organization = (req.headers["x-ado-organization"] as string) ?? defaultOrgName;
+        const authentication = (req.headers["x-ado-authentication"] as string) ?? (argv.authentication as string);
+        const token = (req.headers["x-ado-token"] as string) ?? (argv.token as string);
+        const tenant = (req.headers["x-ado-tenant"] as string) ?? argv.tenant;
         const domainsHeader = req.headers["x-ado-domains"] as string;
         const domains = domainsHeader ? domainsHeader.split(",").map((d) => d.trim()) : (argv.domains as string[]);
 
@@ -202,7 +229,9 @@ async function main() {
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (id) => {
             logger.info(`Session initialized: ${id}`);
-            transports.set(id, transport!);
+            if (transport) {
+              transports.set(id, transport);
+            }
           },
         });
 
