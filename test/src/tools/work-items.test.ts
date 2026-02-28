@@ -820,6 +820,87 @@ describe("configureWorkItemTools", () => {
     });
   });
 
+  describe("update_work_item_comment tool", () => {
+    it("should update a work item comment", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_item_comment");
+
+      if (!call) throw new Error("wit_update_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              workItemId: 42,
+              id: 100,
+              version: 2,
+              text: "Updated comment text",
+            })
+          ),
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "TestProject",
+        workItemId: 42,
+        commentId: 100,
+        text: "Updated comment text",
+      };
+
+      const result = await handler(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/TestProject/_apis/wit/workItems/42/comments/100?format=1&api-version=7.2-preview.4",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "Content-Type": "application/json",
+          }),
+        })
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.text).toBe("Updated comment text");
+    });
+
+    it("should handle update work item comment failure", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_item_comment");
+
+      if (!call) throw new Error("wit_update_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: false,
+        statusText: "Not Found",
+      });
+      global.fetch = mockFetch;
+
+      const params = {
+        project: "TestProject",
+        workItemId: 42,
+        commentId: 999,
+        text: "This should fail",
+      };
+
+      const result = await handler(params);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error updating work item comment");
+      expect(result.content[0].text).toContain("Failed to update work item comment: Not Found");
+    });
+  });
+
   describe("link_work_item_to_pull_request tool", () => {
     it("should call workItemApi.updateWorkItem API with the correct parameters and return the expected result", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
