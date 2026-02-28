@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug (HTTP Transport)",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["-r", "tsconfig-paths/register", "--import", "ts-node/esm"],
+      "program": "${workspaceFolder}/src/index.ts",
+      "args": ["--transport", "http", "--port", "3000"],
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    },
+    {
+      "name": "Debug (Stdio Transport)",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["-r", "tsconfig-paths/register", "--import", "ts-node/esm"],
+      "program": "${workspaceFolder}/src/index.ts",
+      "args": ["${input:ado_org}", "--transport", "stdio"],
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name (e.g. 'contoso')",
+      "default": "contoso"
+    }
+  ]
+}
