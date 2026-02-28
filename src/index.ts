@@ -5,9 +5,13 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { getBearerHandler, WebApi } from "azure-devops-node-api";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+import cors from "cors";
+import { randomUUID } from "crypto";
 
 import { createAuthenticator } from "./auth.js";
 import { logger } from "./logger.js";
@@ -27,13 +31,13 @@ const defaultAuthenticationType = isGitHubCodespaceEnv() ? "azcli" : "interactiv
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
-  .usage("Usage: $0 <organization> [options]")
+  .usage("Usage: $0 [organization] [options]")
   .version(packageVersion)
-  .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
+  .command("$0 [organization]", "Azure DevOps MCP Server", (yargs) => {
     yargs.positional("organization", {
       describe: "Azure DevOps organization name",
       type: "string",
-      demandOption: true,
+      demandOption: false,
     });
   })
   .option("domains", {
@@ -50,21 +54,42 @@ const argv = yargs(hideBin(process.argv))
     choices: ["interactive", "azcli", "env", "envvar"],
     default: defaultAuthenticationType,
   })
+  .option("token", {
+    alias: "k",
+    describe: "Azure DevOps Personal Access Token (PAT)",
+    type: "string",
+  })
   .option("tenant", {
     alias: "t",
     describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
     type: "string",
   })
+  .option("transport", {
+    alias: "tr",
+    describe: "Transport to use",
+    type: "string",
+    choices: ["stdio", "http"],
+    default: "stdio",
+  })
+  .option("port", {
+    alias: "p",
+    describe: "Port to listen on (for http transport)",
+    type: "number",
+    default: 3000,
+    nargs: 1,
+  })
+  .option("allowed-origins", {
+    describe: "Allowed origins for CORS (for http transport). Defaults to restricted. Use '*' to allow all (not recommended for production).",
+    type: "string",
+    array: true,
+  })
   .help()
   .parseSync();
 
-export const orgName = argv.organization as string;
-const orgUrl = "https://dev.azure.com/" + orgName;
+const defaultOrgName = argv.organization as string | undefined;
+const allowedOrigins = argv["allowed-origins"] as string[] | undefined;
 
-const domainsManager = new DomainsManager(argv.domains);
-export const enabledDomains = domainsManager.getEnabledDomains();
-
-function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<WebApi> {
+function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer, orgUrl: string): () => Promise<WebApi> {
   return async () => {
     const accessToken = await getAzureDevOpsToken();
     const authHandler = getBearerHandler(accessToken);
@@ -78,41 +103,156 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
+  const userAgentComposer = new UserAgentComposer(packageVersion);
+
+  const createServerInstance = async (config: { organization: string; authentication: string; token?: string; tenant?: string; domains: string[] }) => {
+    const orgUrl = "https://dev.azure.com/" + config.organization;
+    const domainsManager = new DomainsManager(config.domains);
+    const enabledDomains = domainsManager.getEnabledDomains();
+
+    const tenantId = config.tenant ?? (await getOrgTenant(config.organization));
+
+    // If a token is provided directly via CLI or header, use it.
+    let authenticator;
+    if (config.token) {
+      const tokenValue = config.token;
+      authenticator = async () => tokenValue;
+    } else {
+      authenticator = createAuthenticator(config.authentication, tenantId);
+    }
+
+    const server = new McpServer({
+      name: "Azure DevOps MCP Server",
+      version: packageVersion,
+      icons: [
+        {
+          src: "https://cdn.vsassets.io/content/icons/favicon.ico",
+        },
+      ],
+    });
+
+    server.server.oninitialized = () => {
+      userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
+    };
+
+    configureAllTools(
+      server,
+      authenticator,
+      getAzureDevOpsClient(() => authenticator(), userAgentComposer, orgUrl),
+      () => userAgentComposer.userAgent,
+      enabledDomains,
+      config.organization
+    );
+    return server;
+  };
+
   logger.info("Starting Azure DevOps MCP Server", {
-    organization: orgName,
-    organizationUrl: orgUrl,
-    authentication: argv.authentication,
-    tenant: argv.tenant,
-    domains: argv.domains,
-    enabledDomains: Array.from(enabledDomains),
+    defaultOrganization: defaultOrgName,
+    defaultAuthentication: argv.authentication,
+    defaultTenant: argv.tenant,
+    defaultDomains: argv.domains,
+    transport: argv.transport,
+    port: argv.port,
     version: packageVersion,
     isCodespace: isGitHubCodespaceEnv(),
   });
 
-  const server = new McpServer({
-    name: "Azure DevOps MCP Server",
-    version: packageVersion,
-    icons: [
-      {
-        src: "https://cdn.vsassets.io/content/icons/favicon.ico",
-      },
-    ],
-  });
+  if (argv.transport === "stdio") {
+    if (!defaultOrgName) {
+      console.error("\nError: Organization name is required for stdio transport.");
+      console.error("Usage: npx @azure-devops/mcp <organization>\n");
+      process.exit(1);
+    }
+    const server = await createServerInstance({
+      organization: defaultOrgName,
+      authentication: argv.authentication as string,
+      token: argv.token as string,
+      tenant: argv.tenant,
+      domains: argv.domains as string[],
+    });
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  } else {
+    const app = createMcpExpressApp();
 
-  const userAgentComposer = new UserAgentComposer(packageVersion);
-  server.server.oninitialized = () => {
-    userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
-  };
-  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
+    if (allowedOrigins) {
+      app.use(cors({ origin: allowedOrigins.includes("*") ? true : allowedOrigins }));
+    } else {
+      app.use(cors());
+    }
 
-  // removing prompts untill further notice
-  // configurePrompts(server);
+    const transports = new Map<string, StreamableHTTPServerTransport>();
 
-  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
+    app.all("/mcp", async (req, res) => {
+      const sessionId = req.headers["mcp-session-id"] as string;
+      let transport = sessionId ? transports.get(sessionId) : undefined;
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+      if (!transport) {
+        // Extract configuration from headers or fallback to CLI defaults
+        const organization = (req.headers["x-ado-organization"] as string) ?? defaultOrgName;
+        const authentication = (req.headers["x-ado-authentication"] as string) ?? (argv.authentication as string);
+        const token = (req.headers["x-ado-token"] as string) ?? (argv.token as string);
+        const tenant = (req.headers["x-ado-tenant"] as string) ?? argv.tenant;
+        const domainsHeader = req.headers["x-ado-domains"] as string;
+        const domains = domainsHeader ? domainsHeader.split(",").map((d) => d.trim()) : (argv.domains as string[]);
+
+        if (!organization) {
+          logger.error("Organization name is required. Provide it via CLI or x-ado-organization header.");
+          res.status(400).send("Organization name is required. Provide it via x-ado-organization header.");
+          return;
+        }
+
+        logger.info(`Creating new session`, {
+          organization,
+          authentication,
+          hasToken: !!token,
+          tenant,
+          domains,
+        });
+
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (id) => {
+            logger.info(`Session initialized: ${id}`);
+            if (transport) {
+              transports.set(id, transport);
+            }
+          },
+        });
+
+        try {
+          const server = await createServerInstance({
+            organization,
+            authentication,
+            token,
+            tenant,
+            domains,
+          });
+          await server.connect(transport);
+
+          transport.onclose = () => {
+            logger.info(`Transport closed for session ${transport?.sessionId}`);
+            if (transport?.sessionId) {
+              transports.delete(transport.sessionId);
+            }
+          };
+        } catch (error) {
+          logger.error("Failed to create server instance for session", error);
+          if (!res.headersSent) {
+            res.status(500).send("Failed to initialize MCP session");
+          }
+          return;
+        }
+      }
+
+      await transport.handleRequest(req, res, (req as any).body);
+    });
+
+    const port = argv.port as number;
+    app.listen(port, () => {
+      logger.info(`Azure DevOps MCP Server running on http://localhost:${port}/mcp`);
+    });
+  }
 }
 
 main().catch((error) => {

@@ -61,7 +61,76 @@ For the best experience, use Visual Studio Code and GitHub Copilot. See the [get
 [![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install_AzureDevops_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
 [![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_AzureDevops_MCP_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&quality=insiders&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
 
-After installation, select GitHub Copilot Agent Mode and refresh the tools list. Learn more about Agent Mode in the [VS Code Documentation](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode).
+#### 🔑 Authentication with Personal Access Token (PAT)
+
+If you are using a personal account (e.g., `@gmail.com` or `@outlook.com`) or if your organization restricts interactive logins, you can use a **Personal Access Token (PAT)**.
+
+**Using PAT with Stdio (Claude Desktop, VS Code, etc.):**
+Add the `--token` (or `-k`) argument to your configuration:
+
+```json
+{
+  "mcpServers": {
+    "ado": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "your-organization", "--token", "your-pat-token-here"]
+    }
+  }
+}
+```
+
+**Using PAT with HTTP/SSE:**
+Include the token in your startup command:
+
+```bash
+npx @azure-devops/mcp <organization> --transport http --token your-pat-token-here
+```
+
+#### 🌐 Remote Mode (HTTP/SSE)
+
+The Azure DevOps MCP Server can be run as a standalone HTTP server using Server-Sent Events (SSE). This allows you to host the server centrally and connect multiple clients, or use it in environments where `stdio` transport is not ideal.
+
+##### Starting the Server
+
+To start the server in HTTP mode:
+
+```bash
+npx @azure-devops/mcp <organization> --transport http --port 3000
+```
+
+- `<organization>`: Your default Azure DevOps organization name.
+- `--transport http`: Enables the HTTP/SSE transport.
+- `--port 3000`: (Optional) The port to listen on. Defaults to 3000.
+
+##### Dynamic Configuration (Multi-Tenancy)
+
+When running in HTTP mode, the server can dynamically switch between different organizations or authentication methods for each client session using HTTP headers.
+
+| Header                 | Description                                         | Default (from CLI) |
+| ---------------------- | --------------------------------------------------- | ------------------ |
+| `x-ado-organization`   | Azure DevOps Organization Name                      | `<organization>`   |
+| `x-ado-authentication` | Auth type (`interactive`, `azcli`, `env`, `envvar`) | `interactive`      |
+| `x-ado-token`          | Azure DevOps Personal Access Token (PAT)            | `--token` value    |
+| `x-ado-tenant`         | Azure Tenant ID                                     | (Auto-detected)    |
+| `x-ado-domains`        | Comma-separated domains (e.g., `core,work`)         | `all`              |
+
+##### Connecting a Client
+
+To connect an MCP client (like Claude Desktop) to your remote server, add it to your configuration file:
+
+**Claude Desktop (`claude_desktop_config.json`):**
+
+```json
+{
+  "mcpServers": {
+    "ado-remote": {
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+_Note: Most standard MCP clients do not yet support sending custom HTTP headers. In these cases, the server will use the default values provided when it was started._
 
 #### 🧨 Install from Public Feed (Recommended)
 
