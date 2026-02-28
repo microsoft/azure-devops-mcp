@@ -78,10 +78,6 @@ const argv = yargs(hideBin(process.argv))
     default: 3000,
     nargs: 1,
   })
-  .option("http-token", {
-    describe: "Token to protect the HTTP endpoint (for http transport). If provided, clients must send this in the 'x-mcp-token' header.",
-    type: "string",
-  })
   .option("allowed-origins", {
     describe: "Allowed origins for CORS (for http transport). Defaults to restricted. Use '*' to allow all (not recommended for production).",
     type: "string",
@@ -91,7 +87,6 @@ const argv = yargs(hideBin(process.argv))
   .parseSync();
 
 const defaultOrgName = argv.organization as string | undefined;
-const httpToken = argv["http-token"] as string | undefined;
 const allowedOrigins = argv["allowed-origins"] as string[] | undefined;
 
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer, orgUrl: string): () => Promise<WebApi> {
@@ -189,16 +184,6 @@ async function main() {
     const transports = new Map<string, StreamableHTTPServerTransport>();
 
     app.all("/mcp", async (req, res) => {
-      // Endpoint protection check
-      if (httpToken) {
-        const clientToken = req.headers["x-mcp-token"];
-        if (clientToken !== httpToken) {
-          logger.warn("Unauthorized access attempt to MCP endpoint");
-          res.status(401).send("Unauthorized: Invalid or missing x-mcp-token");
-          return;
-        }
-      }
-
       const sessionId = req.headers["mcp-session-id"] as string;
       let transport = sessionId ? transports.get(sessionId) : undefined;
 
