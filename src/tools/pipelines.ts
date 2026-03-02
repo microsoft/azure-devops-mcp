@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
+import { apiVersion, getEnumKeys, safeEnumConvert, safeStringify } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
@@ -96,7 +96,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       );
 
       return {
-        content: [{ type: "text", text: JSON.stringify(buildDefinitions, null, 2) }],
+        content: [{ type: "text", text: safeStringify(buildDefinitions) }],
       };
     }
   );
@@ -155,7 +155,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
       const newPipeline = await pipelinesApi.createPipeline(createPipelineParams, project);
       return {
-        content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }],
+        content: [{ type: "text", text: safeStringify(newPipeline) }],
       };
     }
   );
@@ -173,7 +173,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const revisions = await buildApi.getDefinitionRevisions(project, definitionId);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(revisions, null, 2) }],
+        content: [{ type: "text", text: safeStringify(revisions) }],
       };
     }
   );
@@ -258,7 +258,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       );
 
       return {
-        content: [{ type: "text", text: JSON.stringify(builds, null, 2) }],
+        content: [{ type: "text", text: safeStringify(builds) }],
       };
     }
   );
@@ -276,7 +276,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const logs = await buildApi.getBuildLogs(project, buildId);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(logs, null, 2) }],
+        content: [{ type: "text", text: safeStringify(logs) }],
       };
     }
   );
@@ -297,7 +297,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const logLines = await buildApi.getBuildLogLines(project, buildId, logId, startLine, endLine);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(logLines, null, 2) }],
+        content: [{ type: "text", text: safeStringify(logLines) }],
       };
     }
   );
@@ -318,7 +318,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const changes = await buildApi.getBuildChanges(project, buildId, continuationToken, top, includeSourceChange);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
+        content: [{ type: "text", text: safeStringify(changes) }],
       };
     }
   );
@@ -337,7 +337,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const pipelineRun = await pipelinesApi.getRun(project, pipelineId, runId);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }],
+        content: [{ type: "text", text: safeStringify(pipelineRun) }],
       };
     }
   );
@@ -355,7 +355,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const pipelineRuns = await pipelinesApi.listRuns(project, pipelineId);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(pipelineRuns, null, 2) }],
+        content: [{ type: "text", text: safeStringify(pipelineRuns) }],
       };
     }
   );
@@ -445,7 +445,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       }
 
       return {
-        content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }],
+        content: [{ type: "text", text: safeStringify(pipelineRun) }],
       };
     }
   );
@@ -463,7 +463,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const build = await buildApi.getBuildReport(project, buildId);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(build, null, 2) }],
+        content: [{ type: "text", text: safeStringify(build) }],
       };
     }
   );
@@ -507,7 +507,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const updatedBuild = await response.text();
 
       return {
-        content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }],
+        content: [{ type: "text", text: safeStringify(updatedBuild) }],
       };
     }
   );
@@ -525,7 +525,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const artifacts = await buildApi.getArtifacts(project, buildId);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(artifacts, null, 2) }],
+        content: [{ type: "text", text: safeStringify(artifacts) }],
       };
     }
   );

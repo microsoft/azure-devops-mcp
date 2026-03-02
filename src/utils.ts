@@ -61,6 +61,19 @@ export function safeEnumConvert<T extends Record<string, string | number>>(enumO
 }
 
 /**
+ * Safely serializes a value to a JSON string, handling `undefined` and `null`.
+ * Unlike `JSON.stringify`, this function always returns a string, using `"null"`
+ * when the value is `undefined` or when `JSON.stringify` would otherwise return
+ * `undefined` (e.g. for top-level `undefined` values).
+ *
+ * @param value The value to serialize
+ * @returns A JSON string representation of the value, or `"null"` if the value is undefined
+ */
+export function safeStringify(value: unknown): string {
+  return JSON.stringify(value ?? null, null, 2) ?? "null";
+}
+
+/**
  * Encodes `>` and `<` for Markdown formatted fields.
  *
  * @param value The text value to encode

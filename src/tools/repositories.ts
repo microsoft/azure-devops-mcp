@@ -26,7 +26,7 @@ import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { getEnumKeys } from "../utils.js";
+import { getEnumKeys, safeStringify } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -204,7 +204,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const trimmedPullRequest = trimPullRequest(pullRequest, true);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
+          content: [{ type: "text", text: safeStringify(trimmedPullRequest) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -415,7 +415,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
+          content: [{ type: "text", text: safeStringify(trimmedUpdatedPullRequest) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -460,7 +460,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           }));
 
           return {
-            content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }],
+            content: [{ type: "text", text: safeStringify(trimmedResponse) }],
           };
         } else {
           for (const reviewerId of reviewerIds) {
@@ -513,7 +513,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }));
 
         return {
-          content: [{ type: "text", text: JSON.stringify(trimmedRepositories, null, 2) }],
+          content: [{ type: "text", text: safeStringify(trimmedRepositories) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -666,7 +666,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const filteredPullRequests = pullRequests?.map((pr) => trimPullRequest(pr));
 
         return {
-          content: [{ type: "text", text: JSON.stringify(filteredPullRequests, null, 2) }],
+          content: [{ type: "text", text: safeStringify(filteredPullRequests) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -731,7 +731,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (fullResponse) {
           return {
-            content: [{ type: "text", text: JSON.stringify(paginatedThreads, null, 2) }],
+            content: [{ type: "text", text: safeStringify(paginatedThreads) }],
           };
         }
 
@@ -739,7 +739,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
 
         return {
-          content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
+          content: [{ type: "text", text: safeStringify(trimmedThreads) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -776,7 +776,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (fullResponse) {
           return {
-            content: [{ type: "text", text: JSON.stringify(paginatedComments, null, 2) }],
+            content: [{ type: "text", text: safeStringify(paginatedComments) }],
           };
         }
 
@@ -784,7 +784,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const trimmedComments = trimComments(paginatedComments);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(trimmedComments, null, 2) }],
+          content: [{ type: "text", text: safeStringify(trimmedComments) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -814,7 +814,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
+          content: [{ type: "text", text: safeStringify(filteredBranches) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -844,7 +844,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],
+          content: [{ type: "text", text: safeStringify(filteredBranches) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -880,7 +880,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(repository, null, 2) }],
+          content: [{ type: "text", text: safeStringify(repository) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -918,7 +918,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           };
         }
         return {
-          content: [{ type: "text", text: JSON.stringify(branch, null, 2) }],
+          content: [{ type: "text", text: safeStringify(branch) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -963,7 +963,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             };
 
             return {
-              content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+              content: [{ type: "text", text: safeStringify(enhancedResponse) }],
             };
           } catch (error) {
             console.warn(`Error fetching PR labels: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -974,12 +974,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             };
 
             return {
-              content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
+              content: [{ type: "text", text: safeStringify(enhancedResponse) }],
             };
           }
         }
         return {
-          content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
+          content: [{ type: "text", text: safeStringify(pullRequest) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -1019,7 +1019,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (fullResponse) {
           return {
-            content: [{ type: "text", text: JSON.stringify(comment, null, 2) }],
+            content: [{ type: "text", text: safeStringify(comment) }],
           };
         }
 
@@ -1172,7 +1172,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const trimmedThread = trimPullRequestThread(thread);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
+          content: [{ type: "text", text: safeStringify(trimmedThread) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -1227,7 +1227,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const trimmedThread = trimPullRequestThread(thread);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(trimmedThread, null, 2) }],
+          content: [{ type: "text", text: safeStringify(trimmedThread) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -1334,7 +1334,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           }
 
           return {
-            content: [{ type: "text", text: JSON.stringify(commits, null, 2) }],
+            content: [{ type: "text", text: safeStringify(commits) }],
           };
         }
 
@@ -1402,7 +1402,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(filteredCommits, null, 2) }],
+          content: [{ type: "text", text: safeStringify(filteredCommits) }],
         };
       } catch (error) {
         return {
@@ -1450,7 +1450,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const queryResult = await gitApi.getPullRequestQuery(query, repository, project);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
+          content: [{ type: "text", text: safeStringify(queryResult) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -1572,7 +1572,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         };
 
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+          content: [{ type: "text", text: safeStringify(response) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

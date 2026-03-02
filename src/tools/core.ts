@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { searchIdentities } from "./auth.js";
+import { safeStringify } from "../utils.js";
 
 import type { ProjectInfo } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
@@ -41,7 +42,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(teams, null, 2) }],
+          content: [{ type: "text", text: safeStringify(teams) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -77,7 +78,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
         const filteredProject = projectNameFilter ? filterProjectsByName(projects, projectNameFilter) : projects;
 
         return {
-          content: [{ type: "text", text: JSON.stringify(filteredProject, null, 2) }],
+          content: [{ type: "text", text: safeStringify(filteredProject) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -113,7 +114,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
         });
 
         return {
-          content: [{ type: "text", text: JSON.stringify(identitiesTrimmed, null, 2) }],
+          content: [{ type: "text", text: safeStringify(identitiesTrimmed) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

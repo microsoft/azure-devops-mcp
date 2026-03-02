@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
-import { getEnumKeys, mapStringArrayToEnum, mapStringToEnum } from "../utils.js";
+import { getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeStringify } from "../utils.js";
 
 const ADVSEC_TOOLS = {
   get_alerts: "advsec_get_alerts",
@@ -79,7 +79,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
         );
 
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: "text", text: safeStringify(result) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -120,7 +120,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
         );
 
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: "text", text: safeStringify(result) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

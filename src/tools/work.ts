@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { TreeStructureGroup, TreeNodeStructureType, WorkItemClassificationNode } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { safeStringify } from "../utils.js";
 
 const WORK_TOOLS = {
   list_team_iterations: "work_list_team_iterations",
@@ -36,7 +37,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(iterations, null, 2) }],
+          content: [{ type: "text", text: safeStringify(iterations) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -94,7 +95,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+          content: [{ type: "text", text: safeStringify(results) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -159,7 +160,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(filteredResults, null, 2) }],
+          content: [{ type: "text", text: safeStringify(filteredResults) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -207,7 +208,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+          content: [{ type: "text", text: safeStringify(results) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -260,7 +261,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         };
 
         return {
-          content: [{ type: "text", text: JSON.stringify(simplifiedResults, null, 2) }],
+          content: [{ type: "text", text: safeStringify(simplifiedResults) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -344,7 +345,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         };
 
         return {
-          content: [{ type: "text", text: JSON.stringify(simplifiedResult, null, 2) }],
+          content: [{ type: "text", text: safeStringify(simplifiedResult) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -375,7 +376,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(rawResults, null, 2) }],
+          content: [{ type: "text", text: safeStringify(rawResults) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, encodeFormattedValue, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
+import { createEnumMapping, encodeFormattedValue, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert, safeStringify } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -429,6 +429,56 @@ describe("utils", () => {
       expect(safeEnumConvert(mockEnum, "B")).toBe(1);
       expect(safeEnumConvert(mockEnum, "0")).toBeUndefined(); // Numeric strings aren't valid keys
     });
+  });
+});
+
+describe("safeStringify", () => {
+  it("should serialize a regular object to JSON string", () => {
+    const obj = { name: "test", value: 42 };
+    const result = safeStringify(obj);
+    expect(result).toBe(JSON.stringify(obj, null, 2));
+  });
+
+  it("should return 'null' for undefined input", () => {
+    expect(safeStringify(undefined)).toBe("null");
+  });
+
+  it("should return 'null' for null input", () => {
+    expect(safeStringify(null)).toBe("null");
+  });
+
+  it("should serialize an array", () => {
+    const arr = [1, 2, 3];
+    expect(safeStringify(arr)).toBe(JSON.stringify(arr, null, 2));
+  });
+
+  it("should return 'null' for empty array that came from optional chaining returning undefined", () => {
+    const value: unknown[] | undefined = undefined;
+    expect(safeStringify(value)).toBe("null");
+  });
+
+  it("should always return a string, never undefined", () => {
+    expect(typeof safeStringify(undefined)).toBe("string");
+    expect(typeof safeStringify(null)).toBe("string");
+    expect(typeof safeStringify({ key: "value" })).toBe("string");
+  });
+
+  it("should serialize nested objects", () => {
+    const nested = { a: { b: { c: 1 } }, items: [1, 2, 3] };
+    expect(safeStringify(nested)).toBe(JSON.stringify(nested, null, 2));
+  });
+
+  it("should serialize strings", () => {
+    expect(safeStringify("hello")).toBe('"hello"');
+  });
+
+  it("should serialize numbers", () => {
+    expect(safeStringify(42)).toBe("42");
+  });
+
+  it("should serialize booleans", () => {
+    expect(safeStringify(true)).toBe("true");
+    expect(safeStringify(false)).toBe("false");
   });
 });
 

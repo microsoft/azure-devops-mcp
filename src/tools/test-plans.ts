@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
+import { safeStringify } from "../utils.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
@@ -37,7 +38,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testPlans, null, 2) }],
+          content: [{ type: "text", text: safeStringify(testPlans) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -78,7 +79,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, project);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(createdTestPlan, null, 2) }],
+          content: [{ type: "text", text: safeStringify(createdTestPlan) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -120,7 +121,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
           const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
 
           return {
-            content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
+            content: [{ type: "text", text: safeStringify(createdTestSuite) }],
           };
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -171,7 +172,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const addedTestCases = await testApi.addTestCasesToSuite(project, planId, suiteId, testCaseIdsString);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }],
+          content: [{ type: "text", text: safeStringify(addedTestCases) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -265,7 +266,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const workItem = await witClient.createWorkItem({}, patchDocument, project, "Test Case");
 
         return {
-          content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
+          content: [{ type: "text", text: safeStringify(workItem) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -312,7 +313,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const workItem = await witClient.updateWorkItem({}, patchDocument, id);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
+          content: [{ type: "text", text: safeStringify(workItem) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -339,7 +340,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const testcases = await coreApi.getTestCaseList(project, planid, suiteid);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testcases, null, 2) }],
+          content: [{ type: "text", text: safeStringify(testcases) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -365,7 +366,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
+          content: [{ type: "text", text: safeStringify(testResults) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -435,7 +436,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         const result = roots.map((root: any) => cleanSuite(root));
 
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: "text", text: safeStringify(result) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

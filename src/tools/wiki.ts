@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
-import { apiVersion } from "../utils.js";
+import { apiVersion, safeStringify } from "../utils.js";
 
 const WIKI_TOOLS = {
   list_wikis: "wiki_list_wikis",
@@ -35,7 +35,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(wiki, null, 2) }],
+          content: [{ type: "text", text: safeStringify(wiki) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -65,7 +65,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(wikis, null, 2) }],
+          content: [{ type: "text", text: safeStringify(wikis) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -106,7 +106,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(pages, null, 2) }],
+          content: [{ type: "text", text: safeStringify(pages) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -168,7 +168,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         const pageData = await response.json();
 
         return {
-          content: [{ type: "text", text: JSON.stringify(pageData, null, 2) }],
+          content: [{ type: "text", text: safeStringify(pageData) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -267,7 +267,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           pageContent = await streamToString(stream);
         }
 
-        return { content: [{ type: "text", text: JSON.stringify(pageContent, null, 2) }] };
+        return { content: [{ type: "text", text: safeStringify(pageContent) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
@@ -322,7 +322,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
               content: [
                 {
                   type: "text",
-                  text: `Successfully created wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
+                  text: `Successfully created wiki page at path: ${normalizedPath}. Response: ${safeStringify(result)}`,
                 },
               ],
             };
@@ -374,7 +374,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
                 content: [
                   {
                     type: "text",
-                    text: `Successfully updated wiki page at path: ${normalizedPath}. Response: ${JSON.stringify(result, null, 2)}`,
+                    text: `Successfully updated wiki page at path: ${normalizedPath}. Response: ${safeStringify(result)}`,
                   },
                 ],
               };
