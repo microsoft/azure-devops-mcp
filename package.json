@@ -28,7 +28,7 @@
     "build": "tsc && shx chmod +x dist/*.js",
     "prepare": "npm run build && husky",
     "watch": "tsc --watch",
-    "inspect": "ALLOWED_ORIGINS=http://127.0.0.1:6274 npx @modelcontextprotocol/inspector node dist/index.js",
+    "inspect": "ALLOWED_ORIGINS=http://127.0.0.1:6274 npx @modelcontextprotocol/inspector@0.21.0 node dist/index.js",
     "start": "node -r tsconfig-paths/register dist/index.js",
     "eslint": "eslint",
     "eslint-fix": "eslint --fix",
@@ -40,7 +40,7 @@
   "dependencies": {
     "@azure/identity": "^4.10.0",
     "@azure/msal-node": "^5.0.4",
-    "@modelcontextprotocol/sdk": "1.27.0",
+    "@modelcontextprotocol/sdk": "1.27.1",
     "azure-devops-extension-api": "^4.264.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.2",
@@ -50,7 +50,6 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.20.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.19.1",
     "eslint-config-prettier": "10.1.8",
