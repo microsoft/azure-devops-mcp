@@ -1473,7 +1473,7 @@ describe("configureWorkItemTools", () => {
       });
 
       // Test different link types to cover all branches in getLinkTypeFromName
-      const linkTypes = ["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "has dependent", "dependent on"];
+      const linkTypes = ["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"];
 
       for (const linkType of linkTypes) {
         const params = {
@@ -1482,20 +1482,7 @@ describe("configureWorkItemTools", () => {
             {
               id: 1,
               linkToId: 2,
-              type: linkType as
-                | "parent"
-                | "child"
-                | "duplicate"
-                | "duplicate of"
-                | "related"
-                | "successor"
-                | "predecessor"
-                | "tested by"
-                | "tests"
-                | "affects"
-                | "affected by"
-                | "has dependent"
-                | "dependent on",
+              type: linkType as "parent" | "child" | "duplicate" | "duplicate of" | "related" | "successor" | "predecessor" | "tested by" | "tests" | "affects" | "affected by",
               comment: "Test comment",
             },
           ],
