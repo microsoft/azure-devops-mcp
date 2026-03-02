@@ -55,10 +55,6 @@ function getLinkTypeFromName(name: string) {
       return "Microsoft.VSTS.Common.Affects-Forward";
     case "affected by":
       return "Microsoft.VSTS.Common.Affects-Reverse";
-    case "has dependent":
-      return "Microsoft.VSTS.Common.Dependent-Forward";
-    case "dependent on":
-      return "Microsoft.VSTS.Common.Dependent-Reverse";
     case "artifact":
       return "ArtifactLink";
     default:
@@ -917,10 +913,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             id: z.number().describe("The ID of the work item to update."),
             linkToId: z.number().describe("The ID of the work item to link to."),
             type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "has dependent", "dependent on"])
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
               .default("related")
               .describe(
-                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', 'has dependent', and 'dependent on'. Defaults to 'related'."
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
               ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
@@ -993,10 +989,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       id: z.number().describe("The ID of the work item to remove the links from."),
       type: z
-        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "has dependent", "dependent on", "artifact"])
+        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
         .default("related")
         .describe(
-          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', 'has dependent', 'dependent on', and 'artifact'. Defaults to 'related'."
+          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
         ),
       url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
     },
