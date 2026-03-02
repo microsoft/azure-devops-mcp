@@ -16,6 +16,8 @@ interface WorkApiMock {
   getCapacitiesWithIdentityRefAndTotals: jest.Mock;
   updateCapacityWithIdentityRef: jest.Mock;
   getTotalIterationCapacities: jest.Mock;
+  getTeamSettings: jest.Mock;
+  getTeamFieldValues: jest.Mock;
 }
 
 interface WorkItemTrackingApiMock {
@@ -41,6 +43,8 @@ describe("configureWorkTools", () => {
       getCapacitiesWithIdentityRefAndTotals: jest.fn(),
       updateCapacityWithIdentityRef: jest.fn(),
       getTotalIterationCapacities: jest.fn(),
+      getTeamSettings: jest.fn(),
+      getTeamFieldValues: jest.fn(),
     };
 
     mockWorkItemTrackingApi = {
@@ -2492,6 +2496,280 @@ describe("configureWorkTools", () => {
       expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error getting iteration capacities: Unknown error occurred");
+    });
+  });
+
+  describe("get_team_settings tool", () => {
+    it("should call getTeamSettings and getTeamFieldValues APIs and return combined result", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTeamSettings as jest.Mock).mockResolvedValue({
+        backlogIteration: {
+          id: "backlog-iter-id",
+          name: "Fabrikam",
+          path: "\\Fabrikam",
+        },
+        defaultIteration: {
+          id: "default-iter-id",
+          name: "Sprint 1",
+          path: "\\Fabrikam\\Sprint 1",
+          attributes: {
+            startDate: "2025-01-01T00:00:00Z",
+            finishDate: "2025-01-14T23:59:59Z",
+          },
+        },
+        defaultIterationMacro: "@CurrentIteration",
+        backlogVisibilities: {
+          "Microsoft.EpicCategory": true,
+          "Microsoft.FeatureCategory": true,
+          "Microsoft.RequirementCategory": true,
+        },
+        bugsBehavior: "asRequirements",
+        workingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      });
+
+      (mockWorkApi.getTeamFieldValues as jest.Mock).mockResolvedValue({
+        defaultValue: "Fabrikam\\Team A",
+        field: {
+          referenceName: "System.AreaPath",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.AreaPath",
+        },
+        values: [
+          { value: "Fabrikam\\Team A", includeChildren: true },
+          { value: "Fabrikam\\Team A\\Sub Area", includeChildren: false },
+        ],
+      });
+
+      const params = {
+        project: "Fabrikam",
+        team: "Team A",
+      };
+
+      const result = await handler(params);
+
+      const expectedTeamContext = { project: "Fabrikam", team: "Team A" };
+      expect(mockWorkApi.getTeamSettings).toHaveBeenCalledWith(expectedTeamContext);
+      expect(mockWorkApi.getTeamFieldValues).toHaveBeenCalledWith(expectedTeamContext);
+
+      const expectedResult = {
+        backlogIteration: {
+          id: "backlog-iter-id",
+          name: "Fabrikam",
+          path: "\\Fabrikam",
+        },
+        defaultIteration: {
+          id: "default-iter-id",
+          name: "Sprint 1",
+          path: "\\Fabrikam\\Sprint 1",
+          attributes: {
+            startDate: "2025-01-01T00:00:00Z",
+            finishDate: "2025-01-14T23:59:59Z",
+          },
+        },
+        defaultIterationMacro: "@CurrentIteration",
+        backlogVisibilities: {
+          "Microsoft.EpicCategory": true,
+          "Microsoft.FeatureCategory": true,
+          "Microsoft.RequirementCategory": true,
+        },
+        bugsBehavior: "asRequirements",
+        workingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        defaultAreaPath: "Fabrikam\\Team A",
+        areaPathField: {
+          referenceName: "System.AreaPath",
+          url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.AreaPath",
+        },
+        areaPaths: [
+          { value: "Fabrikam\\Team A", includeChildren: true },
+          { value: "Fabrikam\\Team A\\Sub Area", includeChildren: false },
+        ],
+      };
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should use default team when team is not provided", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTeamSettings as jest.Mock).mockResolvedValue({
+        backlogIteration: {
+          id: "backlog-iter-id",
+          name: "Fabrikam",
+          path: "\\Fabrikam",
+        },
+        backlogVisibilities: {},
+        bugsBehavior: "off",
+        workingDays: [],
+      });
+
+      (mockWorkApi.getTeamFieldValues as jest.Mock).mockResolvedValue({
+        defaultValue: "Fabrikam",
+        values: [{ value: "Fabrikam", includeChildren: true }],
+      });
+
+      const params = {
+        project: "Fabrikam",
+        team: undefined,
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTeamSettings).toHaveBeenCalledWith({ project: "Fabrikam", team: undefined });
+      expect(mockWorkApi.getTeamFieldValues).toHaveBeenCalledWith({ project: "Fabrikam", team: undefined });
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      expect(parsedResult.backlogIteration).toEqual({
+        id: "backlog-iter-id",
+        name: "Fabrikam",
+        path: "\\Fabrikam",
+      });
+      expect(parsedResult.defaultAreaPath).toBe("Fabrikam");
+    });
+
+    it("should handle null team settings result", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTeamSettings as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "Fabrikam",
+        team: "Team A",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkApi.getTeamFieldValues).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No team settings found");
+    });
+
+    it("should handle null team field values gracefully", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTeamSettings as jest.Mock).mockResolvedValue({
+        backlogIteration: {
+          id: "backlog-iter-id",
+          name: "Fabrikam",
+          path: "\\Fabrikam",
+        },
+        defaultIteration: undefined,
+        defaultIterationMacro: "@CurrentIteration",
+        backlogVisibilities: {},
+        bugsBehavior: "off",
+        workingDays: [],
+      });
+
+      (mockWorkApi.getTeamFieldValues as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "Fabrikam",
+        team: "Team A",
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+
+      expect(parsedResult.backlogIteration).toEqual({
+        id: "backlog-iter-id",
+        name: "Fabrikam",
+        path: "\\Fabrikam",
+      });
+      expect(parsedResult.defaultIteration).toBeUndefined();
+      expect(parsedResult.defaultAreaPath).toBeUndefined();
+      expect(parsedResult.areaPaths).toBeUndefined();
+      expect(parsedResult.areaPathField).toBeUndefined();
+    });
+
+    it("should handle getTeamSettings API error correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      const testError = new Error("Failed to retrieve team settings");
+      (mockWorkApi.getTeamSettings as jest.Mock).mockRejectedValue(testError);
+      (mockWorkApi.getTeamFieldValues as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "Fabrikam",
+        team: "Team A",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching team settings: Failed to retrieve team settings");
+    });
+
+    it("should handle getTeamFieldValues API error correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTeamSettings as jest.Mock).mockResolvedValue({
+        backlogIteration: {
+          id: "backlog-iter-id",
+          name: "Fabrikam",
+          path: "\\Fabrikam",
+        },
+        backlogVisibilities: {},
+        bugsBehavior: "off",
+        workingDays: [],
+      });
+      const testError = new Error("Failed to retrieve team field values");
+      (mockWorkApi.getTeamFieldValues as jest.Mock).mockRejectedValue(testError);
+
+      const params = {
+        project: "Fabrikam",
+        team: "Team A",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching team settings: Failed to retrieve team field values");
+    });
+
+    it("should handle unknown error type correctly", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTeamSettings as jest.Mock).mockRejectedValue("string error");
+      (mockWorkApi.getTeamFieldValues as jest.Mock).mockResolvedValue(null);
+
+      const params = {
+        project: "Fabrikam",
+        team: "Team A",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching team settings: Unknown error occurred");
     });
   });
 });
