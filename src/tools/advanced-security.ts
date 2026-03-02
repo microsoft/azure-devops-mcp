@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
+import { coerceBoolean } from "../shared/zod-utils.js";
 import { getEnumKeys, mapStringArrayToEnum, mapStringToEnum } from "../utils.js";
 
 const ADVSEC_TOOLS = {
@@ -35,7 +36,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
       ruleName: z.string().optional().describe("Filter alerts by rule name."),
       toolName: z.string().optional().describe("Filter alerts by tool name."),
       ref: z.string().optional().describe("Filter alerts by git reference (branch). If not provided and onlyDefaultBranch is true, only includes alerts from default branch."),
-      onlyDefaultBranch: z.boolean().optional().default(true).describe("If true, only return alerts found on the default branch. Defaults to true."),
+      onlyDefaultBranch: coerceBoolean().optional().default(true).describe("If true, only return alerts found on the default branch. Defaults to true."),
       confidenceLevels: z
         .array(z.enum(getEnumKeys(Confidence) as [string, ...string[]]))
         .optional()
@@ -45,7 +46,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
         .array(z.enum(getEnumKeys(AlertValidityStatus) as [string, ...string[]]))
         .optional()
         .describe("Filter alerts by validity status. Only applicable for secret alerts."),
-      top: z.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
+      top: z.coerce.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
       orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("severity").describe("Order results by specified field. Defaults to 'severity'."),
       continuationToken: z.string().optional().describe("Continuation token for pagination."),
     },
@@ -103,7 +104,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repository: z.string().describe("The name or ID of the repository containing the alert."),
-      alertId: z.number().describe("The ID of the alert to retrieve details for."),
+      alertId: z.coerce.number().describe("The ID of the alert to retrieve details for."),
       ref: z.string().optional().describe("Git reference (branch) to filter the alert."),
     },
     async ({ project, repository, alertId, ref }) => {

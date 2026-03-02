@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
+import { coerceBoolean } from "../shared/zod-utils.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
@@ -24,8 +25,8 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     "Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
-      filterActivePlans: z.boolean().default(true).describe("Filter to include only active test plans. Defaults to true."),
-      includePlanDetails: z.boolean().default(false).describe("Include detailed information about each test plan."),
+      filterActivePlans: coerceBoolean().default(true).describe("Filter to include only active test plans. Defaults to true."),
+      includePlanDetails: coerceBoolean().default(false).describe("Include detailed information about each test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
@@ -95,8 +96,8 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     "Creates a new test suite in a test plan.",
     {
       project: z.string().describe("Project ID or project name"),
-      planId: z.number().describe("ID of the test plan that contains the suites"),
-      parentSuiteId: z.number().describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
+      planId: z.coerce.number().describe("ID of the test plan that contains the suites"),
+      parentSuiteId: z.coerce.number().describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
       name: z.string().describe("Name of the child test suite"),
     },
     async ({ project, planId, parentSuiteId, name }) => {
@@ -156,8 +157,8 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     "Adds existing test cases to a test suite.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
-      planId: z.number().describe("The ID of the test plan."),
-      suiteId: z.number().describe("The ID of the test suite."),
+      planId: z.coerce.number().describe("The ID of the test plan."),
+      suiteId: z.coerce.number().describe("The ID of the test suite."),
       testCaseIds: z.string().or(z.array(z.string())).describe("The ID(s) of the test case(s) to add. "),
     },
     async ({ project, planId, suiteId, testCaseIds }) => {
@@ -195,10 +196,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         .describe(
           "The steps to reproduce the test case. Make sure to format each step as '1. Step one|Expected result one\n2. Step two|Expected result two. USE '|' as the delimiter between step and expected result. DO NOT use '|' in the description of the step or expected result."
         ),
-      priority: z.number().optional().describe("The priority of the test case."),
+      priority: z.coerce.number().optional().describe("The priority of the test case."),
       areaPath: z.string().optional().describe("The area path for the test case."),
       iterationPath: z.string().optional().describe("The iteration path for the test case."),
-      testsWorkItemId: z.number().optional().describe("Optional work item id that will be set as a Microsoft.VSTS.Common.TestedBy-Reverse link to the test case."),
+      testsWorkItemId: z.coerce.number().optional().describe("Optional work item id that will be set as a Microsoft.VSTS.Common.TestedBy-Reverse link to the test case."),
     },
     async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId }) => {
       try {
@@ -281,7 +282,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     Test_Plan_Tools.update_test_case_steps,
     "Update an existing test case work item.",
     {
-      id: z.number().describe("The ID of the test case work item to update."),
+      id: z.coerce.number().describe("The ID of the test case work item to update."),
       steps: z
         .string()
         .describe(
@@ -329,8 +330,8 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     "Gets a list of test cases in the test plan.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
-      planid: z.number().describe("The ID of the test plan."),
-      suiteid: z.number().describe("The ID of the test suite."),
+      planid: z.coerce.number().describe("The ID of the test plan."),
+      suiteid: z.coerce.number().describe("The ID of the test suite."),
     },
     async ({ project, planid, suiteid }) => {
       try {
@@ -356,7 +357,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     "Gets a list of test results for a given project and build ID.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
-      buildid: z.number().describe("The ID of the build."),
+      buildid: z.coerce.number().describe("The ID of the build."),
     },
     async ({ project, buildid }) => {
       try {
@@ -382,7 +383,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     "Retrieve a paginated list of test suites from an Azure DevOps project and Test Plan Id.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
-      planId: z.number().describe("The ID of the test plan."),
+      planId: z.coerce.number().describe("The ID of the test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
     async ({ project, planId, continuationToken }) => {

@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { IGitApi } from "azure-devops-node-api/GitApi.js";
 import { z } from "zod";
+import { coerceBoolean } from "../shared/zod-utils.js";
 import { apiVersion } from "../utils.js";
 import { orgName } from "../index.js";
 import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
@@ -26,9 +27,9 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       repository: z.array(z.string()).optional().describe("Filter by repositories"),
       path: z.array(z.string()).optional().describe("Filter by paths"),
       branch: z.array(z.string()).optional().describe("Filter by branches"),
-      includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
-      skip: z.number().default(0).describe("Number of results to skip"),
-      top: z.number().default(5).describe("Maximum number of results to return"),
+      includeFacets: coerceBoolean().default(false).describe("Include facets in the search results"),
+      skip: z.coerce.number().default(0).describe("Number of results to skip"),
+      top: z.coerce.number().default(5).describe("Maximum number of results to return"),
     },
     async ({ searchText, project, repository, path, branch, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
@@ -85,9 +86,9 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       searchText: z.string().describe("Keywords to search for wiki pages"),
       project: z.array(z.string()).optional().describe("Filter by projects"),
       wiki: z.array(z.string()).optional().describe("Filter by wiki names"),
-      includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
-      skip: z.number().default(0).describe("Number of results to skip"),
-      top: z.number().default(10).describe("Maximum number of results to return"),
+      includeFacets: coerceBoolean().default(false).describe("Include facets in the search results"),
+      skip: z.coerce.number().default(0).describe("Number of results to skip"),
+      top: z.coerce.number().default(10).describe("Maximum number of results to return"),
     },
     async ({ searchText, project, wiki, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
@@ -139,9 +140,9 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       workItemType: z.array(z.string()).optional().describe("Filter by work item types"),
       state: z.array(z.string()).optional().describe("Filter by work item states"),
       assignedTo: z.array(z.string()).optional().describe("Filter by assigned to users"),
-      includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
-      skip: z.number().default(0).describe("Number of results to skip for pagination"),
-      top: z.number().default(10).describe("Number of results to return"),
+      includeFacets: coerceBoolean().default(false).describe("Include facets in the search results"),
+      skip: z.coerce.number().default(0).describe("Number of results to skip for pagination"),
+      top: z.coerce.number().default(10).describe("Number of results to return"),
     },
     async ({ searchText, project, areaPath, workItemType, state, assignedTo, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();

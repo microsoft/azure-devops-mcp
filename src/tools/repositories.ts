@@ -23,6 +23,7 @@ import {
   VersionControlRecursionType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
+import { coerceBoolean } from "../shared/zod-utils.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
@@ -165,7 +166,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       targetRefName: z.string().describe("The target branch name for the pull request, e.g., 'refs/heads/main'."),
       title: z.string().describe("The title of the pull request."),
       description: z.string().max(4000).optional().describe("The description of the pull request. Must not be longer than 4000 characters. Optional."),
-      isDraft: z.boolean().optional().default(false).describe("Indicates whether the pull request is a draft. Defaults to false."),
+      isDraft: coerceBoolean().optional().default(false).describe("Indicates whether the pull request is a draft. Defaults to false."),
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
       labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
@@ -324,19 +325,19 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Update a Pull Request by ID with specified fields, including setting autocomplete with various completion options.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
-      pullRequestId: z.number().describe("The ID of the pull request to update."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request to update."),
       title: z.string().optional().describe("The new title for the pull request."),
       description: z.string().max(4000).optional().describe("The new description for the pull request. Must not be longer than 4000 characters."),
-      isDraft: z.boolean().optional().describe("Whether the pull request should be a draft."),
+      isDraft: coerceBoolean().optional().describe("Whether the pull request should be a draft."),
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
       status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
-      autoComplete: z.boolean().optional().describe("Set the pull request to autocomplete when all requirements are met."),
+      autoComplete: coerceBoolean().optional().describe("Set the pull request to autocomplete when all requirements are met."),
       mergeStrategy: z
         .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
         .optional()
         .describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
-      deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
-      transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
+      deleteSourceBranch: coerceBoolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
+      transitionWorkItems: coerceBoolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
       labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
     },
@@ -433,7 +434,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Add or remove reviewers for an existing pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request exists."),
-      pullRequestId: z.number().describe("The ID of the pull request to update."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request to update."),
       reviewerIds: z.array(z.string()).describe("List of reviewer ids to add or remove from the pull request."),
       action: z.enum(["add", "remove"]).describe("Action to perform on the reviewers. Can be 'add' or 'remove'."),
     },
@@ -487,8 +488,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of repositories for a given project",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      top: z.number().default(100).describe("The maximum number of repositories to return."),
-      skip: z.number().default(0).describe("The number of repositories to skip. Defaults to 0."),
+      top: z.coerce.number().default(100).describe("The maximum number of repositories to return."),
+      skip: z.coerce.number().default(0).describe("The number of repositories to skip. Defaults to 0."),
       repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."),
     },
     async ({ project, top, skip, repoNameFilter }) => {
@@ -532,11 +533,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       repositoryId: z.string().optional().describe("The ID of the repository where the pull requests are located."),
       project: z.string().optional().describe("The ID of the project where the pull requests are located."),
-      top: z.number().default(100).describe("The maximum number of pull requests to return."),
-      skip: z.number().default(0).describe("The number of pull requests to skip."),
-      created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
+      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return."),
+      skip: z.coerce.number().default(0).describe("The number of pull requests to skip."),
+      created_by_me: coerceBoolean().default(false).describe("Filter pull requests created by the current user."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user (provide email or unique name). Takes precedence over created_by_me if both are provided."),
-      i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      i_am_reviewer: coerceBoolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
       user_is_reviewer: z
         .string()
         .optional()
@@ -684,13 +685,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of comment threads for a pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request for which to retrieve threads."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request for which to retrieve threads."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
-      iteration: z.number().optional().describe("The iteration ID for which to retrieve threads. Optional, defaults to the latest iteration."),
-      baseIteration: z.number().optional().describe("The base iteration ID for which to retrieve threads. Optional, defaults to the latest base iteration."),
-      top: z.number().default(100).describe("The maximum number of threads to return after filtering."),
-      skip: z.number().default(0).describe("The number of threads to skip after filtering."),
-      fullResponse: z.boolean().optional().default(false).describe("Return full thread JSON response instead of trimmed data."),
+      iteration: z.coerce.number().optional().describe("The iteration ID for which to retrieve threads. Optional, defaults to the latest iteration."),
+      baseIteration: z.coerce.number().optional().describe("The base iteration ID for which to retrieve threads. Optional, defaults to the latest base iteration."),
+      top: z.coerce.number().default(100).describe("The maximum number of threads to return after filtering."),
+      skip: z.coerce.number().default(0).describe("The number of threads to skip after filtering."),
+      fullResponse: coerceBoolean().optional().default(false).describe("Return full thread JSON response instead of trimmed data."),
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
@@ -757,12 +758,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of comments in a pull request thread.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request for which to retrieve thread comments."),
-      threadId: z.number().describe("The ID of the thread for which to retrieve comments."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request for which to retrieve thread comments."),
+      threadId: z.coerce.number().describe("The ID of the thread for which to retrieve comments."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
-      top: z.number().default(100).describe("The maximum number of comments to return."),
-      skip: z.number().default(0).describe("The number of comments to skip."),
-      fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of trimmed data."),
+      top: z.coerce.number().default(100).describe("The maximum number of comments to return."),
+      skip: z.coerce.number().default(0).describe("The number of comments to skip."),
+      fullResponse: coerceBoolean().optional().default(false).describe("Return full comment JSON response instead of trimmed data."),
     },
     async ({ repositoryId, pullRequestId, threadId, project, top, skip, fullResponse }) => {
       try {
@@ -802,7 +803,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of branches for a given repository.",
     {
       repositoryId: z.string().describe("The ID of the repository where the branches are located."),
-      top: z.number().default(100).describe("The maximum number of branches to return. Defaults to 100."),
+      top: z.coerce.number().default(100).describe("The maximum number of branches to return. Defaults to 100."),
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
     async ({ repositoryId, top, filterContains }) => {
@@ -832,7 +833,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of my branches for a given repository Id.",
     {
       repositoryId: z.string().describe("The ID of the repository where the branches are located."),
-      top: z.number().default(100).describe("The maximum number of branches to return."),
+      top: z.coerce.number().default(100).describe("The maximum number of branches to return."),
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
     },
     async ({ repositoryId, top, filterContains }) => {
@@ -936,9 +937,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Get a pull request by its ID.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
-      includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
-      includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request to retrieve."),
+      includeWorkItemRefs: coerceBoolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
+      includeLabels: coerceBoolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
     },
     async ({ repositoryId, pullRequestId, includeWorkItemRefs, includeLabels }) => {
       try {
@@ -997,11 +998,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Replies to a specific comment on a pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
-      threadId: z.number().describe("The ID of the thread to which the comment will be added."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request where the comment thread exists."),
+      threadId: z.coerce.number().describe("The ID of the thread to which the comment will be added."),
       content: z.string().describe("The content of the comment to be added."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
-      fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of a simple confirmation message."),
+      fullResponse: coerceBoolean().optional().default(false).describe("Return full comment JSON response instead of a simple confirmation message."),
     },
     async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse }) => {
       try {
@@ -1042,7 +1043,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Creates a new comment thread on a pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request where the comment thread exists."),
       content: z.string().describe("The content of the comment to be added."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
       filePath: z.string().optional().describe("The path of the file where the comment thread will be created. (optional)"),
@@ -1051,7 +1052,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .optional()
         .default(CommentThreadStatus[CommentThreadStatus.Active])
         .describe("The status of the comment thread. Defaults to 'Active'."),
-      rightFileStartLine: z.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. Starts at 1. (optional)"),
+      rightFileStartLine: z.coerce.number().optional().describe("Position of first character of the thread's span in right file. The line number of a thread's position. Starts at 1. (optional)"),
       rightFileStartOffset: z
         .number()
         .optional()
@@ -1190,8 +1191,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Updates an existing comment thread on a pull request.",
     {
       repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
-      pullRequestId: z.number().describe("The ID of the pull request where the comment thread exists."),
-      threadId: z.number().describe("The ID of the thread to update."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request where the comment thread exists."),
+      threadId: z.coerce.number().describe("The ID of the thread to update."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
@@ -1257,10 +1258,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .optional()
         .default(GitVersionType[GitVersionType.Branch])
         .describe("The meaning of the version parameter, e.g., branch, tag or commit"),
-      skip: z.number().optional().default(0).describe("Number of commits to skip"),
-      top: z.number().optional().default(10).describe("Maximum number of commits to return"),
-      includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
-      includeWorkItems: z.boolean().optional().default(false).describe("Include associated work items"),
+      skip: z.coerce.number().optional().default(0).describe("Number of commits to skip"),
+      top: z.coerce.number().optional().default(10).describe("Maximum number of commits to return"),
+      includeLinks: coerceBoolean().optional().default(false).describe("Include commit links"),
+      includeWorkItems: coerceBoolean().optional().default(false).describe("Include associated work items"),
       // Enhanced search parameters
       searchText: z.string().optional().describe("Search text to filter commits by description/comment. Supports partial matching."),
       author: z.string().optional().describe("Filter commits by author email or display name"),
@@ -1468,7 +1469,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Cast a vote on a pull request. Automatically adds the current user as a reviewer if they are not already one.",
     {
       repositoryId: z.string().describe("The ID of the repository."),
-      pullRequestId: z.number().describe("The ID of the pull request."),
+      pullRequestId: z.coerce.number().describe("The ID of the pull request."),
       vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).describe("The vote to cast: Approved(10), Suggestions(5), None(0), Waiting(-5), Rejected(-10)."),
     },
     async ({ repositoryId, pullRequestId, vote }) => {
@@ -1512,8 +1513,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or name. Required if repositoryId is a name rather than a GUID."),
       version: z.string().optional().describe("The version identifier - branch name (e.g., 'main'), tag name, or commit SHA. Defaults to the repository's default branch."),
       versionType: z.enum(["Branch", "Commit", "Tag"]).optional().default("Branch").describe("The type of version identifier: 'Branch', 'Commit', or 'Tag'. Defaults to 'Branch'."),
-      recursive: z.boolean().optional().default(false).describe("Whether to list items recursively. Defaults to false."),
-      recursionDepth: z.number().optional().default(1).describe("Maximum depth for recursive listing (1-10). Only applies when recursive is true. Defaults to 1."),
+      recursive: coerceBoolean().optional().default(false).describe("Whether to list items recursively. Defaults to false."),
+      recursionDepth: z.coerce.number().optional().default(1).describe("Maximum depth for recursive listing (1-10). Only applies when recursive is true. Defaults to 1."),
     },
     async ({ repositoryId, path, project, version, versionType, recursive, recursionDepth }) => {
       try {

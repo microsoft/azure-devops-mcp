@@ -84,9 +84,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
       project: z.string().describe("The project name or ID where the wiki is located."),
-      top: z.number().default(20).describe("The maximum number of pages to return. Defaults to 20."),
+      top: z.coerce.number().default(20).describe("The maximum number of pages to return. Defaults to 20."),
       continuationToken: z.string().optional().describe("Token for pagination to retrieve the next set of pages."),
-      pageViewsForDays: z.number().optional().describe("Number of days to retrieve page views for. If not specified, page views are not included."),
+      pageViewsForDays: z.coerce.number().optional().describe("Number of days to retrieve page views for. If not specified, page views are not included."),
     },
     async ({ wikiIdentifier, project, top = 20, continuationToken, pageViewsForDays }) => {
       try {

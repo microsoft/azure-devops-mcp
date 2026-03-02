@@ -112,8 +112,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     "List all iterations in a specified Azure DevOps project.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      depth: z.number().default(2).describe("Depth of children to fetch."),
-      excludedIds: z.array(z.number()).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
+      depth: z.coerce.number().default(2).describe("Depth of children to fetch."),
+      excludedIds: z.array(z.coerce.number()).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
     },
     async ({ project, depth, excludedIds: ids }) => {
       try {
@@ -285,7 +285,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         .array(
           z.object({
             name: z.string().describe("The name of the activity (e.g., 'Development')."),
-            capacityPerDay: z.number().describe("The capacity per day for this activity."),
+            capacityPerDay: z.coerce.number().describe("The capacity per day for this activity."),
           })
         )
         .describe("Array of activities and their daily capacities for the team member."),
