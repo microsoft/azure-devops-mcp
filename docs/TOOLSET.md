@@ -41,6 +41,7 @@
 | Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
 | Repositories      | [mcp_ado_repo_list_directory](#mcp_ado_repo_list_directory)                                               | List files and folders in a directory                    |
+| Repositories      | [mcp_ado_repo_commit_files](#mcp_ado_repo_commit_files)                                                   | Commit file changes directly to a repository branch     |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
 | Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                            |
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
@@ -366,6 +367,53 @@ List files and folders in a directory within a repository.
 
 - **Required**: `repositoryId`
 - **Optional**: `path`, `project`, `version`, `versionType`, `recursive`, `recursionDepth`
+
+### mcp_ado_repo_commit_files
+
+Commit one or more file changes directly to a repository branch using the Azure DevOps push API. If the target branch does not exist it is automatically created from the repository default branch. Optionally creates a pull request after the push succeeds.
+
+- **Required**: `project`, `repositoryIdOrName`, `branch`, `commitMessage`, `changes`
+- **Optional**: `createPullRequest`
+
+#### `changes` array items
+
+Each entry in the `changes` array must include:
+
+| Field        | Type                        | Description                                                             |
+| ------------ | --------------------------- | ----------------------------------------------------------------------- |
+| `path`       | `string`                    | Repository-relative file path, e.g. `/docs/test.md`                    |
+| `content`    | `string` *(optional)*       | File content as a UTF-8 or base64 string. Not required for `delete`.   |
+| `changeType` | `"add" \| "edit" \| "delete"` | Type of change to apply to the file.                                  |
+
+#### Example push request payload
+
+```json
+{
+  "refUpdates": [
+    {
+      "name": "refs/heads/feature/test",
+      "oldObjectId": "<current-branch-tip-sha>"
+    }
+  ],
+  "commits": [
+    {
+      "comment": "Add documentation",
+      "changes": [
+        {
+          "changeType": 1,
+          "item": { "path": "/docs/test.md" },
+          "newContent": {
+            "content": "# Hello World",
+            "contentType": 0
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+`changeType` values: `1` = add, `2` = edit, `16` = delete. `contentType` values: `0` = rawtext, `1` = base64encoded.
 
 ## Search
 
