@@ -44,6 +44,8 @@ describe("repos tools", () => {
     getPullRequestQuery: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     updateRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getItems: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getPullRequestIterationChanges: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getPullRequestIterations: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
   };
 
   beforeEach(() => {
@@ -75,6 +77,8 @@ describe("repos tools", () => {
       getPullRequestQuery: jest.fn(),
       updateRefs: jest.fn(),
       getItems: jest.fn(),
+      getPullRequestIterationChanges: jest.fn(),
+      getPullRequestIterations: jest.fn(),
     };
 
     connectionProvider = jest.fn().mockResolvedValue({
@@ -6814,6 +6818,175 @@ describe("repos tools", () => {
           isError: true,
         });
       });
+    });
+  });
+
+  describe("repo_get_pr_files", () => {
+    it("should get PR files for a given iterationId", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pr_files);
+      if (!call) throw new Error("repo_get_pr_files tool not registered");
+      const [, , , handler] = call;
+
+      const mockChanges = {
+        changeEntries: [
+          {
+            changeTrackingId: 1,
+            item: { path: "/src/file.ts" },
+            changeType: 2,
+          },
+        ],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 42,
+        projectId: "test-project",
+        iterationId: 3,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestIterations).not.toHaveBeenCalled();
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 42, 3, "test-project", undefined, undefined, undefined);
+      expect(result.content[0].text).toBe(JSON.stringify(mockChanges, null, 2));
+    });
+
+    it("should fall back to latest iteration when iterationId is not provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pr_files);
+      if (!call) throw new Error("repo_get_pr_files tool not registered");
+      const [, , , handler] = call;
+
+      const mockIterations = [{ id: 1 }, { id: 2 }, { id: 5 }];
+      const mockChanges = {
+        changeEntries: [{ changeTrackingId: 1, item: { path: "/src/new-file.ts" }, changeType: 1 }],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      mockGitApi.getPullRequestIterations.mockResolvedValue(mockIterations);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 42,
+        projectId: "test-project",
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestIterations).toHaveBeenCalledWith("repo123", 42, "test-project");
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 42, 5, "test-project", undefined, undefined, undefined);
+      expect(result.content[0].text).toBe(JSON.stringify(mockChanges, null, 2));
+    });
+
+    it("should pass top and skip for pagination", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pr_files);
+      if (!call) throw new Error("repo_get_pr_files tool not registered");
+      const [, , , handler] = call;
+
+      const mockChanges = {
+        changeEntries: [{ changeTrackingId: 2, item: { path: "/src/other.ts" }, changeType: 2 }],
+        nextSkip: 20,
+        nextTop: 10,
+      };
+
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 42,
+        projectId: "test-project",
+        iterationId: 2,
+        top: 10,
+        skip: 10,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 42, 2, "test-project", 10, 10, undefined);
+      expect(result.content[0].text).toBe(JSON.stringify(mockChanges, null, 2));
+    });
+
+    it("should pass compareTo as a number for iteration comparison", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pr_files);
+      if (!call) throw new Error("repo_get_pr_files tool not registered");
+      const [, , , handler] = call;
+
+      const mockChanges = {
+        changeEntries: [{ changeTrackingId: 3, item: { path: "/src/changed.ts" }, changeType: 4 }],
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 42,
+        projectId: "test-project",
+        iterationId: 4,
+        compareTo: 2,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 42, 4, "test-project", undefined, undefined, 2);
+      expect(result.content[0].text).toBe(JSON.stringify(mockChanges, null, 2));
+    });
+
+    it("should return an error when no iterations exist and iterationId is not provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pr_files);
+      if (!call) throw new Error("repo_get_pr_files tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestIterations.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 42,
+        projectId: "test-project",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iterations found for this pull request.");
+    });
+
+    it("should handle API errors gracefully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pr_files);
+      if (!call) throw new Error("repo_get_pr_files tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestIterationChanges.mockRejectedValue(new Error("Network error"));
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 42,
+        projectId: "test-project",
+        iterationId: 1,
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error getting pull request files: Network error");
     });
   });
 });

@@ -38,6 +38,7 @@ const REPO_TOOLS = {
   get_repo_by_name_or_id: "repo_get_repo_by_name_or_id",
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
+  get_pr_files: "repo_get_pr_files",
   create_pull_request: "repo_create_pull_request",
   create_branch: "repo_create_branch",
   update_pull_request: "repo_update_pull_request",
@@ -1500,6 +1501,51 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           },
         ],
       };
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.get_pr_files,
+    "Get files changed in a pull request iteration. Returns file-level change metadata (path, original path, change type) for a pull request iteration.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request to retrieve changed files for."),
+      projectId: z.string().describe("Project ID or project name."),
+      iterationId: z.number().optional().describe("The iteration ID to get changes for. If not specified, gets changes for the latest iteration."),
+      top: z.number().optional().describe("Maximum number of changes to return."),
+      skip: z.number().optional().describe("Number of changes to skip for pagination."),
+      compareTo: z.number().optional().describe("Iteration ID to compare against. If specified, returns changes between two iterations."),
+    },
+    async ({ repositoryId, pullRequestId, projectId, iterationId, top, skip, compareTo }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+
+        let resolvedIterationId = iterationId;
+        if (resolvedIterationId === undefined) {
+          const iterations = await gitApi.getPullRequestIterations(repositoryId, pullRequestId, projectId);
+          if (!iterations || iterations.length === 0) {
+            return {
+              content: [{ type: "text", text: "No iterations found for this pull request." }],
+              isError: true,
+            };
+          }
+          resolvedIterationId = iterations[iterations.length - 1].id as number;
+        }
+
+        const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, resolvedIterationId, projectId, top, skip, compareTo);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error getting pull request files: ${errorMessage}` }],
+          isError: true,
+        };
+      }
     }
   );
 

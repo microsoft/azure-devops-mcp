@@ -31,6 +31,7 @@
 | Repositories      | [mcp_ado_repo_list_pull_requests_by_repo_or_project](#mcp_ado_repo_list_pull_requests_by_repo_or_project) | List pull requests with optional filters                 |
 | Repositories      | [mcp_ado_repo_list_pull_requests_by_commits](#mcp_ado_repo_list_pull_requests_by_commits)                 | Find pull requests containing specific commits           |
 | Repositories      | [mcp_ado_repo_get_pull_request_by_id](#mcp_ado_repo_get_pull_request_by_id)                               | Get details of a specific pull request                   |
+| Repositories      | [mcp_ado_repo_get_pr_files](#mcp_ado_repo_get_pr_files)                                                   | Get files changed in a pull request iteration            |
 | Repositories      | [mcp_ado_repo_create_pull_request](#mcp_ado_repo_create_pull_request)                                     | Create a new pull request                                |
 | Repositories      | [mcp_ado_repo_update_pull_request](#mcp_ado_repo_update_pull_request)                                     | Update pull request properties and settings              |
 | Repositories      | [mcp_ado_repo_update_pull_request_reviewers](#mcp_ado_repo_update_pull_request_reviewers)                 | Add or remove reviewers from a pull request              |
