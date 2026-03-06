@@ -71,6 +71,7 @@
 | Work Items        | [mcp_ado_wit_link_work_item_to_pull_request](#mcp_ado_wit_link_work_item_to_pull_request)                 | Link a work item to a pull request                       |
 | Work Items        | [mcp_ado_wit_list_work_item_comments](#mcp_ado_wit_list_work_item_comments)                               | List comments on a work item                             |
 | Work Items        | [mcp_ado_wit_add_work_item_comment](#mcp_ado_wit_add_work_item_comment)                                   | Add a comment to a work item                             |
+| Work Items        | [mcp_ado_wit_update_work_item_comment](#mcp_ado_wit_update_work_item_comment)                             | Update an existing comment on a work item                |
 | Work Items        | [mcp_ado_wit_list_work_item_revisions](#mcp_ado_wit_list_work_item_revisions)                             | Get revision history of a work item                      |
 | Work Items        | [mcp_ado_wit_get_work_item_type](#mcp_ado_wit_get_work_item_type)                                         | Get details of a work item type                          |
 | Work Items        | [mcp_ado_wit_my_work_items](#mcp_ado_wit_my_work_items)                                                   | List work items relevant to current user                 |
@@ -583,6 +584,13 @@ Retrieve list of comments for a work item by ID.
 Add comment to a work item by ID.
 
 - **Required**: `project`, `workItemId`, `comment`
+- **Optional**: `format`
+
+### mcp_ado_wit_update_work_item_comment
+
+Update an existing comment on a work item by ID.
+
+- **Required**: `project`, `workItemId`, `commentId`, `text`
 - **Optional**: `format`
 
 ### mcp_ado_wit_list_work_item_revisions
