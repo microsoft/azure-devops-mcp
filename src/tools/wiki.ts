@@ -208,7 +208,8 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         const connection = await connectionProvider();
-        const wikiApi = await connection.getWikiApi();
+        const accessToken = await tokenProvider();
+        const baseUrl = connection.serverUrl.replace(/\/$/, "");
         let resolvedProject = project;
         let resolvedWiki = wikiIdentifier;
         let resolvedPath: string | undefined = path;
@@ -230,8 +231,6 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
           if (parsed.pageId) {
             try {
-              const accessToken = await tokenProvider();
-              const baseUrl = connection.serverUrl.replace(/\/$/, "");
               const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages/${parsed.pageId}?includeContent=true&api-version=7.1`;
               const resp = await fetch(restUrl, {
                 headers: {
@@ -260,11 +259,27 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           if (!resolvedProject || !resolvedWiki) {
             return { content: [{ type: "text", text: "Project and wikiIdentifier must be defined to fetch wiki page content." }], isError: true };
           }
-          const stream = await wikiApi.getPageText(resolvedProject, resolvedWiki, resolvedPath, undefined, undefined, true);
-          if (!stream) {
+          const params = new URLSearchParams({
+            "path": resolvedPath,
+            "includeContent": "true",
+            "api-version": apiVersion,
+          });
+          const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages?${params.toString()}`;
+          const resp = await fetch(restUrl, {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "User-Agent": userAgentProvider(),
+            },
+          });
+          if (!resp.ok) {
+            const errorText = await resp.text();
+            return { content: [{ type: "text", text: `Error fetching wiki page content: ${errorText}` }], isError: true };
+          }
+          const json = await resp.json();
+          if (!json || typeof json.content !== "string") {
             return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
           }
-          pageContent = await streamToString(stream);
+          pageContent = json.content;
         }
 
         return { content: [{ type: "text", text: JSON.stringify(pageContent, null, 2) }] };
@@ -399,16 +414,6 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       }
     }
   );
-}
-
-function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    stream.setEncoding("utf8");
-    stream.on("data", (chunk) => (data += chunk));
-    stream.on("end", () => resolve(data));
-    stream.on("error", reject);
-  });
 }
 
 // Helper to parse Azure DevOps wiki page URLs.
