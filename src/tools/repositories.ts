@@ -202,8 +202,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         );
 
         if (!pullRequest) {
-          // Fallback: the PR was created server-side but the API returned null.
-          // Try to retrieve it by source/target branch.
           const prs = await gitApi.getPullRequests(repositoryId, { sourceRefName, targetRefName, status: PullRequestStatus.Active }, undefined, undefined, 0, 1);
           if (prs && prs.length > 0) {
             pullRequest = prs[0];
