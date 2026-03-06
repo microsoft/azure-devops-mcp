@@ -1025,6 +1025,94 @@ describe("repos tools", () => {
       const result = await handler(params);
       expect(result.content).toBeDefined();
     });
+
+    it("should fall back to getPullRequests when createPullRequest returns null", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      if (!call) throw new Error("repo_create_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockFallbackPR = {
+        pullRequestId: 789,
+        codeReviewId: 789,
+        repository: { name: "test-repo" },
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Fallback PR",
+        description: "Fallback description",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
+
+      mockGitApi.createPullRequest.mockResolvedValue(null);
+      mockGitApi.getPullRequests.mockResolvedValue([mockFallbackPR]);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        title: "Fallback PR",
+        description: "Fallback description",
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
+        "repo123",
+        { sourceRefName: "refs/heads/feature-branch", targetRefName: "refs/heads/main", status: PullRequestStatus.Active },
+        undefined,
+        undefined,
+        0,
+        1
+      );
+
+      const expectedTrimmedPR = {
+        pullRequestId: 789,
+        codeReviewId: 789,
+        repository: "test-repo",
+        status: PullRequestStatus.Active,
+        createdBy: {
+          displayName: "Test User",
+          uniqueName: "testuser@example.com",
+        },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Fallback PR",
+        description: "Fallback description",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+      };
+      expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
+    });
+
+    it("should return no-data message when createPullRequest returns null and fallback finds no PRs", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      if (!call) throw new Error("repo_create_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createPullRequest.mockResolvedValue(null);
+      mockGitApi.getPullRequests.mockResolvedValue([]);
+
+      const params = {
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature-branch",
+        targetRefName: "refs/heads/main",
+        title: "Test PR",
+      };
+
+      const result = await handler(params);
+
+      expect(result.content[0].text).toBe("Pull request created but API returned no data.");
+      expect(result.isError).toBeUndefined();
+    });
   });
 
   describe("repo_create_branch", () => {
