@@ -186,7 +186,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
-        const pullRequest = await gitApi.createPullRequest(
+        let pullRequest = await gitApi.createPullRequest(
           {
             sourceRefName,
             targetRefName,
@@ -200,6 +200,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           },
           repositoryId
         );
+
+        if (!pullRequest) {
+          const prs = await gitApi.getPullRequests(repositoryId, { sourceRefName, targetRefName, status: PullRequestStatus.Active }, undefined, undefined, 0, 1);
+          if (prs && prs.length > 0) {
+            pullRequest = prs[0];
+          } else {
+            return {
+              content: [{ type: "text", text: "Pull request created but API returned no data." }],
+            };
+          }
+        }
 
         const trimmedPullRequest = trimPullRequest(pullRequest, true);
 
