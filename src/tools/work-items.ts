@@ -1218,20 +1218,28 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.wiql_query,
-    "Execute a WIQL (Work Item Query Language) query to find work items. Returns matching work item references (IDs and URLs). Use wit_get_work_items_batch_by_ids to retrieve full work item details from the returned IDs.",
+    "Execute a WIQL (Work Item Query Language) query to find work items. Use wit_get_work_items_batch_by_ids to retrieve full work item details from the returned IDs.",
     {
-      query: z.string().describe("The WIQL query text, e.g. 'SELECT [System.Id], [System.Title] FROM WorkItems WHERE [System.State] = \\'Active\\''."),
+      query: z.string().describe("The WIQL query text, e.g. 'SELECT [System.Id], [System.Title] FROM WorkItems WHERE [System.State] = \"Active\"'."),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project to scope the query to."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Required for team-scoped macros like @CurrentIteration."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Only used when project is also provided. Required for team-scoped macros like @CurrentIteration."),
       timePrecision: z.boolean().optional().describe("Whether to include time precision in the results. Defaults to false."),
       top: z.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
+      responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete query results (default), 'ids' returns only work item IDs for reduced payload size."),
     },
-    async ({ query, project, team, timePrecision, top }) => {
+    async ({ query, project, team, timePrecision, top, responseType }) => {
       try {
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
         const teamContext = project ? { project, team } : undefined;
         const queryResult = await workItemApi.queryByWiql({ query }, teamContext, timePrecision, top);
+
+        if (responseType === "ids") {
+          const ids = queryResult.workItems?.map((workItem) => workItem.id).filter((id): id is number => id !== undefined) || [];
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ids, count: ids.length }, null, 2) }],
+          };
+        }
 
         return {
           content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],

@@ -644,10 +644,10 @@ Retrieve the results of a work item query given the query ID.
 
 ### mcp_ado_wit_wiql_query
 
-Execute a WIQL (Work Item Query Language) query to find work items. Returns matching work item references (IDs and URLs). Use `wit_get_work_items_batch_by_ids` to retrieve full work item details from the returned IDs.
+Execute a WIQL (Work Item Query Language) query to find work items. Use `wit_get_work_items_batch_by_ids` to retrieve full work item details from the returned IDs.
 
 - **Required**: `query`
-- **Optional**: `project`, `team`, `timePrecision`, `top`
+- **Optional**: `project`, `responseType`, `team`, `timePrecision`, `top`
 
 ## Work
 
