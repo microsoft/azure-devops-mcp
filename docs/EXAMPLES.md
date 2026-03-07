@@ -14,6 +14,7 @@ This guide offers step-by-step examples for using the Azure DevOps MCP Server to
 - [Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)
 - [Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
 - [Adding Artifact Links](#adding-artifact-links)
+- [Query Work Items with WIQL](#query-work-items-with-wiql)
 - [Reading, Creating, and Updating Wiki Page Content](#reading-creating-and-updating-wiki-page-content)
 
 ## 🙋‍♂️ Projects and Teams
@@ -186,6 +187,28 @@ Get me the list of pull requests for Constoso project and Frabrikam repo. Then l
 ```
 
 📽️ [Azure Devops MCP Server: Adding artifact links](https://youtu.be/t8HqEt8cZtY)
+
+### Query Work Items with WIQL
+
+You can use WIQL (Work Item Query Language) to run custom queries against your Azure DevOps project. This is useful for advanced filtering that goes beyond the built-in search tools.
+
+```text
+Use WIQL to find all bugs in Closed state for project Contoso
+```
+
+The model will construct and execute a WIQL query like:
+
+```sql
+SELECT [System.Id], [System.Title], [System.State]
+FROM WorkItems
+WHERE [System.WorkItemType] = 'Bug' AND [System.State] = 'Closed'
+```
+
+You can also use team-scoped macros like `@CurrentIteration` when you provide a team context:
+
+```text
+Use WIQL to get all user stories in the current iteration for project Contoso and team Fabrikam
+```
 
 ## 📖 Wiki
 
