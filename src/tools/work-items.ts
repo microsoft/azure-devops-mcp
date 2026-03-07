@@ -1231,7 +1231,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
         const teamContext = project ? { project, team } : undefined;
-        console.log("!!!!!!!!! Executing WIQL query: ", query, " with team context: ", teamContext);
         const queryResult = await workItemApi.queryByWiql({ query }, teamContext, timePrecision, top);
 
         return {
