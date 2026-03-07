@@ -493,6 +493,42 @@ export const _mockQuery = {
   url: "https://dev.azure.com/fabrikam/6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c/_apis/wit/queries/342f0f44-4069-46b1-a940-3d0468979ceb",
 };
 
+export const _mockWiqlQueryResult = {
+  queryType: "flat",
+  asOf: "2024-06-15T12:00:00.000Z",
+  columns: [
+    {
+      referenceName: "System.Id",
+      name: "ID",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.Id",
+    },
+    {
+      referenceName: "System.Title",
+      name: "Title",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.Title",
+    },
+    {
+      referenceName: "System.State",
+      name: "State",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.State",
+    },
+  ],
+  workItems: [
+    {
+      id: 297,
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/297",
+    },
+    {
+      id: 299,
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/299",
+    },
+    {
+      id: 301,
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/301",
+    },
+  ],
+};
+
 export const _mockQueryResults = {
   queryType: "tree",
   asOf: "2014-12-29T20:49:33.803Z",
