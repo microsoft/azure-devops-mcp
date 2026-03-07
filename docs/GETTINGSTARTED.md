@@ -346,9 +346,6 @@ Add the `azure-devops` entry under the `mcp` key:
     "azure-devops": {
       "type": "local",
       "command": ["npx", "-y", "@azure-devops/mcp", "<your-org>"],
-      "environment": {
-        "AZURE_DEVOPS_EXT_PAT": "<your-pat>"
-      },
       "enabled": true
     }
   }
@@ -357,17 +354,7 @@ Add the `azure-devops` entry under the `mcp` key:
 
 Replace `<your-org>` with your Azure DevOps organization name (e.g. `contoso`).
 
-> **Authentication:** The `AZURE_DEVOPS_EXT_PAT` environment variable is optional. If omitted, Opencode will trigger browser-based Microsoft account login on first use.
->
-> **To create a Personal Access Token (PAT):**
-> 1. Go to `https://dev.azure.com/<your-org>`
-> 2. Click your **profile icon** (top-right) → **Personal access tokens**
-> 3. Click **New Token** → set a name → select **Full access** → click **Create**
-> 4. Copy the token and set it in your environment:
->    ```bash
->    export AZURE_DEVOPS_EXT_PAT="<your-pat>"
->    ```
->    Or add it directly in the `environment` block of your `opencode.json` as shown above.
+> **Note:** On first use, Opencode will trigger browser-based Microsoft account login.
 
 > **Tip:** Limit loaded tools using domain filtering by appending `-d` flags to the command:
 > ```json
