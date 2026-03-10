@@ -86,6 +86,7 @@
 | Work              | [mcp_ado_work_get_iteration_capacities](#mcp_ado_work_get_iteration_capacities)                           | Get capacity for all teams in an iteration               |
 | Work              | [mcp_ado_work_get_team_capacity](#mcp_ado_work_get_team_capacity)                                         | Get capacity for a specific team in iteration            |
 | Work              | [mcp_ado_work_update_team_capacity](#mcp_ado_work_update_team_capacity)                                   | Update team member capacity for iteration                |
+| Work              | [mcp_ado_work_get_team_settings](#mcp_ado_work_get_team_settings)                                         | Get team settings including default iteration and area   |
 
 ## Advanced Security
 
@@ -691,3 +692,10 @@ Update the team capacity of a team member for a specific iteration in a project.
 
 - **Required**: `project`, `team`, `teamMemberId`, `iterationId`, `activities`
 - **Optional**: `daysOff`
+
+### mcp_ado_work_get_team_settings
+
+Get team settings including default iteration, backlog iteration, and default area path for a team.
+
+- **Required**: `project`
+- **Optional**: `team`
