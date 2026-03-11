@@ -1481,6 +1481,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository."),
       pullRequestId: z.number().describe("The ID of the pull request."),
       vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).describe("The vote to cast: Approved(10), Suggestions(5), None(0), Waiting(-5), Rejected(-10)."),
+      aasdasdsascvadcasdascxazxcac,
     },
     async ({ repositoryId, pullRequestId, vote }) => {
       const connection = await connectionProvider();
