@@ -14,10 +14,11 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 3. [⚙️ Supported Tools](#️-supported-tools)
 4. [🔌 Installation & Getting Started](#-installation--getting-started)
 5. [🌏 Using Domains](#-using-domains)
-6. [📝 Troubleshooting](#-troubleshooting)
-7. [🎩 Examples & Best Practices](#-examples--best-practices)
-8. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-9. [📌 Contributing](#-contributing)
+6. [🏢 On-Premises / TFS Support](#-on-premises--tfs-support)
+7. [📝 Troubleshooting](#-troubleshooting)
+8. [🎩 Examples & Best Practices](#-examples--best-practices)
+9. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+10. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -160,6 +161,183 @@ Domains that are available are: `core`, `work`, `work-items`, `search`, `test-pl
 We recommend that you always enable `core` tools so that you can fetch project level information.
 
 > By default all domains are loaded
+
+## 🏢 On-Premises / TFS Support
+
+The Azure DevOps MCP Server supports both **Azure DevOps Services (cloud)** and **on-premises installations** (Azure DevOps Server / Team Foundation Server).
+
+### Configuration for On-Premises Installations
+
+- Pass the full URL to the on-premises Azure DevOps Server instance in the `organization` argument
+- Provide the PAT token via the environment variable `AZURE_DEVOPS_PAT`
+- Instruct the mcp server to authenticate via the environment with `-a env`
+
+```json
+{
+  "servers": {
+    "ado_onprem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "https://tfs.company.com/DefaultCollection", "-a", "env"],
+      "env": {
+        "AZURE_DEVOPS_PAT": "<PAT>"
+      }
+    }
+  }
+}
+```
+
+- Optional: You may want to additionally set `AZURE_DEVOPS_IGNORE_SSL_ERRORS` in case the server uses internal SSL certificates
+
+```json
+{
+  ...
+      "env": {
+        "AZURE_DEVOPS_PAT": "<PAT>",
+        "AZURE_DEVOPS_IGNORE_SSL_ERRORS": "true"
+      }
+  ...
+}
+```
+
+### ✅ On-Premises Verification Test Report
+
+The following report summarises read-only verification test runs executed against a fairly recent version of an **Azure DevOps Server** instance.
+
+Verification was performed twice: first against the modified `2.4.0` branch containing the on-premises support changes, and then re-run successfully against the current `HEAD`.
+
+> **Legend:** ✅ Pass · ⏭️ Skipped (write op or n/a) · 🚫 Not supported on-premises (by design)
+
+#### Core & Work
+
+| #   | Tool                            | Result | Notes           |
+| --- | ------------------------------- | ------ | --------------- |
+| 1   | `core_list_projects`            | ✅     |                 |
+| 2   | `core_list_project_teams`       | ✅     |                 |
+| 3   | `core_get_identity_ids`         | ✅     |                 |
+| 4   | `work_list_iterations`          | ✅     |                 |
+| 5   | `work_list_team_iterations`     | ✅     |                 |
+| 6   | `work_get_team_capacity`        | ✅     |                 |
+| 7   | `work_get_iteration_capacities` | ✅     |                 |
+| 8   | `work_create_iterations`        | ⏭️     | Write — not run |
+| 9   | `work_assign_iterations`        | ⏭️     | Write — not run |
+| 10  | `work_update_team_capacity`     | ⏭️     | Write — not run |
+
+#### Pipelines
+
+| #   | Tool                                       | Result | Notes           |
+| --- | ------------------------------------------ | ------ | --------------- |
+| 11  | `pipelines_get_build_definitions`          | ✅     |                 |
+| 12  | `pipelines_get_builds`                     | ✅     |                 |
+| 13  | `pipelines_get_build_status`               | ✅     |                 |
+| 14  | `pipelines_get_build_changes`              | ✅     |                 |
+| 15  | `pipelines_get_build_log`                  | ✅     |                 |
+| 16  | `pipelines_get_build_log_by_id`            | ✅     |                 |
+| 17  | `pipelines_get_build_definition_revisions` | ✅     |                 |
+| 18  | `pipelines_list_runs`                      | ✅     |                 |
+| 19  | `pipelines_get_run`                        | ✅     |                 |
+| 20  | `pipelines_run_pipeline`                   | ⏭️     | Write — not run |
+| 21  | `pipelines_update_build_stage`             | ⏭️     | Write — not run |
+
+#### Repositories
+
+| #   | Tool                                         | Result | Notes           |
+| --- | -------------------------------------------- | ------ | --------------- |
+| 22  | `repo_list_repos_by_project`                 | ✅     |                 |
+| 23  | `repo_get_repo_by_name_or_id`                | ✅     |                 |
+| 24  | `repo_list_branches_by_repo`                 | ✅     |                 |
+| 25  | `repo_list_my_branches_by_repo`              | ✅     |                 |
+| 26  | `repo_get_branch_by_name`                    | ✅     |                 |
+| 27  | `repo_list_pull_requests_by_repo_or_project` | ✅     |                 |
+| 28  | `repo_get_pull_request_by_id`                | ✅     |                 |
+| 29  | `repo_list_pull_request_threads`             | ✅     |                 |
+| 30  | `repo_list_pull_request_thread_comments`     | ✅     |                 |
+| 31  | `repo_search_commits`                        | ✅     |                 |
+| 32  | `repo_list_pull_requests_by_commits`         | ✅     |                 |
+| 33  | `repo_create_branch`                         | ⏭️     | Write — not run |
+| 34  | `repo_create_pull_request`                   | ⏭️     | Write — not run |
+| 35  | `repo_update_pull_request`                   | ⏭️     | Write — not run |
+| 36  | `repo_update_pull_request_reviewers`         | ⏭️     | Write — not run |
+| 37  | `repo_reply_to_comment`                      | ⏭️     | Write — not run |
+| 38  | `repo_create_pull_request_thread`            | ⏭️     | Write — not run |
+| 39  | `repo_update_pull_request_thread`            | ⏭️     | Write — not run |
+
+#### Search
+
+| #   | Tool              | Result | Notes |
+| --- | ----------------- | ------ | ----- |
+| 40  | `search_code`     | ✅     |       |
+| 41  | `search_wiki`     | ✅     |       |
+| 42  | `search_workitem` | ✅     |       |
+
+#### Wiki
+
+| #   | Tool                         | Result | Notes           |
+| --- | ---------------------------- | ------ | --------------- |
+| 43  | `wiki_list_wikis`            | ✅     |                 |
+| 44  | `wiki_get_wiki`              | ✅     |                 |
+| 45  | `wiki_list_pages`            | ✅     |                 |
+| 46  | `wiki_get_page`              | ✅     |                 |
+| 47  | `wiki_get_page_content`      | ✅     |                 |
+| 48  | `wiki_create_or_update_page` | ⏭️     | Write — not run |
+
+#### Work Items
+
+| #   | Tool                                 | Result | Notes           |
+| --- | ------------------------------------ | ------ | --------------- |
+| 49  | `wit_my_work_items`                  | ✅     |                 |
+| 50  | `wit_list_backlogs`                  | ✅     |                 |
+| 51  | `wit_list_backlog_work_items`        | ✅     |                 |
+| 52  | `wit_get_work_item`                  | ✅     |                 |
+| 53  | `wit_get_work_items_batch_by_ids`    | ✅     |                 |
+| 54  | `wit_list_work_item_comments`        | ✅     |                 |
+| 55  | `wit_list_work_item_revisions`       | ✅     |                 |
+| 56  | `wit_get_work_items_for_iteration`   | ✅     |                 |
+| 57  | `wit_get_work_item_type`             | ✅     |                 |
+| 58  | `wit_get_query`                      | ✅     |                 |
+| 59  | `wit_get_query_results_by_id`        | ✅     |                 |
+| 60  | `wit_add_work_item_comment`          | ⏭️     | Write — not run |
+| 61  | `wit_update_work_item`               | ⏭️     | Write — not run |
+| 62  | `wit_create_work_item`               | ⏭️     | Write — not run |
+| 63  | `wit_add_child_work_items`           | ⏭️     | Write — not run |
+| 64  | `wit_link_work_item_to_pull_request` | ⏭️     | Write — not run |
+| 65  | `wit_update_work_items_batch`        | ⏭️     | Write — not run |
+| 66  | `wit_work_items_link`                | ⏭️     | Write — not run |
+| 67  | `wit_work_item_unlink`               | ⏭️     | Write — not run |
+| 68  | `wit_add_artifact_link`              | ⏭️     | Write — not run |
+
+#### Test Plans
+
+| #   | Tool                                       | Result | Notes                               |
+| --- | ------------------------------------------ | ------ | ----------------------------------- |
+| 69  | `testplan_list_test_plans`                 | ✅     |                                     |
+| 70  | `testplan_list_test_suites`                | ✅     |                                     |
+| 71  | `testplan_list_test_cases`                 | ⏭️     | Skipped — requires active test plan |
+| 72  | `testplan_show_test_results_from_build_id` | ✅     |                                     |
+| 73  | `testplan_create_test_plan`                | ⏭️     | Write — not run                     |
+| 74  | `testplan_create_test_suite`               | ⏭️     | Write — not run                     |
+| 75  | `testplan_create_test_case`                | ⏭️     | Write — not run                     |
+| 76  | `testplan_add_test_cases_to_suite`         | ⏭️     | Write — not run                     |
+| 77  | `testplan_update_test_case_steps`          | ⏭️     | Write — not run                     |
+
+#### Advanced Security
+
+| #   | Tool                       | Result | Notes                                                          |
+| --- | -------------------------- | ------ | -------------------------------------------------------------- |
+| 78  | `advsec_get_alerts`        | 🚫     | Returns friendly on-premises not-supported message (by design) |
+| 79  | `advsec_get_alert_details` | 🚫     | Not applicable — no alert IDs available on-premises            |
+
+#### Summary
+
+| Category                                 | Count  |
+| ---------------------------------------- | ------ |
+| ✅ Passed (read)                         | 47     |
+| ⏭️ Skipped (write / n/a)                 | 30     |
+| 🚫 Not supported on-premises (by design) | 2      |
+| **Total tools**                          | **79** |
+
+All 47 read-only tools passed against Azure DevOps Server (on-premises).  
+Advanced Security tools are cloud-only by design and return a descriptive error on-premises.
 
 ## 📝 Troubleshooting
 

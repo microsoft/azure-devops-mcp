@@ -6,7 +6,7 @@ import { WebApi } from "azure-devops-node-api";
 import { IGitApi } from "azure-devops-node-api/GitApi.js";
 import { z } from "zod";
 import { apiVersion } from "../utils.js";
-import { orgName } from "../index.js";
+import { isOnPremiseServer, buildAuthorizationHeader, getServerContext } from "../shared/server-context.js";
 import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { GitItem } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
@@ -33,7 +33,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     async ({ searchText, project, repository, path, branch, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
       const connection = await connectionProvider();
-      const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
+      const baseUrl = isOnPremiseServer() ? connection.serverUrl : `https://almsearch.dev.azure.com/${getServerContext().orgName}`;
+      const url = `${baseUrl}/_apis/search/codesearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -56,7 +57,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
+          "Authorization": buildAuthorizationHeader(accessToken),
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(requestBody),
@@ -91,7 +92,9 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     },
     async ({ searchText, project, wiki, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
-      const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/wikisearchresults?api-version=${apiVersion}`;
+      const connection = await connectionProvider();
+      const baseUrl = isOnPremiseServer() ? connection.serverUrl : `https://almsearch.dev.azure.com/${getServerContext().orgName}`;
+      const url = `${baseUrl}/_apis/search/wikisearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -112,7 +115,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
+          "Authorization": buildAuthorizationHeader(accessToken),
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(requestBody),
@@ -145,7 +148,9 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     },
     async ({ searchText, project, areaPath, workItemType, state, assignedTo, includeFacets, skip, top }) => {
       const accessToken = await tokenProvider();
-      const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`;
+      const connection = await connectionProvider();
+      const baseUrl = isOnPremiseServer() ? connection.serverUrl : `https://almsearch.dev.azure.com/${getServerContext().orgName}`;
+      const url = `${baseUrl}/_apis/search/workitemsearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -169,7 +174,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
+          "Authorization": buildAuthorizationHeader(accessToken),
           "User-Agent": userAgentProvider(),
         },
         body: JSON.stringify(requestBody),

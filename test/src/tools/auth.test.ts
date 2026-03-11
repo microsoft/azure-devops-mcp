@@ -5,8 +5,31 @@ import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { WebApi } from "azure-devops-node-api";
 import { getCurrentUserDetails, getUserIdFromEmail, searchIdentities } from "../../../src/tools/auth";
 
+jest.mock("../../../src/shared/server-context.js", () => ({
+  buildAuthorizationHeader: (token: string) => `Bearer ${token}`,
+  getServerContext: () => ({
+    orgName: "test-org",
+    orgUrl: "https://dev.azure.com/test-org",
+    isOnPremise: false,
+    isPATAuth: false,
+  }),
+  isOnPremiseServer: () => false,
+}));
+
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
+
+jest.mock("../../../src/shared/server-context.js", () => ({
+  buildAuthorizationHeader: jest.fn((token: string) => `Bearer ${token}`),
+  getServerContext: jest.fn(() => ({
+    orgUrl: "https://dev.azure.com/test-org",
+    orgName: "test-org",
+    serverUrl: "https://dev.azure.com/test-org",
+    isOnPremise: false,
+    isPATAuth: false,
+  })),
+  isOnPremiseServer: jest.fn(() => false),
+}));
 
 describe("auth functions", () => {
   let tokenProvider: TokenProviderMock;

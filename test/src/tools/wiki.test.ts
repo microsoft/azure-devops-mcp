@@ -6,8 +6,32 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureWikiTools } from "../../../src/tools/wiki";
 
+jest.mock("../../../src/shared/server-context.js", () => ({
+  buildAuthorizationHeader: (token: string) => `Bearer ${token}`,
+  getServerContext: () => ({
+    orgName: "testorg",
+    orgUrl: "https://dev.azure.com/testorg",
+    isOnPremise: false,
+    isPATAuth: false,
+  }),
+  isOnPremiseServer: () => false,
+}));
+
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
+
+jest.mock("../../../src/shared/server-context.js", () => ({
+  buildAuthorizationHeader: jest.fn((token: string) => `Bearer ${token}`),
+  getServerContext: jest.fn(() => ({
+    orgUrl: "https://dev.azure.com/test-org",
+    orgName: "test-org",
+    serverUrl: "https://dev.azure.com/test-org",
+    isOnPremise: false,
+    isPATAuth: false,
+  })),
+  isOnPremiseServer: jest.fn(() => false),
+}));
+
 interface WikiApiMock {
   getWiki: jest.Mock;
   getAllWikis: jest.Mock;

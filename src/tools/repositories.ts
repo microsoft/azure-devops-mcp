@@ -850,9 +850,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
-        const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, true, undefined, undefined, filterContains);
+        const branches = await gitApi.getRefs(repositoryId, undefined, undefined, undefined, undefined, true, undefined, undefined, undefined);
 
-        const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top);
+        const filteredBranches = branchesFilterOutIrrelevantProperties(branches, top).filter((name) => !filterContains || name.includes(filterContains));
 
         return {
           content: [{ type: "text", text: JSON.stringify(filteredBranches, null, 2) }],

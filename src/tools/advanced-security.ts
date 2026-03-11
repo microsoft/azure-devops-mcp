@@ -6,6 +6,7 @@ import { WebApi } from "azure-devops-node-api";
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
 import { getEnumKeys, mapStringArrayToEnum, mapStringToEnum } from "../utils.js";
+import { isOnPremiseServer } from "../shared/server-context.js";
 
 const ADVSEC_TOOLS = {
   get_alerts: "advsec_get_alerts",
@@ -50,6 +51,17 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
       continuationToken: z.string().optional().describe("Continuation token for pagination."),
     },
     async ({ project, repository, alertType, states, severities, ruleId, ruleName, toolName, ref, onlyDefaultBranch, confidenceLevels, validity, top, orderBy, continuationToken }) => {
+      if (isOnPremiseServer()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Advanced Security (advsec_get_alerts) is not supported on Azure DevOps Server (on-premises). This feature is only available on Azure DevOps Services (cloud).",
+            },
+          ],
+          isError: true,
+        };
+      }
       try {
         const connection = await connectionProvider();
         const alertApi = await connection.getAlertApi();
@@ -107,6 +119,17 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
       ref: z.string().optional().describe("Git reference (branch) to filter the alert."),
     },
     async ({ project, repository, alertId, ref }) => {
+      if (isOnPremiseServer()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Advanced Security (advsec_get_alert_details) is not supported on Azure DevOps Server (on-premises). This feature is only available on Azure DevOps Services (cloud).",
+            },
+          ],
+          isError: true,
+        };
+      }
       try {
         const connection = await connectionProvider();
         const alertApi = await connection.getAlertApi();

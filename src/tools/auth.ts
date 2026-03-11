@@ -4,6 +4,7 @@
 import { WebApi } from "azure-devops-node-api";
 import { apiVersion } from "../utils.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
+import { buildAuthorizationHeader, getServerContext, isOnPremiseServer } from "../shared/server-context.js";
 
 interface IdentitiesResponse {
   value: IdentityBase[];
@@ -16,7 +17,7 @@ async function getCurrentUserDetails(tokenProvider: () => Promise<string>, conne
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${token}`,
+      "Authorization": buildAuthorizationHeader(token),
       "Content-Type": "application/json",
       "User-Agent": userAgentProvider(),
     },
@@ -29,13 +30,20 @@ async function getCurrentUserDetails(tokenProvider: () => Promise<string>, conne
 }
 
 /**
- * Searches for identities using Azure DevOps Identity API
+ * Searches for identities using the Azure DevOps Identity API.
+ *
+ * URL routing:
+ *  - On-premise TFS/Azure DevOps Server: {serverUrl}/_apis/identities
+ *  - Cloud (dev.azure.com):              https://vssps.dev.azure.com/{orgName}/_apis/identities
+ *
+ * Auth header is determined by buildAuthorizationHeader() which checks
+ * whether the AZURE_DEVOPS_PAT env var is set.
  */
 async function searchIdentities(identity: string, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): Promise<IdentitiesResponse> {
   const token = await tokenProvider();
   const connection = await connectionProvider();
-  const orgName = connection.serverUrl.split("/")[3];
-  const baseUrl = `https://vssps.dev.azure.com/${orgName}/_apis/identities`;
+
+  const baseUrl = isOnPremiseServer() ? `${connection.serverUrl}/_apis/identities` : `https://vssps.dev.azure.com/${getServerContext().orgName}/_apis/identities`;
 
   const params = new URLSearchParams({
     "api-version": apiVersion,
@@ -45,7 +53,7 @@ async function searchIdentities(identity: string, tokenProvider: () => Promise<s
 
   const response = await fetch(`${baseUrl}?${params}`, {
     headers: {
-      "Authorization": `Bearer ${token}`,
+      "Authorization": buildAuthorizationHeader(token),
       "Content-Type": "application/json",
       "User-Agent": userAgentProvider(),
     },

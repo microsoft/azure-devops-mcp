@@ -107,7 +107,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const workItems = await workApi.getBacklogLevelWorkItems(teamContext, backlogId);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(workItems, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(workItems ?? { workItems: [] }, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

@@ -3277,7 +3277,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", undefined, undefined, true, undefined, undefined, undefined);
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, undefined, undefined, undefined, true, undefined, undefined, undefined);
 
       const expectedResult = ["my-feature", "main"];
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));

@@ -393,6 +393,10 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
 
         const testSuites = await testPlanApi.getTestSuitesForPlan(project, planId, expand, continuationToken);
 
+        if (!testSuites || testSuites.length === 0) {
+          return { content: [{ type: "text", text: "[]" }] };
+        }
+
         // The API returns a flat list where the root suite is first, followed by all nested suites
         // We need to build a proper hierarchy by creating a map and assembling the tree
 

@@ -8,8 +8,31 @@ import { Alert, AlertType, AlertValidityStatus, Confidence, Severity, State } fr
 import { PagedList } from "azure-devops-node-api/interfaces/common/VSSInterfaces";
 import { configureAdvSecTools } from "../../../src/tools/advanced-security";
 
+jest.mock("../../../src/shared/server-context.js", () => ({
+  buildAuthorizationHeader: (token: string) => `Bearer ${token}`,
+  getServerContext: () => ({
+    orgName: "test-org",
+    orgUrl: "https://dev.azure.com/test-org",
+    isOnPremise: false,
+    isPATAuth: false,
+  }),
+  isOnPremiseServer: () => false,
+}));
+
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
+
+jest.mock("../../../src/shared/server-context.js", () => ({
+  buildAuthorizationHeader: jest.fn((token: string) => `Bearer ${token}`),
+  getServerContext: jest.fn(() => ({
+    orgUrl: "https://dev.azure.com/test-org",
+    orgName: "test-org",
+    serverUrl: "https://dev.azure.com/test-org",
+    isOnPremise: false,
+    isPATAuth: false,
+  })),
+  isOnPremiseServer: jest.fn(() => false),
+}));
 
 interface AlertApiMock {
   getAlerts: jest.Mock;
