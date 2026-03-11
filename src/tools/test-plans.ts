@@ -375,16 +375,18 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
         // Step 2: Fetch detailed results per run with server-side outcome filtering
         const allResults = (
           await Promise.all(
-            testRuns.map((run) =>
-              coreApi.getTestResults(
-                project,
-                run.id!,
-                undefined, // detailsToInclude
-                undefined, // skip
-                undefined, // top
-                outcomeEnums
+            testRuns
+              .filter((run) => run.id !== undefined)
+              .map((run) =>
+                coreApi.getTestResults(
+                  project,
+                  run.id as number,
+                  undefined, // detailsToInclude
+                  undefined, // skip
+                  undefined, // top
+                  outcomeEnums
+                )
               )
-            )
           )
         ).flat();
 
