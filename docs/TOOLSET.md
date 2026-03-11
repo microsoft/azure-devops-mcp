@@ -71,6 +71,7 @@
 | Work Items        | [mcp_ado_wit_link_work_item_to_pull_request](#mcp_ado_wit_link_work_item_to_pull_request)                 | Link a work item to a pull request                       |
 | Work Items        | [mcp_ado_wit_list_work_item_comments](#mcp_ado_wit_list_work_item_comments)                               | List comments on a work item                             |
 | Work Items        | [mcp_ado_wit_add_work_item_comment](#mcp_ado_wit_add_work_item_comment)                                   | Add a comment to a work item                             |
+| Work Items        | [mcp_ado_wit_update_work_item_comment](#mcp_ado_wit_update_work_item_comment)                             | Update an existing comment on a work item                |
 | Work Items        | [mcp_ado_wit_list_work_item_revisions](#mcp_ado_wit_list_work_item_revisions)                             | Get revision history of a work item                      |
 | Work Items        | [mcp_ado_wit_get_work_item_type](#mcp_ado_wit_get_work_item_type)                                         | Get details of a work item type                          |
 | Work Items        | [mcp_ado_wit_my_work_items](#mcp_ado_wit_my_work_items)                                                   | List work items relevant to current user                 |
@@ -86,6 +87,7 @@
 | Work              | [mcp_ado_work_get_iteration_capacities](#mcp_ado_work_get_iteration_capacities)                           | Get capacity for all teams in an iteration               |
 | Work              | [mcp_ado_work_get_team_capacity](#mcp_ado_work_get_team_capacity)                                         | Get capacity for a specific team in iteration            |
 | Work              | [mcp_ado_work_update_team_capacity](#mcp_ado_work_update_team_capacity)                                   | Update team member capacity for iteration                |
+| Work              | [mcp_ado_work_get_team_settings](#mcp_ado_work_get_team_settings)                                         | Get team settings including default iteration and area   |
 
 ## Advanced Security
 
@@ -585,6 +587,13 @@ Add comment to a work item by ID.
 - **Required**: `project`, `workItemId`, `comment`
 - **Optional**: `format`
 
+### mcp_ado_wit_update_work_item_comment
+
+Update an existing comment on a work item by ID.
+
+- **Required**: `project`, `workItemId`, `commentId`, `text`
+- **Optional**: `format`
+
 ### mcp_ado_wit_list_work_item_revisions
 
 Retrieve list of revisions for a work item by ID.
@@ -691,3 +700,10 @@ Update the team capacity of a team member for a specific iteration in a project.
 
 - **Required**: `project`, `team`, `teamMemberId`, `iterationId`, `activities`
 - **Optional**: `daysOff`
+
+### mcp_ado_work_get_team_settings
+
+Get team settings including default iteration, backlog iteration, and default area path for a team.
+
+- **Required**: `project`
+- **Optional**: `team`
