@@ -14,6 +14,7 @@ const WORK_TOOLS = {
   get_team_capacity: "work_get_team_capacity",
   update_team_capacity: "work_update_team_capacity",
   get_iteration_capacities: "work_get_iteration_capacities",
+  get_team_settings: "work_get_team_settings",
 };
 
 function configureWorkTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
@@ -382,6 +383,53 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
 
         return {
           content: [{ type: "text", text: `Error getting iteration capacities: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORK_TOOLS.get_team_settings,
+    "Get team settings including default iteration, backlog iteration, and default area path for a team.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
+    },
+    async ({ project, team }) => {
+      try {
+        const connection = await connectionProvider();
+        const workApi = await connection.getWorkApi();
+        const teamContext = { project, team };
+
+        const teamSettings = await workApi.getTeamSettings(teamContext);
+
+        if (!teamSettings) {
+          return { content: [{ type: "text", text: "No team settings found" }], isError: true };
+        }
+
+        const teamFieldValues = await workApi.getTeamFieldValues(teamContext);
+
+        const result = {
+          backlogIteration: teamSettings.backlogIteration,
+          defaultIteration: teamSettings.defaultIteration,
+          defaultIterationMacro: teamSettings.defaultIterationMacro,
+          backlogVisibilities: teamSettings.backlogVisibilities,
+          bugsBehavior: teamSettings.bugsBehavior,
+          workingDays: teamSettings.workingDays,
+          defaultAreaPath: teamFieldValues?.defaultValue,
+          areaPathField: teamFieldValues?.field,
+          areaPaths: teamFieldValues?.values,
+        };
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+        return {
+          content: [{ type: "text", text: `Error fetching team settings: ${errorMessage}` }],
           isError: true,
         };
       }
