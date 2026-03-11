@@ -41,6 +41,8 @@ describe("configureTestPlanTools", () => {
     } as unknown as ITestPlanApi;
     mockTestResultsApi = {
       getTestResultDetailsForBuild: jest.fn(),
+      getTestRuns: jest.fn(),
+      getTestResults: jest.fn(),
     } as unknown as ITestResultsApi;
     mockWitApi = {
       createWorkItem: jest.fn(),
@@ -592,21 +594,66 @@ describe("configureTestPlanTools", () => {
   });
 
   describe("test_results_from_build_id tool", () => {
-    it("should call getTestResultDetailsForBuild with the correct parameters and return the expected result", async () => {
+    it("should fetch test runs then get detailed results and return formatted output", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
       const [, , , handler] = call;
 
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({ results: ["Result 1"] });
-      const params = {
-        project: "proj1",
-        buildid: 123,
-      };
-      const result = await handler(params);
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValue([{ id: 100 }, { id: 200 }]);
+      (mockTestResultsApi.getTestResults as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            id: 1,
+            testCaseTitle: "TestHello",
+            outcome: "Failed",
+            errorMessage: "Assert.Equal() failed",
+            stackTrace: "at TestClass.TestHello() line 42",
+            automatedTestName: "Namespace.TestClass.TestHello",
+            automatedTestStorage: "test.dll",
+            durationInMs: 1500,
+            testRun: { id: "100" },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 2,
+            testCaseTitle: "TestWorld",
+            outcome: "Passed",
+            automatedTestName: "Namespace.TestClass.TestWorld",
+            automatedTestStorage: "test.dll",
+            durationInMs: 200,
+            testRun: { id: "200" },
+          },
+        ]);
 
-      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith("proj1", 123);
-      expect(result.content[0].text).toBe(JSON.stringify({ results: ["Result 1"] }, null, 2));
+      const result = await handler({ project: "proj1", buildid: 123 });
+
+      expect(mockTestResultsApi.getTestRuns).toHaveBeenCalledWith("proj1", "vstfs:///Build/Build/123");
+      expect(mockTestResultsApi.getTestResults).toHaveBeenCalledTimes(2);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(2);
+      expect(parsed[0].testCaseTitle).toBe("TestHello");
+      expect(parsed[0].errorMessage).toBe("Assert.Equal() failed");
+      expect(parsed[0].stackTrace).toBe("at TestClass.TestHello() line 42");
+      expect(parsed[0].outcome).toBe("Failed");
+      expect(parsed[1].testCaseTitle).toBe("TestWorld");
+      expect(parsed[1].outcome).toBe("Passed");
+    });
+
+    it("should pass outcome enum values for server-side filtering", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
+      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValue([{ id: 100 }]);
+      (mockTestResultsApi.getTestResults as jest.Mock).mockResolvedValue([{ id: 1, testCaseTitle: "FailingTest", outcome: "Failed", errorMessage: "error" }]);
+
+      await handler({ project: "proj1", buildid: 123, outcomes: ["Failed", "Aborted"] });
+
+      // TestOutcome.Failed = 3, TestOutcome.Aborted = 6
+      expect(mockTestResultsApi.getTestResults).toHaveBeenCalledWith("proj1", 100, undefined, undefined, undefined, [3, 6]);
     });
 
     it("should handle API errors when fetching test results", async () => {
@@ -615,14 +662,9 @@ describe("configureTestPlanTools", () => {
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
       const [, , , handler] = call;
 
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockRejectedValue(new Error("API Error"));
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockRejectedValue(new Error("API Error"));
 
-      const params = {
-        project: "proj1",
-        buildid: 123,
-      };
-
-      const result = await handler(params);
+      const result = await handler({ project: "proj1", buildid: 123 });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching test results");
       expect(result.content[0].text).toContain("API Error");
