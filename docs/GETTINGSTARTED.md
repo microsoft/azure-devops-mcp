@@ -335,6 +335,7 @@ You can now use the Azure DevOps MCP Server tools directly in chat.
 Add the Azure DevOps MCP server to your Opencode config file.
 
 **Config file location:**
+
 - macOS / Linux: `~/.config/opencode/opencode.json`
 
 Add the `azure-devops` entry under the `mcp` key:
@@ -357,9 +358,11 @@ Replace `<your-org>` with your Azure DevOps organization name (e.g. `contoso`).
 > **Note:** On first use, Opencode will trigger browser-based Microsoft account login.
 
 > **Tip:** Limit loaded tools using domain filtering by appending `-d` flags to the command:
+>
 > ```json
 > "command": ["npx", "-y", "@azure-devops/mcp", "<your-org>", "-d", "core", "work", "work-items"]
 > ```
+>
 > Available domains: `core`, `work`, `work-items`, `repositories`, `wiki`, `pipelines`, `search`, `test-plans`, `advanced-security`
 
 For more on Opencode MCP configuration, see the [Opencode MCP docs](https://opencode.ai/docs/mcp-servers/).
@@ -390,6 +393,7 @@ Kilocode supports MCP servers at two levels — **global** (all workspaces) or *
 Create `.kilocode/mcp.json` in your project root with the same content as above. This file can be committed to version control to share the setup with your team.
 
 > **Windows users:** Wrap the command for the Windows Command Prompt:
+>
 > ```json
 > {
 >   "mcpServers": {
