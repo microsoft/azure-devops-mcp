@@ -3426,6 +3426,33 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
     });
 
+    it("should pass project parameter when provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 456,
+        title: "Test PR with project",
+        status: 1,
+      };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+
+      const params = {
+        repositoryId: "my-repo-name",
+        pullRequestId: 456,
+        project: "my-project",
+        includeWorkItemRefs: false,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("my-repo-name", 456, "my-project", undefined, undefined, undefined, undefined, false);
+      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+    });
+
     it("should include work item refs when requested", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 

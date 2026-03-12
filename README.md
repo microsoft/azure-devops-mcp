@@ -47,7 +47,7 @@ See [TOOLSET.md](./docs/TOOLSET.md) for a comprehensive list.
 
 ## 🔌 Installation & Getting Started
 
-For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
+For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, Cursor, Opencode, and Kilocode.
 
 ### Prerequisites
 
