@@ -11,6 +11,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "typeRoots": ["node_modules/@types"],
     "paths": {
       "@modules/*": ["modules/*"],
       "@tools/*": ["tools/*"],
