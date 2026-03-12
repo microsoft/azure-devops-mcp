@@ -23,9 +23,9 @@ function filterProjectsByName(projects: ProjectInfo[], projectNameFilter: string
 function configureCoreTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     CORE_TOOLS.list_project_teams,
-    "Retrieve a list of teams for the specified Azure DevOps project.",
+    "Retrieve a list of teams for an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
       mine: z.boolean().optional().describe("If true, only return teams that the authenticated user is a member of."),
       top: z.number().optional().describe("The maximum number of teams to return. Defaults to 100."),
       skip: z.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),
@@ -34,7 +34,44 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
       try {
         const connection = await connectionProvider();
         const coreApi = await connection.getCoreApi();
-        const teams = await coreApi.getTeams(project, mine, top, skip, false);
+
+        let resolvedProject = project;
+
+        if (!resolvedProject) {
+          const projects = await coreApi.getProjects("wellFormed", 100, 0, undefined, false);
+
+          if (!projects || projects.length === 0) {
+            return { content: [{ type: "text", text: "No projects found to select from." }], isError: true };
+          }
+
+          const result = await server.server.elicitInput({
+            mode: "form",
+            message: "Select the Azure DevOps project to list teams for.",
+            requestedSchema: {
+              type: "object",
+              properties: {
+                project: {
+                  type: "string",
+                  title: "Project",
+                  description: "The Azure DevOps project to list teams for.",
+                  oneOf: projects.map((p) => ({
+                    const: p.name ?? p.id ?? "",
+                    title: p.name ?? p.id ?? "Unknown project",
+                  })),
+                },
+              },
+              required: ["project"],
+            },
+          });
+
+          if (result.action !== "accept" || !result.content?.project) {
+            return { content: [{ type: "text", text: "Project selection cancelled." }] };
+          }
+
+          resolvedProject = String(result.content.project);
+        }
+
+        const teams = await coreApi.getTeams(resolvedProject, mine, top, skip, false);
 
         if (!teams) {
           return { content: [{ type: "text", text: "No teams found" }], isError: true };
