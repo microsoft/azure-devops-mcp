@@ -23,7 +23,7 @@ describe("configureCoreTools", () => {
   let mockCoreApi: CoreApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
     tokenProvider = jest.fn();
     userAgentProvider = () => "Jest";
 
@@ -415,6 +415,108 @@ describe("configureCoreTools", () => {
       expect(mockCoreApi.getTeams).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching project teams: Unknown error occurred");
+    });
+
+    it("should elicit project when project is not provided and user accepts", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
+      if (!call) throw new Error("core_list_project_teams tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
+        { id: "proj-1", name: "ProjectAlpha" },
+        { id: "proj-2", name: "ProjectBeta" },
+      ]);
+
+      ((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock).mockResolvedValue({
+        action: "accept",
+        content: { project: "ProjectAlpha" },
+      });
+
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
+
+      const params = { project: undefined, mine: undefined, top: undefined, skip: undefined };
+      const result = await handler(params);
+
+      expect(mockCoreApi.getProjects).toHaveBeenCalledWith("wellFormed", 100, 0, undefined, false);
+      expect((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput).toHaveBeenCalled();
+      expect(mockCoreApi.getTeams).toHaveBeenCalledWith("ProjectAlpha", undefined, undefined, undefined, false);
+      expect(result.content[0].text).toContain("Team One");
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should return cancellation message when user declines elicitation", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
+      if (!call) throw new Error("core_list_project_teams tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      ((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock).mockResolvedValue({
+        action: "decline",
+      });
+
+      const params = { project: undefined, mine: undefined, top: undefined, skip: undefined };
+      const result = await handler(params);
+
+      expect(mockCoreApi.getTeams).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe("Project selection cancelled.");
+    });
+
+    it("should fall back to project id when name is missing in elicitation options", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
+      if (!call) throw new Error("core_list_project_teams tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
+        { id: "proj-1", name: undefined },
+        { id: undefined, name: undefined },
+      ]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValue({
+        action: "accept",
+        content: { project: "proj-1" },
+      });
+
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
+
+      const params = { project: undefined, mine: undefined, top: undefined, skip: undefined };
+      const result = await handler(params);
+
+      const schema = elicitMock.mock.calls[0][0].requestedSchema;
+      const oneOf = schema.properties.project.oneOf;
+
+      // Project with no name falls back to id
+      expect(oneOf[0]).toEqual({ const: "proj-1", title: "proj-1" });
+      // Project with neither name nor id falls back to "" and "Unknown project"
+      expect(oneOf[1]).toEqual({ const: "", title: "Unknown project" });
+
+      expect(mockCoreApi.getTeams).toHaveBeenCalledWith("proj-1", undefined, undefined, undefined, false);
+      expect(result.content[0].text).toContain("Team One");
+    });
+
+    it("should return error when no projects are available for elicitation", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_project_teams");
+      if (!call) throw new Error("core_list_project_teams tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([]);
+
+      const params = { project: undefined, mine: undefined, top: undefined, skip: undefined };
+      const result = await handler(params);
+
+      expect((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput).not.toHaveBeenCalled();
+      expect(mockCoreApi.getTeams).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No projects found to select from.");
     });
   });
 
