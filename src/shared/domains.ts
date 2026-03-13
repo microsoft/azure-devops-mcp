@@ -7,7 +7,6 @@ import { logger } from "../logger.js";
  * Available Azure DevOps MCP domains
  */
 export enum Domain {
-  ADVANCED_SECURITY = "advanced-security",
   PIPELINES = "pipelines",
   CORE = "core",
   REPOSITORIES = "repositories",

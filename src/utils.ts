@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-export const apiVersion = "7.2-preview.1";
+export const apiVersion = "7.1";
 export const batchApiVersion = "5.0";
-export const markdownCommentsApiVersion = "7.2-preview.4";
+export const markdownCommentsApiVersion = "7.1";
 
 export function createEnumMapping<T extends Record<string, string | number>>(enumObject: T): Record<string, T[keyof T]> {
   const mapping: Record<string, T[keyof T]> = {};
