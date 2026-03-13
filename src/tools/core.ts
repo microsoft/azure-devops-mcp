@@ -2,10 +2,10 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getBearerHandler, WebApi } from "azure-devops-node-api";
+import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { searchIdentities } from "./auth.js";
-import { packageVersion } from "../version.js";
+import { getConnection } from "../shared/connection.js";
 
 import type { ProjectInfo } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
@@ -105,19 +105,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ stateFilter, top, skip, continuationToken, projectNameFilter, organization }) => {
       try {
-        let connection: WebApi;
-        if (organization) {
-          const orgUrl = "https://dev.azure.com/" + organization;
-          const accessToken = await tokenProvider();
-          const authHandler = getBearerHandler(accessToken);
-          connection = new WebApi(orgUrl, authHandler, undefined, {
-            productName: "AzureDevOps.MCP",
-            productVersion: packageVersion,
-            userAgent: userAgentProvider(),
-          });
-        } else {
-          connection = await connectionProvider();
-        }
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const coreApi = await connection.getCoreApi();
         const projects = await coreApi.getProjects(stateFilter, top, skip, continuationToken, false);
 
