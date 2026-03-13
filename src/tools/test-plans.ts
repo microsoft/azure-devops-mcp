@@ -28,11 +28,12 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       filterActivePlans: z.boolean().default(true).describe("Filter to include only active test plans. Defaults to true."),
       includePlanDetails: z.boolean().default(false).describe("Include detailed information about each test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
+    async ({ project, filterActivePlans, includePlanDetails, continuationToken, organization }) => {
       try {
         const owner = ""; //making owner an empty string untill we can figure out how to get owner id
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const testPlanApi = await connection.getTestPlanApi();
 
         const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
@@ -61,10 +62,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       startDate: z.string().optional().describe("The start date of the test plan"),
       endDate: z.string().optional().describe("The end date of the test plan"),
       areaPath: z.string().optional().describe("The area path for the test plan"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, name, iteration, description, startDate, endDate, areaPath }) => {
+    async ({ project, name, iteration, description, startDate, endDate, areaPath, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const testPlanApi = await connection.getTestPlanApi();
 
         const testPlanToCreate: TestPlanCreateParams = {
@@ -99,14 +101,15 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       planId: z.number().describe("ID of the test plan that contains the suites"),
       parentSuiteId: z.number().describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
       name: z.string().describe("Name of the child test suite"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, planId, parentSuiteId, name }) => {
+    async ({ project, planId, parentSuiteId, name, organization }) => {
       const maxRetries = 5;
       const baseDelay = 500; // milliseconds
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+          const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
           const testPlanApi = await connection.getTestPlanApi();
 
           const testSuiteToCreate = {
@@ -160,10 +163,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       planId: z.number().describe("The ID of the test plan."),
       suiteId: z.number().describe("The ID of the test suite."),
       testCaseIds: z.string().or(z.array(z.string())).describe("The ID(s) of the test case(s) to add. "),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, planId, suiteId, testCaseIds }) => {
+    async ({ project, planId, suiteId, testCaseIds, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const testApi = await connection.getTestApi();
 
         // If testCaseIds is an array, convert it to comma-separated string
@@ -200,10 +204,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       areaPath: z.string().optional().describe("The area path for the test case."),
       iterationPath: z.string().optional().describe("The iteration path for the test case."),
       testsWorkItemId: z.number().optional().describe("Optional work item id that will be set as a Microsoft.VSTS.Common.TestedBy-Reverse link to the test case."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId }) => {
+    async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const witClient = await connection.getWorkItemTrackingApi();
 
         let stepsXml;
@@ -288,10 +293,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
         .describe(
           "The steps to reproduce the test case. Make sure to format each step as '1. Step one|Expected result one\n2. Step two|Expected result two. USE '|' as the delimiter between step and expected result. DO NOT use '|' in the description of the step or expected result."
         ),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ id, steps }) => {
+    async ({ id, steps, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const witClient = await connection.getWorkItemTrackingApi();
 
         let stepsXml;
@@ -332,10 +338,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       planid: z.number().describe("The ID of the test plan."),
       suiteid: z.number().describe("The ID of the test suite."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, planid, suiteid }) => {
+    async ({ project, planid, suiteid, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const coreApi = await connection.getTestPlanApi();
         const testcases = await coreApi.getTestCaseList(project, planid, suiteid);
 
@@ -358,10 +365,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       buildid: z.number().describe("The ID of the build."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildid }) => {
+    async ({ project, buildid, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const coreApi = await connection.getTestResultsApi();
         const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
 
@@ -385,10 +393,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       planId: z.number().describe("The ID of the test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, planId, continuationToken }) => {
+    async ({ project, planId, continuationToken, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const testPlanApi = await connection.getTestPlanApi();
         const expand: SuiteExpand = SuiteExpand.Children;
 

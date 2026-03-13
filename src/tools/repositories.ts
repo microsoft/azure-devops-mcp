@@ -170,10 +170,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
       labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels }) => {
+    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
 
@@ -237,10 +238,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       branchName: z.string().describe("The name of the new branch to create, e.g., 'feature-branch'."),
       sourceBranchName: z.string().optional().default("main").describe("The name of the source branch to create the new branch from. Defaults to 'main'."),
       sourceCommitId: z.string().optional().describe("The commit ID to create the branch from. If not provided, uses the latest commit of the source branch."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, branchName, sourceBranchName, sourceCommitId }) => {
+    async ({ repositoryId, branchName, sourceBranchName, sourceCommitId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         let commitId = sourceCommitId;
@@ -351,10 +353,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
       labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels }) => {
+    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // Build update object with only provided fields
@@ -448,10 +451,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       pullRequestId: z.number().describe("The ID of the pull request to update."),
       reviewerIds: z.array(z.string()).describe("List of reviewer ids to add or remove from the pull request."),
       action: z.enum(["add", "remove"]).describe("Action to perform on the reviewers. Can be 'add' or 'remove'."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, reviewerIds, action }) => {
+    async ({ repositoryId, pullRequestId, reviewerIds, action, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         let updatedPullRequest;
@@ -502,10 +506,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().default(100).describe("The maximum number of repositories to return."),
       skip: z.number().default(0).describe("The number of repositories to skip. Defaults to 0."),
       repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, top, skip, repoNameFilter }) => {
+    async ({ project, top, skip, repoNameFilter, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const repositories = await gitApi.getRepositories(project, false, false, false);
 
@@ -559,10 +564,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe("Filter pull requests by status. Defaults to 'Active'."),
       sourceRefName: z.string().optional().describe("Filter pull requests from this source branch (e.g., 'refs/heads/feature-branch')."),
       targetRefName: z.string().optional().describe("Filter pull requests into this target branch (e.g., 'refs/heads/main')."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
+    async ({ repositoryId, project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // Build the search criteria
@@ -709,10 +715,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe("Filter threads by status. If not specified, returns threads of all statuses."),
       authorEmail: z.string().optional().describe("Filter threads by the email of the thread author (first comment author)."),
       authorDisplayName: z.string().optional().describe("Filter threads by the display name of the thread author (first comment author). Case-insensitive partial matching."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName }) => {
+    async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
@@ -775,10 +782,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().default(100).describe("The maximum number of comments to return."),
       skip: z.number().default(0).describe("The number of comments to skip."),
       fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of trimmed data."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, threadId, project, top, skip, fullResponse }) => {
+    async ({ repositoryId, pullRequestId, threadId, project, top, skip, fullResponse, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // Get thread comments - GitApi uses getComments for retrieving comments from a specific thread
@@ -816,10 +824,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the branches are located."),
       top: z.number().default(100).describe("The maximum number of branches to return. Defaults to 100."),
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, top, filterContains }) => {
+    async ({ repositoryId, top, filterContains, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, undefined, undefined, undefined, filterContains);
 
@@ -846,10 +855,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository where the branches are located."),
       top: z.number().default(100).describe("The maximum number of branches to return."),
       filterContains: z.string().optional().describe("Filter to find branches that contain this string in their name."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, top, filterContains }) => {
+    async ({ repositoryId, top, filterContains, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, true, undefined, undefined, filterContains);
 
@@ -875,10 +885,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       project: z.string().describe("Project name or ID where the repository is located."),
       repositoryNameOrId: z.string().describe("Repository name or ID."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, repositoryNameOrId }) => {
+    async ({ project, repositoryNameOrId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const repositories = await gitApi.getRepositories(project);
 
@@ -911,10 +922,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       repositoryId: z.string().describe("The ID of the repository where the branch is located."),
       branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, branchName }) => {
+    async ({ repositoryId, branchName, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, branchName);
         const branch = branches.find((branch) => branch.name === `refs/heads/${branchName}` || branch.name === branchName);
@@ -954,10 +966,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a repository name instead of a GUID."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, project, includeWorkItemRefs, includeLabels }) => {
+    async ({ repositoryId, pullRequestId, project, includeWorkItemRefs, includeLabels, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project, undefined, undefined, undefined, undefined, includeWorkItemRefs);
 
@@ -1017,10 +1030,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       content: z.string().describe("The content of the comment to be added."),
       project: z.string().optional().describe("Project ID or project name (optional)"),
       fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of a simple confirmation message."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse }) => {
+    async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
 
@@ -1085,10 +1099,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe(
           "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must be set if rightFileEndLine is also specified. (optional)"
         ),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
+    async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const normalizedFilePath = filePath && !filePath.startsWith("/") ? `/${filePath}` : filePath;
@@ -1212,10 +1227,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
         .describe("The new status for the comment thread."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, threadId, project, status }) => {
+    async ({ repositoryId, pullRequestId, threadId, project, status, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const updateRequest: Record<string, unknown> = {};
 
@@ -1286,6 +1302,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       toDate: z.string().optional().describe("Filter commits to this date (ISO 8601 format, e.g., '2024-12-31T23:59:59Z')"),
       commitIds: z.array(z.string()).optional().describe("Array of specific commit IDs to retrieve. When provided, other filters are ignored except top/skip."),
       historySimplificationMode: z.enum(["FirstParent", "SimplifyMerges", "FullHistory", "FullHistorySimplifyMerges"]).optional().describe("How to simplify the commit history"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
     async ({
       project,
@@ -1307,9 +1324,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       toDate,
       commitIds,
       historySimplificationMode,
+      organization,
     }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // If specific commit IDs are provided, use getCommits with commit ID filtering
@@ -1447,10 +1465,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .optional()
         .default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit])
         .describe("Type of query to perform"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, repository, commits, queryType }) => {
+    async ({ project, repository, commits, queryType, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const query: GitPullRequestQuery = {
@@ -1485,9 +1504,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       repositoryId: z.string().describe("The ID of the repository."),
       pullRequestId: z.number().describe("The ID of the pull request."),
       vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).describe("The vote to cast: Approved(10), Suggestions(5), None(0), Waiting(-5), Rejected(-10)."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, vote }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ repositoryId, pullRequestId, vote, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const gitApi = await connection.getGitApi();
 
       const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
@@ -1529,10 +1549,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       versionType: z.enum(["Branch", "Commit", "Tag"]).optional().default("Branch").describe("The type of version identifier: 'Branch', 'Commit', or 'Tag'. Defaults to 'Branch'."),
       recursive: z.boolean().optional().default(false).describe("Whether to list items recursively. Defaults to false."),
       recursionDepth: z.number().optional().default(1).describe("Maximum depth for recursive listing (1-10). Only applies when recursive is true. Defaults to 1."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, path, project, version, versionType, recursive, recursionDepth }) => {
+    async ({ repositoryId, path, project, version, versionType, recursive, recursionDepth, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const versionDescriptor = buildVersionDescriptor(version, versionType);

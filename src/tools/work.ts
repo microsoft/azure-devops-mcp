@@ -26,10 +26,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team."),
       timeframe: z.enum(["current"]).optional().describe("The timeframe for which to retrieve iterations. Currently, only 'current' is supported."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team, timeframe }) => {
+    async ({ project, team, timeframe, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const iterations = await workApi.getTeamIterations({ project, team }, timeframe);
 
@@ -65,10 +66,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
           })
         )
         .describe("An array of iterations to create. Each iteration must have a name and can optionally have start and finish dates in ISO format."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, iterations }) => {
+    async ({ project, iterations, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
         const results = [];
 
@@ -116,10 +118,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       depth: z.number().default(2).describe("Depth of children to fetch."),
       excludedIds: z.array(z.number()).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, depth, excludedIds: ids }) => {
+    async ({ project, depth, excludedIds: ids, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
         let results = [];
 
@@ -188,10 +191,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
           })
         )
         .describe("An array of iterations to assign. Each iteration must have an identifier and a path."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team, iterations }) => {
+    async ({ project, team, iterations, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
         const results = [];
@@ -229,10 +233,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().describe("The name or Id of the Azure DevOps project."),
       team: z.string().describe("The name or Id of the Azure DevOps team."),
       iterationId: z.string().describe("The Iteration Id to get capacity for."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team, iterationId }) => {
+    async ({ project, team, iterationId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 
@@ -300,10 +305,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
         )
         .optional()
         .describe("Array of days off for the team member, each with a start and end date in ISO format."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team, teamMemberId, iterationId, activities, daysOff }) => {
+    async ({ project, team, teamMemberId, iterationId, activities, daysOff, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 
@@ -364,10 +370,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       project: z.string().describe("The name or Id of the Azure DevOps project."),
       iterationId: z.string().describe("The Iteration Id to get capacity for."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, iterationId }) => {
+    async ({ project, iterationId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
 
         const rawResults = await workApi.getTotalIterationCapacities(project, iterationId);
@@ -396,10 +403,11 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team }) => {
+    async ({ project, team, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 

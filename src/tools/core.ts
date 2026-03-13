@@ -30,10 +30,11 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
       mine: z.boolean().optional().describe("If true, only return teams that the authenticated user is a member of."),
       top: z.number().optional().describe("The maximum number of teams to return. Defaults to 100."),
       skip: z.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, mine, top, skip }) => {
+    async ({ project, mine, top, skip, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const coreApi = await connection.getCoreApi();
 
         let resolvedProject = project;
@@ -134,8 +135,9 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve Azure DevOps identity IDs for a provided search filter.",
     {
       searchFilter: z.string().describe("Search filter (unique name, display name, email) to retrieve identity IDs for."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ searchFilter }) => {
+    async ({ searchFilter, organization }) => {
       try {
         const identities = await searchIdentities(searchFilter, tokenProvider, connectionProvider, userAgentProvider);
 

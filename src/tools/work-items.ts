@@ -71,10 +71,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team }) => {
+    async ({ project, team, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
         const backlogs = await workApi.getBacklogs(teamContext);
@@ -99,10 +100,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().describe("The name or ID of the Azure DevOps team."),
       backlogId: z.string().describe("The ID of the backlog category to retrieve work items from."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team, backlogId }) => {
+    async ({ project, team, backlogId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 
@@ -129,10 +131,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       type: z.enum(["assignedtome", "myactivity"]).default("assignedtome").describe("The type of work items to retrieve. Defaults to 'assignedtome'."),
       top: z.number().default(50).describe("The maximum number of work items to return. Defaults to 50."),
       includeCompleted: z.boolean().default(false).describe("Whether to include completed work items. Defaults to false."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, type, top, includeCompleted }) => {
+    async ({ project, type, top, includeCompleted, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
 
         const workItems = await workApi.getPredefinedQueryResults(project, type, top, includeCompleted);
@@ -157,10 +160,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       ids: z.array(z.number()).describe("The IDs of the work items to retrieve."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, ids, fields }) => {
+    async ({ project, ids, fields, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const defaultFields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
 
@@ -223,10 +227,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .describe("Optional expand parameter to include additional details in the response.")
         .optional()
         .describe("Expand options include 'all', 'fields', 'links', 'none', and 'relations'. Relations can be used to get child workitems. Defaults to 'none'."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ id, project, fields, asOf, expand }) => {
+    async ({ id, project, fields, asOf, expand, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const workItem = await workItemApi.getWorkItem(id, fields, asOf, expand as unknown as WorkItemExpand, project);
 
@@ -251,10 +256,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemId: z.number().describe("The ID of the work item to retrieve comments for."),
       top: z.number().default(50).describe("Optional number of comments to retrieve. Defaults to all comments."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, workItemId, top }) => {
+    async ({ project, workItemId, top, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const comments = await workItemApi.getComments(project, workItemId, top);
 
@@ -279,10 +285,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemId: z.number().describe("The ID of the work item to add a comment to."),
       comment: z.string().describe("The text of the comment to add to the work item."),
       format: z.enum(["markdown", "html"]).optional().default("html"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, workItemId, comment, format }) => {
+    async ({ project, workItemId, comment, format, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -329,10 +336,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       commentId: z.number().describe("The ID of the comment to update."),
       text: z.string().describe("The updated comment text."),
       format: z.enum(["markdown", "html"]).optional().default("html"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, workItemId, commentId, text, format }) => {
+    async ({ project, workItemId, commentId, text, format, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
         const body: Record<string, string> = { text };
@@ -380,10 +388,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .default("None")
         .optional()
         .describe("Optional expand parameter to include additional details. Defaults to 'None'."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, workItemId, top, skip, expand }) => {
+    async ({ project, workItemId, top, skip, expand, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const revisions = await workItemApi.getRevisions(workItemId, top, skip, safeEnumConvert(WorkItemExpand, expand), project);
 
@@ -444,10 +453,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
         })
       ),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ parentId, project, workItemType, items }) => {
+    async ({ parentId, project, workItemType, items, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -571,10 +581,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       pullRequestId: z.number().describe("The ID of the pull request to link to."),
       workItemId: z.number().describe("The ID of the work item to link to the pull request."),
       pullRequestProjectId: z.string().optional().describe("The project ID containing the pull request. If not provided, defaults to the work item's project ID (for same-project linking)."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ projectId, repositoryId, pullRequestId, workItemId, pullRequestProjectId }) => {
+    async ({ projectId, repositoryId, pullRequestId, workItemId, pullRequestProjectId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         // Create artifact link relation using vstfs format
@@ -639,10 +650,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
       iterationId: z.string().describe("The ID of the iteration to retrieve work items for."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, team, iterationId }) => {
+    async ({ project, team, iterationId, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
 
         //get the work items for the current iteration
@@ -680,10 +692,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           })
         )
         .describe("An array of field updates to apply to the work item."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ id, updates }) => {
+    async ({ id, updates, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         // Convert operation names to lowercase for API
@@ -713,10 +726,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       workItemType: z.string().describe("The name of the work item type to retrieve."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, workItemType }) => {
+    async ({ project, workItemType, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         const workItemTypeInfo = await workItemApi.getWorkItemType(project, workItemType);
@@ -749,10 +763,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           })
         )
         .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, workItemType, fields }) => {
+    async ({ project, workItemType, fields, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         const document = fields.map(({ name, value, format }) => ({
@@ -807,10 +822,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       depth: z.number().default(0).describe("Optional depth parameter to specify how deep to expand the query. Defaults to 0."),
       includeDeleted: z.boolean().default(false).describe("Whether to include deleted items in the query results. Defaults to false."),
       useIsoDateFormat: z.boolean().default(false).describe("Whether to use ISO date format in the response. Defaults to false."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, query, expand, depth, includeDeleted, useIsoDateFormat }) => {
+    async ({ project, query, expand, depth, includeDeleted, useIsoDateFormat, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         const queryDetails = await workItemApi.getQuery(project, query, safeEnumConvert(QueryExpand, expand), depth, includeDeleted, useIsoDateFormat);
@@ -838,10 +854,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       timePrecision: z.boolean().optional().describe("Whether to include time precision in the results. Defaults to false."),
       top: z.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
       responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete query results (default), 'ids' returns only work item IDs for reduced payload size."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ id, project, team, timePrecision, top, responseType }) => {
+    async ({ id, project, team, timePrecision, top, responseType, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const teamContext = { project, team };
         const queryResult = await workItemApi.queryById(id, teamContext, timePrecision, top);
@@ -883,10 +900,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           })
         )
         .describe("An array of updates to apply to work items. Each update should include the operation (op), work item ID (id), field path (path), and new value (value)."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ updates }) => {
+    async ({ updates, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -971,10 +989,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           })
         )
         .describe(""),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, updates }) => {
+    async ({ project, updates, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -1044,10 +1063,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
         ),
       url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, id, type, url }) => {
+    async ({ project, id, type, url, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, project);
         const relations: WorkItemRelation[] = workItem.relations ?? [];
@@ -1148,10 +1168,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .default("Branch")
         .describe("Type of artifact link, defaults to 'Branch'. This determines both the link type and how to build the VSTFS URI from individual components."),
       comment: z.string().optional().describe("Comment to include with the artifact link."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, linkType, comment }) => {
+    async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, linkType, comment, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         let finalArtifactUri: string;

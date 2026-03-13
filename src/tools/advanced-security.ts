@@ -49,10 +49,11 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<st
       top: z.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
       orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("severity").describe("Order results by specified field. Defaults to 'severity'."),
       continuationToken: z.string().optional().describe("Continuation token for pagination."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, repository, alertType, states, severities, ruleId, ruleName, toolName, ref, onlyDefaultBranch, confidenceLevels, validity, top, orderBy, continuationToken }) => {
+    async ({ project, repository, alertType, states, severities, ruleId, ruleName, toolName, ref, onlyDefaultBranch, confidenceLevels, validity, top, orderBy, continuationToken, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const alertApi = await connection.getAlertApi();
 
         const isSecretAlert = !alertType || alertType.toLowerCase() === "secret";
@@ -106,10 +107,11 @@ function configureAdvSecTools(server: McpServer, tokenProvider: () => Promise<st
       repository: z.string().describe("The name or ID of the repository containing the alert."),
       alertId: z.number().describe("The ID of the alert to retrieve details for."),
       ref: z.string().optional().describe("Git reference (branch) to filter the alert."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, repository, alertId, ref }) => {
+    async ({ project, repository, alertId, ref, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const alertApi = await connection.getAlertApi();
 
         const result = await alertApi.getAlert(

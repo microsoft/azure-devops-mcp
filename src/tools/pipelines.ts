@@ -54,6 +54,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       taskIdFilter: z.string().optional().describe("Task ID to filter build definitions"),
       processType: z.number().optional().describe("Process type to filter build definitions"),
       yamlFilename: z.string().optional().describe("YAML filename to filter build definitions"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
     async ({
       project,
@@ -73,8 +74,9 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       taskIdFilter,
       processType,
       yamlFilename,
+      organization,
     }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const buildDefinitions = await buildApi.getDefinitions(
         project,
@@ -119,9 +121,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       repositoryName: z.string().describe("The name of the repository. In case of GitHub repository, this is the full name (:owner/:repo) - e.g. octocat/Hello-World."),
       repositoryId: z.string().optional().describe("The ID of the repository."),
       repositoryConnectionId: z.string().optional().describe("The service connection ID for GitHub repositories. Not required for Azure Repos Git."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, name, folder, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, name, folder, yamlPath, repositoryType, repositoryName, repositoryId, repositoryConnectionId, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const pipelinesApi = await connection.getPipelinesApi();
 
       const repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
@@ -167,9 +170,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("Project ID or name to get the build definition revisions for"),
       definitionId: z.number().describe("ID of the build definition to get revisions for"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, definitionId }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, definitionId, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const revisions = await buildApi.getDefinitionRevisions(project, definitionId);
 
@@ -208,6 +212,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       buildIds: z.array(z.number()).optional().describe("Array of build IDs to retrieve"),
       repositoryId: z.string().optional().describe("Repository ID to filter builds"),
       repositoryType: z.enum(["TfsGit", "GitHub", "BitbucketCloud"]).optional().describe("Type of repository to filter builds"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
     async ({
       project,
@@ -231,8 +236,9 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       buildIds,
       repositoryId,
       repositoryType,
+      organization,
     }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const builds = await buildApi.getBuilds(
         project,
@@ -270,9 +276,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("Project ID or name to get the build log for"),
       buildId: z.number().describe("ID of the build to get the log for"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildId }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, buildId, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const logs = await buildApi.getBuildLogs(project, buildId);
 
@@ -291,9 +298,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       logId: z.number().describe("ID of the log to retrieve"),
       startLine: z.number().optional().describe("Starting line number for the log content, defaults to 0"),
       endLine: z.number().optional().describe("Ending line number for the log content, defaults to the end of the log"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildId, logId, startLine, endLine }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, buildId, logId, startLine, endLine, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const logLines = await buildApi.getBuildLogLines(project, buildId, logId, startLine, endLine);
 
@@ -312,9 +320,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       continuationToken: z.string().optional().describe("Continuation token for pagination"),
       top: z.number().default(100).describe("Number of changes to retrieve, defaults to 100"),
       includeSourceChange: z.boolean().optional().describe("Whether to include source changes in the results, defaults to false"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildId, continuationToken, top, includeSourceChange }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, buildId, continuationToken, top, includeSourceChange, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const changes = await buildApi.getBuildChanges(project, buildId, continuationToken, top, includeSourceChange);
 
@@ -331,9 +340,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("Project ID or name to run the build in"),
       pipelineId: z.number().describe("ID of the pipeline to run"),
       runId: z.number().describe("ID of the run to get"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, pipelineId, runId }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, pipelineId, runId, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const pipelinesApi = await connection.getPipelinesApi();
       const pipelineRun = await pipelinesApi.getRun(project, pipelineId, runId);
 
@@ -349,9 +359,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("Project ID or name to run the build in"),
       pipelineId: z.number().describe("ID of the pipeline to run"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, pipelineId }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, pipelineId, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const pipelinesApi = await connection.getPipelinesApi();
       const pipelineRuns = await pipelinesApi.listRuns(project, pipelineId);
 
@@ -419,13 +430,14 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       templateParameters: z.record(z.string(), z.string()).optional().describe("Custom build parameters as key-value pairs"),
       variables: z.record(z.string(), variableSchema).optional().describe("A dictionary of variables to pass to the pipeline."),
       yamlOverride: z.string().optional().describe("YAML override for the pipeline run."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, pipelineId, pipelineVersion, previewRun, resources, stagesToSkip, templateParameters, variables, yamlOverride }) => {
+    async ({ project, pipelineId, pipelineVersion, previewRun, resources, stagesToSkip, templateParameters, variables, yamlOverride, organization }) => {
       if (!previewRun && yamlOverride) {
         throw new Error("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
       }
 
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const pipelinesApi = await connection.getPipelinesApi();
       const runRequest = {
         previewRun: previewRun,
@@ -457,9 +469,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("Project ID or name to get the build status for"),
       buildId: z.number().describe("ID of the build to get the status for"),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildId }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, buildId, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const build = await buildApi.getBuildReport(project, buildId);
 
@@ -478,9 +491,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       stageName: z.string().describe("Name of the stage to update"),
       status: z.enum(getEnumKeys(StageUpdateType) as [string, ...string[]]).describe("New status for the stage"),
       forceRetryAllJobs: z.boolean().default(false).describe("Whether to force retry all jobs in the stage."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildId, stageName, status, forceRetryAllJobs }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, buildId, stageName, status, forceRetryAllJobs, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const orgUrl = connection.serverUrl;
       const endpoint = `${orgUrl}/${project}/_apis/build/builds/${buildId}/stages/${stageName}?api-version=${apiVersion}`;
       const token = await tokenProvider();
@@ -519,9 +533,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the project."),
       buildId: z.number().describe("The ID of the build."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildId }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, buildId, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const artifacts = await buildApi.getArtifacts(project, buildId);
 
@@ -539,9 +554,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       buildId: z.number().describe("The ID of the build."),
       artifactName: z.string().describe("The name of the artifact to download."),
       destinationPath: z.string().optional().describe("The local path to download the artifact to. If not provided, returns binary content as base64."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project, buildId, artifactName, destinationPath }) => {
-      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+    async ({ project, buildId, artifactName, destinationPath, organization }) => {
+      const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const buildApi = await connection.getBuildApi();
       const artifact = await buildApi.getArtifact(project, buildId, artifactName);
 

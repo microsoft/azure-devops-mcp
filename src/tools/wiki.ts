@@ -24,10 +24,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ wikiIdentifier, project }) => {
+    async ({ wikiIdentifier, project, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
         const wiki = await wikiApi.getWiki(wikiIdentifier, project);
 
@@ -54,10 +55,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of wikis for an organization or project.",
     {
       project: z.string().optional().describe("The project name or ID to filter wikis. If not provided, all wikis in the organization will be returned."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ project }) => {
+    async ({ project, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
         const wikis = await wikiApi.getAllWikis(project);
 
@@ -88,10 +90,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.number().default(20).describe("The maximum number of pages to return. Defaults to 20."),
       continuationToken: z.string().optional().describe("Token for pagination to retrieve the next set of pages."),
       pageViewsForDays: z.number().optional().describe("Number of days to retrieve page views for. If not specified, page views are not included."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ wikiIdentifier, project, top = 20, continuationToken, pageViewsForDays }) => {
+    async ({ wikiIdentifier, project, top = 20, continuationToken, pageViewsForDays, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
 
         const pagesBatchRequest: WikiPagesBatchRequest = {
@@ -131,10 +134,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         .enum(["None", "OneLevel", "OneLevelPlusNestedEmptyFolders", "Full"])
         .optional()
         .describe("Recursion level for subpages. 'None' returns only the specified page. 'OneLevel' includes direct children. 'Full' includes all descendants."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ wikiIdentifier, project, path, recursionLevel }) => {
+    async ({ wikiIdentifier, project, path, recursionLevel, organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const accessToken = await tokenProvider();
 
         // Normalize the path
@@ -195,8 +199,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       wikiIdentifier: z.string().optional().describe("The unique identifier of the wiki. Required if url is not provided."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. Required if url is not provided."),
       path: z.string().optional().describe("The path of the wiki page to retrieve content for. Optional, defaults to root page if not provided."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ url, wikiIdentifier, project, path }: { url?: string; wikiIdentifier?: string; project?: string; path?: string }) => {
+    async ({ url, wikiIdentifier, project, path, organization }: { url?: string; wikiIdentifier?: string; project?: string; path?: string; organization?: string }) => {
       try {
         const hasUrl = !!url;
         const hasPair = !!wikiIdentifier && !!project;
@@ -208,7 +213,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           return { content: [{ type: "text", text: "Error fetching wiki page content: You must provide either 'url' OR both 'wikiIdentifier' and 'project'." }], isError: true };
         }
 
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
         let resolvedProject = project;
         let resolvedWiki = wikiIdentifier;
@@ -290,10 +295,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("The project name or ID where the wiki is located. If not provided, the default project will be used."),
       etag: z.string().optional().describe("ETag for editing existing pages (optional, will be fetched if not provided)."),
       branch: z.string().default("wikiMaster").describe("The branch name for the wiki repository. Defaults to 'wikiMaster' which is the default branch for Azure DevOps wikis."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ wikiIdentifier, path, content, project, etag, branch = "wikiMaster" }) => {
+    async ({ wikiIdentifier, path, content, project, etag, branch = "wikiMaster", organization }) => {
       try {
-        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
+        const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const accessToken = await tokenProvider();
 
         // Normalize the path
