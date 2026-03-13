@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { WebApi } from "azure-devops-node-api";
+import { getConnection } from "../shared/connection.js";
 import { apiVersion } from "../utils.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
 
@@ -10,7 +11,7 @@ interface IdentitiesResponse {
 }
 
 async function getCurrentUserDetails(tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
-  const connection = await connectionProvider();
+  const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
   const url = `${connection.serverUrl}/_apis/connectionData`;
   const token = await tokenProvider();
   const response = await fetch(url, {
@@ -33,7 +34,7 @@ async function getCurrentUserDetails(tokenProvider: () => Promise<string>, conne
  */
 async function searchIdentities(identity: string, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): Promise<IdentitiesResponse> {
   const token = await tokenProvider();
-  const connection = await connectionProvider();
+  const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
   const orgName = connection.serverUrl.split("/")[3];
   const baseUrl = `https://vssps.dev.azure.com/${orgName}/_apis/identities`;
 

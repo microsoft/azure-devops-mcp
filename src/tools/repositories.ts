@@ -179,10 +179,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const forkSource: GitForkRef | undefined = forkSourceRepositoryId
           ? {
-              repository: {
-                id: forkSourceRepositoryId,
-              },
-            }
+            repository: {
+              id: forkSourceRepositoryId,
+            },
+          }
           : undefined;
 
         const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
@@ -1572,9 +1572,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           commitId: item.commitId,
           contentMetadata: item.contentMetadata
             ? {
-                contentType: item.contentMetadata.contentType,
-                fileName: item.contentMetadata.fileName,
-              }
+              contentType: item.contentMetadata.contentType,
+              fileName: item.contentMetadata.fileName,
+            }
             : undefined,
         }));
 

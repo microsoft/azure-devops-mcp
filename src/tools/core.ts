@@ -33,7 +33,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ project, mine, top, skip }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const coreApi = await connection.getCoreApi();
 
         let resolvedProject = project;

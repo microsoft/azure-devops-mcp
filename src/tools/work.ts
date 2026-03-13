@@ -252,10 +252,10 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
               ...rest,
               teamMember: member.teamMember
                 ? {
-                    displayName: member.teamMember.displayName,
-                    id: member.teamMember.id,
-                    uniqueName: member.teamMember.uniqueName,
-                  }
+                  displayName: member.teamMember.displayName,
+                  id: member.teamMember.id,
+                  uniqueName: member.teamMember.uniqueName,
+                }
                 : undefined,
             };
           }),
@@ -336,10 +336,10 @@ function configureWorkTools(server: McpServer, tokenProvider: () => Promise<stri
         const simplifiedResult = {
           teamMember: updatedCapacity.teamMember
             ? {
-                displayName: updatedCapacity.teamMember.displayName,
-                id: updatedCapacity.teamMember.id,
-                uniqueName: updatedCapacity.teamMember.uniqueName,
-              }
+              displayName: updatedCapacity.teamMember.displayName,
+              id: updatedCapacity.teamMember.id,
+              uniqueName: updatedCapacity.teamMember.uniqueName,
+            }
             : undefined,
           activities: updatedCapacity.activities,
           daysOff: updatedCapacity.daysOff,
