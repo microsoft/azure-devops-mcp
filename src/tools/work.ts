@@ -3,6 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { getConnection } from "../shared/connection.js";
 import { z } from "zod";
 import { TreeStructureGroup, TreeNodeStructureType, WorkItemClassificationNode } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 
@@ -17,7 +18,7 @@ const WORK_TOOLS = {
   get_team_settings: "work_get_team_settings",
 };
 
-function configureWorkTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
+function configureWorkTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORK_TOOLS.list_team_iterations,
     "Retrieve a list of iterations for a specific team in a project.",
@@ -28,7 +29,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, team, timeframe }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const iterations = await workApi.getTeamIterations({ project, team }, timeframe);
 
@@ -67,7 +68,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, iterations }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
         const results = [];
 
@@ -118,7 +119,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, depth, excludedIds: ids }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
         let results = [];
 
@@ -190,7 +191,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, team, iterations }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
         const results = [];
@@ -231,7 +232,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, team, iterationId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 
@@ -302,7 +303,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, team, teamMemberId, iterationId, activities, daysOff }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 
@@ -366,7 +367,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, iterationId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
 
         const rawResults = await workApi.getTotalIterationCapacities(project, iterationId);
@@ -398,7 +399,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     },
     async ({ project, team }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 

@@ -3,6 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { getConnection } from "../shared/connection.js";
 import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
 
@@ -18,7 +19,7 @@ const Test_Plan_Tools = {
   create_test_suite: "testplan_create_test_suite",
 };
 
-function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
+function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     Test_Plan_Tools.list_test_plans,
     "Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.",
@@ -31,7 +32,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
       try {
         const owner = ""; //making owner an empty string untill we can figure out how to get owner id
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const testPlanApi = await connection.getTestPlanApi();
 
         const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
@@ -63,7 +64,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ project, name, iteration, description, startDate, endDate, areaPath }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const testPlanApi = await connection.getTestPlanApi();
 
         const testPlanToCreate: TestPlanCreateParams = {
@@ -105,7 +106,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          const connection = await connectionProvider();
+          const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
           const testPlanApi = await connection.getTestPlanApi();
 
           const testSuiteToCreate = {
@@ -162,7 +163,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ project, planId, suiteId, testCaseIds }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const testApi = await connection.getTestApi();
 
         // If testCaseIds is an array, convert it to comma-separated string
@@ -202,7 +203,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const witClient = await connection.getWorkItemTrackingApi();
 
         let stepsXml;
@@ -290,7 +291,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ id, steps }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const witClient = await connection.getWorkItemTrackingApi();
 
         let stepsXml;
@@ -334,7 +335,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ project, planid, suiteid }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const coreApi = await connection.getTestPlanApi();
         const testcases = await coreApi.getTestCaseList(project, planid, suiteid);
 
@@ -360,7 +361,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ project, buildid }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const coreApi = await connection.getTestResultsApi();
         const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
 
@@ -387,7 +388,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ project, planId, continuationToken }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const testPlanApi = await connection.getTestPlanApi();
         const expand: SuiteExpand = SuiteExpand.Children;
 

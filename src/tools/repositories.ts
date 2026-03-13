@@ -3,6 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { getConnection } from "../shared/connection.js";
 import {
   GitRef,
   GitForkRef,
@@ -172,7 +173,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
 
@@ -239,7 +240,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, branchName, sourceBranchName, sourceCommitId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         let commitId = sourceCommitId;
@@ -353,7 +354,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // Build update object with only provided fields
@@ -450,7 +451,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, reviewerIds, action }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         let updatedPullRequest;
@@ -504,7 +505,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ project, top, skip, repoNameFilter }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const repositories = await gitApi.getRepositories(project, false, false, false);
 
@@ -561,7 +562,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, project, top, skip, created_by_me, created_by_user, i_am_reviewer, user_is_reviewer, status, sourceRefName, targetRefName }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // Build the search criteria
@@ -711,7 +712,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, project, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
@@ -777,7 +778,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, threadId, project, top, skip, fullResponse }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // Get thread comments - GitApi uses getComments for retrieving comments from a specific thread
@@ -818,7 +819,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, top, filterContains }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, undefined, undefined, undefined, filterContains);
 
@@ -848,7 +849,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, top, filterContains }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", undefined, undefined, true, undefined, undefined, filterContains);
 
@@ -877,7 +878,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ project, repositoryNameOrId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const repositories = await gitApi.getRepositories(project);
 
@@ -913,7 +914,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, branchName }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const branches = await gitApi.getRefs(repositoryId, undefined, "heads/", false, false, undefined, false, undefined, branchName);
         const branch = branches.find((branch) => branch.name === `refs/heads/${branchName}` || branch.name === branchName);
@@ -956,7 +957,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, project, includeWorkItemRefs, includeLabels }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project, undefined, undefined, undefined, undefined, includeWorkItemRefs);
 
@@ -1019,7 +1020,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
 
@@ -1087,7 +1088,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const normalizedFilePath = filePath && !filePath.startsWith("/") ? `/${filePath}` : filePath;
@@ -1214,7 +1215,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, pullRequestId, threadId, project, status }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
         const updateRequest: Record<string, unknown> = {};
 
@@ -1308,7 +1309,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       historySimplificationMode,
     }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         // If specific commit IDs are provided, use getCommits with commit ID filtering
@@ -1449,7 +1450,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ project, repository, commits, queryType }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const query: GitPullRequestQuery = {
@@ -1486,7 +1487,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).describe("The vote to cast: Approved(10), Suggestions(5), None(0), Waiting(-5), Rejected(-10)."),
     },
     async ({ repositoryId, pullRequestId, vote }) => {
-      const connection = await connectionProvider();
+      const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
       const gitApi = await connection.getGitApi();
 
       const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
@@ -1531,7 +1532,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ repositoryId, path, project, version, versionType, recursive, recursionDepth }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
 
         const versionDescriptor = buildVersionDescriptor(version, versionType);

@@ -3,6 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { getConnection } from "../shared/connection.js";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
 import { apiVersion } from "../utils.js";
@@ -26,7 +27,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ wikiIdentifier, project }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
         const wiki = await wikiApi.getWiki(wikiIdentifier, project);
 
@@ -56,7 +57,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ project }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
         const wikis = await wikiApi.getAllWikis(project);
 
@@ -90,7 +91,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ wikiIdentifier, project, top = 20, continuationToken, pageViewsForDays }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
 
         const pagesBatchRequest: WikiPagesBatchRequest = {
@@ -133,7 +134,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ wikiIdentifier, project, path, recursionLevel }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const accessToken = await tokenProvider();
 
         // Normalize the path
@@ -207,7 +208,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           return { content: [{ type: "text", text: "Error fetching wiki page content: You must provide either 'url' OR both 'wikiIdentifier' and 'project'." }], isError: true };
         }
 
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const wikiApi = await connection.getWikiApi();
         let resolvedProject = project;
         let resolvedWiki = wikiIdentifier;
@@ -292,7 +293,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ wikiIdentifier, path, content, project, etag, branch = "wikiMaster" }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const accessToken = await tokenProvider();
 
         // Normalize the path

@@ -3,6 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { getConnection } from "../shared/connection.js";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
@@ -73,7 +74,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, team }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
         const backlogs = await workApi.getBacklogs(teamContext);
@@ -101,7 +102,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, team, backlogId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
         const teamContext = { project, team };
 
@@ -131,7 +132,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, type, top, includeCompleted }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
 
         const workItems = await workApi.getPredefinedQueryResults(project, type, top, includeCompleted);
@@ -159,7 +160,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, ids, fields }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const defaultFields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
 
@@ -225,7 +226,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ id, project, fields, asOf, expand }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const workItem = await workItemApi.getWorkItem(id, fields, asOf, expand as unknown as WorkItemExpand, project);
 
@@ -253,7 +254,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, workItemId, top }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const comments = await workItemApi.getComments(project, workItemId, top);
 
@@ -281,7 +282,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, workItemId, comment, format }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -331,7 +332,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, workItemId, commentId, text, format }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
         const body: Record<string, string> = { text };
@@ -382,7 +383,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, workItemId, top, skip, expand }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const revisions = await workItemApi.getRevisions(workItemId, top, skip, safeEnumConvert(WorkItemExpand, expand), project);
 
@@ -446,7 +447,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ parentId, project, workItemType, items }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -573,7 +574,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ projectId, repositoryId, pullRequestId, workItemId, pullRequestProjectId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         // Create artifact link relation using vstfs format
@@ -641,7 +642,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, team, iterationId }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workApi = await connection.getWorkApi();
 
         //get the work items for the current iteration
@@ -682,7 +683,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ id, updates }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         // Convert operation names to lowercase for API
@@ -715,7 +716,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, workItemType }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         const workItemTypeInfo = await workItemApi.getWorkItemType(project, workItemType);
@@ -751,7 +752,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, workItemType, fields }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         const document = fields.map(({ name, value, format }) => ({
@@ -809,7 +810,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, query, expand, depth, includeDeleted, useIsoDateFormat }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         const queryDetails = await workItemApi.getQuery(project, query, safeEnumConvert(QueryExpand, expand), depth, includeDeleted, useIsoDateFormat);
@@ -840,7 +841,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ id, project, team, timePrecision, top, responseType }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const teamContext = { project, team };
         const queryResult = await workItemApi.queryById(id, teamContext, timePrecision, top);
@@ -885,7 +886,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ updates }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -973,7 +974,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, updates }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -1046,7 +1047,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, id, type, url }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemApi = await connection.getWorkItemTrackingApi();
         const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, project);
         const relations: WorkItemRelation[] = workItem.relations ?? [];
@@ -1150,7 +1151,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, linkType, comment }) => {
       try {
-        const connection = await connectionProvider();
+        const connection = await getConnection(undefined, connectionProvider, tokenProvider, userAgentProvider);
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         let finalArtifactUri: string;
