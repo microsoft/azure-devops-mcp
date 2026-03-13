@@ -5,6 +5,10 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureCoreTools } from "../../../src/tools/core";
 import { WebApi } from "azure-devops-node-api";
+import { getConnection } from "../../../src/shared/connection";
+
+jest.mock("../../../src/shared/connection");
+const mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -37,6 +41,14 @@ describe("configureCoreTools", () => {
     };
 
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+
+    // By default, getConnection delegates to connectionProvider
+    mockGetConnection.mockImplementation(async (organization, connProvider) => {
+      if (organization) {
+        return mockConnection as unknown as WebApi;
+      }
+      return connProvider();
+    });
   });
 
   describe("tool registration", () => {
@@ -329,10 +341,6 @@ describe("configureCoreTools", () => {
         },
       ]);
 
-      const WebApiModule = require("azure-devops-node-api");
-      const OriginalWebApi = WebApiModule.WebApi;
-      WebApiModule.WebApi = jest.fn().mockImplementation(() => mockConnection);
-
       const result = await handler({
         stateFilter: "wellFormed",
         top: undefined,
@@ -341,10 +349,8 @@ describe("configureCoreTools", () => {
         organization: "contoso",
       });
 
-      WebApiModule.WebApi = OriginalWebApi;
-
+      expect(mockGetConnection).toHaveBeenCalledWith("contoso", connectionProvider, tokenProvider, userAgentProvider);
       expect(connectionProvider).not.toHaveBeenCalled();
-      expect(tokenProvider).toHaveBeenCalled();
       expect(result.content[0].text).toContain("CrossOrgProject");
     });
   });

@@ -32,7 +32,13 @@ async function getCurrentUserDetails(tokenProvider: () => Promise<string>, conne
 /**
  * Searches for identities using Azure DevOps Identity API
  */
-async function searchIdentities(identity: string, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, organization?: string): Promise<IdentitiesResponse> {
+async function searchIdentities(
+  identity: string,
+  tokenProvider: () => Promise<string>,
+  connectionProvider: () => Promise<WebApi>,
+  userAgentProvider: () => string,
+  organization?: string
+): Promise<IdentitiesResponse> {
   const token = await tokenProvider();
   const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
   const orgName = connection.serverUrl.split("/")[3];
@@ -63,7 +69,13 @@ async function searchIdentities(identity: string, tokenProvider: () => Promise<s
 /**
  * Gets the user ID from email or unique name using Azure DevOps Identity API
  */
-async function getUserIdFromEmail(userEmail: string, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, organization?: string): Promise<string> {
+async function getUserIdFromEmail(
+  userEmail: string,
+  tokenProvider: () => Promise<string>,
+  connectionProvider: () => Promise<WebApi>,
+  userAgentProvider: () => string,
+  organization?: string
+): Promise<string> {
   const identities = await searchIdentities(userEmail, tokenProvider, connectionProvider, userAgentProvider, organization);
 
   if (!identities || identities.value?.length === 0) {

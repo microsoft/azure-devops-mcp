@@ -180,10 +180,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const forkSource: GitForkRef | undefined = forkSourceRepositoryId
           ? {
-            repository: {
-              id: forkSourceRepositoryId,
-            },
-          }
+              repository: {
+                id: forkSourceRepositoryId,
+              },
+            }
           : undefined;
 
         const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
@@ -355,7 +355,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
       organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ repositoryId, pullRequestId, title, description, isDraft, targetRefName, status, autoComplete, mergeStrategy, deleteSourceBranch, transitionWorkItems, bypassReason, labels, organization }) => {
+    async ({
+      repositoryId,
+      pullRequestId,
+      title,
+      description,
+      isDraft,
+      targetRefName,
+      status,
+      autoComplete,
+      mergeStrategy,
+      deleteSourceBranch,
+      transitionWorkItems,
+      bypassReason,
+      labels,
+      organization,
+    }) => {
       try {
         const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
         const gitApi = await connection.getGitApi();
@@ -1593,9 +1608,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           commitId: item.commitId,
           contentMetadata: item.contentMetadata
             ? {
-              contentType: item.contentMetadata.contentType,
-              fileName: item.contentMetadata.fileName,
-            }
+                contentType: item.contentMetadata.contentType,
+                fileName: item.contentMetadata.fileName,
+              }
             : undefined,
         }));
 

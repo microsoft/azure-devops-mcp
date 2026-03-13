@@ -9,22 +9,22 @@ import { packageVersion } from "../version.js";
  * connection to that org; otherwise falls back to the default connectionProvider.
  */
 export async function getConnection(
-    organization: string | undefined,
-    connectionProvider: () => Promise<WebApi>,
-    tokenProvider: () => Promise<string>,
-    userAgentProvider: () => string
+  organization: string | undefined,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
 ): Promise<WebApi> {
-    if (!organization) {
-        return connectionProvider();
-    }
+  if (!organization) {
+    return connectionProvider();
+  }
 
-    const orgUrl = "https://dev.azure.com/" + organization;
-    const accessToken = await tokenProvider();
-    const authHandler = getBearerHandler(accessToken);
+  const orgUrl = "https://dev.azure.com/" + organization;
+  const accessToken = await tokenProvider();
+  const authHandler = getBearerHandler(accessToken);
 
-    return new WebApi(orgUrl, authHandler, undefined, {
-        productName: "AzureDevOps.MCP",
-        productVersion: packageVersion,
-        userAgent: userAgentProvider(),
-    });
+  return new WebApi(orgUrl, authHandler, undefined, {
+    productName: "AzureDevOps.MCP",
+    productVersion: packageVersion,
+    userAgent: userAgentProvider(),
+  });
 }
