@@ -161,6 +161,10 @@ We recommend that you always enable `core` tools so that you can fetch project l
 
 > By default all domains are loaded
 
+## 🏢 Multi-Organization Support
+
+The `core_list_projects` tool accepts an optional `organization` parameter to query a different Azure DevOps organization. If omitted, the default org from startup is used.
+
 ## 📝 Troubleshooting
 
 See the [Troubleshooting guide](./docs/TROUBLESHOOTING.md) for help with common issues and logging.

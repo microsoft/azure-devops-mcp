@@ -2,9 +2,10 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebApi } from "azure-devops-node-api";
+import { getBearerHandler, WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { searchIdentities } from "./auth.js";
+import { packageVersion } from "../version.js";
 
 import type { ProjectInfo } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
@@ -93,17 +94,30 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     CORE_TOOLS.list_projects,
-    "Retrieve a list of projects in your Azure DevOps organization.",
+    "Retrieve a list of projects in your Azure DevOps organization. Optionally specify a different organization to query.",
     {
       stateFilter: z.enum(["all", "wellFormed", "createPending", "deleted"]).default("wellFormed").describe("Filter projects by their state. Defaults to 'wellFormed'."),
       top: z.number().optional().describe("The maximum number of projects to return. Defaults to 100."),
       skip: z.number().optional().describe("The number of projects to skip for pagination. Defaults to 0."),
       continuationToken: z.number().optional().describe("Continuation token for pagination. Used to fetch the next set of results if available."),
       projectNameFilter: z.string().optional().describe("Filter projects by name. Supports partial matches."),
+      organization: z.string().optional().describe("Override the default Azure DevOps organization. If not provided, the organization configured at startup (via CLI arg or env var) is used."),
     },
-    async ({ stateFilter, top, skip, continuationToken, projectNameFilter }) => {
+    async ({ stateFilter, top, skip, continuationToken, projectNameFilter, organization }) => {
       try {
-        const connection = await connectionProvider();
+        let connection: WebApi;
+        if (organization) {
+          const orgUrl = "https://dev.azure.com/" + organization;
+          const accessToken = await tokenProvider();
+          const authHandler = getBearerHandler(accessToken);
+          connection = new WebApi(orgUrl, authHandler, undefined, {
+            productName: "AzureDevOps.MCP",
+            productVersion: packageVersion,
+            userAgent: userAgentProvider(),
+          });
+        } else {
+          connection = await connectionProvider();
+        }
         const coreApi = await connection.getCoreApi();
         const projects = await coreApi.getProjects(stateFilter, top, skip, continuationToken, false);
 

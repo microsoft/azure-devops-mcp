@@ -280,6 +280,73 @@ describe("configureCoreTools", () => {
       const filteredProjects = JSON.parse(result.content[0].text);
       expect(filteredProjects).toHaveLength(2);
     });
+
+    it("should fall back to default connection when organization is omitted", async () => {
+      configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
+
+      if (!call) throw new Error("core_list_projects tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
+        {
+          id: "eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+          name: "Fabrikam-Fiber-TFVC",
+          description: "Team Foundation Version Control projects.",
+          url: "https://dev.azure.com/fabrikam/_apis/projects/eb6e4656-77fc-42a1-9181-4c6d8e9da5d1",
+          state: "wellFormed",
+        },
+      ]);
+
+      const result = await handler({
+        stateFilter: "wellFormed",
+        top: undefined,
+        skip: undefined,
+        continuationToken: undefined,
+      });
+
+      expect(connectionProvider).toHaveBeenCalled();
+      expect(result.content[0].text).toContain("Fabrikam-Fiber-TFVC");
+    });
+
+    it("should use a different connection when organization is provided", async () => {
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-pat");
+
+      configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "core_list_projects");
+
+      if (!call) throw new Error("core_list_projects tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([
+        {
+          id: "d4e5f6a7-b8c9-0123-4567-89abcdef0123",
+          name: "CrossOrgProject",
+          url: "https://dev.azure.com/contoso/_apis/projects/d4e5f6a7-b8c9-0123-4567-89abcdef0123",
+          state: "wellFormed",
+        },
+      ]);
+
+      const WebApiModule = require("azure-devops-node-api");
+      const OriginalWebApi = WebApiModule.WebApi;
+      WebApiModule.WebApi = jest.fn().mockImplementation(() => mockConnection);
+
+      const result = await handler({
+        stateFilter: "wellFormed",
+        top: undefined,
+        skip: undefined,
+        continuationToken: undefined,
+        organization: "contoso",
+      });
+
+      WebApiModule.WebApi = OriginalWebApi;
+
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(tokenProvider).toHaveBeenCalled();
+      expect(result.content[0].text).toContain("CrossOrgProject");
+    });
   });
 
   describe("list_project_teams tool", () => {
