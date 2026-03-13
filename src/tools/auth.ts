@@ -9,14 +9,18 @@ interface IdentitiesResponse {
   value: IdentityBase[];
 }
 
+function makeBasicAuthHeader(pat: string): string {
+  return "Basic " + Buffer.from(":" + pat).toString("base64");
+}
+
 async function getCurrentUserDetails(tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   const connection = await connectionProvider();
   const url = `${connection.serverUrl}/_apis/connectionData`;
-  const token = await tokenProvider();
+  const pat = await tokenProvider();
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${token}`,
+      "Authorization": makeBasicAuthHeader(pat),
       "Content-Type": "application/json",
       "User-Agent": userAgentProvider(),
     },
@@ -32,10 +36,9 @@ async function getCurrentUserDetails(tokenProvider: () => Promise<string>, conne
  * Searches for identities using Azure DevOps Identity API
  */
 async function searchIdentities(identity: string, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): Promise<IdentitiesResponse> {
-  const token = await tokenProvider();
+  const pat = await tokenProvider();
   const connection = await connectionProvider();
-  const orgName = connection.serverUrl.split("/")[3];
-  const baseUrl = `https://vssps.dev.azure.com/${orgName}/_apis/identities`;
+  const baseUrl = `${connection.serverUrl}/_apis/identities`;
 
   const params = new URLSearchParams({
     "api-version": apiVersion,
@@ -45,7 +48,7 @@ async function searchIdentities(identity: string, tokenProvider: () => Promise<s
 
   const response = await fetch(`${baseUrl}?${params}`, {
     headers: {
-      "Authorization": `Bearer ${token}`,
+      "Authorization": makeBasicAuthHeader(pat),
       "Content-Type": "application/json",
       "User-Agent": userAgentProvider(),
     },

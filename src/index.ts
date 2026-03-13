@@ -5,70 +5,50 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { getBearerHandler, WebApi } from "azure-devops-node-api";
+import { getPersonalAccessTokenHandler, WebApi } from "azure-devops-node-api";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
 import { logger } from "./logger.js";
-import { getOrgTenant } from "./org-tenants.js";
-//import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
 
-function isGitHubCodespaceEnv(): boolean {
-  return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
-}
-
-const defaultAuthenticationType = isGitHubCodespaceEnv() ? "azcli" : "interactive";
-
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
   .scriptName("mcp-server-azuredevops")
-  .usage("Usage: $0 <organization> [options]")
+  .usage("Usage: $0 [options]")
   .version(packageVersion)
-  .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
-    yargs.positional("organization", {
-      describe: "Azure DevOps organization name",
-      type: "string",
-      demandOption: true,
-    });
-  })
   .option("domains", {
     alias: "d",
-    describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories builds work'. Defaults to 'all'.",
+    describe: "Domain(s) to enable: 'all' for everything, or specific domains like 'repositories pipelines work'. Defaults to 'all'.",
     type: "string",
     array: true,
     default: "all",
   })
-  .option("authentication", {
-    alias: "a",
-    describe: "Type of authentication to use",
-    type: "string",
-    choices: ["interactive", "azcli", "env", "envvar"],
-    default: defaultAuthenticationType,
-  })
-  .option("tenant", {
-    alias: "t",
-    describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
-    type: "string",
-  })
   .help()
   .parseSync();
 
-export const orgName = argv.organization as string;
-const orgUrl = "https://dev.azure.com/" + orgName;
+const serverUrlEnv = process.env["ADO_SERVER_URL"];
+if (!serverUrlEnv) {
+  logger.error("ADO_SERVER_URL environment variable is not set. Please set it to the full collection URL, e.g. https://ado.company.internal/tfs/DefaultCollection");
+  process.exit(1);
+}
+const serverUrl: string = serverUrlEnv;
 
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
 
+// Export the server URL so tool files can use it directly
+export const adoServerUrl = serverUrl;
+
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<WebApi> {
   return async () => {
-    const accessToken = await getAzureDevOpsToken();
-    const authHandler = getBearerHandler(accessToken);
-    const connection = new WebApi(orgUrl, authHandler, undefined, {
+    const pat = await getAzureDevOpsToken();
+    const authHandler = getPersonalAccessTokenHandler(pat);
+    const connection = new WebApi(serverUrl, authHandler, undefined, {
       productName: "AzureDevOps.MCP",
       productVersion: packageVersion,
       userAgent: userAgentComposer.userAgent,
@@ -78,15 +58,11 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
-  logger.info("Starting Azure DevOps MCP Server", {
-    organization: orgName,
-    organizationUrl: orgUrl,
-    authentication: argv.authentication,
-    tenant: argv.tenant,
+  logger.info("Starting Azure DevOps MCP Server (on-premises)", {
+    serverUrl,
     domains: argv.domains,
     enabledDomains: Array.from(enabledDomains),
     version: packageVersion,
-    isCodespace: isGitHubCodespaceEnv(),
   });
 
   const server = new McpServer({
@@ -103,11 +79,7 @@ async function main() {
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
-  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
-
-  // removing prompts untill further notice
-  // configurePrompts(server);
+  const authenticator = createAuthenticator();
 
   configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer), () => userAgentComposer.userAgent, enabledDomains);
 

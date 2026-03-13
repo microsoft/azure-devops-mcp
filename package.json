@@ -38,8 +38,6 @@
     "test": "jest"
   },
   "dependencies": {
-    "@azure/identity": "^4.10.0",
-    "@azure/msal-node": "^5.0.6",
     "@modelcontextprotocol/sdk": "1.27.1",
     "azure-devops-extension-api": "^4.264.0",
     "azure-devops-extension-sdk": "^4.0.2",
