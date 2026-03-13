@@ -1690,7 +1690,7 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("john@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("john@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", { status: PullRequestStatus.Active, repositoryId: "repo123", creatorId: "specific-user-123" }, undefined, undefined, 0, 100);
     });
 
@@ -1856,7 +1856,7 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.getPullRequests).toHaveBeenCalledWith("repo123", { status: PullRequestStatus.Active, repositoryId: "repo123", reviewerId: "reviewer-user-123" }, undefined, undefined, 0, 100);
     });
 
@@ -1882,7 +1882,7 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific-reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific-reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGetCurrentUserDetails).not.toHaveBeenCalled(); // Should not be called since user_is_reviewer takes precedence
       expect(mockGitApi.getPullRequests).toHaveBeenCalledWith(
         "repo123",
@@ -1914,7 +1914,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("nonexistent@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("nonexistent@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error finding reviewer with email nonexistent@example.com: User not found");
       expect(mockGitApi.getPullRequests).not.toHaveBeenCalled();
@@ -2007,7 +2007,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, creatorId: "user123" }, undefined, 0, 100);
 
       const expectedResult = [
@@ -2061,7 +2061,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, reviewerId: "user123" }, undefined, 0, 100);
 
       const expectedResult = [
@@ -2116,7 +2116,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, creatorId: "user123", reviewerId: "user123" }, undefined, 0, 100);
 
       const expectedResult = [
@@ -2174,7 +2174,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGetCurrentUserDetails).not.toHaveBeenCalled(); // Should not be called when created_by_user is provided
       expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, creatorId: "specific-user-123" }, undefined, 0, 100);
 
@@ -2362,7 +2362,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, reviewerId: "reviewer-user-123" }, undefined, 0, 100);
 
       const expectedResult = [
@@ -2405,7 +2405,7 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific-reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("specific-reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGetCurrentUserDetails).not.toHaveBeenCalled(); // Should not be called since user_is_reviewer takes precedence
       expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith("test-project", { status: PullRequestStatus.Active, reviewerId: "specific-reviewer-123" }, undefined, 0, 100);
     });
@@ -2430,7 +2430,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("nonexistent@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("nonexistent@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error finding reviewer with email nonexistent@example.com: User not found");
       expect(mockGitApi.getPullRequestsByProject).not.toHaveBeenCalled();
@@ -2461,8 +2461,8 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("creator@example.com", tokenProvider, connectionProvider, userAgentProvider);
-      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("creator@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
+      expect(mockGetUserIdFromEmail).toHaveBeenCalledWith("reviewer@example.com", tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.getPullRequestsByProject).toHaveBeenCalledWith(
         "test-project",
         {
@@ -4531,7 +4531,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
+      expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider, undefined);
       expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123" }, "repo123", 427, "user123");
       expect(result.content[0].text).toBe("Successfully cast vote 'Approved' on PR #427.");
     });

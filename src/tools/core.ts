@@ -139,7 +139,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ searchFilter, organization }) => {
       try {
-        const identities = await searchIdentities(searchFilter, tokenProvider, connectionProvider, userAgentProvider);
+        const identities = await searchIdentities(searchFilter, tokenProvider, connectionProvider, userAgentProvider, organization);
 
         if (!identities || identities.value?.length === 0) {
           return { content: [{ type: "text", text: "No identities found" }], isError: true };

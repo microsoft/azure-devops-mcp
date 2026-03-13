@@ -35,7 +35,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     async ({ searchText, project, repository, path, branch, includeFacets, skip, top, organization }) => {
       const accessToken = await tokenProvider();
       const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
-      const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/codesearchresults?api-version=${apiVersion}`;
+      const resolvedOrg = organization ?? orgName;
+      const url = `https://almsearch.dev.azure.com/${resolvedOrg}/_apis/search/codesearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -94,7 +95,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     },
     async ({ searchText, project, wiki, includeFacets, skip, top, organization }) => {
       const accessToken = await tokenProvider();
-      const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/wikisearchresults?api-version=${apiVersion}`;
+      const resolvedOrg = organization ?? orgName;
+      const url = `https://almsearch.dev.azure.com/${resolvedOrg}/_apis/search/wikisearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,
@@ -149,7 +151,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     },
     async ({ searchText, project, areaPath, workItemType, state, assignedTo, includeFacets, skip, top, organization }) => {
       const accessToken = await tokenProvider();
-      const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/workitemsearchresults?api-version=${apiVersion}`;
+      const resolvedOrg = organization ?? orgName;
+      const url = `https://almsearch.dev.azure.com/${resolvedOrg}/_apis/search/workitemsearchresults?api-version=${apiVersion}`;
 
       const requestBody: Record<string, unknown> = {
         searchText,

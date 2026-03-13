@@ -373,7 +373,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (autoComplete !== undefined) {
           if (autoComplete) {
-            const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+            const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider, organization);
             const autoCompleteUserId = data.authenticatedUser.id;
             updateRequest.autoCompleteSetBy = { id: autoCompleteUserId };
 
@@ -609,7 +609,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (created_by_user) {
           try {
-            const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
+            const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider, organization);
             searchCriteria.creatorId = userId;
           } catch (error) {
             return {
@@ -623,14 +623,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             };
           }
         } else if (created_by_me) {
-          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider, organization);
           const userId = data.authenticatedUser.id;
           searchCriteria.creatorId = userId;
         }
 
         if (user_is_reviewer) {
           try {
-            const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+            const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider, organization);
             searchCriteria.reviewerId = reviewerUserId;
           } catch (error) {
             return {
@@ -644,7 +644,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             };
           }
         } else if (i_am_reviewer) {
-          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider, organization);
           const userId = data.authenticatedUser.id;
           searchCriteria.reviewerId = userId;
         }
@@ -1510,7 +1510,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       const connection = await getConnection(organization, connectionProvider, tokenProvider, userAgentProvider);
       const gitApi = await connection.getGitApi();
 
-      const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+      const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider, organization);
       const userId = userDetails.authenticatedUser.id;
 
       if (!userId) {

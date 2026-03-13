@@ -255,7 +255,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
               } else if (resp.status === 404) {
                 return { content: [{ type: "text", text: `Error fetching wiki page content: Page with id ${parsed.pageId} not found` }], isError: true };
               }
-            } catch {}
+            } catch { }
           }
         }
 
