@@ -14,11 +14,11 @@ This is an MCP server for **Azure DevOps Server 2022.2 (on-premises)**. It conne
 
 Set the following environment variables before starting the server:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ADO_SERVER_URL` | Yes | Full collection URL, e.g. `https://ado.company.internal/tfs/DefaultCollection` |
-| `ADO_PAT` | Yes | Personal Access Token |
-| `LOG_LEVEL` | No | Logging level: `debug`, `info`, `warn`, `error` (default: `info`) |
+| Variable         | Required | Description                                                                    |
+| ---------------- | -------- | ------------------------------------------------------------------------------ |
+| `ADO_SERVER_URL` | Yes      | Full collection URL, e.g. `https://ado.company.internal/tfs/DefaultCollection` |
+| `ADO_PAT`        | Yes      | Personal Access Token                                                          |
+| `LOG_LEVEL`      | No       | Logging level: `debug`, `info`, `warn`, `error` (default: `info`)              |
 
 ### Example `.env`
 
@@ -81,27 +81,29 @@ ADO_SERVER_URL=https://ado.company.internal/tfs/DefaultCollection ADO_PAT=<token
 
 The server groups tools into domains. Use `-d` to enable only what you need:
 
-| Domain | Description |
-|--------|-------------|
-| `core` | Projects and teams |
-| `work` | Iterations and team capacity |
-| `work-items` | Work item tracking (CRUD, queries, links) |
-| `repositories` | Git repos and pull requests |
-| `pipelines` | Build pipelines and runs |
-| `wiki` | Wiki pages |
-| `test-plans` | Test plans, suites, cases |
-| `search` | Code, wiki, and work item search |
+| Domain         | Description                               |
+| -------------- | ----------------------------------------- |
+| `core`         | Projects and teams                        |
+| `work`         | Iterations and team capacity              |
+| `work-items`   | Work item tracking (CRUD, queries, links) |
+| `repositories` | Git repos and pull requests               |
+| `pipelines`    | Build pipelines and runs                  |
+| `wiki`         | Wiki pages                                |
+| `test-plans`   | Test plans, suites, cases                 |
+| `search`       | Code, wiki, and work item search          |
 
 By default all domains are loaded. We recommend always enabling `core`.
 
 ## Supported Tools
 
 ### core
+
 - `core_list_projects` — List projects in the collection
 - `core_list_project_teams` — List teams for a project
 - `core_get_identity_ids` — Search identity IDs by name or email
 
 ### work
+
 - `work_list_team_iterations` — List iterations for a team
 - `work_list_iterations` — List all iterations in a project
 - `work_create_iterations` — Create iterations with dates
@@ -112,6 +114,7 @@ By default all domains are loaded. We recommend always enabling `core`.
 - `work_get_team_settings` — Get team configuration settings
 
 ### work-items
+
 - `wit_my_work_items` — Work items assigned to current user
 - `wit_list_backlogs` — List backlogs
 - `wit_list_backlog_work_items` — Get work items in a backlog
@@ -135,6 +138,7 @@ By default all domains are loaded. We recommend always enabling `core`.
 - `wit_add_artifact_link` — Add an artifact link
 
 ### repositories
+
 - `repo_list_repos_by_project` — List repositories
 - `repo_list_pull_requests_by_repo_or_project` — List PRs
 - `repo_list_branches_by_repo` — List branches
@@ -157,6 +161,7 @@ By default all domains are loaded. We recommend always enabling `core`.
 - `repo_list_directory` — List files in a repo path
 
 ### pipelines
+
 - `pipelines_get_builds` — List builds
 - `pipelines_get_build_changes` — Changes in a build
 - `pipelines_get_build_definitions` — List build definitions
@@ -173,6 +178,7 @@ By default all domains are loaded. We recommend always enabling `core`.
 - `pipelines_download_artifact` — Download an artifact
 
 ### wiki
+
 - `wiki_list_wikis` — List wikis in a project
 - `wiki_get_wiki` — Get a specific wiki
 - `wiki_list_pages` — List wiki pages
@@ -181,6 +187,7 @@ By default all domains are loaded. We recommend always enabling `core`.
 - `wiki_create_or_update_page` — Create or update a page
 
 ### test-plans
+
 - `testplan_create_test_plan` — Create a test plan
 - `testplan_create_test_case` — Create a test case
 - `testplan_update_test_case_steps` — Update test case steps
@@ -192,6 +199,7 @@ By default all domains are loaded. We recommend always enabling `core`.
 - `testplan_create_test_suite` — Create a test suite
 
 ### search
+
 - `search_code` — Search code repositories
 - `search_wiki` — Search wiki pages
 - `search_workitem` — Search work items
@@ -200,16 +208,16 @@ By default all domains are loaded. We recommend always enabling `core`.
 
 The following cloud-only features were removed from the original server and are not available in this on-prem edition:
 
-| Feature / Domain | Reason |
-|-----------------|--------|
+| Feature / Domain                                                             | Reason                                                                                                               |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `advanced-security` domain (`advsec_get_alerts`, `advsec_get_alert_details`) | Advanced Security (GHAS for Azure DevOps) is a cloud-only service. No REST API for on-premises in ADO Server 2022.2. |
-| Tenant discovery (`org-tenants.ts`) | Called `vssps.dev.azure.com` to resolve Azure AD tenant IDs. Not applicable to on-premises AD. |
-| Interactive OAuth / MSAL authentication | Uses Microsoft identity platform (Entra ID / AAD). Not available for on-prem AD authentication. |
-| Azure CLI authentication (`azcli`) | Depends on `az login` with Microsoft identity platform. Not applicable on-prem. |
-| Default Azure Credential chain (`env`) | Depends on Azure managed identity or Entra ID. Not applicable on-prem. |
-| `ADO_MCP_AUTH_TOKEN` env var | Renamed to `ADO_PAT` for clarity. |
-| `organization` CLI positional argument | Replaced by `ADO_SERVER_URL` environment variable which carries the full collection URL. |
-| `--authentication` / `--tenant` CLI flags | Removed — PAT via `ADO_PAT` is the only authentication method. |
+| Tenant discovery (`org-tenants.ts`)                                          | Called `vssps.dev.azure.com` to resolve Azure AD tenant IDs. Not applicable to on-premises AD.                       |
+| Interactive OAuth / MSAL authentication                                      | Uses Microsoft identity platform (Entra ID / AAD). Not available for on-prem AD authentication.                      |
+| Azure CLI authentication (`azcli`)                                           | Depends on `az login` with Microsoft identity platform. Not applicable on-prem.                                      |
+| Default Azure Credential chain (`env`)                                       | Depends on Azure managed identity or Entra ID. Not applicable on-prem.                                               |
+| `ADO_MCP_AUTH_TOKEN` env var                                                 | Renamed to `ADO_PAT` for clarity.                                                                                    |
+| `organization` CLI positional argument                                       | Replaced by `ADO_SERVER_URL` environment variable which carries the full collection URL.                             |
+| `--authentication` / `--tenant` CLI flags                                    | Removed — PAT via `ADO_PAT` is the only authentication method.                                                       |
 
 ## Authentication
 
