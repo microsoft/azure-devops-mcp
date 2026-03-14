@@ -369,6 +369,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         const connection = await connectionProvider();
         const workApi = await connection.getWorkApi();
 
+        // TODO: Verify getTotalIterationCapacities is available in Azure DevOps Server 2022.2.
+        // This API may have been added in a later version. If it fails, consider removing this tool.
         const rawResults = await workApi.getTotalIterationCapacities(project, iterationId);
 
         if (!rawResults || !rawResults.teams || rawResults.teams.length === 0) {

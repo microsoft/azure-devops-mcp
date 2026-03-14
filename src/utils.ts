@@ -5,6 +5,14 @@ export const apiVersion = "7.1";
 export const batchApiVersion = "5.0";
 export const markdownCommentsApiVersion = "7.1";
 
+/**
+ * Creates a Basic auth header value from a PAT (Personal Access Token).
+ * Azure DevOps Server on-premises requires Basic auth with format `:PAT` base64-encoded.
+ */
+export function makeBasicAuthHeader(pat: string): string {
+  return "Basic " + Buffer.from(":" + pat).toString("base64");
+}
+
 export function createEnumMapping<T extends Record<string, string | number>>(enumObject: T): Record<string, T[keyof T]> {
   const mapping: Record<string, T[keyof T]> = {};
   for (const [key, value] of Object.entries(enumObject)) {

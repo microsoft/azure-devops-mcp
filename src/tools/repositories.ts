@@ -27,6 +27,7 @@ import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { getEnumKeys } from "../utils.js";
+import { logger } from "../logger.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -980,7 +981,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
             };
           } catch (error) {
-            console.warn(`Error fetching PR labels: ${error instanceof Error ? error.message : "Unknown error"}`);
+            logger.warn(`Error fetching PR labels: ${error instanceof Error ? error.message : "Unknown error"}`);
             // Fall back to the original response without labels
             const enhancedResponse = {
               ...pullRequest,
@@ -1338,7 +1339,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               }
             } catch (error) {
               // Log error but continue with other commits
-              console.warn(`Failed to retrieve commit ${commitId}: ${error instanceof Error ? error.message : String(error)}`);
+              logger.warn(`Failed to retrieve commit ${commitId}: ${error instanceof Error ? error.message : String(error)}`);
               // Add error information to result instead of failing completely
               commits.push({
                 commitId: commitId,
@@ -1486,34 +1487,45 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).describe("The vote to cast: Approved(10), Suggestions(5), None(0), Waiting(-5), Rejected(-10)."),
     },
     async ({ repositoryId, pullRequestId, vote }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
-      const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-      const userId = userDetails.authenticatedUser.id;
+        const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+        const userId = userDetails.authenticatedUser.id;
 
-      if (!userId) {
-        throw new Error("Could not determine authenticated user ID.");
+        if (!userId) {
+          return {
+            content: [{ type: "text", text: "Error: Could not determine authenticated user ID." }],
+            isError: true,
+          };
+        }
+
+        const voteMap: Record<string, number> = {
+          Approved: 10,
+          ApprovedWithSuggestions: 5,
+          NoVote: 0,
+          WaitingForAuthor: -5,
+          Rejected: -10,
+        };
+
+        await gitApi.createPullRequestReviewer({ vote: voteMap[vote], id: userId } as any, repositoryId, pullRequestId, userId);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Successfully cast vote '${vote}' on PR #${pullRequestId}.`,
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error voting on pull request: ${errorMessage}` }],
+          isError: true,
+        };
       }
-
-      const voteMap: Record<string, number> = {
-        Approved: 10,
-        ApprovedWithSuggestions: 5,
-        NoVote: 0,
-        WaitingForAuthor: -5,
-        Rejected: -10,
-      };
-
-      await gitApi.createPullRequestReviewer({ vote: voteMap[vote], id: userId } as any, repositoryId, pullRequestId, userId);
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Successfully cast vote '${vote}' on PR #${pullRequestId}.`,
-          },
-        ],
-      };
     }
   );
 

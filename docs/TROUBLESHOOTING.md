@@ -262,9 +262,9 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
    Error fetching projects: Failed to find api location for area: Location id: e81700f7-3be2-46de-8624-2eb35882fcaa
    ```
 
-   **Cause:** This occurs when the Azure DevOps organization name is incorrect or doesn't exist.
+   **Cause:** This occurs when the Azure DevOps Server URL is incorrect or the server is unreachable.
 
    **Solution:** Verify that:
-   - The organization name is spelled correctly (case-sensitive)
-   - The organization exists and you have access to it
-   - You're using just the organization name, not the full URL (e.g., use `contoso` not `https://dev.azure.com/contoso`)
+   - The `ADO_SERVER_URL` is the full collection URL (e.g., `https://ado.company.internal/tfs/DefaultCollection`)
+   - The server is reachable from your network
+   - You have access to the collection

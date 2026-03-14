@@ -2,15 +2,11 @@
 // Licensed under the MIT License.
 
 import { WebApi } from "azure-devops-node-api";
-import { apiVersion } from "../utils.js";
+import { apiVersion, makeBasicAuthHeader } from "../utils.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
 
 interface IdentitiesResponse {
   value: IdentityBase[];
-}
-
-function makeBasicAuthHeader(pat: string): string {
-  return "Basic " + Buffer.from(":" + pat).toString("base64");
 }
 
 async function getCurrentUserDetails(tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {

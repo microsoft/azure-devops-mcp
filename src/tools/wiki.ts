@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
-import { apiVersion } from "../utils.js";
+import { apiVersion, makeBasicAuthHeader } from "../utils.js";
 
 const WIKI_TOOLS = {
   list_wikis: "wiki_list_wikis",
@@ -50,9 +50,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     WIKI_TOOLS.list_wikis,
-    "Retrieve a list of wikis for an organization or project.",
+    "Retrieve a list of wikis for a collection or project.",
     {
-      project: z.string().optional().describe("The project name or ID to filter wikis. If not provided, all wikis in the organization will be returned."),
+      project: z.string().optional().describe("The project name or ID to filter wikis. If not provided, all wikis in the collection will be returned."),
     },
     async ({ project }) => {
       try {
@@ -86,17 +86,16 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().describe("The project name or ID where the wiki is located."),
       top: z.number().default(20).describe("The maximum number of pages to return. Defaults to 20."),
       continuationToken: z.string().optional().describe("Token for pagination to retrieve the next set of pages."),
-      pageViewsForDays: z.number().optional().describe("Number of days to retrieve page views for. If not specified, page views are not included."),
     },
-    async ({ wikiIdentifier, project, top = 20, continuationToken, pageViewsForDays }) => {
+    async ({ wikiIdentifier, project, top = 20, continuationToken }) => {
       try {
         const connection = await connectionProvider();
         const wikiApi = await connection.getWikiApi();
 
+        // NOTE: pageViewsForDays omitted — page view statistics are a cloud-only feature
         const pagesBatchRequest: WikiPagesBatchRequest = {
           top,
           continuationToken,
-          pageViewsForDays,
         };
 
         const pages = await wikiApi.getPagesBatch(pagesBatchRequest, project, wikiIdentifier);
@@ -155,7 +154,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const response = await fetch(url, {
           headers: {
-            "Authorization": `Bearer ${accessToken}`,
+            "Authorization": makeBasicAuthHeader(accessToken),
             "User-Agent": userAgentProvider(),
           },
         });
@@ -189,7 +188,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         .string()
         .optional()
         .describe(
-          "The full URL of the wiki page to retrieve content for. If provided, wikiIdentifier, project, and path are ignored. Supported patterns: https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiIdentifier}?pagePath=%2FMy%20Page and https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiIdentifier}/{pageId}/Page-Title"
+          "The full URL of the wiki page to retrieve content for. If provided, wikiIdentifier, project, and path are ignored. Supported patterns: https://{server}/{collection}/{project}/_wiki/wikis/{wikiIdentifier}?pagePath=%2FMy%20Page and https://{server}/{collection}/{project}/_wiki/wikis/{wikiIdentifier}/{pageId}/Page-Title"
         ),
       wikiIdentifier: z.string().optional().describe("The unique identifier of the wiki. Required if url is not provided."),
       project: z.string().optional().describe("The project name or ID where the wiki is located. Required if url is not provided."),
@@ -235,7 +234,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
               const restUrl = `${baseUrl}/${resolvedProject}/_apis/wiki/wikis/${resolvedWiki}/pages/${parsed.pageId}?includeContent=true&api-version=7.1`;
               const resp = await fetch(restUrl, {
                 headers: {
-                  "Authorization": `Bearer ${accessToken}`,
+                  "Authorization": makeBasicAuthHeader(accessToken),
                   "User-Agent": userAgentProvider(),
                 },
               });
@@ -249,7 +248,10 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
               } else if (resp.status === 404) {
                 return { content: [{ type: "text", text: `Error fetching wiki page content: Page with id ${parsed.pageId} not found` }], isError: true };
               }
-            } catch {}
+            } catch (err) {
+              // If fetching by page ID fails due to network issues, fall through to path-based retrieval
+              // The outer catch will handle error reporting if path-based retrieval also fails
+            }
           }
         }
 
@@ -309,7 +311,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           const createResponse = await fetch(url, {
             method: "PUT",
             headers: {
-              "Authorization": `Bearer ${accessToken}`,
+              "Authorization": makeBasicAuthHeader(accessToken),
               "Content-Type": "application/json",
               "User-Agent": userAgentProvider(),
             },
@@ -338,7 +340,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
               const getResponse = await fetch(url, {
                 method: "GET",
                 headers: {
-                  "Authorization": `Bearer ${accessToken}`,
+                  "Authorization": makeBasicAuthHeader(accessToken),
                   "User-Agent": userAgentProvider(),
                 },
               });
@@ -360,7 +362,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
             const updateResponse = await fetch(url, {
               method: "PUT",
               headers: {
-                "Authorization": `Bearer ${accessToken}`,
+                "Authorization": makeBasicAuthHeader(accessToken),
                 "Content-Type": "application/json",
                 "User-Agent": userAgentProvider(),
                 "If-Match": currentEtag,
@@ -412,9 +414,9 @@ function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
 }
 
 // Helper to parse Azure DevOps wiki page URLs.
-// Supported examples:
-//  - https://dev.azure.com/org/project/_wiki/wikis/wikiIdentifier?wikiVersion=GBmain&pagePath=%2FHome
-//  - https://dev.azure.com/org/project/_wiki/wikis/wikiIdentifier/123/Title-Of-Page
+// Supported examples (on-prem):
+//  - https://server/collection/project/_wiki/wikis/wikiIdentifier?wikiVersion=GBmain&pagePath=%2FHome
+//  - https://server/collection/project/_wiki/wikis/wikiIdentifier/123/Title-Of-Page
 // Returns either a structured object OR an error message inside { error }.
 function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; pagePath?: string; pageId?: number; error?: undefined } | { error: string } {
   try {

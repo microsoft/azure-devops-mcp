@@ -93,7 +93,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     CORE_TOOLS.list_projects,
-    "Retrieve a list of projects in your Azure DevOps organization.",
+    "Retrieve a list of projects in your Azure DevOps collection.",
     {
       stateFilter: z.enum(["all", "wellFormed", "createPending", "deleted"]).default("wellFormed").describe("Filter projects by their state. Defaults to 'wellFormed'."),
       top: z.number().optional().describe("The maximum number of projects to return. Defaults to 100."),
