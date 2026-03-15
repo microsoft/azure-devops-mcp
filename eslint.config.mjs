@@ -1,9 +1,7 @@
-import pluginHeader from "eslint-plugin-header";
+import pluginHeader from "@tony.ganchev/eslint-plugin-header";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 import validateToolNamesRule from "./eslint-rules/tool-name-lint-rule.js";
-
-pluginHeader.rules.header.meta.schema = false; // workaround for https://github.com/Stuk/eslint-plugin-header/issues/57
 
 export default tseslint.config(
   // Global ignores
