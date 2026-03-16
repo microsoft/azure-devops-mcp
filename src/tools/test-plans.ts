@@ -4,6 +4,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { TestOutcome } from "azure-devops-node-api/interfaces/TestInterfaces.js";
 import { z } from "zod";
 
 const Test_Plan_Tools = {
@@ -353,19 +354,57 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
 
   server.tool(
     Test_Plan_Tools.test_results_from_build_id,
-    "Gets a list of test results for a given project and build ID.",
+    "Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       buildid: z.number().describe("The ID of the build."),
+      outcomes: z.array(z.string()).optional().describe("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
     },
-    async ({ project, buildid }) => {
+    async ({ project, buildid, outcomes }) => {
       try {
         const connection = await connectionProvider();
         const coreApi = await connection.getTestResultsApi();
-        const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
+
+        // Step 1: Get test runs for this build
+        const buildUri = `vstfs:///Build/Build/${buildid}`;
+        const testRuns = await coreApi.getTestRuns(project, buildUri);
+
+        // Map outcome strings to TestOutcome enum values for server-side filtering
+        const outcomeEnums = outcomes?.map((o) => TestOutcome[o as keyof typeof TestOutcome]);
+
+        // Step 2: Fetch detailed results per run with server-side outcome filtering
+        const allResults = (
+          await Promise.all(
+            testRuns
+              .filter((run) => run.id !== undefined)
+              .map((run) =>
+                coreApi.getTestResults(
+                  project,
+                  run.id as number,
+                  undefined, // detailsToInclude
+                  undefined, // skip
+                  undefined, // top
+                  outcomeEnums
+                )
+              )
+          )
+        ).flat();
+
+        // Extract useful fields from the results
+        const formattedResults = allResults.map((r) => ({
+          id: r.id,
+          testCaseTitle: r.testCaseTitle,
+          outcome: r.outcome,
+          errorMessage: r.errorMessage,
+          stackTrace: r.stackTrace,
+          automatedTestName: r.automatedTestName,
+          automatedTestStorage: r.automatedTestStorage,
+          durationInMs: r.durationInMs,
+          runId: r.testRun?.id,
+        }));
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(formattedResults, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
