@@ -48,7 +48,7 @@ The Azure DevOps MCP Server is built from tools that are concise, simple, focuse
 
 ## 🚀 Remote MCP Server
 
-The Azure DevOps **Remote MCP Server** is now available in [public preview]().
+The Azure DevOps **Remote MCP Server** is now available in [public preview](https://devblogs.microsoft.com/devops/azure-devops-remote-mcp-server-public-preview).
 
 Over time, the Remote MCP Server will replace this local MCP Server. We will continue to support the local server for now, but future investments will primarily focus on the remote experience.
 
