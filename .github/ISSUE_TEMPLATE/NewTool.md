@@ -1,10 +1,9 @@
 ---
 name: Add new tool(s)
 about: Use this template to leverage AI to add the tools you want
-title: ''
-labels: ''
+title: ""
+labels: ""
 assignees: danhellem
-
 ---
 
 ## Replace the content with your actual issue making sure to keep similar style so that GitHub Copilot can generate this change for you!
