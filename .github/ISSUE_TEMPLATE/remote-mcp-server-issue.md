@@ -8,6 +8,9 @@ assignees: danhellem
 
 This template is for **Azure DevOps Remote MCP Server feedback only**.
 
+**Important**
+**Internal Microsoft users:** Do **NOT** file issues here. Please use the internal Teams channel to share your feedback.
+
 ## Issue Type
 
 Select the option that best describes your issue.
