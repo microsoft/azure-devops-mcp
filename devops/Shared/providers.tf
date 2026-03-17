@@ -1,0 +1,36 @@
+# Configure provider features here
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "3.95.0" # previous was: "3.83.0"
+    }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 2.26"
+    }
+    azapi = {
+      source = "Azure/azapi"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "3.1.3"
+    }
+  }
+}
+
+provider "azurerm" {
+  subscription_id = var.azure_rm_subscription_id
+
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = true
+    }
+  }
+}
+
+provider "azuread" {
+}
+
+provider "random" {
+}
