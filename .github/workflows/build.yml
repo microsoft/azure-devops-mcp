@@ -14,6 +14,7 @@ jobs:
       REGISTRY_NAME: obaisharedregistry
       REGISTRY_LOGIN_SERVER: obaisharedregistry.azurecr.io
       IMAGE_NAME: azure-devops-mcp
+      TF_WORKING_DIR: ./devops/Mcp
 
     steps:
       - name: Checkout repository
@@ -53,7 +54,6 @@ jobs:
           images: ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.build_number.outputs.value }}
-            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
@@ -64,3 +64,39 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Configure Terraform service principal auth
+        run: |
+          echo "ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=${{ secrets.ARM_CLIENT_SECRET }}" >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}" >> $GITHUB_ENV
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false -backend-config=config.tfbackend
+
+      - name: Check Terraform formatting
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      - name: Validate Terraform config
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: >
+          terraform plan -out=tfplan -input=false
+          -var="azure_rm_subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
+          -var="build_number=${{ steps.build_number.outputs.value }}"
+          -var="ado_mcp_auth_token=${{ secrets.ADO_MCP_AUTH_TOKEN }}"
+
+      - name: Terraform apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -input=false -auto-approve tfplan
