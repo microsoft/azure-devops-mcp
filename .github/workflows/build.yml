@@ -19,6 +19,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Generate build number
+        id: build_number
+        run: echo "value=${{ github.run_number }}.${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -48,6 +52,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=${{ steps.build_number.outputs.value }}
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
