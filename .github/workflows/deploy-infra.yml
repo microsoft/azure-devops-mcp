@@ -25,13 +25,7 @@ jobs:
           subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
           environment: 'azurecloud'
           allow-no-subscriptions: false
-
-      - name: Configure Terraform service principal auth
-        run: |
-          echo "ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }}" >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=${{ secrets.ARM_CLIENT_SECRET }}" >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}" >> $GITHUB_ENV
+          enable-AzPSSession: false
 
       - name: Configure Terraform service principal auth
         run: |
