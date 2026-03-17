@@ -25,16 +25,22 @@ interface WorkItemTrackingApiMock {
   getClassificationNodes: jest.Mock;
 }
 
+interface CoreApiMock {
+  getProjects: jest.Mock;
+  getTeams: jest.Mock;
+}
+
 describe("configureWorkTools", () => {
   let server: McpServer;
   let tokenProvider: TokenProviderMock;
   let connectionProvider: ConnectionProviderMock;
-  let mockConnection: { getWorkApi: jest.Mock; getWorkItemTrackingApi: jest.Mock };
+  let mockConnection: { getWorkApi: jest.Mock; getWorkItemTrackingApi: jest.Mock; getCoreApi: jest.Mock };
   let mockWorkApi: WorkApiMock;
   let mockWorkItemTrackingApi: WorkItemTrackingApiMock;
+  let mockCoreApi: CoreApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
     tokenProvider = jest.fn();
 
     mockWorkApi = {
@@ -52,9 +58,15 @@ describe("configureWorkTools", () => {
       getClassificationNodes: jest.fn(),
     };
 
+    mockCoreApi = {
+      getProjects: jest.fn(),
+      getTeams: jest.fn(),
+    };
+
     mockConnection = {
       getWorkApi: jest.fn().mockResolvedValue(mockWorkApi),
       getWorkItemTrackingApi: jest.fn().mockResolvedValue(mockWorkItemTrackingApi),
+      getCoreApi: jest.fn().mockResolvedValue(mockCoreApi),
     };
 
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
@@ -89,15 +101,16 @@ describe("configureWorkTools", () => {
 
       const params = {
         project: "fabrikam",
-        team: undefined,
+        team: "Fabrikam Team",
         timeframe: undefined,
       };
 
       const result = await handler(params);
 
-      expect(mockWorkApi.getTeamIterations).toHaveBeenCalledWith({ project: "fabrikam", team: undefined }, undefined);
+      expect(mockWorkApi.getTeamIterations).toHaveBeenCalledWith({ project: "fabrikam", team: "Fabrikam Team" }, undefined);
 
-      expect(result.content[0].text).toBe(
+      expect(result.content[0].text).toBe("Project: fabrikam, Team: Fabrikam Team");
+      expect(result.content[1].text).toBe(
         JSON.stringify(
           [
             {
@@ -181,6 +194,87 @@ describe("configureWorkTools", () => {
       expect(mockWorkApi.getTeamIterations).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching team iterations: Unknown error occurred");
+    });
+
+    it("should elicit project and team when not provided and user accepts", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
+      if (!call) throw new Error("work_list_team_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } }).mockResolvedValueOnce({ action: "accept", content: { team: "Team One" } });
+
+      (mockWorkApi.getTeamIterations as jest.Mock).mockResolvedValue([{ id: "iter-1", name: "Sprint 1" }]);
+
+      const result = await handler({ project: undefined, team: undefined, timeframe: undefined });
+
+      expect(elicitMock).toHaveBeenCalledTimes(2);
+      expect(mockWorkApi.getTeamIterations).toHaveBeenCalledWith({ project: "ProjectAlpha", team: "Team One" }, undefined);
+      expect(result.content[0].text).toBe("Project: ProjectAlpha, Team: Team One");
+      expect(result.content[1].text).toContain("Sprint 1");
+    });
+
+    it("should return cancellation when project elicitation is declined", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
+      if (!call) throw new Error("work_list_team_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "decline" });
+
+      const result = await handler({ project: undefined, team: undefined, timeframe: undefined });
+
+      expect(result.content[0].text).toBe("Project selection cancelled.");
+      expect(mockWorkApi.getTeamIterations).not.toHaveBeenCalled();
+    });
+
+    it("should return cancellation when team elicitation is declined", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
+      if (!call) throw new Error("work_list_team_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } }).mockResolvedValueOnce({ action: "decline" });
+
+      const result = await handler({ project: undefined, team: undefined, timeframe: undefined });
+
+      expect(result.content[0].text).toBe("Team selection cancelled.");
+      expect(mockWorkApi.getTeamIterations).not.toHaveBeenCalled();
+    });
+
+    it("should return error when no teams are available for elicitation", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_team_iterations");
+      if (!call) throw new Error("work_list_team_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } });
+
+      const result = await handler({ project: undefined, team: undefined, timeframe: undefined });
+
+      expect(elicitMock).toHaveBeenCalledTimes(1);
+      expect(mockWorkApi.getTeamIterations).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No teams found to select from.");
     });
   });
 
@@ -983,6 +1077,53 @@ describe("configureWorkTools", () => {
       expect(parsedResult[0].children[0].id).toBeUndefined();
       expect(parsedResult[0].children[0].name).toBe("No ID Node");
     });
+
+    it("should elicit project when not provided and user accepts", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } });
+
+      (mockWorkItemTrackingApi.getClassificationNodes as jest.Mock).mockResolvedValue([
+        {
+          id: 1,
+          name: "Iteration",
+          structureType: TreeNodeStructureType.Iteration,
+          hasChildren: false,
+          children: [],
+        },
+      ]);
+
+      const result = await handler({ project: undefined, depth: 2 });
+
+      expect(elicitMock).toHaveBeenCalledTimes(1);
+      expect(mockWorkItemTrackingApi.getClassificationNodes).toHaveBeenCalledWith("ProjectAlpha", [], 2);
+      expect(result.content[0].text).toContain("Iteration");
+    });
+
+    it("should return cancellation when project elicitation is declined", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_list_iterations");
+      if (!call) throw new Error("work_list_iterations tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "decline" });
+
+      const result = await handler({ project: undefined, depth: 2 });
+
+      expect(result.content[0].text).toBe("Project selection cancelled.");
+      expect(mockWorkItemTrackingApi.getClassificationNodes).not.toHaveBeenCalled();
+    });
   });
 
   describe("assign_iterations", () => {
@@ -1749,6 +1890,53 @@ describe("configureWorkTools", () => {
       expect(parsedResult.totalCapacityPerDay).toBe(7.5);
       expect(parsedResult.totalDaysOff).toBe(1);
     });
+
+    it("should elicit project when not provided and user accepts", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } });
+
+      (mockWorkApi.getCapacitiesWithIdentityRefAndTotals as jest.Mock).mockResolvedValue({
+        teamMembers: [
+          {
+            teamMember: { displayName: "Alex", id: "id-1", uniqueName: "alex@example.com" },
+            activities: [{ name: "Development", capacityPerDay: 8 }],
+            daysOff: [],
+          },
+        ],
+      });
+
+      const result = await handler({ project: undefined, team: "Team A", iterationId: "iter-1" });
+
+      expect(elicitMock).toHaveBeenCalledTimes(1);
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).toHaveBeenCalled();
+      expect(result.content[0].text).toContain("Alex");
+    });
+
+    it("should return cancellation when project elicitation is declined", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_capacity");
+      if (!call) throw new Error("work_get_team_capacity tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "decline" });
+
+      const result = await handler({ project: undefined, team: "Team A", iterationId: "iter-1" });
+
+      expect(result.content[0].text).toBe("Project selection cancelled.");
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).not.toHaveBeenCalled();
+    });
   });
 
   describe("update_team_capacity tool", () => {
@@ -2497,6 +2685,47 @@ describe("configureWorkTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error getting iteration capacities: Unknown error occurred");
     });
+
+    it("should elicit project when not provided and user accepts", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } });
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockResolvedValue({
+        teams: [{ team: { id: "team-1", name: "Team One" } }],
+      });
+
+      const result = await handler({ project: undefined, iterationId: "iter-1" });
+
+      expect(elicitMock).toHaveBeenCalledTimes(1);
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalledWith("ProjectAlpha", "iter-1");
+      expect(result.content[0].text).toContain("Team One");
+    });
+
+    it("should return cancellation when project elicitation is declined", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_iteration_capacities");
+      if (!call) throw new Error("work_get_iteration_capacities tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "decline" });
+
+      const result = await handler({ project: undefined, iterationId: "iter-1" });
+
+      expect(result.content[0].text).toBe("Project selection cancelled.");
+      expect(mockWorkApi.getTotalIterationCapacities).not.toHaveBeenCalled();
+    });
   });
 
   describe("get_team_settings tool", () => {
@@ -2589,7 +2818,8 @@ describe("configureWorkTools", () => {
         ],
       };
 
-      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+      expect(result.content[0].text).toBe("Project: Fabrikam, Team: Team A");
+      expect(result.content[1].text).toBe(JSON.stringify(expectedResult, null, 2));
     });
 
     it("should use default team when team is not provided", async () => {
@@ -2615,6 +2845,11 @@ describe("configureWorkTools", () => {
         values: [{ value: "Fabrikam", includeChildren: true }],
       });
 
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Fabrikam Team" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { team: "Fabrikam Team" } });
+
       const params = {
         project: "Fabrikam",
         team: undefined,
@@ -2622,10 +2857,11 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      expect(mockWorkApi.getTeamSettings).toHaveBeenCalledWith({ project: "Fabrikam", team: undefined });
-      expect(mockWorkApi.getTeamFieldValues).toHaveBeenCalledWith({ project: "Fabrikam", team: undefined });
+      expect(mockWorkApi.getTeamSettings).toHaveBeenCalledWith({ project: "Fabrikam", team: "Fabrikam Team" });
+      expect(mockWorkApi.getTeamFieldValues).toHaveBeenCalledWith({ project: "Fabrikam", team: "Fabrikam Team" });
 
-      const parsedResult = JSON.parse(result.content[0].text);
+      expect(result.content[0].text).toBe("Project: Fabrikam, Team: Fabrikam Team");
+      const parsedResult = JSON.parse(result.content[1].text);
 
       expect(parsedResult.backlogIteration).toEqual({
         id: "backlog-iter-id",
@@ -2685,7 +2921,8 @@ describe("configureWorkTools", () => {
 
       const result = await handler(params);
 
-      const parsedResult = JSON.parse(result.content[0].text);
+      expect(result.content[0].text).toBe("Project: Fabrikam, Team: Team A");
+      const parsedResult = JSON.parse(result.content[1].text);
 
       expect(parsedResult.backlogIteration).toEqual({
         id: "backlog-iter-id",
@@ -2770,6 +3007,72 @@ describe("configureWorkTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching team settings: Unknown error occurred");
+    });
+
+    it("should elicit project and team when not provided and user accepts", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } }).mockResolvedValueOnce({ action: "accept", content: { team: "Team One" } });
+
+      (mockWorkApi.getTeamSettings as jest.Mock).mockResolvedValue({
+        backlogIteration: { id: "backlog-iter-id", name: "ProjectAlpha", path: "\\ProjectAlpha" },
+        backlogVisibilities: {},
+        bugsBehavior: "off",
+        workingDays: [],
+      });
+      (mockWorkApi.getTeamFieldValues as jest.Mock).mockResolvedValue(null);
+
+      const result = await handler({ project: undefined, team: undefined });
+
+      expect(elicitMock).toHaveBeenCalledTimes(2);
+      expect(mockWorkApi.getTeamSettings).toHaveBeenCalled();
+      expect(result.content[0].text).toBe("Project: ProjectAlpha, Team: Team One");
+      expect(result.content[1].text).toContain("backlogIteration");
+    });
+
+    it("should return cancellation when project elicitation is declined for team settings", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "decline" });
+
+      const result = await handler({ project: undefined, team: undefined });
+
+      expect(result.content[0].text).toBe("Project selection cancelled.");
+      expect(mockWorkApi.getTeamSettings).not.toHaveBeenCalled();
+    });
+
+    it("should return cancellation when team elicitation is declined for team settings", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_get_team_settings");
+      if (!call) throw new Error("work_get_team_settings tool not registered");
+      const [, , , handler] = call;
+
+      (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
+      (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
+
+      const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
+      elicitMock.mockResolvedValueOnce({ action: "accept", content: { project: "ProjectAlpha" } }).mockResolvedValueOnce({ action: "decline" });
+
+      const result = await handler({ project: undefined, team: undefined });
+
+      expect(result.content[0].text).toBe("Team selection cancelled.");
+      expect(mockWorkApi.getTeamSettings).not.toHaveBeenCalled();
     });
   });
 });
