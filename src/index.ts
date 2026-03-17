@@ -61,7 +61,7 @@ const argv = yargs(hideBin(process.argv))
 export const orgName = argv.organization as string;
 const orgUrl = "https://dev.azure.com/" + orgName;
 
-const domainsManager = new DomainsManager(argv.domains);
+const domainsManager = new DomainsManager(argv.domains as string | string[] | undefined);
 export const enabledDomains = domainsManager.getEnabledDomains();
 
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer): () => Promise<WebApi> {
@@ -103,8 +103,8 @@ async function main() {
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
-  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
+  const tenantId = ((await getOrgTenant(orgName)) ?? argv.tenant) as string | undefined;
+  const authenticator = createAuthenticator(argv.authentication as string, tenantId);
 
   // removing prompts untill further notice
   // configurePrompts(server);
