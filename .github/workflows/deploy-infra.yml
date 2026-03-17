@@ -1,9 +1,6 @@
 name: Deploy shared infrastructure
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch: {}
 
 jobs:
