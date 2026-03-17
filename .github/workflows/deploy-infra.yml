@@ -1,0 +1,42 @@
+name: Deploy shared infrastructure
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+jobs:
+  deploy-infra:
+    name: Terraform deploy (devops/Shared)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform init
+        working-directory: ./devops/Shared
+        run: terraform init -input=false
+
+      - name: Validate Terraform config
+        working-directory: ./devops/Shared
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: ./devops/Shared
+        run: terraform plan -out=tfplan -input=false
+
+      - name: Terraform apply
+        working-directory: ./devops/Shared
+        run: terraform apply -input=false -auto-approve tfplan
