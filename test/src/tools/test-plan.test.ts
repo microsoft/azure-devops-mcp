@@ -739,7 +739,7 @@ describe("configureTestPlanTools", () => {
       expect(parsed[2].id).toBe(3);
 
       // Verify testCaseTitle field exists in all results
-      parsed.forEach((result: any, index: number) => {
+      parsed.forEach((result: any) => {
         expect(result).toHaveProperty("testCaseTitle");
         expect(result.testCaseTitle).toBeTruthy();
       });
