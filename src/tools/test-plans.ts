@@ -4,7 +4,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
-import { TestOutcome } from "azure-devops-node-api/interfaces/TestInterfaces.js";
 import { z } from "zod";
 
 const Test_Plan_Tools = {
@@ -354,7 +353,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
 
   server.tool(
     Test_Plan_Tools.test_results_from_build_id,
-    "Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes.",
+    "Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes. Efficiently handles builds with large numbers of test runs.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       buildid: z.number().describe("The ID of the build."),
@@ -363,34 +362,35 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     async ({ project, buildid, outcomes }) => {
       try {
         const connection = await connectionProvider();
-        const coreApi = await connection.getTestResultsApi();
+        const testResultsApi = await connection.getTestResultsApi();
 
-        // Step 1: Get test runs for this build
-        const buildUri = `vstfs:///Build/Build/${buildid}`;
-        const testRuns = await coreApi.getTestRuns(project, buildUri);
+        // Build filter expression for outcomes if specified
+        const outcomeFilter = outcomes?.map((o) => `Outcome eq '${o}'`).join(" or ");
 
-        // Map outcome strings to TestOutcome enum values for server-side filtering
-        const outcomeEnums = outcomes?.map((o) => TestOutcome[o as keyof typeof TestOutcome]);
+        // Fetch test result details for the build in a single API call
+        // This is more efficient than getTestRuns + getTestResults per run,
+        // especially for builds with many test runs (e.g., cloud testing with one run per test case)
+        const testResultDetails = await testResultsApi.getTestResultDetailsForBuild(
+          project,
+          buildid,
+          undefined, // publishContext
+          undefined, // groupBy
+          outcomeFilter, // filter by outcome
+          undefined, // orderby
+          true // shouldIncludeResults - get individual test results, not just aggregates
+        );
 
-        // Step 2: Fetch detailed results per run with server-side outcome filtering
-        const allResults = (
-          await Promise.all(
-            testRuns
-              .filter((run) => run.id !== undefined)
-              .map((run) =>
-                coreApi.getTestResults(
-                  project,
-                  run.id as number,
-                  undefined, // detailsToInclude
-                  undefined, // skip
-                  undefined, // top
-                  outcomeEnums
-                )
-              )
-          )
-        ).flat();
+        // Extract individual test results from the grouped response
+        const allResults: any[] = [];
+        if (testResultDetails.resultsForGroup) {
+          for (const group of testResultDetails.resultsForGroup) {
+            if (group.results) {
+              allResults.push(...group.results);
+            }
+          }
+        }
 
-        // Extract useful fields from the results
+        // Format results to extract useful fields
         const formattedResults = allResults.map((r) => ({
           id: r.id,
           testCaseTitle: r.testCaseTitle,
