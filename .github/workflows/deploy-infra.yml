@@ -10,6 +10,8 @@ jobs:
   deploy-infra:
     name: Terraform deploy (devops/Shared)
     runs-on: ubuntu-latest
+    env:
+      TF_WORKING_DIR: ./devops/Shared
 
     steps:
       - name: Checkout repository
@@ -33,6 +35,7 @@ jobs:
           echo "ARM_CLIENT_SECRET=${{ secrets.ARM_CLIENT_SECRET }}" >> $GITHUB_ENV
           echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
           echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}" >> $GITHUB_ENV
+          echo "ARM_USE_AZUREAD=true" >> $GITHUB_ENV
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -40,17 +43,21 @@ jobs:
           terraform_version: "1.9.0"
 
       - name: Terraform init
-        working-directory: ./devops/Shared
-        run: terraform init -input=false
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false -backend-config=config.tfbackend
+
+      - name: Check Terraform formatting
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
 
       - name: Validate Terraform config
-        working-directory: ./devops/Shared
+        working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform validate
 
       - name: Terraform plan
-        working-directory: ./devops/Shared
-        run: terraform plan -out=tfplan -input=false
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -out=tfplan -input=false -var="azure_rm_subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
 
       - name: Terraform apply
-        working-directory: ./devops/Shared
+        working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -input=false -auto-approve tfplan
