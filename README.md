@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > The Azure DevOps Remote MCP Server is now available in public preview for all organizations. We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
 >
-> [Learn more](#-remote-mcp-server))
+> [Learn more](#-remote-mcp-server)
 
 Easily install the Azure DevOps MCP Server for VS Code or VS Code Insiders:
 
