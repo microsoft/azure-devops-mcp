@@ -1062,7 +1062,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
-        const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
+        const comment = await gitApi.createComment({ content, commentType: 1 }, repositoryId, pullRequestId, threadId, project);
 
         // Check if the comment was successfully created
         if (!comment) {
@@ -1220,7 +1220,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         const thread = await gitApi.createThread(
-          { comments: [{ content: content }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
+          { comments: [{ content: content, commentType: 1 }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
           repositoryId,
           pullRequestId,
           project
