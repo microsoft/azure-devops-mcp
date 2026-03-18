@@ -3,7 +3,7 @@ resource "azapi_resource" "mcp_auth" {
   name      = "current"
   parent_id = azurerm_container_app.mcp.id
 
-  body = jsonencode({
+  body = {
     properties = {
       platform = {
         enabled = true
@@ -33,7 +33,7 @@ resource "azapi_resource" "mcp_auth" {
         preserveUrlFragmentsForLogins = false
       }
     }
-  })
+  }
 
   depends_on = [
     azurerm_container_app.mcp
