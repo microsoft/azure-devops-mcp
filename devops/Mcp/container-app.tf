@@ -14,6 +14,11 @@ resource "azurerm_container_app" "mcp" {
     value = var.ado_mcp_auth_token
   }
 
+  secret {
+    name  = "microsoft-auth-client-secret"
+    value = var.microsoft_auth_client_secret
+  }
+
   registry {
     server               = data.azurerm_container_registry.acr.login_server
     username             = data.azurerm_container_registry.acr.admin_username

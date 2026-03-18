@@ -5,6 +5,9 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "3.95.0" # previous was: 3.83.0
     }
+    azapi = {
+      source = "Azure/azapi"
+    }
   }
 }
 
@@ -16,4 +19,7 @@ provider "azurerm" {
       prevent_deletion_if_contains_resources = true
     }
   }
+}
+
+provider "azapi" {
 }

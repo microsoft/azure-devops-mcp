@@ -96,6 +96,9 @@ jobs:
           -var="azure_rm_subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
           -var="build_number=${{ steps.build_number.outputs.value }}"
           -var="ado_mcp_auth_token=${{ secrets.ADO_MCP_AUTH_TOKEN }}"
+          -var="microsoft_auth_client_id=${{ secrets.MICROSOFT_AUTH_CLIENT_ID }}"
+          -var="microsoft_auth_client_secret=${{ secrets.MICROSOFT_AUTH_CLIENT_SECRET }}"
+          -var="microsoft_auth_tenant_id=${{ secrets.MICROSOFT_AUTH_TENANT_ID }}"
 
       - name: Terraform apply
         working-directory: ${{ env.TF_WORKING_DIR }}

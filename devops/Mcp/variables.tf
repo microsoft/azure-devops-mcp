@@ -26,6 +26,34 @@ variable "ado_mcp_auth_token" {
   }
 }
 
+variable "microsoft_auth_client_id" {
+  type        = string
+  description = "Microsoft Entra application (client) ID used by Container Apps authentication."
+  validation {
+    condition     = length(var.microsoft_auth_client_id) > 0
+    error_message = "Microsoft auth client ID should be a non-empty string."
+  }
+}
+
+variable "microsoft_auth_client_secret" {
+  type        = string
+  sensitive   = true
+  description = "Microsoft Entra application client secret used by Container Apps authentication."
+  validation {
+    condition     = length(var.microsoft_auth_client_secret) > 0
+    error_message = "Microsoft auth client secret should be a non-empty string."
+  }
+}
+
+variable "microsoft_auth_tenant_id" {
+  type        = string
+  description = "Microsoft Entra tenant ID used by Container Apps authentication."
+  validation {
+    condition     = length(var.microsoft_auth_tenant_id) > 0
+    error_message = "Microsoft auth tenant ID should be a non-empty string."
+  }
+}
+
 variable "project" {
   type        = string
   description = "Project code which is used for naming the stage resources. For example, \"dcslgs-wt\"."
@@ -49,4 +77,3 @@ variable "resource_location" {
     error_message = "Stage location moniker should be a non-empty string like \"uksouth\", \"canadacentral\"."
   }
 }
-
