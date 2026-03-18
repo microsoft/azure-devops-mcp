@@ -452,10 +452,10 @@ Update an existing test case work item.
 
 ### mcp_ado_testplan_show_test_results_from_build_id
 
-Gets a list of test results for a given project and build ID.
+Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes.
 
 - **Required**: `project`, `buildid`
-- **Optional**: None
+- **Optional**: `outcomes`
 
 ## Wiki
 

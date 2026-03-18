@@ -41,6 +41,8 @@ describe("configureTestPlanTools", () => {
     } as unknown as ITestPlanApi;
     mockTestResultsApi = {
       getTestResultDetailsForBuild: jest.fn(),
+      getTestRuns: jest.fn(),
+      getTestResults: jest.fn(),
     } as unknown as ITestResultsApi;
     mockWitApi = {
       createWorkItem: jest.fn(),
@@ -592,21 +594,79 @@ describe("configureTestPlanTools", () => {
   });
 
   describe("test_results_from_build_id tool", () => {
-    it("should call getTestResultDetailsForBuild with the correct parameters and return the expected result", async () => {
+    it("should fetch test result details for build and return formatted output", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
       const [, , , handler] = call;
 
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({ results: ["Result 1"] });
-      const params = {
-        project: "proj1",
-        buildid: 123,
-      };
-      const result = await handler(params);
+      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
+        resultsForGroup: [
+          {
+            results: [
+              {
+                id: 1,
+                testCaseTitle: "TestHello",
+                outcome: "Failed",
+                errorMessage: "Assert.Equal() failed",
+                stackTrace: "at TestClass.TestHello() line 42",
+                automatedTestName: "Namespace.TestClass.TestHello",
+                automatedTestStorage: "test.dll",
+                durationInMs: 1500,
+                testRun: { id: "100" },
+              },
+              {
+                id: 2,
+                testCaseTitle: "TestWorld",
+                outcome: "Passed",
+                automatedTestName: "Namespace.TestClass.TestWorld",
+                automatedTestStorage: "test.dll",
+                durationInMs: 200,
+                testRun: { id: "200" },
+              },
+            ],
+          },
+        ],
+      });
 
-      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith("proj1", 123);
-      expect(result.content[0].text).toBe(JSON.stringify({ results: ["Result 1"] }, null, 2));
+      const result = await handler({ project: "proj1", buildid: 123 });
+
+      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith("proj1", 123, undefined, undefined, undefined, undefined, true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(2);
+      expect(parsed[0].testCaseTitle).toBe("TestHello");
+      expect(parsed[0].errorMessage).toBe("Assert.Equal() failed");
+      expect(parsed[0].stackTrace).toBe("at TestClass.TestHello() line 42");
+      expect(parsed[0].outcome).toBe("Failed");
+      expect(parsed[1].testCaseTitle).toBe("TestWorld");
+      expect(parsed[1].outcome).toBe("Passed");
+    });
+
+    it("should pass outcome filter expression for server-side filtering", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
+      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
+        resultsForGroup: [
+          {
+            results: [{ id: 1, testCaseTitle: "FailingTest", outcome: "Failed", errorMessage: "error" }],
+          },
+        ],
+      });
+
+      await handler({ project: "proj1", buildid: 123, outcomes: ["Failed", "Aborted"] });
+
+      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith(
+        "proj1",
+        123,
+        undefined, // publishContext
+        undefined, // groupBy
+        "Outcome eq 'Failed' or Outcome eq 'Aborted'", // filter expression
+        undefined, // orderby
+        true // shouldIncludeResults
+      );
     });
 
     it("should handle API errors when fetching test results", async () => {
@@ -617,15 +677,156 @@ describe("configureTestPlanTools", () => {
 
       (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockRejectedValue(new Error("API Error"));
 
-      const params = {
-        project: "proj1",
-        buildid: 123,
-      };
-
-      const result = await handler(params);
+      const result = await handler({ project: "proj1", buildid: 123 });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching test results");
       expect(result.content[0].text).toContain("API Error");
+    });
+
+    it("should return test case titles for all results across multiple groups", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
+      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
+      const [, , , handler] = call;
+
+      // Simulate multiple groups (e.g., grouped by configuration or test suite)
+      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
+        resultsForGroup: [
+          {
+            groupByValue: "Configuration1",
+            results: [
+              {
+                id: 1,
+                testCaseTitle: "Test Case Alpha",
+                outcome: "Passed",
+                durationInMs: 100,
+              },
+              {
+                id: 2,
+                testCaseTitle: "Test Case Beta",
+                outcome: "Failed",
+                errorMessage: "Assertion failed",
+              },
+            ],
+          },
+          {
+            groupByValue: "Configuration2",
+            results: [
+              {
+                id: 3,
+                testCaseTitle: "Test Case Gamma",
+                outcome: "Passed",
+                durationInMs: 150,
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await handler({ project: "proj1", buildid: 456 });
+
+      const parsed = JSON.parse(result.content[0].text);
+
+      // Verify all 3 results are present
+      expect(parsed).toHaveLength(3);
+
+      // Explicitly verify each test case title is present and correct
+      expect(parsed[0].testCaseTitle).toBe("Test Case Alpha");
+      expect(parsed[0].id).toBe(1);
+      expect(parsed[1].testCaseTitle).toBe("Test Case Beta");
+      expect(parsed[1].id).toBe(2);
+      expect(parsed[2].testCaseTitle).toBe("Test Case Gamma");
+      expect(parsed[2].id).toBe(3);
+
+      // Verify testCaseTitle field exists in all results
+      parsed.forEach((result: any) => {
+        expect(result).toHaveProperty("testCaseTitle");
+        expect(result.testCaseTitle).toBeTruthy();
+      });
+    });
+
+    it("should handle empty results groups without errors", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
+      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
+        resultsForGroup: [
+          {
+            groupByValue: "EmptyGroup",
+            results: [],
+          },
+          {
+            groupByValue: "GroupWithResults",
+            results: [
+              {
+                id: 1,
+                testCaseTitle: "Only Test",
+                outcome: "Passed",
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await handler({ project: "proj1", buildid: 789 });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0].testCaseTitle).toBe("Only Test");
+    });
+
+    it("should return test case titles when present and handle missing titles gracefully", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
+      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
+        resultsForGroup: [
+          {
+            results: [
+              {
+                id: 1,
+                testCaseTitle: "Manual Test Case Title",
+                automatedTestName: "Namespace.TestClass.TestMethod",
+                outcome: "Passed",
+              },
+              {
+                id: 2,
+                testCaseTitle: undefined, // Missing testCaseTitle
+                automatedTestName: "Namespace.TestClass.AnotherTest",
+                outcome: "Failed",
+              },
+              {
+                id: 3,
+                testCaseTitle: "Another Manual Test Case",
+                automatedTestName: "Namespace.TestClass.ThirdTest",
+                outcome: "Passed",
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await handler({ project: "proj1", buildid: 999 });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(3);
+
+      // Verify testCaseTitle is present when provided by the API
+      expect(parsed[0]).toHaveProperty("testCaseTitle");
+      expect(parsed[0].testCaseTitle).toBe("Manual Test Case Title");
+
+      // When testCaseTitle is undefined, JSON.stringify omits it (expected behavior)
+      // but automatedTestName should still be available
+      expect(parsed[1].id).toBe(2);
+      expect(parsed[1].automatedTestName).toBe("Namespace.TestClass.AnotherTest");
+
+      // Third result also has testCaseTitle
+      expect(parsed[2]).toHaveProperty("testCaseTitle");
+      expect(parsed[2].testCaseTitle).toBe("Another Manual Test Case");
     });
   });
 
