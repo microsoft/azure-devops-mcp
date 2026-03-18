@@ -14,7 +14,7 @@ import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
 import { requireEasyAuth, makeAllowlistMiddleware } from "./auth/easyauth.js";
-import { logger } from "./logger.js";
+import { logger, logIncomingMcpMessage } from "./logger.js";
 import { getOrgTenant } from "./org-tenants.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
@@ -147,6 +147,16 @@ async function main(): Promise<void> {
   app.all("/mcp", mcpAuth, async (req: Request, res: Response) => {
     try {
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      const bodyMessages = Array.isArray(req.body) ? req.body : req.body ? [req.body] : [];
+      for (const message of bodyMessages) {
+        if (message && typeof message === "object" && "method" in message) {
+          logIncomingMcpMessage("http", message, {
+            httpMethod: req.method,
+            sessionId,
+          });
+        }
+      }
+
       let transport: StreamableHTTPServerTransport;
 
       if (sessionId && transports[sessionId]) {
