@@ -118,6 +118,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         title: "Updated Title",
         description: "Updated Description",
         isDraft: true,
@@ -134,7 +135,8 @@ describe("repos tools", () => {
           targetRefName: "refs/heads/main",
         },
         "repo123",
-        123
+        123,
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -184,6 +186,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         title: "New Title",
       };
 
@@ -194,7 +197,8 @@ describe("repos tools", () => {
           title: "New Title",
         },
         "repo123",
-        123
+        123,
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -244,6 +248,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         status: "Active" as const,
       };
 
@@ -254,7 +259,8 @@ describe("repos tools", () => {
           status: PullRequestStatus.Active,
         },
         "repo123",
-        123
+        123,
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -304,6 +310,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         status: "Abandoned" as const,
       };
 
@@ -314,7 +321,8 @@ describe("repos tools", () => {
           status: PullRequestStatus.Abandoned,
         },
         "repo123",
-        123
+        123,
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -364,6 +372,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         title: "Updated Title",
         status: "Active" as const,
       };
@@ -376,7 +385,8 @@ describe("repos tools", () => {
           status: PullRequestStatus.Active,
         },
         "repo123",
-        123
+        123,
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -409,6 +419,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
       };
 
       const result = await handler(params);
@@ -446,6 +457,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "test-repo-id",
         pullRequestId: 123,
+        project: "test-project",
         autoComplete: true,
         mergeStrategy: "Squash",
         deleteSourceBranch: true,
@@ -465,7 +477,8 @@ describe("repos tools", () => {
           }),
         }),
         "test-repo-id",
-        123
+        123,
+        "test-project"
       );
       expect(result.isError).toBeFalsy();
       const parsedResult = JSON.parse(result.content[0].text);
@@ -491,6 +504,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "test-repo-id",
         pullRequestId: 123,
+        project: "test-project",
         autoComplete: false,
       };
 
@@ -502,7 +516,8 @@ describe("repos tools", () => {
           completionOptions: null,
         }),
         "test-repo-id",
-        123
+        123,
+        "test-project"
       );
       expect(result.isError).toBeFalsy();
     });
@@ -534,6 +549,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "test-repo-id",
         pullRequestId: 123,
+        project: "test-project",
         autoComplete: true,
       };
 
@@ -547,7 +563,8 @@ describe("repos tools", () => {
           }),
         }),
         "test-repo-id",
-        123
+        123,
+        "test-project"
       );
       expect(result.isError).toBeFalsy();
     });
@@ -579,6 +596,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "test-repo-id",
         pullRequestId: 123,
+        project: "test-project",
         autoComplete: true,
         bypassReason: "Emergency fix needed",
       };
@@ -594,7 +612,8 @@ describe("repos tools", () => {
           }),
         }),
         "test-repo-id",
-        123
+        123,
+        "test-project"
       );
       expect(result.isError).toBeFalsy();
     });
@@ -617,6 +636,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         description: longDescription,
       };
 
@@ -666,26 +686,27 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         labels: ["enhancement", "feature"],
       };
 
       const result = await handler(params);
 
       // Verify that existing labels were fetched
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "test-project");
 
       // Verify that existing labels were deleted
-      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label1");
-      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label2");
+      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label1", "test-project");
+      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label2", "test-project");
       expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledTimes(2);
 
       // Verify that new labels were created
-      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "enhancement" }, "repo123", 123);
-      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "feature" }, "repo123", 123);
+      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "enhancement" }, "repo123", 123, "test-project");
+      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "feature" }, "repo123", 123, "test-project");
       expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledTimes(2);
 
       // Verify that getPullRequest was called to get the updated PR (since only labels were updated)
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123);
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, "test-project");
 
       expect(result.isError).toBeFalsy();
     });
@@ -724,6 +745,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         title: "Updated Title",
         description: "Updated Description",
         labels: ["new-label"],
@@ -732,9 +754,9 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       // Verify labels were updated
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123);
-      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label1");
-      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "new-label" }, "repo123", 123);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "test-project");
+      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label1", "test-project");
+      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "new-label" }, "repo123", 123, "test-project");
 
       // Verify PR was updated with title and description
       expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
@@ -743,7 +765,8 @@ describe("repos tools", () => {
           description: "Updated Description",
         },
         "repo123",
-        123
+        123,
+        "test-project"
       );
 
       // Since there are other fields besides labels, updatePullRequest should have been called
@@ -787,24 +810,25 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         labels: [],
       };
 
       const result = await handler(params);
 
       // Verify that existing labels were fetched
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "test-project");
 
       // Verify that all existing labels were deleted
-      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label1");
-      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label2");
+      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label1", "test-project");
+      expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledWith("repo123", 123, "label2", "test-project");
       expect(mockGitApi.deletePullRequestLabels).toHaveBeenCalledTimes(2);
 
       // Verify that no new labels were created
       expect(mockGitApi.createPullRequestLabel).not.toHaveBeenCalled();
 
       // Verify that getPullRequest was called
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123);
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, "test-project");
 
       expect(result.isError).toBeFalsy();
     });
@@ -840,19 +864,20 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 123,
+        project: "test-project",
         labels: ["first-label"],
       };
 
       const result = await handler(params);
 
       // Verify that existing labels were fetched
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "test-project");
 
       // Verify that no labels were deleted
       expect(mockGitApi.deletePullRequestLabels).not.toHaveBeenCalled();
 
       // Verify that new label was created
-      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "first-label" }, "repo123", 123);
+      expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledWith({ name: "first-label" }, "repo123", 123, "test-project");
       expect(mockGitApi.createPullRequestLabel).toHaveBeenCalledTimes(1);
 
       expect(result.isError).toBeFalsy();
@@ -889,6 +914,7 @@ describe("repos tools", () => {
         sourceRefName: "refs/heads/feature-branch",
         targetRefName: "refs/heads/main",
         title: "New Feature",
+        project: "test-project",
       };
 
       const result = await handler(params);
@@ -905,7 +931,8 @@ describe("repos tools", () => {
           labels: undefined,
           supportsIterations: true,
         },
-        "repo123"
+        "repo123",
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -959,6 +986,7 @@ describe("repos tools", () => {
         title: "New Feature",
         description: "This is a new feature",
         isDraft: true,
+        project: "test-project",
         workItems: "1234 5678",
         forkSourceRepositoryId: "fork-repo-123",
         labels: ["enhancement", "needs-review"],
@@ -982,7 +1010,8 @@ describe("repos tools", () => {
           labels: [{ name: "enhancement" }, { name: "needs-review" }],
           supportsIterations: true,
         },
-        "repo123"
+        "repo123",
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -1141,13 +1170,14 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "feature-branch",
         sourceBranchName: "main",
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "main");
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", "test-project", "heads/", false, false, undefined, false, undefined, "main");
       expect(mockGitApi.updateRefs).toHaveBeenCalledWith(
         [
           {
@@ -1156,7 +1186,8 @@ describe("repos tools", () => {
             oldObjectId: "0000000000000000000000000000000000000000",
           },
         ],
-        "repo123"
+        "repo123",
+        "test-project"
       );
 
       expect(result.content[0].text).toBe("Branch 'feature-branch' created successfully from 'main' (abc123def456)");
@@ -1187,13 +1218,14 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "feature-branch",
         sourceBranchName: "develop",
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "develop");
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", "test-project", "heads/", false, false, undefined, false, undefined, "develop");
       expect(mockGitApi.updateRefs).toHaveBeenCalledWith(
         [
           {
@@ -1202,7 +1234,8 @@ describe("repos tools", () => {
             oldObjectId: "0000000000000000000000000000000000000000",
           },
         ],
-        "repo123"
+        "repo123",
+        "test-project"
       );
 
       expect(result.content[0].text).toBe("Branch 'feature-branch' created successfully from 'develop' (def456ghi789)");
@@ -1226,6 +1259,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "feature-branch",
         sourceBranchName: "main",
         sourceCommitId: "xyz789abc123",
@@ -1243,7 +1277,8 @@ describe("repos tools", () => {
             oldObjectId: "0000000000000000000000000000000000000000",
           },
         ],
-        "repo123"
+        "repo123",
+        "test-project"
       );
 
       expect(result.content[0].text).toBe("Branch 'feature-branch' created successfully from 'main' (xyz789abc123)");
@@ -1260,6 +1295,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "feature-branch",
         sourceBranchName: "nonexistent",
       };
@@ -1282,6 +1318,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "feature-branch",
         sourceBranchName: "main",
       };
@@ -1317,6 +1354,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "existing-branch",
         sourceBranchName: "main",
       };
@@ -1351,6 +1389,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "failing-branch",
         sourceBranchName: "main",
       };
@@ -1381,6 +1420,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "feature-branch",
         sourceBranchName: "main",
       };
@@ -1409,6 +1449,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "feature-branch",
         sourceBranchName: "main",
       };
@@ -1434,13 +1475,14 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 456,
+        project: "test-project",
         reviewerIds: ["reviewer1", "reviewer2"],
         action: "add" as const,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.createPullRequestReviewers).toHaveBeenCalledWith([{ id: "reviewer1" }, { id: "reviewer2" }], "repo123", 456);
+      expect(mockGitApi.createPullRequestReviewers).toHaveBeenCalledWith([{ id: "reviewer1" }, { id: "reviewer2" }], "repo123", 456, "test-project");
 
       expect(result.content[0].text).toBe(JSON.stringify(mockReviewers, null, 2));
     });
@@ -1457,6 +1499,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 456,
+        project: "test-project",
         reviewerIds: ["reviewer1", "reviewer2"],
         action: "remove" as const,
       };
@@ -1464,8 +1507,8 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledTimes(2);
-      expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo123", 456, "reviewer1");
-      expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo123", 456, "reviewer2");
+      expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo123", 456, "reviewer1", "test-project");
+      expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo123", 456, "reviewer2", "test-project");
 
       expect(result.content[0].text).toBe("Reviewers with IDs reviewer1, reviewer2 removed from pull request 456.");
     });
@@ -3247,12 +3290,13 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         top: 100,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", undefined, undefined, undefined, undefined, undefined, undefined);
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", "test-project", "heads/", undefined, undefined, undefined, undefined, undefined, undefined);
 
       const expectedResult = ["main", "feature-2", "feature-1"]; // Sorted reverse alphabetically
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
@@ -3272,12 +3316,13 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         top: 100,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", undefined, undefined, true, undefined, undefined, undefined);
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", "test-project", "heads/", undefined, undefined, true, undefined, undefined, undefined);
 
       const expectedResult = ["my-feature", "main"];
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
@@ -3370,12 +3415,13 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "main",
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "main");
+      expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", "test-project", "heads/", false, false, undefined, false, undefined, "main");
       expect(result.content[0].text).toBe(JSON.stringify(mockBranches[0], null, 2));
     });
 
@@ -3390,6 +3436,7 @@ describe("repos tools", () => {
 
       const params = {
         repositoryId: "repo123",
+        project: "test-project",
         branchName: "nonexistent",
       };
 
@@ -4526,13 +4573,14 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 427,
+        project: "test-project",
         vote: "Approved" as const,
       };
 
       const result = await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
-      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123" }, "repo123", 427, "user123");
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123" }, "repo123", 427, "user123", "test-project");
       expect(result.content[0].text).toBe("Successfully cast vote 'Approved' on PR #427.");
     });
 
@@ -4548,12 +4596,13 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 427,
+        project: "test-project",
         vote: "Rejected" as const,
       };
 
       await handler(params);
 
-      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: -10, id: "user123" }, "repo123", 427, "user123");
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: -10, id: "user123" }, "repo123", 427, "user123", "test-project");
     });
 
     it("should throw when authenticated user ID is missing", async () => {
@@ -4568,6 +4617,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 427,
+        project: "test-project",
         vote: "NoVote" as const,
       };
 
@@ -4587,6 +4637,7 @@ describe("repos tools", () => {
       const params = {
         repositoryId: "repo123",
         pullRequestId: 427,
+        project: "test-project",
         vote: "WaitingForAuthor" as const,
       };
 
@@ -5060,6 +5111,7 @@ describe("repos tools", () => {
         title: "Test PR",
         description: undefined,
         isDraft: undefined,
+        project: "test-project",
         // forkSourceRepositoryId is undefined - should test the branch where it's undefined
       };
 
@@ -5077,7 +5129,8 @@ describe("repos tools", () => {
           labels: undefined,
           supportsIterations: true,
         },
-        "repo123"
+        "repo123",
+        "test-project"
       );
 
       const expectedTrimmedPR = {
@@ -5747,6 +5800,7 @@ describe("repos tools", () => {
         sourceRefName: "refs/heads/feature",
         targetRefName: "refs/heads/main",
         title: "Test PR",
+        project: "test-project",
         // workItems is undefined - should test the ternary operator
       };
 
@@ -5756,7 +5810,8 @@ describe("repos tools", () => {
         expect.objectContaining({
           workItemRefs: [], // Should be empty array when workItems is undefined
         }),
-        "repo123"
+        "repo123",
+        "test-project"
       );
     });
 
@@ -5775,6 +5830,7 @@ describe("repos tools", () => {
         sourceRefName: "refs/heads/feature",
         targetRefName: "refs/heads/main",
         title: "Test PR",
+        project: "test-project",
         workItems: "123 456", // workItems provided - should be split and mapped
       };
 
@@ -5784,7 +5840,8 @@ describe("repos tools", () => {
         expect.objectContaining({
           workItemRefs: [{ id: "123" }, { id: "456" }], // Should be split and mapped
         }),
-        "repo123"
+        "repo123",
+        "test-project"
       );
     });
 
