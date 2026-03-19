@@ -116,7 +116,10 @@ function filterReposByName(repositories: GitRepository[], repoNameFilter: string
   return filteredByName;
 }
 
-function trimPullRequest(pr: GitPullRequest, includeDescription = false) {
+function trimPullRequest(pr: GitPullRequest | null | undefined, includeDescription = false) {
+  if (!pr) {
+    return null;
+  }
   return {
     pullRequestId: pr.pullRequestId,
     codeReviewId: pr.codeReviewId,
@@ -217,6 +220,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         const trimmedPullRequest = trimPullRequest(pullRequest, true);
+
+        if (!trimmedPullRequest) {
+          return {
+            content: [{ type: "text", text: "Pull request created but API returned no data." }],
+          };
+        }
 
         return {
           content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }],
@@ -447,6 +456,12 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
+
+        if (!trimmedUpdatedPullRequest) {
+          return {
+            content: [{ type: "text", text: "Pull request updated but API returned no data." }],
+          };
+        }
 
         return {
           content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }],
