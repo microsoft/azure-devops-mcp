@@ -9,7 +9,7 @@ import { configurePipelineTools } from "../../../src/tools/pipelines";
 import { apiVersion } from "../../../src/utils.js";
 import { mockUpdateBuildStageResponse, mockMultipleArtifacts, mockArtifact } from "../../mocks/pipelines";
 import { Readable } from "stream";
-import { resolve } from "path";
+import { resolve, join } from "path";
 import { mkdirSync, createWriteStream } from "fs";
 
 // Mock fetch globally
@@ -1017,8 +1017,10 @@ describe("configurePipelineTools", () => {
   describe("pipelines_download_artifact", () => {
     let mockWriteStream: any;
     let mockFileStream: Readable;
+    const originalEnv = process.env;
 
     beforeEach(() => {
+      process.env = { ...originalEnv };
       mockWriteStream = {
         write: jest.fn(),
         end: jest.fn(),
@@ -1036,6 +1038,10 @@ describe("configurePipelineTools", () => {
           this.push(null);
         },
       });
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
     });
 
     it("should download and save an artifact", async () => {
@@ -1056,16 +1062,114 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         buildId: 12345,
         artifactName: "drop",
-        destinationPath: "D:\\temp\\artifacts",
+        destinationPath: "artifacts",
       };
+
+      // Configure a base directory within process.cwd().
+      process.env.ADO_MCP_ARTIFACTS_DIR = "temp";
 
       const result = await handler(params);
 
       expect(mockGetArtifact).toHaveBeenCalledWith("test-project", 12345, "drop");
       expect(mockGetArtifactContentZip).toHaveBeenCalledWith("test-project", 12345, "drop");
-      expect(mkdirSync).toHaveBeenCalledWith(resolve("D:\\temp\\artifacts"), { recursive: true });
-      expect(createWriteStream).toHaveBeenCalledWith(expect.stringContaining("drop.zip"));
+      expect(mkdirSync).toHaveBeenCalledWith(resolve(process.cwd(), "temp", "artifacts"), { recursive: true });
+      expect(createWriteStream).toHaveBeenCalledWith(expect.stringContaining("drop.zip"), { flags: "wx" });
       expect(result.content[0].text).toContain("Artifact drop downloaded");
+    });
+
+    it("should reject destinationPath traversal outside base dir", async () => {
+      const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
+      const mockGetArtifactContentZip = jest.fn().mockResolvedValue(mockFileStream);
+
+      mockConnection.getBuildApi.mockResolvedValue({
+        getArtifact: mockGetArtifact,
+        getArtifactContentZip: mockGetArtifactContentZip,
+      } as any);
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      process.env.ADO_MCP_ARTIFACTS_DIR = "base";
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "..\\..\\artifacts",
+      };
+
+      await expect(handler(params)).rejects.toThrow("destinationPath");
+    });
+
+    it("should reject absolute destinationPath when base dir is not configured", async () => {
+      const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
+      const mockGetArtifactContentZip = jest.fn().mockResolvedValue(mockFileStream);
+
+      mockConnection.getBuildApi.mockResolvedValue({
+        getArtifact: mockGetArtifact,
+        getArtifactContentZip: mockGetArtifactContentZip,
+      } as any);
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      delete process.env.ADO_MCP_ARTIFACTS_DIR;
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "D:\\temp\\artifacts",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Absolute 'destinationPath' is not allowed");
+    });
+
+    it("should reject artifactName containing path separators or null bytes", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      await expect(handler({ project: "test-project", buildId: 12345, artifactName: "..\\temp", destinationPath: "artifacts" })).rejects.toThrow("must not contain path separators or null bytes");
+
+      await expect(handler({ project: "test-project", buildId: 12345, artifactName: "../temp", destinationPath: "artifacts" })).rejects.toThrow("must not contain path separators or null bytes");
+
+      await expect(handler({ project: "test-project", buildId: 12345, artifactName: "temp\0name", destinationPath: "artifacts" })).rejects.toThrow("must not contain path separators or null bytes");
+    });
+
+    it("should default downloads under ./.ado-mcp-artifacts when base dir is not configured", async () => {
+      const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
+      const mockGetArtifactContentZip = jest.fn().mockResolvedValue(mockFileStream);
+
+      mockConnection.getBuildApi.mockResolvedValue({
+        getArtifact: mockGetArtifact,
+        getArtifactContentZip: mockGetArtifactContentZip,
+      } as any);
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      delete process.env.ADO_MCP_ARTIFACTS_DIR;
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "artifacts",
+      };
+
+      const result = await handler(params);
+
+      const expectedDir = resolve(process.cwd(), ".ado-mcp-artifacts", "artifacts");
+      expect(mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true });
+      expect(result.content[0].text).toContain(expectedDir);
     });
 
     it("should handle artifact not found", async () => {
@@ -1084,7 +1188,7 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         buildId: 12345,
         artifactName: "drop",
-        destinationPath: "D:\\temp\\artifacts",
+        destinationPath: "artifacts",
       };
 
       const result = await handler(params);

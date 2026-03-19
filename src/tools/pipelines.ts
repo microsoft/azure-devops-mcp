@@ -9,7 +9,7 @@ import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 import { mkdirSync, createWriteStream } from "fs";
-import { join, resolve } from "path";
+import { isAbsolute, join, relative, resolve, sep } from "path";
 
 const PIPELINE_TOOLS = {
   pipelines_get_builds: "pipelines_get_builds",
@@ -27,6 +27,57 @@ const PIPELINE_TOOLS = {
   pipelines_list_artifacts: "pipelines_list_artifacts",
   pipelines_download_artifact: "pipelines_download_artifact",
 };
+
+const DEFAULT_ARTIFACTS_BASE_DIR = ".ado-mcp-artifacts";
+
+function sanitizeFileName(fileName: string): string {
+  const trimmed = fileName.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Invalid 'artifactName': must not be empty or whitespace-only.");
+  }
+
+  const sanitized = trimmed.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
+  return sanitized.slice(0, 128);
+}
+
+function resolveAndValidateDestinationPath(destinationPath: string): string {
+  const configuredBaseDir = process.env.ADO_MCP_ARTIFACTS_DIR;
+
+  const cwd = resolve(process.cwd());
+  const baseDirName = configuredBaseDir && configuredBaseDir.trim().length > 0 ? configuredBaseDir.trim() : DEFAULT_ARTIFACTS_BASE_DIR;
+
+  if (isAbsolute(baseDirName)) {
+    throw new Error("Invalid ADO_MCP_ARTIFACTS_DIR: must be a relative directory within the server working directory.");
+  }
+
+  const baseDirAbs = resolve(cwd, baseDirName);
+  const relBaseToCwd = relative(cwd, baseDirAbs);
+  if (relBaseToCwd === ".." || relBaseToCwd.startsWith(`..${sep}`) || isAbsolute(relBaseToCwd)) {
+    throw new Error("Invalid ADO_MCP_ARTIFACTS_DIR: must not escape the server working directory.");
+  }
+
+  if (isAbsolute(destinationPath)) {
+    throw new Error("Absolute 'destinationPath' is not allowed.");
+  }
+
+  const destinationAbs = resolve(baseDirAbs, destinationPath);
+  const relToBase = relative(baseDirAbs, destinationAbs);
+  if (relToBase === ".." || relToBase.startsWith(`..${sep}`) || isAbsolute(relToBase)) {
+    throw new Error(`Invalid 'destinationPath': must be within ./${baseDirName.replace(/\\/g, "/")}.`);
+  }
+
+  return destinationAbs;
+}
+
+function ensurePathWithinDirectory(directoryPath: string, candidatePath: string): void {
+  const resolvedDirectory = resolve(directoryPath);
+  const resolvedCandidate = resolve(candidatePath);
+  const rel = relative(resolvedDirectory, resolvedCandidate);
+
+  if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error("Invalid download path: resolved file path must be within the destination directory.");
+  }
+}
 
 function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
@@ -537,9 +588,22 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the project."),
       buildId: z.number().describe("The ID of the build."),
       artifactName: z.string().describe("The name of the artifact to download."),
-      destinationPath: z.string().optional().describe("The local path to download the artifact to. If not provided, returns binary content as base64."),
+      destinationPath: z
+        .string()
+        .optional()
+        .describe(
+          `Local directory to download the artifact into. For security, downloads are restricted to a base directory under the server working directory (ADO_MCP_ARTIFACTS_DIR if set, otherwise ./${DEFAULT_ARTIFACTS_BASE_DIR}). If not provided, returns binary content as base64.`
+        ),
     },
     async ({ project, buildId, artifactName, destinationPath }) => {
+      if (artifactName.length === 0) {
+        throw new Error("Invalid 'artifactName': must not be empty.");
+      }
+
+      if (/[\\/\0]/.test(artifactName)) {
+        throw new Error("Invalid 'artifactName': must not contain path separators or null bytes.");
+      }
+
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
       const artifact = await buildApi.getArtifact(project, buildId, artifactName);
@@ -550,24 +614,32 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         };
       }
 
+      if (artifact.id === undefined || artifact.id === null) {
+        throw new Error("Failed to determine artifact id for downloaded file name.");
+      }
+
       const fileStream = await buildApi.getArtifactContentZip(project, buildId, artifactName);
 
       // If destinationPath is provided, save to disk
       if (destinationPath) {
-        const fullDestinationPath = resolve(destinationPath);
+        const safeArtifactFileName = sanitizeFileName(artifactName);
+        const fullDestinationPath = resolveAndValidateDestinationPath(destinationPath);
 
         mkdirSync(fullDestinationPath, { recursive: true });
-        const fileDestinationPath = join(fullDestinationPath, `${artifactName}.zip`);
+        const fileDestinationPath = join(fullDestinationPath, `${safeArtifactFileName}.zip`);
 
-        const writeStream = createWriteStream(fileDestinationPath);
+        ensurePathWithinDirectory(fullDestinationPath, fileDestinationPath);
+
+        const writeStream = createWriteStream(fileDestinationPath, { flags: "wx" });
         await new Promise<void>((resolve, reject) => {
           fileStream.pipe(writeStream);
           fileStream.on("end", () => resolve());
           fileStream.on("error", (err) => reject(err));
+          writeStream.on("error", (err) => reject(err));
         });
 
         return {
-          content: [{ type: "text", text: `Artifact ${artifactName} downloaded to ${destinationPath}.` }],
+          content: [{ type: "text", text: `Artifact ${artifactName} downloaded to ${fullDestinationPath}.` }],
         };
       }
 
