@@ -23,7 +23,7 @@ resource "azapi_resource" "mcp_auth" {
           }
           validation = {
             allowedAudiences = [
-              var.microsoft_auth_client_id
+              "api://${var.microsoft_auth_client_id}"
             ]
           }
         }
