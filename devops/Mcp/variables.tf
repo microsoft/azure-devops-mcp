@@ -35,16 +35,6 @@ variable "microsoft_auth_client_id" {
   }
 }
 
-variable "microsoft_auth_client_secret" {
-  type        = string
-  sensitive   = true
-  description = "Microsoft Entra application client secret used by Container Apps authentication."
-  validation {
-    condition     = length(var.microsoft_auth_client_secret) > 0
-    error_message = "Microsoft auth client secret should be a non-empty string."
-  }
-}
-
 variable "microsoft_auth_tenant_id" {
   type        = string
   description = "Microsoft Entra tenant ID used by Container Apps authentication."
