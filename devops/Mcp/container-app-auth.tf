@@ -18,8 +18,8 @@ resource "azapi_resource" "mcp_auth" {
         azureActiveDirectory = {
           enabled = true
           registration = {
-            clientId                = var.microsoft_auth_client_id
-            openIdIssuer            = "https://login.microsoftonline.com/${var.microsoft_auth_tenant_id}/v2.0"
+            clientId     = var.microsoft_auth_client_id
+            openIdIssuer = "https://login.microsoftonline.com/${var.microsoft_auth_tenant_id}/v2.0"
           }
           validation = {
             allowedAudiences = [
