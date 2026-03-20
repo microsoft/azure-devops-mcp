@@ -1,0 +1,50 @@
+schema: spec-driven
+
+# Project context
+# This is shown to AI when creating artifacts.
+context: |
+  Tech Stack:
+  - Language: TypeScript (ESM)
+  - Runtime: Node.js 20+
+  - SDK: @modelcontextprotocol/sdk
+  - ADO API: azure-devops-node-api, fetch (native)
+  - CLI Parsing: yargs
+  - Testing: Jest (ts-jest)
+  - Tool Validation: Zod
+
+  Architecture & Patterns:
+  - Modular Tooling: Tools are grouped by domain in `src/tools/` (e.g., `repositories.ts`, `work-items.ts`).
+  - Shared Config: Global configuration (orgUrl, orgName, isCustomUrl) is managed in `src/config.ts`.
+  - Dependency Injection: Tool configuration functions receive `server`, `authHeaderProvider`, `connectionProvider`, and `userAgentProvider`.
+  - API Versioning: Global API versions are managed in `src/utils.ts` and initialized in `src/index.ts`.
+  - Error Handling: Use try/catch in tool handlers; return `isError: true` with a clear message for MCP error reporting.
+
+  Coding Standards:
+  - Formatting: Prettier (config in `.prettierrc.json`).
+  - Linting: ESLint (rules in `eslint.config.mjs`, including custom `tool-name-lint-rule.js`).
+  - Naming: Use camelCase for variables/functions, PascalCase for classes/interfaces. Tool names follow `<domain>_<action>` pattern (e.g., `wit_get_work_item`).
+  - Authentication: Support 'interactive', 'azcli', and 'pat'/'envvar'. PAT requires `Basic` auth with encoded `:token`.
+
+  Testing Policy:
+  - Location: All tests in `test/src/` mirroring `src/` structure.
+  - Mocks: Use `test/mocks/` for complex ADO API responses.
+  - Coverage: Maintain high coverage (current > 98%). Every new requirement MUST have a corresponding test scenario.
+  - Snapshot: We prefer literal string/JSON expectations over snapshots for tool outputs.
+
+# Per-artifact rules
+rules:
+  proposal:
+    - Always include "Why", "What Changes", "Capabilities", and "Impact" sections.
+    - Explicitly state if the change impacts Azure DevOps Server (on-premise).
+  design:
+    - Must detail changes to CLI arguments and global state in `src/config.ts`.
+    - Must specify how the authentication handler is affected.
+    - Include a "Risks / Trade-offs" section for architectural shifts.
+  specs:
+    - One spec file per capability.
+    - Each requirement MUST have at least one `#### Scenario` in WHEN/THEN format.
+    - Use SHALL/MUST for normative requirements.
+  tasks:
+    - Group tasks by functional area (e.g., "1. Config", "2. Core", "3. Tools").
+    - Ensure a "Tests and Validation" group is always included.
+    - Keep tasks small and verifiable.
