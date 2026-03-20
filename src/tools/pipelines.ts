@@ -42,19 +42,8 @@ function sanitizeFileName(fileName: string): string {
 
 function resolveAndValidateDestinationPath(destinationPath: string): string {
   const configuredBaseDir = process.env.ADO_MCP_ARTIFACTS_DIR;
-
-  const cwd = resolve(process.cwd());
   const baseDirName = configuredBaseDir && configuredBaseDir.trim().length > 0 ? configuredBaseDir.trim() : DEFAULT_ARTIFACTS_BASE_DIR;
-
-  if (isAbsolute(baseDirName)) {
-    throw new Error("Invalid ADO_MCP_ARTIFACTS_DIR: must be a relative directory within the server working directory.");
-  }
-
-  const baseDirAbs = resolve(cwd, baseDirName);
-  const relBaseToCwd = relative(cwd, baseDirAbs);
-  if (relBaseToCwd === ".." || relBaseToCwd.startsWith(`..${sep}`) || isAbsolute(relBaseToCwd)) {
-    throw new Error("Invalid ADO_MCP_ARTIFACTS_DIR: must not escape the server working directory.");
-  }
+  const baseDirAbs = resolve(baseDirName);
 
   if (isAbsolute(destinationPath)) {
     throw new Error("Absolute 'destinationPath' is not allowed.");
@@ -63,7 +52,7 @@ function resolveAndValidateDestinationPath(destinationPath: string): string {
   const destinationAbs = resolve(baseDirAbs, destinationPath);
   const relToBase = relative(baseDirAbs, destinationAbs);
   if (relToBase === ".." || relToBase.startsWith(`..${sep}`) || isAbsolute(relToBase)) {
-    throw new Error(`Invalid 'destinationPath': must be within ./${baseDirName.replace(/\\/g, "/")}.`);
+    throw new Error(`Invalid 'destinationPath': must be within the base directory.`);
   }
 
   return destinationAbs;
@@ -592,7 +581,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         .string()
         .optional()
         .describe(
-          `Local directory to download the artifact into. For security, downloads are restricted to a base directory under the server working directory (ADO_MCP_ARTIFACTS_DIR if set, otherwise ./${DEFAULT_ARTIFACTS_BASE_DIR}). If not provided, returns binary content as base64.`
+          `Relative directory path to download the artifact into. Must be a relative path within the base directory (ADO_MCP_ARTIFACTS_DIR env var if set, otherwise ./${DEFAULT_ARTIFACTS_BASE_DIR}). Absolute paths and path traversal (e.g. '../') are not allowed. If not provided, returns binary content as base64.`
         ),
     },
     async ({ project, buildId, artifactName, destinationPath }) => {
