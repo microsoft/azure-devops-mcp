@@ -21,7 +21,7 @@ function filterProjectsByName(projects: ProjectInfo[], projectNameFilter: string
   return projects.filter((project) => project.name?.toLowerCase().includes(lowerCaseFilter));
 }
 
-function configureCoreTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configureCoreTools(server: McpServer, authHeaderProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     CORE_TOOLS.list_project_teams,
     "Retrieve a list of teams for an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
@@ -108,7 +108,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     },
     async ({ searchFilter }) => {
       try {
-        const identities = await searchIdentities(searchFilter, tokenProvider, connectionProvider, userAgentProvider);
+        const identities = await searchIdentities(searchFilter, authHeaderProvider, connectionProvider, userAgentProvider);
 
         if (!identities || identities.value?.length === 0) {
           return { content: [{ type: "text", text: "No identities found" }], isError: true };

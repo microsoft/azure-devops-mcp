@@ -155,7 +155,7 @@ function buildVersionDescriptor(version?: string, versionType?: string): GitVers
   };
 }
 
-function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+function configureRepoTools(server: McpServer, authHeaderProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     REPO_TOOLS.create_pull_request,
     "Create a new pull request.",
@@ -369,7 +369,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (autoComplete !== undefined) {
           if (autoComplete) {
-            const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+            const data = await getCurrentUserDetails(authHeaderProvider, connectionProvider, userAgentProvider);
             const autoCompleteUserId = data.authenticatedUser.id;
             updateRequest.autoCompleteSetBy = { id: autoCompleteUserId };
 
@@ -602,7 +602,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (created_by_user) {
           try {
-            const userId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
+            const userId = await getUserIdFromEmail(created_by_user, authHeaderProvider, connectionProvider, userAgentProvider);
             searchCriteria.creatorId = userId;
           } catch (error) {
             return {
@@ -616,14 +616,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             };
           }
         } else if (created_by_me) {
-          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const data = await getCurrentUserDetails(authHeaderProvider, connectionProvider, userAgentProvider);
           const userId = data.authenticatedUser.id;
           searchCriteria.creatorId = userId;
         }
 
         if (user_is_reviewer) {
           try {
-            const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+            const reviewerUserId = await getUserIdFromEmail(user_is_reviewer, authHeaderProvider, connectionProvider, userAgentProvider);
             searchCriteria.reviewerId = reviewerUserId;
           } catch (error) {
             return {
@@ -637,7 +637,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             };
           }
         } else if (i_am_reviewer) {
-          const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          const data = await getCurrentUserDetails(authHeaderProvider, connectionProvider, userAgentProvider);
           const userId = data.authenticatedUser.id;
           searchCriteria.reviewerId = userId;
         }
@@ -1489,7 +1489,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
 
-      const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+      const userDetails = await getCurrentUserDetails(authHeaderProvider, connectionProvider, userAgentProvider);
       const userId = userDetails.authenticatedUser.id;
 
       if (!userId) {

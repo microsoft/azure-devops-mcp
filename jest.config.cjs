@@ -52,5 +52,6 @@ module.exports = {
     "^(.+)/auth\\.js$": "$1/auth.ts",
     "^(.+)/logger\\.js$": "$1/logger.ts",
     "^(.+)/elicitations\\.js$": "$1/elicitations.ts",
+    "^(.+)/config\\.js$": "$1/config.ts",
   },
 };

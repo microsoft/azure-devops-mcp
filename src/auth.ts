@@ -78,6 +78,7 @@ class OAuthAuthenticator {
 function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
   logger.debug(`Creating authenticator of type '${type}' with tenantId='${tenantId ?? "undefined"}'`);
   switch (type) {
+    case "pat":
     case "envvar":
       logger.debug(`Authenticator: Using environment variable authentication (ADO_MCP_AUTH_TOKEN)`);
       // Read token from fixed environment variable
@@ -122,4 +123,11 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
       };
   }
 }
-export { createAuthenticator };
+function getAuthorizationHeader(type: string, token: string): string {
+  if (type === "pat" || type === "envvar") {
+    return `Basic ${Buffer.from(`:${token}`).toString("base64")}`;
+  }
+  return `Bearer ${token}`;
+}
+
+export { createAuthenticator, getAuthorizationHeader };

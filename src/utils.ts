@@ -1,9 +1,20 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-export const apiVersion = "7.2-preview.1";
-export const batchApiVersion = "5.0";
-export const markdownCommentsApiVersion = "7.2-preview.4";
+export let apiVersion = "7.2-preview.1";
+export let batchApiVersion = "5.0";
+export let markdownCommentsApiVersion = "7.2-preview.4";
+
+/**
+ * Updates the global API versions.
+ * @param version The new API version to use for the main API
+ */
+export function setApiVersions(version: string): void {
+  apiVersion = version;
+  // If the user specifies a specific version, we might want to also adjust these,
+  // but for now let's just make them available for override if needed.
+  // Actually, usually batchApiVersion is fixed at 5.0 for compatibility.
+}
 
 export function createEnumMapping<T extends Record<string, string | number>>(enumObject: T): Record<string, T[keyof T]> {
   const mapping: Record<string, T[keyof T]> = {};

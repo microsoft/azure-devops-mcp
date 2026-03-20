@@ -182,6 +182,30 @@ We recommend that you always enable `core` tools so that you can fetch project l
 
 > By default all domains are loaded
 
+## 🏢 Azure DevOps Server (On-Premise) Support
+
+The Azure DevOps MCP Server supports self-hosted instances of **Azure DevOps Server 2022**.
+
+To connect to a Server instance:
+
+1. Use the `--url` (or `-u`) argument to specify your full collection URL.
+2. Use the `--authentication pat` (or `envvar`) argument and set the `ADO_MCP_AUTH_TOKEN` environment variable with your Personal Access Token.
+3. (Optional) Use `--api-version` (or `-v`) to target a specific REST API version (defaults to `7.2-preview.1`).
+
+Example `mcp.json` for Azure DevOps Server:
+
+```json
+{
+  "servers": {
+    "ado_server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "DefaultCollection", "--url", "https://tfs.contoso.com/tfs/DefaultCollection", "--authentication", "pat", "--api-version", "7.1"]
+    }
+  }
+}
+```
+
 ## 📝 Troubleshooting
 
 See the [Troubleshooting guide](./docs/TROUBLESHOOTING.md) for help with common issues and logging.

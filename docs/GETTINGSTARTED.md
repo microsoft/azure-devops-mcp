@@ -93,7 +93,7 @@ Click "Select Tools" and choose the available tools.
 
 ##### Using Token Authentication via Environment Variables
 
-For automated scenarios or when you want to use a token stored in an environment variable, you can use the `envvar` authentication type:
+For automated scenarios or when you want to use a token stored in an environment variable (Personal Access Token), you can use the `pat` or `envvar` authentication type:
 
 1. **Set your token in the ADO_MCP_AUTH_TOKEN environment variable:**
 
@@ -115,7 +115,7 @@ For automated scenarios or when you want to use a token stored in an environment
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "pat"]
        }
      }
    }
