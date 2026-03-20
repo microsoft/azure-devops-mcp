@@ -19,6 +19,7 @@ import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
 import { setApiVersions } from "./utils.js";
 import { setConfig } from "./config.js";
+import { ar } from "zod/v4/locales";
 
 function isGitHubCodespaceEnv(): boolean {
   return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
@@ -73,8 +74,9 @@ const argv = yargs(hideBin(process.argv))
 const name = argv.organization as string;
 const url = (argv.url as string) || "https://dev.azure.com/" + name;
 const custom = !!argv.url;
+const insecure = !!argv.insecure;
 
-setConfig(name, url, custom);
+setConfig(name, url, custom, insecure);
 
 export { name as orgName, url as orgUrl, custom as isCustomUrl };
 
@@ -87,11 +89,16 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
     const authType = argv.authentication as string;
     // Use Personal Access Token handler for 'pat' or 'envvar' types, which is required for ADO Server
     const authHandler = authType === "pat" || authType === "envvar" ? getPersonalAccessTokenHandler(accessToken) : getBearerHandler(accessToken);
-    const connection = new WebApi(url, authHandler, undefined, {
-      productName: "AzureDevOps.MCP",
-      productVersion: packageVersion,
-      userAgent: userAgentComposer.userAgent,
-    });
+    const connection = new WebApi(
+      url,
+      authHandler,
+      { ignoreSslError: insecure },
+      {
+        productName: "AzureDevOps.MCP",
+        productVersion: packageVersion,
+        userAgent: userAgentComposer.userAgent,
+      }
+    );
     return connection;
   };
 }
