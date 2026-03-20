@@ -1056,14 +1056,14 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         buildId: 12345,
         artifactName: "drop",
-        destinationPath: "D:\\temp\\artifacts",
+        destinationPath: "temp\\artifacts",
       };
 
       const result = await handler(params);
 
       expect(mockGetArtifact).toHaveBeenCalledWith("test-project", 12345, "drop");
       expect(mockGetArtifactContentZip).toHaveBeenCalledWith("test-project", 12345, "drop");
-      expect(mkdirSync).toHaveBeenCalledWith(resolve("D:\\temp\\artifacts"), { recursive: true });
+      expect(mkdirSync).toHaveBeenCalledWith(resolve("temp\\artifacts"), { recursive: true });
       expect(createWriteStream).toHaveBeenCalledWith(expect.stringContaining("drop.zip"));
       expect(result.content[0].text).toContain("Artifact drop downloaded");
     });
@@ -1084,7 +1084,7 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         buildId: 12345,
         artifactName: "drop",
-        destinationPath: "D:\\temp\\artifacts",
+        destinationPath: "temp\\artifacts",
       };
 
       const result = await handler(params);
@@ -1110,10 +1110,78 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         buildId: 12345,
         artifactName: "drop",
-        destinationPath: "D:\\temp\\artifacts",
+        destinationPath: "temp\\artifacts",
       };
 
       await expect(handler(params)).rejects.toThrow("Network error");
+    });
+
+    it("should reject destinationPath with a Windows absolute path", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "C:\\temp\\artifacts",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and paths traversals are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should reject destinationPath with a Unix absolute path", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "/tmp/artifacts",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and paths traversals are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should reject destinationPath with path traversal segments", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "..\\..\\temp\\artifacts",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and paths traversals are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should reject artifactName with path traversal segments", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
+      if (!call) throw new Error("pipelines_download_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "..\\..\\drop",
+        destinationPath: "temp\\artifacts",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid artifactName: path traversal is not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
     });
 
     it("should return artifact as base64 binary when destinationPath is not provided", async () => {
