@@ -9,7 +9,7 @@ import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 import { mkdirSync, createWriteStream } from "fs";
-import { join, resolve } from "path";
+import { join, posix, resolve, win32 } from "path";
 
 const PIPELINE_TOOLS = {
   pipelines_get_builds: "pipelines_get_builds",
@@ -540,6 +540,16 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       destinationPath: z.string().optional().describe("The local path to download the artifact to. If not provided, returns binary content as base64."),
     },
     async ({ project, buildId, artifactName, destinationPath }) => {
+      const isAbsolutePath = (value: string) => posix.isAbsolute(value) || win32.isAbsolute(value);
+
+      if (artifactName.includes("..")) {
+        throw new Error("Invalid artifactName: path traversal is not allowed.");
+      }
+
+      if (destinationPath && (destinationPath.includes("..") || isAbsolutePath(destinationPath))) {
+        throw new Error("Invalid destinationPath: absolute paths and paths traversals are not allowed.");
+      }
+
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
       const artifact = await buildApi.getArtifact(project, buildId, artifactName);
