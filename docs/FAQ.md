@@ -27,3 +27,7 @@ At this time, only the local version of the MCP Server is supported.
 Unfortunately, personal accounts are not supported. To maintain a higher level of authentication and security, your account must be backed by Entra ID. If you receive an error message like this, it means you are using a personal account.
 
 ![image of login error for personal accounts](./media/personal-accounts-error.png)
+
+## When will a remote Azure DevOps MCP Server be availble?
+
+We receive this question frequently. The good news is that work is currently underway. Development began in early January 2026. Once we can provide a reliable timeline, we will publish it on the public [Azure DevOps roadmap](https://learn.microsoft.com/en-us/azure/devops/release-notes/features-timeline).

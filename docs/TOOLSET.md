@@ -35,11 +35,13 @@
 | Repositories      | [mcp_ado_repo_create_pull_request](#mcp_ado_repo_create_pull_request)                                     | Create a new pull request                                |
 | Repositories      | [mcp_ado_repo_update_pull_request](#mcp_ado_repo_update_pull_request)                                     | Update pull request properties and settings              |
 | Repositories      | [mcp_ado_repo_update_pull_request_reviewers](#mcp_ado_repo_update_pull_request_reviewers)                 | Add or remove reviewers from a pull request              |
+| Repositories      | [mcp_ado_repo_vote_pull_request](#mcp_ado_repo_vote_pull_request)                                         | Cast a vote on a pull request                            |
 | Repositories      | [mcp_ado_repo_list_pull_request_threads](#mcp_ado_repo_list_pull_request_threads)                         | List comment threads on a pull request                   |
 | Repositories      | [mcp_ado_repo_list_pull_request_thread_comments](#mcp_ado_repo_list_pull_request_thread_comments)         | List comments in a specific thread                       |
 | Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request            |
 | Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
+| Repositories      | [mcp_ado_repo_list_directory](#mcp_ado_repo_list_directory)                                               | List files and folders in a directory                    |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
 | Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                            |
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
@@ -70,6 +72,7 @@
 | Work Items        | [mcp_ado_wit_link_work_item_to_pull_request](#mcp_ado_wit_link_work_item_to_pull_request)                 | Link a work item to a pull request                       |
 | Work Items        | [mcp_ado_wit_list_work_item_comments](#mcp_ado_wit_list_work_item_comments)                               | List comments on a work item                             |
 | Work Items        | [mcp_ado_wit_add_work_item_comment](#mcp_ado_wit_add_work_item_comment)                                   | Add a comment to a work item                             |
+| Work Items        | [mcp_ado_wit_update_work_item_comment](#mcp_ado_wit_update_work_item_comment)                             | Update an existing comment on a work item                |
 | Work Items        | [mcp_ado_wit_list_work_item_revisions](#mcp_ado_wit_list_work_item_revisions)                             | Get revision history of a work item                      |
 | Work Items        | [mcp_ado_wit_get_work_item_type](#mcp_ado_wit_get_work_item_type)                                         | Get details of a work item type                          |
 | Work Items        | [mcp_ado_wit_my_work_items](#mcp_ado_wit_my_work_items)                                                   | List work items relevant to current user                 |
@@ -85,6 +88,7 @@
 | Work              | [mcp_ado_work_get_iteration_capacities](#mcp_ado_work_get_iteration_capacities)                           | Get capacity for all teams in an iteration               |
 | Work              | [mcp_ado_work_get_team_capacity](#mcp_ado_work_get_team_capacity)                                         | Get capacity for a specific team in iteration            |
 | Work              | [mcp_ado_work_update_team_capacity](#mcp_ado_work_update_team_capacity)                                   | Update team member capacity for iteration                |
+| Work              | [mcp_ado_work_get_team_settings](#mcp_ado_work_get_team_settings)                                         | Get team settings including default iteration and area   |
 
 ## Advanced Security
 
@@ -211,6 +215,19 @@ Updates the stage of a specific build.
 - **Required**: `project`, `buildId`, `stageName`, `status`
 - **Optional**: `forceRetryAllJobs`
 
+### mcp_ado_pipelines_list_artifacts
+
+Lists artifacts for a given build.
+
+- **Required**: `project`, `buildId`
+
+### mcp_ado_pipelines_download_artifact
+
+Downloads a pipeline artifact.
+
+- **Required**: `project`, `buildId`, `artifactName`
+- **Optional**: `destinationPath`
+
 ## Repositories
 
 ### mcp_ado_repo_list_repos_by_project
@@ -322,6 +339,13 @@ Add or remove reviewers for an existing pull request.
 - **Required**: `repositoryId`, `pullRequestId`, `reviewerIds`, `action`
 - **Optional**: None
 
+### mcp_ado_repo_vote_pull_request
+
+Cast a vote on a pull request.
+
+- **Required**: `repositoryId`, `pullRequestId`, `vote`
+- **Optional**: None
+
 ### mcp_ado_repo_list_pull_request_threads
 
 Retrieve a list of comment threads for a pull request.
@@ -356,6 +380,13 @@ Replies to a specific comment on a pull request.
 
 - **Required**: `repositoryId`, `pullRequestId`, `threadId`, `content`
 - **Optional**: `fullResponse`, `project`
+
+### mcp_ado_repo_list_directory
+
+List files and folders in a directory within a repository.
+
+- **Required**: `repositoryId`
+- **Optional**: `path`, `project`, `version`, `versionType`, `recursive`, `recursionDepth`
 
 ## Search
 
@@ -440,10 +471,10 @@ Update an existing test case work item.
 
 ### mcp_ado_testplan_show_test_results_from_build_id
 
-Gets a list of test results for a given project and build ID.
+Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes.
 
 - **Required**: `project`, `buildid`
-- **Optional**: None
+- **Optional**: `outcomes`
 
 ## Wiki
 
@@ -575,6 +606,13 @@ Add comment to a work item by ID.
 - **Required**: `project`, `workItemId`, `comment`
 - **Optional**: `format`
 
+### mcp_ado_wit_update_work_item_comment
+
+Update an existing comment on a work item by ID.
+
+- **Required**: `project`, `workItemId`, `commentId`, `text`
+- **Optional**: `format`
+
 ### mcp_ado_wit_list_work_item_revisions
 
 Retrieve list of revisions for a work item by ID.
@@ -681,3 +719,10 @@ Update the team capacity of a team member for a specific iteration in a project.
 
 - **Required**: `project`, `team`, `teamMemberId`, `iterationId`, `activities`
 - **Optional**: `daysOff`
+
+### mcp_ado_work_get_team_settings
+
+Get team settings including default iteration, backlog iteration, and default area path for a team.
+
+- **Required**: `project`
+- **Optional**: `team`

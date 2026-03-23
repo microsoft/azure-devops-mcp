@@ -1,6 +1,6 @@
 {
   "name": "@azure-devops/mcp",
-  "version": "2.3.0",
+  "version": "2.5.0",
   "mcpName": "microsoft.com/azure-devops",
   "description": "MCP server for interacting with Azure DevOps",
   "license": "MIT",
@@ -28,7 +28,7 @@
     "build": "tsc && shx chmod +x dist/*.js",
     "prepare": "npm run build && husky",
     "watch": "tsc --watch",
-    "inspect": "ALLOWED_ORIGINS=http://127.0.0.1:6274 npx @modelcontextprotocol/inspector node dist/index.js",
+    "inspect": "ALLOWED_ORIGINS=http://127.0.0.1:6274 npx @modelcontextprotocol/inspector@0.21.0 node dist/index.js",
     "start": "node -r tsconfig-paths/register dist/index.js",
     "eslint": "eslint",
     "eslint-fix": "eslint --fix",
@@ -39,8 +39,8 @@
   },
   "dependencies": {
     "@azure/identity": "^4.10.0",
-    "@azure/msal-node": "^3.6.0",
-    "@modelcontextprotocol/sdk": "1.25.2",
+    "@azure/msal-node": "^5.0.6",
+    "@modelcontextprotocol/sdk": "1.27.1",
     "azure-devops-extension-api": "^4.264.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.2",
@@ -50,7 +50,6 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.17.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.19.1",
     "eslint-config-prettier": "10.1.8",
@@ -60,12 +59,12 @@
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
     "lint-staged": "^16.2.7",
-    "prettier": "3.7.3",
+    "prettier": "3.8.1",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.6",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.48.0"
+    "typescript-eslint": "^8.54.0"
   },
   "lint-staged": {
     "**/*.(js|ts|jsx|tsx|json|css|md)": [

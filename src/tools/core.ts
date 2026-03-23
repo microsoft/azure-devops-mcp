@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { searchIdentities } from "./auth.js";
+import { elicitProject } from "../shared/elicitations.js";
 
 import type { ProjectInfo } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
@@ -23,9 +24,9 @@ function filterProjectsByName(projects: ProjectInfo[], projectNameFilter: string
 function configureCoreTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     CORE_TOOLS.list_project_teams,
-    "Retrieve a list of teams for the specified Azure DevOps project.",
+    "Retrieve a list of teams for an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       mine: z.boolean().optional().describe("If true, only return teams that the authenticated user is a member of."),
       top: z.number().optional().describe("The maximum number of teams to return. Defaults to 100."),
       skip: z.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),
@@ -34,7 +35,16 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
       try {
         const connection = await connectionProvider();
         const coreApi = await connection.getCoreApi();
-        const teams = await coreApi.getTeams(project, mine, top, skip, false);
+
+        let resolvedProject = project;
+
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to list teams for.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const teams = await coreApi.getTeams(resolvedProject, mine, top, skip, false);
 
         if (!teams) {
           return { content: [{ type: "text", text: "No teams found" }], isError: true };

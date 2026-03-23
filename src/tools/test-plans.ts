@@ -100,31 +100,54 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       name: z.string().describe("Name of the child test suite"),
     },
     async ({ project, planId, parentSuiteId, name }) => {
-      try {
-        const connection = await connectionProvider();
-        const testPlanApi = await connection.getTestPlanApi();
+      const maxRetries = 5;
+      const baseDelay = 500; // milliseconds
 
-        const testSuiteToCreate = {
-          name,
-          parentSuite: {
-            id: parentSuiteId,
-            name: "",
-          },
-          suiteType: 2,
-        };
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const connection = await connectionProvider();
+          const testPlanApi = await connection.getTestPlanApi();
 
-        const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
+          const testSuiteToCreate = {
+            name,
+            parentSuite: {
+              id: parentSuiteId,
+              name: "",
+            },
+            suiteType: 2,
+          };
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        return {
-          content: [{ type: "text", text: `Error creating test suite: ${errorMessage}` }],
-          isError: true,
-        };
+          const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+          // Check if it's a concurrency conflict error
+          const isConcurrencyError = errorMessage.includes("TF26071") || errorMessage.includes("got update") || errorMessage.includes("changed by someone else");
+
+          // If it's a concurrency error and we have retries left, wait and retry
+          if (isConcurrencyError && attempt < maxRetries) {
+            const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 200; // Exponential backoff with jitter
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue; // Retry
+          }
+
+          // If not a concurrency error or out of retries, return error
+          return {
+            content: [{ type: "text", text: `Error creating test suite: ${errorMessage}` }],
+            isError: true,
+          };
+        }
       }
+
+      // This should never be reached, but TypeScript requires a return value
+      return {
+        content: [{ type: "text", text: "Error creating test suite: Maximum retries exceeded" }],
+        isError: true,
+      };
     }
   );
 
@@ -330,19 +353,58 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
 
   server.tool(
     Test_Plan_Tools.test_results_from_build_id,
-    "Gets a list of test results for a given project and build ID.",
+    "Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes. Efficiently handles builds with large numbers of test runs.",
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       buildid: z.number().describe("The ID of the build."),
+      outcomes: z.array(z.string()).optional().describe("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
     },
-    async ({ project, buildid }) => {
+    async ({ project, buildid, outcomes }) => {
       try {
         const connection = await connectionProvider();
-        const coreApi = await connection.getTestResultsApi();
-        const testResults = await coreApi.getTestResultDetailsForBuild(project, buildid);
+        const testResultsApi = await connection.getTestResultsApi();
+
+        // Build filter expression for outcomes if specified
+        const outcomeFilter = outcomes?.map((o) => `Outcome eq '${o}'`).join(" or ");
+
+        // Fetch test result details for the build in a single API call
+        // This is more efficient than getTestRuns + getTestResults per run,
+        // especially for builds with many test runs (e.g., cloud testing with one run per test case)
+        const testResultDetails = await testResultsApi.getTestResultDetailsForBuild(
+          project,
+          buildid,
+          undefined, // publishContext
+          undefined, // groupBy
+          outcomeFilter, // filter by outcome
+          undefined, // orderby
+          true // shouldIncludeResults - get individual test results, not just aggregates
+        );
+
+        // Extract individual test results from the grouped response
+        const allResults: any[] = [];
+        if (testResultDetails.resultsForGroup) {
+          for (const group of testResultDetails.resultsForGroup) {
+            if (group.results) {
+              allResults.push(...group.results);
+            }
+          }
+        }
+
+        // Format results to extract useful fields
+        const formattedResults = allResults.map((r) => ({
+          id: r.id,
+          testCaseTitle: r.testCaseTitle,
+          outcome: r.outcome,
+          errorMessage: r.errorMessage,
+          stackTrace: r.stackTrace,
+          automatedTestName: r.automatedTestName,
+          automatedTestStorage: r.automatedTestStorage,
+          durationInMs: r.durationInMs,
+          runId: r.testRun?.id,
+        }));
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testResults, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(formattedResults, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";

@@ -5,9 +5,12 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 - [Prerequisites](#-prerequisites)
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
 - [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
+- [Getting started with GitHub Copilot CLI](#-using-mcp-server-with-github-copilot-cli)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
 - [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
 - [Getting started with Cursor](#-using-mcp-server-with-cursor)
+- [Getting started with Opencode](#-using-mcp-server-with-opencode)
+- [Getting started with Kilocode](#-using-mcp-server-with-kilocode)
 - [Optimizing Your Experience](#-optimizing-your-experience)
 
 ## 🕐 Prerequisites
@@ -225,6 +228,32 @@ Click the "Tools" icon and choose the available tools.
 
 For more details, see [Visual Studio MCP Servers documentation](https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers?view=vs-2022) and the [Getting Started Video](https://www.youtube.com/watch?v=oPFecZHBCkg).
 
+### 💻 Using MCP Server with GitHub Copilot CLI
+
+Use the Copilot CLI to interactively add the MCP server:
+
+```bash
+/mcp add
+```
+
+Alternatively, create or edit the configuration file `~/.copilot/mcp-config.json` and add:
+
+```json
+{
+  "mcpServers": {
+    "ado": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "{Contoso}"],
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+Replace `{Contoso}` with your Azure DevOps organization name.
+
+For more information, see the [Copilot CLI documentation](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli).
+
 ### 🤖 Using MCP Server with Claude Code
 
 See https://docs.anthropic.com/en/docs/claude-code/mcp for general guidance on adding MCP Server to Claude Code experience.
@@ -300,3 +329,82 @@ Replace `Contoso` with your Azure DevOps organization.
 You can now use the Azure DevOps MCP Server tools directly in chat.
 
 📽️ [Azure DevOps MCP Server: Getting started with Cursor](https://youtu.be/550VPTnjYRg)
+
+### 🟢 Using MCP Server with Opencode
+
+Add the Azure DevOps MCP server to your Opencode config file.
+
+**Config file location:**
+
+- macOS / Linux: `~/.config/opencode/opencode.json`
+
+Add the `azure-devops` entry under the `mcp` key:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "azure-devops": {
+      "type": "local",
+      "command": ["npx", "-y", "@azure-devops/mcp", "<your-org>"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Replace `<your-org>` with your Azure DevOps organization name (e.g. `contoso`).
+
+> **Note:** On first use, Opencode will trigger browser-based Microsoft account login.
+
+> **Tip:** Limit loaded tools using domain filtering by appending `-d` flags to the command:
+>
+> ```json
+> "command": ["npx", "-y", "@azure-devops/mcp", "<your-org>", "-d", "core", "work", "work-items"]
+> ```
+>
+> Available domains: `core`, `work`, `work-items`, `repositories`, `wiki`, `pipelines`, `search`, `test-plans`, `advanced-security`
+
+For more on Opencode MCP configuration, see the [Opencode MCP docs](https://opencode.ai/docs/mcp-servers/).
+
+### ⬛ Using MCP Server with Kilocode
+
+Kilocode supports MCP servers at two levels — **global** (all workspaces) or **project** (repo-specific).
+
+#### Option A — Global config
+
+1. Open the Kilocode pane → click the ⚙️ icon → **Agent Behaviour** → **MCP Servers**
+2. Click **Edit Global MCP** to open `mcp_settings.json`
+3. Add the `azure-devops` entry:
+
+```json
+{
+  "mcpServers": {
+    "azure-devops": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "<your-org>"]
+    }
+  }
+}
+```
+
+#### Option B — Project config
+
+Create `.kilocode/mcp.json` in your project root with the same content as above. This file can be committed to version control to share the setup with your team.
+
+> **Windows users:** Wrap the command for the Windows Command Prompt:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "azure-devops": {
+>       "command": "cmd",
+>       "args": ["/c", "npx", "-y", "@azure-devops/mcp", "<your-org>"]
+>     }
+>   }
+> }
+> ```
+
+Replace `<your-org>` with your Azure DevOps organization name. On first use, a browser window will open for Microsoft account login.
+
+For more on Kilocode MCP configuration, see the [Kilocode MCP docs](https://kilo.ai/docs/automate/mcp/using-in-kilo-code).
