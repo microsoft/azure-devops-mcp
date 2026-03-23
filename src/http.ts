@@ -15,6 +15,7 @@ import { hideBin } from "yargs/helpers";
 import { createAuthenticator } from "./auth.js";
 import { requireEasyAuth, makeAllowlistMiddleware } from "./auth/easyauth.js";
 import { logger, logIncomingMcpMessage } from "./logger.js";
+import { LoggingStreamableHTTPServerTransport } from "./logging-streamable-http-transport.js";
 import { getOrgTenant } from "./org-tenants.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
@@ -162,7 +163,7 @@ async function main(): Promise<void> {
       if (sessionId && transports[sessionId]) {
         transport = transports[sessionId];
       } else if (!sessionId && req.method === "POST" && isInitializeRequest(req.body)) {
-        transport = new StreamableHTTPServerTransport({
+        transport = new LoggingStreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           enableJsonResponse: true,
           onsessioninitialized: (sid) => {

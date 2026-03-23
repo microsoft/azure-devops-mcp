@@ -45,4 +45,45 @@ describe("summarizeMcpMessage", () => {
       uri: "ado://work-items/123",
     });
   });
+
+  it("summarizes tool call responses without logging full content", () => {
+    const summary = summarizeMcpMessage({
+      jsonrpc: "2.0",
+      id: 42,
+      result: {
+        content: [
+          { type: "text", text: "Very large response body" },
+          { type: "resource_link", uri: "ado://repo/file" },
+        ],
+        isError: true,
+      },
+    });
+
+    expect(summary).toEqual({
+      jsonrpc: "2.0",
+      id: 42,
+      resultKeys: ["content", "isError"],
+      isError: true,
+      contentItems: 2,
+      contentTypes: ["resource_link", "text"],
+    });
+  });
+
+  it("summarizes JSON-RPC error responses", () => {
+    const summary = summarizeMcpMessage({
+      jsonrpc: "2.0",
+      id: "req-1",
+      error: {
+        code: -32603,
+        message: "Internal server error",
+      },
+    });
+
+    expect(summary).toEqual({
+      jsonrpc: "2.0",
+      id: "req-1",
+      errorCode: -32603,
+      errorMessage: "Internal server error",
+    });
+  });
 });

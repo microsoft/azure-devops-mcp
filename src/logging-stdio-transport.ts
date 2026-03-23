@@ -6,7 +6,7 @@ import type { Readable, Writable } from "node:stream";
 import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 
-import { logIncomingMcpMessage } from "./logger.js";
+import { logIncomingMcpMessage, logOutgoingMcpMessage } from "./logger.js";
 
 export class LoggingStdioServerTransport {
   private readonly readBuffer = new ReadBuffer();
@@ -72,6 +72,10 @@ export class LoggingStdioServerTransport {
   send(message: JSONRPCMessage): Promise<void> {
     return new Promise((resolve) => {
       const json = serializeMessage(message);
+      logOutgoingMcpMessage("stdio", message, {
+        payloadBytes: Buffer.byteLength(JSON.stringify(message), "utf8"),
+        framedBytes: Buffer.byteLength(json, "utf8"),
+      });
       if (this.stdout.write(json)) {
         resolve();
       } else {

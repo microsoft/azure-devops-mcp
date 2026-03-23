@@ -51,6 +51,34 @@ function getArgumentKeys(argumentsValue: unknown): string[] | undefined {
   return Object.keys(argumentsValue).sort();
 }
 
+function getObjectKeys(value: unknown): string[] | undefined {
+  if (!isObject(value)) {
+    return undefined;
+  }
+
+  return Object.keys(value).sort();
+}
+
+function getContentSummary(contentValue: unknown): Record<string, unknown> {
+  if (!Array.isArray(contentValue)) {
+    return {};
+  }
+
+  const contentTypes = Array.from(
+    new Set(
+      contentValue
+        .filter(isObject)
+        .map((item) => item.type)
+        .filter((type): type is string => typeof type === "string")
+    )
+  ).sort();
+
+  return {
+    contentItems: contentValue.length,
+    contentTypes: contentTypes.length > 0 ? contentTypes : undefined,
+  };
+}
+
 export function summarizeMcpMessage(message: JSONRPCMessage): Record<string, unknown> {
   const summary: Record<string, unknown> = {
     jsonrpc: "jsonrpc" in message ? message.jsonrpc : undefined,
@@ -87,11 +115,39 @@ export function summarizeMcpMessage(message: JSONRPCMessage): Record<string, unk
     }
   }
 
+  if ("result" in message && isObject(message.result)) {
+    summary.resultKeys = getObjectKeys(message.result);
+
+    if (typeof message.result.isError === "boolean") {
+      summary.isError = message.result.isError;
+    }
+
+    Object.assign(summary, getContentSummary(message.result.content));
+  }
+
+  if ("error" in message && isObject(message.error)) {
+    if (typeof message.error.code === "number") {
+      summary.errorCode = message.error.code;
+    }
+
+    if (typeof message.error.message === "string") {
+      summary.errorMessage = message.error.message;
+    }
+  }
+
   return Object.fromEntries(Object.entries(summary).filter(([, value]) => typeof value !== "undefined"));
 }
 
 export function logIncomingMcpMessage(transport: "stdio" | "http", message: JSONRPCMessage, extra?: Record<string, unknown>): void {
   logger.info("MCP request received", {
+    transport,
+    ...extra,
+    ...summarizeMcpMessage(message),
+  });
+}
+
+export function logOutgoingMcpMessage(transport: "stdio" | "http", message: JSONRPCMessage, extra?: Record<string, unknown>): void {
+  logger.info("MCP response sent", {
     transport,
     ...extra,
     ...summarizeMcpMessage(message),
