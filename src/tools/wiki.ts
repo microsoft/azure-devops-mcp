@@ -92,10 +92,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
       try {
         const connection = await connectionProvider();
         const wikiApi = await connection.getWikiApi();
+        const normalizedContinuationToken = continuationToken?.trim() ? continuationToken.trim() : undefined;
 
         const pagesBatchRequest: WikiPagesBatchRequest = {
           top,
-          continuationToken,
+          continuationToken: normalizedContinuationToken,
           pageViewsForDays,
         };
 

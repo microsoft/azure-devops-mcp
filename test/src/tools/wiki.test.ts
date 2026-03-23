@@ -273,6 +273,33 @@ describe("configureWikiTools", () => {
       expect(result.isError).toBeUndefined();
     });
 
+    it("should omit an empty continuation token", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
+      if (!call) throw new Error("wiki_list_pages tool not registered");
+      const [, , , handler] = call;
+      mockWikiApi.getPagesBatch.mockResolvedValue({ value: ["page1"] });
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        project: "proj1",
+        top: 20,
+        continuationToken: "",
+      };
+      const result = await handler(params);
+
+      expect(mockWikiApi.getPagesBatch).toHaveBeenCalledWith(
+        {
+          top: 20,
+          continuationToken: undefined,
+          pageViewsForDays: undefined,
+        },
+        "proj1",
+        "wiki1"
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
     it("should handle API errors correctly", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_list_pages");
