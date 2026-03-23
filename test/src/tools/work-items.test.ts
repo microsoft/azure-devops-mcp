@@ -5,6 +5,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
+import { Readable } from "stream";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import {
   _mockBacklogs,
@@ -3530,7 +3531,6 @@ describe("configureWorkItemTools", () => {
 
   describe("wit_get_work_item_attachment tool", () => {
     function makeReadableStream(data: Buffer): NodeJS.ReadableStream {
-      const { Readable } = require("stream");
       const stream = new Readable();
       stream.push(data);
       stream.push(null);
