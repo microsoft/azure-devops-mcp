@@ -821,6 +821,37 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toContain("Error adding work item comment");
       expect(result.content[0].text).toContain("Failed to add a work item comment: Not Found");
     });
+
+    it("should encode the project parameter to prevent URL path injection", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_work_item_comment");
+      if (!call) throw new Error("wit_add_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 1, text: "comment" })),
+      });
+      global.fetch = mockFetch;
+
+      const maliciousProject = "../../_apis/hooks/subscriptions";
+      const params = {
+        comment: "attacker-controlled body content",
+        project: maliciousProject,
+        workItemId: 1,
+      };
+
+      await handler(params);
+
+      const calledUrl = mockFetch.mock.calls[0][0] as string;
+      // The project must be encoded in the URL to prevent path traversal
+      expect(calledUrl).toContain(encodeURIComponent(maliciousProject));
+      expect(calledUrl).not.toContain("../../");
+    });
   });
 
   describe("update_work_item_comment tool", () => {
@@ -901,6 +932,38 @@ describe("configureWorkItemTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error updating work item comment");
       expect(result.content[0].text).toContain("Failed to update work item comment: Not Found");
+    });
+
+    it("should encode the project parameter to prevent URL path injection", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_update_work_item_comment");
+      if (!call) throw new Error("wit_update_work_item_comment tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 1, text: "updated" })),
+      });
+      global.fetch = mockFetch;
+
+      const maliciousProject = "../../_apis/hooks/subscriptions/hookId";
+      const params = {
+        project: maliciousProject,
+        workItemId: 1,
+        commentId: 1,
+        text: "attacker-controlled body",
+      };
+
+      await handler(params);
+
+      const calledUrl = mockFetch.mock.calls[0][0] as string;
+      // The project must be encoded in the URL to prevent path traversal
+      expect(calledUrl).toContain(encodeURIComponent(maliciousProject));
+      expect(calledUrl).not.toContain("../../");
     });
   });
 
@@ -2633,6 +2696,72 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe("Error creating child work items: Unknown error occurred");
       expect(result.isError).toBe(true);
+    });
+
+    it("should encode the project parameter in batch request URI to prevent path injection", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
+      if (!call) throw new Error("wit_add_child_work_items tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] }),
+      });
+      global.fetch = mockFetch;
+
+      const maliciousProject = "../../_apis/audit/streams";
+      const params = {
+        parentId: 1,
+        project: maliciousProject,
+        workItemType: "Task",
+        items: [{ title: "Test", description: "Test" }],
+      };
+
+      await handler(params);
+
+      const calledBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const batchUri = calledBody[0].uri as string;
+      // The project must be encoded in the batch URI to prevent path traversal
+      expect(batchUri).toContain(encodeURIComponent(maliciousProject));
+      expect(batchUri).not.toContain("../../");
+    });
+
+    it("should encode the workItemType parameter in batch request URI to prevent path injection", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_child_work_items");
+      if (!call) throw new Error("wit_add_child_work_items tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] }),
+      });
+      global.fetch = mockFetch;
+
+      const maliciousType = "Task/../../_apis/audit/streams";
+      const params = {
+        parentId: 1,
+        project: "ValidProject",
+        workItemType: maliciousType,
+        items: [{ title: "Test", description: "Test" }],
+      };
+
+      await handler(params);
+
+      const calledBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const batchUri = calledBody[0].uri as string;
+      // The workItemType must be encoded in the batch URI to prevent path traversal
+      expect(batchUri).toContain(encodeURIComponent(maliciousType));
+      expect(batchUri).not.toContain("Task/../../");
     });
   });
 
