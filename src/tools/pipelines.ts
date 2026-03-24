@@ -541,13 +541,14 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, buildId, artifactName, destinationPath }) => {
       const isAbsolutePath = (value: string) => posix.isAbsolute(value) || win32.isAbsolute(value);
+      const hasDriveLetter = (value: string) => /^[a-zA-Z]:/.test(value);
 
       if (artifactName.includes("..")) {
         throw new Error("Invalid artifactName: path traversal is not allowed.");
       }
 
-      if (destinationPath && (destinationPath.includes("..") || isAbsolutePath(destinationPath))) {
-        throw new Error("Invalid destinationPath: absolute paths and paths traversals are not allowed.");
+      if (destinationPath && (destinationPath.includes("..") || isAbsolutePath(destinationPath) || hasDriveLetter(destinationPath))) {
+        throw new Error("Invalid destinationPath: absolute paths and path traversals are not allowed.");
       }
 
       const connection = await connectionProvider();
