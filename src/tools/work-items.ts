@@ -290,7 +290,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         };
 
         const formatParameter = format === "markdown" ? 0 : 1;
-        const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
+        const response = await fetch(`${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${accessToken}`,
@@ -337,15 +337,18 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const body: Record<string, string> = { text };
 
         const formatParameter = format === "markdown" ? 0 : 1;
-        const response = await fetch(`${orgUrl}/${project}/_apis/wit/workItems/${workItemId}/comments/${commentId}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
-          method: "PATCH",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-            "User-Agent": userAgentProvider(),
-          },
-          body: JSON.stringify(body),
-        });
+        const response = await fetch(
+          `${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workItems/${workItemId}/comments/${commentId}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+              "User-Agent": userAgentProvider(),
+            },
+            body: JSON.stringify(body),
+          }
+        );
 
         if (!response.ok) {
           throw new Error(`Failed to update work item comment: ${response.statusText}`);
@@ -523,7 +526,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
           return {
             method: "PATCH",
-            uri: `/${project}/_apis/wit/workitems/$${workItemType}?api-version=${batchApiVersion}`,
+            uri: `/${encodeURIComponent(project)}/_apis/wit/workitems/$${encodeURIComponent(workItemType)}?api-version=${batchApiVersion}`,
             headers: {
               "Content-Type": "application/json-patch+json",
             },
