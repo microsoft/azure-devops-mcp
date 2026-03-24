@@ -45,7 +45,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
         .array(z.enum(getEnumKeys(AlertValidityStatus) as [string, ...string[]]))
         .optional()
         .describe("Filter alerts by validity status. Only applicable for secret alerts."),
-      top: z.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
+      top: z.coerce.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
       orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("severity").describe("Order results by specified field. Defaults to 'severity'."),
       continuationToken: z.string().optional().describe("Continuation token for pagination."),
     },
@@ -103,7 +103,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repository: z.string().describe("The name or ID of the repository containing the alert."),
-      alertId: z.number().describe("The ID of the alert to retrieve details for."),
+      alertId: z.coerce.number().min(1).describe("The ID of the alert to retrieve details for."),
       ref: z.string().optional().describe("Git reference (branch) to filter the alert."),
     },
     async ({ project, repository, alertId, ref }) => {

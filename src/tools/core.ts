@@ -28,8 +28,8 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       mine: z.boolean().optional().describe("If true, only return teams that the authenticated user is a member of."),
-      top: z.number().optional().describe("The maximum number of teams to return. Defaults to 100."),
-      skip: z.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),
+      top: z.coerce.number().optional().describe("The maximum number of teams to return. Defaults to 100."),
+      skip: z.coerce.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),
     },
     async ({ project, mine, top, skip }) => {
       try {
@@ -69,9 +69,9 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     "Retrieve a list of projects in your Azure DevOps organization.",
     {
       stateFilter: z.enum(["all", "wellFormed", "createPending", "deleted"]).default("wellFormed").describe("Filter projects by their state. Defaults to 'wellFormed'."),
-      top: z.number().optional().describe("The maximum number of projects to return. Defaults to 100."),
-      skip: z.number().optional().describe("The number of projects to skip for pagination. Defaults to 0."),
-      continuationToken: z.number().optional().describe("Continuation token for pagination. Used to fetch the next set of results if available."),
+      top: z.coerce.number().optional().describe("The maximum number of projects to return. Defaults to 100."),
+      skip: z.coerce.number().optional().describe("The number of projects to skip for pagination. Defaults to 0."),
+      continuationToken: z.coerce.number().optional().describe("Continuation token for pagination. Used to fetch the next set of results if available."),
       projectNameFilter: z.string().optional().describe("Filter projects by name. Supports partial matches."),
     },
     async ({ stateFilter, top, skip, continuationToken, projectNameFilter }) => {

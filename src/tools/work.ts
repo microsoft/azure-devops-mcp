@@ -132,8 +132,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     "List all iterations in a specified Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      depth: z.number().default(2).describe("Depth of children to fetch."),
-      excludedIds: z.array(z.number()).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
+      depth: z.coerce.number().default(2).describe("Depth of children to fetch."),
+      excludedIds: z.array(z.coerce.number().min(1)).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
     },
     async ({ project, depth, excludedIds: ids }) => {
       try {
