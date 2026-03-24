@@ -226,6 +226,141 @@ describe("configurePipelineTools", () => {
         })
       );
     });
+
+    describe("URL path injection prevention", () => {
+      it("should encode project parameter to prevent path traversal in URL", async () => {
+        configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+        if (!call) throw new Error("pipelines_update_build_stage tool not registered");
+        const [, , , handler] = call;
+
+        (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
+
+        const mockResponse = {
+          ok: true,
+          text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse)),
+        };
+        (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
+
+        const maliciousProject = "../../_apis/hooks/subscriptions";
+        const params = {
+          project: maliciousProject,
+          buildId: 1,
+          stageName: "Build",
+          status: "Retry",
+          forceRetryAllJobs: false,
+        };
+
+        await handler(params);
+
+        const calledUrl = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0][0] as string;
+        // The URL must NOT contain the raw unencoded traversal sequence
+        expect(calledUrl).not.toContain("../../_apis/hooks/subscriptions");
+        // The URL must contain the encoded project parameter
+        expect(calledUrl).toContain(encodeURIComponent(maliciousProject));
+      });
+
+      it("should encode stageName parameter to prevent path traversal in URL", async () => {
+        configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+        if (!call) throw new Error("pipelines_update_build_stage tool not registered");
+        const [, , , handler] = call;
+
+        (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
+
+        const mockResponse = {
+          ok: true,
+          text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse)),
+        };
+        (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
+
+        const maliciousStageName = "../../../_apis/serviceendpoint/endpoints";
+        const params = {
+          project: "test-project",
+          buildId: 1,
+          stageName: maliciousStageName,
+          status: "Retry",
+          forceRetryAllJobs: false,
+        };
+
+        await handler(params);
+
+        const calledUrl = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0][0] as string;
+        // The URL must NOT contain the raw unencoded traversal sequence
+        expect(calledUrl).not.toContain("../../../_apis/serviceendpoint/endpoints");
+        // The URL must contain the encoded stageName parameter
+        expect(calledUrl).toContain(encodeURIComponent(maliciousStageName));
+      });
+
+      it("should encode both project and stageName when both contain malicious input", async () => {
+        configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+        if (!call) throw new Error("pipelines_update_build_stage tool not registered");
+        const [, , , handler] = call;
+
+        (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
+
+        const mockResponse = {
+          ok: true,
+          text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse)),
+        };
+        (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
+
+        const maliciousProject = "../../_apis/hooks/subscriptions";
+        const maliciousStageName = "../../_apis/wit/workitems";
+        const params = {
+          project: maliciousProject,
+          buildId: 1,
+          stageName: maliciousStageName,
+          status: "Retry",
+          forceRetryAllJobs: false,
+        };
+
+        await handler(params);
+
+        const calledUrl = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0][0] as string;
+        // The URL must contain both encoded parameters
+        expect(calledUrl).toContain(encodeURIComponent(maliciousProject));
+        expect(calledUrl).toContain(encodeURIComponent(maliciousStageName));
+        // Verify the correct URL structure is maintained
+        expect(calledUrl).toMatch(
+          new RegExp(
+            `^https://dev\\.azure\\.com/test-org/${encodeURIComponent(maliciousProject).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/_apis/build/builds/1/stages/${encodeURIComponent(maliciousStageName).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\?api-version=`
+          )
+        );
+      });
+
+      it("should encode project parameter containing slash characters", async () => {
+        configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_update_build_stage");
+        if (!call) throw new Error("pipelines_update_build_stage tool not registered");
+        const [, , , handler] = call;
+
+        (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
+
+        const mockResponse = {
+          ok: true,
+          text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse)),
+        };
+        (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
+
+        const projectWithSlashes = "my/project/name";
+        const params = {
+          project: projectWithSlashes,
+          buildId: 1,
+          stageName: "Build",
+          status: "Retry",
+          forceRetryAllJobs: false,
+        };
+
+        await handler(params);
+
+        const calledUrl = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0][0] as string;
+        // Slashes in project name must be encoded to prevent path manipulation
+        expect(calledUrl).toContain(encodeURIComponent(projectWithSlashes));
+        expect(calledUrl).not.toMatch(/test-org\/my\/project\/name\/_apis/);
+      });
+    });
   });
 
   describe("get_definitions tool", () => {

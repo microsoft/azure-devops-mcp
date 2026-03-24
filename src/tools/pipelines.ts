@@ -481,7 +481,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, buildId, stageName, status, forceRetryAllJobs }) => {
       const connection = await connectionProvider();
       const orgUrl = connection.serverUrl;
-      const endpoint = `${orgUrl}/${project}/_apis/build/builds/${buildId}/stages/${stageName}?api-version=${apiVersion}`;
+      const endpoint = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId}/stages/${encodeURIComponent(stageName)}?api-version=${apiVersion}`;
       const token = await tokenProvider();
 
       const body = {
