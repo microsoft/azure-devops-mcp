@@ -30,6 +30,7 @@ const WORKITEM_TOOLS = {
   work_items_link: "wit_work_items_link",
   work_item_unlink: "wit_work_item_unlink",
   add_artifact_link: "wit_add_artifact_link",
+  get_work_item_attachment: "wit_get_work_item_attachment",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -1265,6 +1266,70 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       }
     }
   );
+
+  server.tool(
+    WORKITEM_TOOLS.get_work_item_attachment,
+    "Download a work item attachment by its ID and return the content as a base64-encoded resource. Useful for viewing images (e.g. screenshots) attached to work items such as bugs.",
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
+      fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type for the returned resource."),
+    },
+    async ({ project, attachmentId, fileName }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const stream = await workItemApi.getAttachmentContent(attachmentId, fileName, project);
+
+        const chunks: Buffer[] = [];
+        await new Promise<void>((resolve, reject) => {
+          stream.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+          stream.on("end", resolve);
+          stream.on("error", reject);
+        });
+
+        const buffer = Buffer.concat(chunks);
+        const base64Data = buffer.toString("base64");
+        const mimeType = getMimeType(fileName);
+
+        return {
+          content: [
+            {
+              type: "resource",
+              resource: {
+                uri: `data:${mimeType};base64,${base64Data}`,
+                mimeType,
+                blob: base64Data,
+              },
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error retrieving work item attachment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+}
+
+function getMimeType(fileName: string | undefined): string {
+  const ext = fileName?.split(".").pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    bmp: "image/bmp",
+    svg: "image/svg+xml",
+    webp: "image/webp",
+    pdf: "application/pdf",
+    txt: "text/plain",
+    zip: "application/zip",
+  };
+  return (ext && mimeTypes[ext]) ?? "application/octet-stream";
 }
 
 export { WORKITEM_TOOLS, configureWorkItemTools };

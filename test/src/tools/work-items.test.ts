@@ -5,6 +5,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
+import { Readable } from "stream";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import {
   _mockBacklogs,
@@ -41,6 +42,7 @@ interface WorkItemTrackingApiMock {
   getWorkItemType: jest.Mock;
   getQuery: jest.Mock;
   queryById: jest.Mock;
+  getAttachmentContent: jest.Mock;
 }
 
 interface MockConnection {
@@ -81,6 +83,7 @@ describe("configureWorkItemTools", () => {
       getWorkItemType: jest.fn(),
       getQuery: jest.fn(),
       queryById: jest.fn(),
+      getAttachmentContent: jest.fn(),
     };
 
     mockConnection = {
@@ -3652,6 +3655,98 @@ describe("configureWorkItemTools", () => {
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe("Work item update failed");
       });
+    });
+  });
+
+  describe("wit_get_work_item_attachment tool", () => {
+    function makeReadableStream(data: Buffer): NodeJS.ReadableStream {
+      const stream = new Readable();
+      stream.push(data);
+      stream.push(null);
+      return stream;
+    }
+
+    it("should return attachment content as a base64 image resource", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeImageData = Buffer.from("fake-png-bytes");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeImageData));
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getAttachmentContent).toHaveBeenCalledWith(params.attachmentId, params.fileName, params.project);
+
+      const base64Data = fakeImageData.toString("base64");
+      expect(result.content[0].type).toBe("resource");
+      expect(result.content[0].resource.mimeType).toBe("image/png");
+      expect(result.content[0].resource.blob).toBe(base64Data);
+      expect(result.content[0].resource.uri).toBe(`data:image/png;base64,${base64Data}`);
+    });
+
+    it("should use application/octet-stream for an unknown file extension", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeData = Buffer.from("binary-data");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "data.xyz",
+      });
+
+      expect(result.content[0].resource.mimeType).toBe("application/octet-stream");
+    });
+
+    it("should use application/octet-stream when fileName is omitted", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeData = Buffer.from("binary-data");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+      });
+
+      expect(result.content[0].resource.mimeType).toBe("application/octet-stream");
+    });
+
+    it("should return an error when getAttachmentContent rejects", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.getAttachmentContent.mockRejectedValue(new Error("Not found"));
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: Not found");
     });
   });
 });
