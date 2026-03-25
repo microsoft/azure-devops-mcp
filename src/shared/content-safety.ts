@@ -20,7 +20,7 @@ export function spotlightContent(content: string, source: string): string {
  * Creates an MCP response containing spotlighted external content.
  * Use this for any tool that returns content fetched from Azure DevOps APIs.
  */
-export function createExternalContentResponse(content: unknown, source: string): { content: Array<{ type: "text"; text: string }> } {
+export function createExternalContentResponse(content: unknown, source: string): { content: { type: "text"; text: string }[] } {
   const serialized = typeof content === "string" ? content : JSON.stringify(content, null, 2);
   const spotlighted = spotlightContent(serialized, source);
   return { content: [{ type: "text", text: spotlighted }] };

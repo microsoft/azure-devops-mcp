@@ -14,7 +14,7 @@ describe("content-safety", () => {
       // Must contain closing delimiter with same nonce
       const nonceMatch = result.match(/^<<([0-9a-f]{32})>>/);
       expect(nonceMatch).not.toBeNull();
-      const nonce = nonceMatch![1];
+      const nonce = nonceMatch?.[1] ?? "";
       expect(result).toContain(`<</${nonce}>>`);
     });
 
@@ -54,7 +54,7 @@ describe("content-safety", () => {
       const nonce = result.match(/<<([0-9a-f]+)>>/)?.[1];
 
       expect(nonce).not.toBeUndefined();
-      expect(nonce!.length).toBe(32);
+      expect(nonce?.length).toBe(32);
     });
 
     it("should not be affected by content containing fake closing delimiters", () => {
