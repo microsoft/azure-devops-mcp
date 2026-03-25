@@ -9,6 +9,7 @@ import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 import { mkdirSync, createWriteStream } from "fs";
+import { createExternalContentResponse } from "../shared/content-safety.js";
 import { join, posix, resolve, win32 } from "path";
 
 const PIPELINE_TOOLS = {
@@ -296,9 +297,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const buildApi = await connection.getBuildApi();
       const logLines = await buildApi.getBuildLogLines(project, buildId, logId, startLine, endLine);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(logLines, null, 2) }],
-      };
+      return createExternalContentResponse(logLines, "build log");
     }
   );
 
