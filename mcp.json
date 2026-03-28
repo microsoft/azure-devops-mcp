@@ -1,11 +1,4 @@
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
   "servers": {
     "ado": {
       "type": "stdio",
@@ -14,6 +7,26 @@
       "env": {
         "LOG_LEVEL": "debug"
       }
+    },
+    "com.microsoft/azure": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": ["Azure.Mcp@2.0.0-beta.34", "--yes", "--", "server", "start"],
+      "gallery": "https://api.mcp.github.com",
+      "version": "2.0.0-beta.34"
+    },
+    "neondatabase/mcp-server-neon": {
+      "type": "http",
+      "url": "https://mcp.neon.tech/sse",
+      "gallery": "https://api.mcp.github.com",
+      "version": "1.0.0"
     }
-  }
+  },
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+    }
+  ]
 }
