@@ -6,6 +6,7 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
 import { apiVersion } from "../utils.js";
+import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const WIKI_TOOLS = {
   list_wikis: "wiki_list_wikis",
@@ -267,7 +268,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           pageContent = await streamToString(stream);
         }
 
-        return { content: [{ type: "text", text: JSON.stringify(pageContent, null, 2) }] };
+        return createExternalContentResponse(pageContent, "wiki page");
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
