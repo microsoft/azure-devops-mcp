@@ -164,8 +164,8 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
     it("returns the full list of available domains", () => {
       const availableDomains = DomainsManager.getAvailableDomains();
 
-      expect(availableDomains).toEqual(["advanced-security", "pipelines", "core", "repositories", "search", "test-plans", "wiki", "work", "work-items"]);
-      expect(availableDomains.length).toBe(9);
+      expect(availableDomains).toEqual(["advanced-security", "pipelines", "core", "repositories", "search", "test-plans", "wiki", "work", "work-items", "mcp-apps"]);
+      expect(availableDomains.length).toBe(10);
     });
   });
 

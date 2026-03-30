@@ -6,6 +6,7 @@ import { WebApi } from "azure-devops-node-api";
 
 import { Domain } from "./shared/domains.js";
 import { configureAdvSecTools } from "./tools/advanced-security.js";
+import { configureMcpAppsTools } from "./tools/mcp-apps.js";
 import { configurePipelineTools } from "./tools/pipelines.js";
 import { configureCoreTools } from "./tools/core.js";
 import { configureRepoTools } from "./tools/repositories.js";
@@ -23,6 +24,7 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<strin
   };
 
   configureIfDomainEnabled(Domain.CORE, () => configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider));
+  configureIfDomainEnabled(Domain.MCP_APPS, () => configureMcpAppsTools(server));
   configureIfDomainEnabled(Domain.WORK, () => configureWorkTools(server, tokenProvider, connectionProvider));
   configureIfDomainEnabled(Domain.PIPELINES, () => configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider));
   configureIfDomainEnabled(Domain.REPOSITORIES, () => configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider));
