@@ -56,19 +56,18 @@ module.exports = {
 
   moduleNameMapper: {
     // Mock ext-apps/server for CommonJS test compatibility
-    "^@modelcontextprotocol/ext-apps/server$": "<rootDir>/test/mocks/ext-apps-server.ts",
+    "^@modelcontextprotocol/ext-apps/server$": "<rootDir>/test/mocks/mcp-apps/ext-apps-server.ts",
     "^(.+)/version\\.js$": "$1/version.ts",
     "^(.+)/utils\\.js$": "$1/utils.ts",
     "^(.+)/auth\\.js$": "$1/auth.ts",
     "^(.+)/logger\\.js$": "$1/logger.ts",
-    "^(.+)/comment-helpers\\.js$": "$1/comment-helpers.ts",
     "^(.+)/work-item-filters\\.js$": "$1/work-item-filters.ts",
     "^(.+)/elicitations\\.js$": "$1/elicitations.ts",
     "^(.+)/content-safety\\.js$": "$1/content-safety.ts",
     // Apps module mocks for React component testing
-    "@modelcontextprotocol/ext-apps/react$": "<rootDir>/test/mocks/ext-apps-react.ts",
-    "^@modelcontextprotocol/ext-apps$": "<rootDir>/test/mocks/ext-apps.ts",
-    "^react-quill-new$": "<rootDir>/test/mocks/react-quill-new.tsx",
-    "react-quill-new/dist/quill\\.snow\\.css$": "<rootDir>/test/mocks/empty.ts",
+    "@modelcontextprotocol/ext-apps/react$": "<rootDir>/test/mocks/mcp-apps/ext-apps-react.ts",
+    "^@modelcontextprotocol/ext-apps$": "<rootDir>/test/mocks/mcp-apps/ext-apps.ts",
+    "^react-quill-new$": "<rootDir>/test/mocks/mcp-apps/react-quill-new.tsx",
+    "\\.css$": "<rootDir>/test/mocks/mcp-apps/style-mock.ts",
   },
 };

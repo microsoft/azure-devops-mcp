@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 
 // Maps app name → { entry HTML path, output filename }
 const apps: Record<string, { entry: string; output: string }> = {
-  "comment-review": { entry: "src/apps/comment-review/index.html", output: "comment-review-app" },
+  "work-items": { entry: "src/apps/work-items/index.html", output: "work-items-app" },
 };
 
 const APP = process.env.APP;

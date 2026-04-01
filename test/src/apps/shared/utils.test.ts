@@ -57,9 +57,10 @@ describe("colorForType", () => {
       expect(a.bg).not.toBe(b.bg);
     });
 
-    it("returns HSL when apiColor is undefined", () => {
+    it("returns known color or HSL when apiColor is undefined", () => {
       const result = colorForType("Feature", undefined);
-      expect(result.bg).toMatch(/^hsl\(/);
+      // "Feature" is now a known type with a static color
+      expect(result.bg).toBe("#773b93");
     });
   });
 });
