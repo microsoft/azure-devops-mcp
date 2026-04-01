@@ -2,25 +2,18 @@
 // Licensed under the MIT License.
 
 import { logger } from "../../logger.js";
+import { normalizeAdoHtml } from "./utils.js";
 
 /**
  * Convert plain text to ADO-compatible HTML for work item comments.
  * ADO comments are HTML-based; its own editor wraps each line in <div> tags.
- * If text already contains HTML tags, it is returned as-is.
+ * If text already contains HTML tags, it is normalized for ADO.
  */
 export function toCommentHtml(text: string): string {
   if (!text) return text;
   if (/<[a-z][\s\S]*>/i.test(text)) {
-    let result = text;
-    // Convert <p> → <div> if present
-    if (/<\/p>/i.test(result)) {
-      result = result.replace(/<p([^>]*)>/gi, "<div$1>").replace(/<\/p>/gi, "</div>");
-    }
-    // Empty divs (from Quill blank lines) → <div><br></div> for ADO spacing
-    result = result.replace(/<div><\/div>/gi, "<div><br></div>");
-    return result;
+    return normalizeAdoHtml(text);
   }
-  // Plain text: wrap each line in <div>.
   return text
     .split(/\n/)
     .map((line) => `<div>${line || "<br>"}</div>`)

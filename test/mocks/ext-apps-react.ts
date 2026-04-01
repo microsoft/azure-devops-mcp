@@ -32,3 +32,7 @@ export function useApp(options: { appInfo: any; capabilities: any; onAppCreated?
 export function useHostStyles(_app: any) {
   // no-op in tests
 }
+
+export function useDocumentTheme(): "light" | "dark" {
+  return "dark";
+}

@@ -2,20 +2,18 @@
 // Licensed under the MIT License.
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
+import { useApp, useHostStyles, useDocumentTheme } from "@modelcontextprotocol/ext-apps/react";
+import { applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
 import type { App } from "@modelcontextprotocol/ext-apps";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import type { ContentItem, CommentReviewPayload, ReviewAction } from "./types.ts";
-import { colorForType } from "../shared/utils.ts";
-import { toCommentHtml } from "../shared/comment-helpers.ts";
+import { colorForType, normalizeAdoHtml } from "../shared/utils.ts";
 
-/** Quill toolbar modules – rich-text controls. */
 const quillModules = {
   toolbar: [[{ header: [1, 2, 3, false] }], ["bold", "italic", "underline", "strike"], [{ list: "ordered" }, { list: "bullet" }], ["link", "code-block"], ["clean"]],
 };
 
-/** Check if the Quill HTML content is effectively empty (only whitespace / empty tags). */
 function isHtmlEmpty(html: string): boolean {
   return (
     html
@@ -25,7 +23,6 @@ function isHtmlEmpty(html: string): boolean {
   );
 }
 
-/** Convert plain text (with newlines) to HTML. If already HTML, return as-is. */
 function ensureHtml(text: string): string {
   if (!text) return text;
   if (/<[a-z][\s\S]*>/i.test(text)) return text;
@@ -90,6 +87,9 @@ export function CommentReviewApp() {
     appRef.current = createdApp;
 
     createdApp.onhostcontextchanged = (ctx) => {
+      if (ctx.theme) {
+        applyDocumentTheme(ctx.theme);
+      }
       if (ctx.safeAreaInsets) {
         const { top, right, bottom, left } = ctx.safeAreaInsets;
         document.body.style.padding = `${top}px ${right}px ${bottom}px ${left}px`;
@@ -124,10 +124,14 @@ export function CommentReviewApp() {
   });
 
   useHostStyles(app);
+  useDocumentTheme();
 
   useEffect(() => {
     if (!app) return;
     const ctx = app.getHostContext();
+    if (ctx?.theme) {
+      applyDocumentTheme(ctx.theme);
+    }
     if (ctx?.safeAreaInsets) {
       const { top, right, bottom, left } = ctx.safeAreaInsets;
       document.body.style.padding = `${top}px ${right}px ${bottom}px ${left}px`;
@@ -184,7 +188,7 @@ export function CommentReviewApp() {
               project: payload.project,
               workItemId: payload.workItemId,
               commentId: payload.commentId,
-              text: toCommentHtml(comment),
+              text: normalizeAdoHtml(comment),
             },
           });
 
@@ -399,7 +403,7 @@ export function CommentReviewApp() {
             <div className="cr-header__content">
               <div className="cr-header__meta">
                 {(() => {
-                  const c = colorForType(payload?.workItemType ?? "");
+                  const c = colorForType(payload?.workItemType ?? "", payload?.workItemTypeColor);
                   return (
                     <span className="cr-type-badge" style={{ background: c.bg, color: c.fg }}>
                       {payload?.workItemType}
@@ -476,7 +480,7 @@ export function CommentReviewApp() {
           <div className="cr-header__content">
             <div className="cr-header__meta">
               {(() => {
-                const c = colorForType(payload?.workItemType ?? "");
+                const c = colorForType(payload?.workItemType ?? "", payload?.workItemTypeColor);
                 return (
                   <span className="cr-type-badge" style={{ background: c.bg, color: c.fg }}>
                     {payload?.workItemType}

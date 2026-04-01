@@ -40,9 +40,12 @@ jest.mock("@modelcontextprotocol/ext-apps/react", () => ({
     return { app: mockApp, error: null };
   },
   useHostStyles: jest.fn(),
+  useDocumentTheme: jest.fn().mockReturnValue("dark"),
 }));
 
-jest.mock("@modelcontextprotocol/ext-apps", () => ({}));
+jest.mock("@modelcontextprotocol/ext-apps", () => ({
+  applyDocumentTheme: jest.fn(),
+}));
 
 jest.mock("react-quill-new", () => {
   const RQ = (props: any) =>
@@ -62,10 +65,7 @@ jest.mock("react-quill-new/dist/quill.snow.css", () => ({}));
 
 jest.mock("../../../../src/apps/shared/utils", () => ({
   colorForType: jest.fn().mockReturnValue({ bg: "#cc293d", fg: "#fff" }),
-}));
-
-jest.mock("../../../../src/apps/shared/comment-helpers", () => ({
-  toCommentHtml: jest.fn((text: string) => text),
+  normalizeAdoHtml: jest.fn((html: string) => html),
 }));
 
 const samplePayload = {
@@ -73,6 +73,7 @@ const samplePayload = {
   commentId: 10,
   title: "Fix login bug",
   workItemType: "Bug",
+  workItemTypeColor: "#CC293D",
   comment: "This is a test comment",
   project: "Contoso",
   orgUrl: "https://dev.azure.com/testorg",

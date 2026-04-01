@@ -9,6 +9,7 @@ export interface CommentReviewPayload {
   commentId: number;
   title: string;
   workItemType: string;
+  workItemTypeColor?: string;
   comment: string;
   project: string;
   orgUrl?: string;

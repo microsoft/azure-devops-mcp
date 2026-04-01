@@ -163,7 +163,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Retrieve list of work items by IDs in batch.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      ids: z.array(z.number()).describe("The IDs of the work items to retrieve."),
+      ids: z.array(z.coerce.number().min(1)).describe("The IDs of the work items to retrieve."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
     },
     async ({ project, ids, fields }) => {
@@ -303,22 +303,24 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
         const orgUrl = connection.serverUrl;
-        const accessToken = await tokenProvider();
 
-        // Fetch work item details (title, type) to display in the header
-        const workItem = await workItemApi.getWorkItem(args.workItemId, ["System.Title", "System.WorkItemType"], undefined, undefined, args.project);
+        // Parallelize: fetch work item details and access token concurrently
+        const [workItem, accessToken] = await Promise.all([workItemApi.getWorkItem(args.workItemId, ["System.Title", "System.WorkItemType"], undefined, undefined, args.project), tokenProvider()]);
 
         const title = workItem?.fields?.["System.Title"] ?? "Unknown";
         const workItemType = workItem?.fields?.["System.WorkItemType"] ?? "Work Item";
 
-        // Apply HTML formatting only when format is html (default); pass raw text for markdown
-        let commentBody: string;
-        if (args.format === "html") {
-          commentBody = toCommentHtml(args.comment);
-          commentBody = await uploadInlineImages(commentBody, orgUrl, args.project, accessToken, userAgentProvider());
-        } else {
-          commentBody = args.comment;
-        }
+        // Prepare comment body (may involve image uploads)
+        const commentBodyPromise =
+          args.format === "html" ? uploadInlineImages(toCommentHtml(args.comment), orgUrl, args.project, accessToken, userAgentProvider()).then((html) => html) : Promise.resolve(args.comment);
+
+        // Fetch type color (non-critical) in parallel with comment preparation
+        const typeColorPromise = workItemApi
+          .getWorkItemType(args.project, workItemType)
+          .then((info) => (info?.color ? `#${info.color}` : undefined))
+          .catch(() => undefined);
+
+        const [commentBody, workItemTypeColor] = await Promise.all([commentBodyPromise, typeColorPromise]);
 
         const formatParameter = args.format === "markdown" ? 0 : 1;
         const response = await fetch(
@@ -352,6 +354,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
                 commentId,
                 title,
                 workItemType,
+                workItemTypeColor,
                 comment: commentBody,
                 project: args.project,
                 orgUrl,

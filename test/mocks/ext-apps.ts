@@ -13,3 +13,7 @@ export interface App {
   onerror: ((error: any) => void) | null;
   onteardown: (() => Promise<any>) | null;
 }
+
+export function applyDocumentTheme(_theme: "light" | "dark"): void {
+  // no-op in tests
+}

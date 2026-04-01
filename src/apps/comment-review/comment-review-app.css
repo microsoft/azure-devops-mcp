@@ -21,7 +21,7 @@ select {
   --cr-radius-sm: 6px;
   --cr-radius-md: 10px;
   --cr-radius-lg: 14px;
-  --cr-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --cr-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--cr-border);
   --cr-shadow-btn: 0 1px 3px rgba(0, 0, 0, 0.2);
   --cr-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --cr-bg: var(--color-background-primary, var(--vscode-editor-background, #1a1d23));
@@ -29,12 +29,20 @@ select {
   --cr-fg-muted: var(--color-text-secondary, var(--vscode-descriptionForeground, #8b949e));
   --cr-surface: var(--color-background-secondary, var(--vscode-sideBar-background, #1f2228));
   --cr-surface-elevated: var(--color-background-tertiary, var(--vscode-input-background, #282c34));
-  --cr-border: var(--color-border-primary, var(--vscode-panel-border, rgba(255, 255, 255, 0.08)));
+  --cr-border: var(--color-border-primary, var(--vscode-panel-border, rgba(128, 128, 128, 0.2)));
   --cr-accent: var(--vscode-button-background, #2188ff);
   --cr-accent-hover: var(--vscode-button-hoverBackground, #1f7ade);
   --cr-accent-fg: var(--vscode-button-foreground, #fff);
-  --cr-danger: #e5534b;
-  --cr-success: #3fb950;
+  --cr-danger: var(--color-text-danger, #e5534b);
+  --cr-danger-bg: var(--color-background-danger, rgba(229, 83, 75, 0.12));
+  --cr-success: var(--color-text-success, #3fb950);
+  --cr-success-bg: var(--color-background-success, rgba(63, 185, 80, 0.12));
+
+  /* Theme-aware overlays: use foreground color so they work on both light & dark backgrounds */
+  --cr-overlay-subtle: color-mix(in srgb, var(--cr-fg) 5%, transparent);
+  --cr-overlay-light: color-mix(in srgb, var(--cr-fg) 8%, transparent);
+  --cr-overlay-medium: color-mix(in srgb, var(--cr-fg) 12%, transparent);
+  --cr-overlay-strong: color-mix(in srgb, var(--cr-fg) 20%, transparent);
 }
 
 body {
@@ -193,7 +201,8 @@ body {
 .cr-tab-bar {
   display: inline-flex;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--cr-overlay-subtle);
+  border: 1px solid var(--cr-border);
   border-radius: var(--cr-radius-sm);
   padding: 2px;
 }
@@ -218,11 +227,11 @@ body {
 
 .cr-tab-bar__tab:hover {
   color: var(--cr-fg);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--cr-overlay-light);
 }
 
 .cr-tab-bar__tab--active {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--cr-overlay-medium);
   color: var(--cr-fg);
   font-weight: 600;
 }
@@ -325,7 +334,7 @@ body {
 }
 
 .cr-preview .ql-editor code {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--cr-overlay-light);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 0.9em;
@@ -384,7 +393,7 @@ body {
 }
 
 .cr-editor__quill-wrapper .ql-editor.ql-blank::before {
-  color: var(--vscode-input-placeholderForeground, rgba(255, 255, 255, 0.3));
+  color: var(--vscode-input-placeholderForeground, var(--cr-fg-muted));
   font-style: normal;
 }
 
@@ -481,9 +490,9 @@ body {
 }
 
 .cr-btn--ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--cr-overlay-light);
   color: var(--cr-fg);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--cr-overlay-medium);
 }
 
 .cr-btn--secondary {
@@ -504,8 +513,8 @@ body {
   border-radius: 10px;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ade80;
+  background: var(--cr-success-bg);
+  color: var(--cr-success);
 }
 
 .cr-done-actions {
@@ -519,7 +528,7 @@ body {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--cr-overlay-strong);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -558,17 +567,17 @@ body {
 }
 
 .status-icon--success {
-  background: rgba(63, 185, 80, 0.12);
+  background: var(--cr-success-bg);
   color: var(--cr-success);
 }
 
 .status-icon--error {
-  background: rgba(229, 83, 75, 0.12);
+  background: var(--cr-danger-bg);
   color: var(--cr-danger);
 }
 
 .status-icon--neutral {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--cr-overlay-light);
   color: var(--cr-fg-muted);
 }
 
@@ -639,7 +648,7 @@ body {
 .spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid rgba(255, 255, 255, 0.08);
+  border: 3px solid var(--cr-overlay-light);
   border-top-color: var(--cr-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -749,7 +758,7 @@ body {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(229, 83, 75, 0.12);
+  background: var(--cr-danger-bg);
   color: var(--cr-danger);
   margin-bottom: 12px;
 }
@@ -822,11 +831,11 @@ body {
 
 .cr-dialog__btn--cancel:hover {
   color: var(--cr-fg);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--cr-overlay-light);
 }
 
 .cr-dialog__btn--cancel:active {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--cr-overlay-subtle);
 }
 
 .cr-dialog__btn:focus-visible {
