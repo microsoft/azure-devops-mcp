@@ -4,6 +4,7 @@
     "isolatedModules": true,
     "module": "CommonJS",
     "moduleResolution": "Node",
+    "jsx": "react-jsx",
     "outDir": "dist-test",
     "rootDir": "."
   },

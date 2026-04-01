@@ -24,7 +24,7 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<strin
   };
 
   configureIfDomainEnabled(Domain.CORE, () => configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider));
-  configureIfDomainEnabled(Domain.MCP_APPS, () => configureMcpAppsTools(server));
+  configureIfDomainEnabled(Domain.MCP_APPS, () => configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider));
   configureIfDomainEnabled(Domain.WORK, () => configureWorkTools(server, tokenProvider, connectionProvider));
   configureIfDomainEnabled(Domain.PIPELINES, () => configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider));
   configureIfDomainEnabled(Domain.REPOSITORIES, () => configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider));

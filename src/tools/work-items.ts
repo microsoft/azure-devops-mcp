@@ -1,12 +1,17 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { z } from "zod";
+import { logger } from "../logger.js";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
+import { toCommentHtml, uploadInlineImages } from "../apps/shared/comment-helpers.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -17,10 +22,11 @@ const WORKITEM_TOOLS = {
   update_work_item: "wit_update_work_item",
   create_work_item: "wit_create_work_item",
   list_work_item_comments: "wit_list_work_item_comments",
+  update_work_item_comment: "wit_update_work_item_comment",
+  delete_work_item_comment: "wit_delete_work_item_comment",
+  add_work_item_comment: "wit_add_work_item_comment",
   list_work_item_revisions: "wit_list_work_item_revisions",
   get_work_items_for_iteration: "wit_get_work_items_for_iteration",
-  add_work_item_comment: "wit_add_work_item_comment",
-  update_work_item_comment: "wit_update_work_item_comment",
   add_child_work_items: "wit_add_child_work_items",
   link_work_item_to_pull_request: "wit_link_work_item_to_pull_request",
   get_work_item_type: "wit_get_work_item_type",
@@ -121,6 +127,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     }
   );
 
+  const distDir = path.join(import.meta.dirname, "..");
+
   server.tool(
     WORKITEM_TOOLS.my_work_items,
     "Retrieve a list of work items relevent to the authenticated user.",
@@ -155,7 +163,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Retrieve list of work items by IDs in batch.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      ids: z.array(z.coerce.number().min(1)).describe("The IDs of the work items to retrieve."),
+      ids: z.array(z.number()).describe("The IDs of the work items to retrieve."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
     },
     async ({ project, ids, fields }) => {
@@ -271,49 +279,141 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     }
   );
 
-  server.tool(
+  const commentReviewResourceUri = "ui://comment-review/app.html";
+
+  registerAppTool(
+    server,
     WORKITEM_TOOLS.add_work_item_comment,
-    "Add comment to a work item by ID.",
+    {
+      title: "Add comment to a work item by ID.",
+      description:
+        "Posts a comment to an Azure DevOps work item immediately and opens a non-blocking review UI so the user can see what was posted. " +
+        "The agent provides the work item ID, project, and comment body. The comment is posted right away and the tool returns immediately. " +
+        "The review UI lets the user edit or delete the posted comment after the fact if needed.",
+      inputSchema: {
+        project: z.string().describe("The name or ID of the Azure DevOps project."),
+        workItemId: z.coerce.number().min(1).describe("The ID of the work item to add a comment to."),
+        comment: z.string().describe("The text of the comment to add to the work item."),
+        format: z.enum(["markdown", "html"]).optional().default("html"),
+      },
+      _meta: { ui: { resourceUri: commentReviewResourceUri } },
+    },
+    async (args) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const orgUrl = connection.serverUrl;
+        const accessToken = await tokenProvider();
+
+        // Fetch work item details (title, type) to display in the header
+        const workItem = await workItemApi.getWorkItem(args.workItemId, ["System.Title", "System.WorkItemType"], undefined, undefined, args.project);
+
+        const title = workItem?.fields?.["System.Title"] ?? "Unknown";
+        const workItemType = workItem?.fields?.["System.WorkItemType"] ?? "Work Item";
+
+        // Apply HTML formatting only when format is html (default); pass raw text for markdown
+        let commentBody: string;
+        if (args.format === "html") {
+          commentBody = toCommentHtml(args.comment);
+          commentBody = await uploadInlineImages(commentBody, orgUrl, args.project, accessToken, userAgentProvider());
+        } else {
+          commentBody = args.comment;
+        }
+
+        const formatParameter = args.format === "markdown" ? 0 : 1;
+        const response = await fetch(
+          `${orgUrl}/${encodeURIComponent(args.project)}/_apis/wit/workItems/${args.workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+              "User-Agent": userAgentProvider(),
+            },
+            body: JSON.stringify({ text: commentBody }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to post comment: ${response.statusText}`);
+        }
+
+        const postedComment = (await response.json()) as { id: number };
+        const commentId = postedComment.id;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: "posted",
+                message: `Comment posted to ${workItemType} #${args.workItemId} ("${title}"). The user can review, edit, or delete it in the review UI.`,
+                workItemId: args.workItemId,
+                commentId,
+                title,
+                workItemType,
+                comment: commentBody,
+                project: args.project,
+                orgUrl,
+              }),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error posting comment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  registerAppResource(server, commentReviewResourceUri, commentReviewResourceUri, { mimeType: RESOURCE_MIME_TYPE }, async () => {
+    try {
+      const html = await fs.readFile(path.join(distDir, "comment-review-app.html"), "utf-8");
+      return {
+        contents: [{ uri: commentReviewResourceUri, mimeType: RESOURCE_MIME_TYPE, text: html }],
+      };
+    } catch (error) {
+      logger.warn("Comment Review App UI not found. Run 'npm run build:ui' to generate it.", { error });
+      return {
+        contents: [{ uri: commentReviewResourceUri, mimeType: RESOURCE_MIME_TYPE, text: "<html><body>Comment Review App UI not built. Run npm run build:ui</body></html>" }],
+      };
+    }
+  });
+
+  server.tool(
+    WORKITEM_TOOLS.delete_work_item_comment,
+    "Deletes a comment from an Azure DevOps work item.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      workItemId: z.coerce.number().min(1).describe("The ID of the work item to add a comment to."),
-      comment: z.string().describe("The text of the comment to add to the work item."),
-      format: z.enum(["markdown", "html"]).optional().default("html"),
+      workItemId: z.coerce.number().min(1).describe("The ID of the work item."),
+      commentId: z.coerce.number().min(1).describe("The ID of the comment to delete."),
     },
-    async ({ project, workItemId, comment, format }) => {
+    async ({ project, workItemId, commentId }) => {
       try {
         const connection = await connectionProvider();
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
-        const body = {
-          text: comment,
-        };
-
-        const formatParameter = format === "markdown" ? 0 : 1;
-        const response = await fetch(`${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
-          method: "POST",
+        const response = await fetch(`${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workItems/${workItemId}/comments/${commentId}?api-version=${markdownCommentsApiVersion}`, {
+          method: "DELETE",
           headers: {
             "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
             "User-Agent": userAgentProvider(),
           },
-          body: JSON.stringify(body),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to add a work item comment: ${response.statusText}}`);
+          throw new Error(`Failed to delete work item comment: ${response.statusText}`);
         }
 
-        const comments = await response.text();
-
-        return {
-          content: [{ type: "text", text: comments }],
-        };
+        return { content: [{ type: "text", text: JSON.stringify({ deleted: true, commentId }) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
-          content: [{ type: "text", text: `Error adding work item comment: ${errorMessage}` }],
+          content: [{ type: "text", text: `Error deleting work item comment: ${errorMessage}` }],
           isError: true,
         };
       }
@@ -335,7 +435,15 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const connection = await connectionProvider();
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
-        const body: Record<string, string> = { text };
+
+        let body: string;
+        if (format === "html") {
+          let commentHtml = toCommentHtml(text);
+          commentHtml = await uploadInlineImages(commentHtml, orgUrl, project, accessToken, userAgentProvider());
+          body = commentHtml;
+        } else {
+          body = text;
+        }
 
         const formatParameter = format === "markdown" ? 0 : 1;
         const response = await fetch(
@@ -347,7 +455,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               "Content-Type": "application/json",
               "User-Agent": userAgentProvider(),
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify({ text: body }),
           }
         );
 
