@@ -9,10 +9,12 @@ import path from "node:path";
 import { z } from "zod";
 import { logger } from "../logger.js";
 import { applyWorkItemFilters } from "../apps/shared/work-item-filters.js";
+import { searchIdentities } from "./auth.js";
 
 const MCP_APPS_TOOLS = {
-  my_work_items: "mcp_my_work_items",
-  get_work_item_type_icon: "wit_get_work_item_type_icon",
+  my_work_items: "mcp_app_my_work_items",
+  get_work_item_type_icon: "mcp_app_get_work_item_type_icon",
+  search_identities: "mcp_app_search_identities",
 };
 
 function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): void {
@@ -287,6 +289,69 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
           content: [{ type: "text", text: `Error retrieving work item type icon: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  // --- Identity Search (app-only, for people-picker typeahead) ---
+  registerAppTool(
+    server,
+    MCP_APPS_TOOLS.search_identities,
+    {
+      title: "Search Identities",
+      description: "Search for Azure DevOps identities by name, email, or alias. Returns matching users for people-picker typeahead.",
+      inputSchema: {
+        query: z.string().min(2).describe("The search string (display name, email, or alias). Minimum 2 characters."),
+      },
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async ({ query }) => {
+      try {
+        // Search with the full query and individual words for better coverage
+        const searchTerms = new Set<string>([query]);
+        for (const word of query.split(/\s+/)) {
+          if (word.length >= 2) searchTerms.add(word);
+        }
+
+        const allIdentities = new Map<string, { id: string; displayName: string; mail: string }>();
+
+        await Promise.all(
+          [...searchTerms].map(async (term) => {
+            try {
+              const result = await searchIdentities(term, tokenProvider, connectionProvider, userAgentProvider);
+              if (result?.value) {
+                for (const identity of result.value) {
+                  if (identity.id && identity.providerDisplayName && !identity.properties?.SchemaClassName?.["$value"]?.includes("Group")) {
+                    allIdentities.set(identity.id, {
+                      id: identity.id,
+                      displayName: identity.providerDisplayName,
+                      mail: (identity.properties?.Mail as any)?.["$value"] ?? "",
+                    });
+                  }
+                }
+              }
+            } catch {
+              // Individual term search failed, continue with others
+            }
+          })
+        );
+
+        // Sort: prioritize results where all query words match
+        const lowerWords = query.toLowerCase().split(/\s+/).filter(Boolean);
+        const sorted = [...allIdentities.values()].sort((a, b) => {
+          const aName = a.displayName.toLowerCase();
+          const bName = b.displayName.toLowerCase();
+          const aAllMatch = lowerWords.every((w) => aName.includes(w));
+          const bAllMatch = lowerWords.every((w) => bName.includes(w));
+          if (aAllMatch !== bAllMatch) return aAllMatch ? -1 : 1;
+          return aName.localeCompare(bName);
+        });
+
+        const identities = sorted.slice(0, 10);
+        return { content: [{ type: "text", text: JSON.stringify(identities) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error searching identities: ${errorMessage}` }], isError: true };
       }
     }
   );

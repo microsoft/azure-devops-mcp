@@ -58,12 +58,6 @@ export function compareCellValues(field: string, a: WorkItem, b: WorkItem, direc
   return aStr.localeCompare(bStr) * dir;
 }
 
-export function getTypeBadgeClass(type: string): string {
-  const t = type.toLowerCase().replace(/\s+/g, "");
-  const map: Record<string, string> = { bug: "type-bug", task: "type-task", userstory: "type-userstory", feature: "type-feature", epic: "type-epic", issue: "type-issue" };
-  return map[t] ?? "type-default";
-}
-
 export function getPriorityBadgeClass(priority: number): string {
   const map: Record<number, string> = { 1: "priority-critical", 2: "priority-high", 3: "priority-medium", 4: "priority-low" };
   return map[priority] ?? "priority-default";

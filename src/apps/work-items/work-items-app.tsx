@@ -4,7 +4,8 @@
 import { useState, useCallback, useRef, useEffect, Fragment } from "react";
 import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import type { WorkItem, DisplayConfig, ColumnConfig, SortConfig, SuggestedValue, QueryContext } from "./types.ts";
-import { getTypeBadgeClass, getPriorityBadgeClass, getStateClass, getPriorityLabel, getWorkItemId, formatCellValue } from "./utils.ts";
+import { getPriorityBadgeClass, getStateClass, getPriorityLabel, getWorkItemId, formatCellValue } from "./utils.ts";
+import { colorForType } from "../shared/utils.ts";
 import { FilterBar } from "./components/filter-bar.tsx";
 import { Pagination } from "./components/pagination.tsx";
 import { QueryPanel } from "./components/query-panel.tsx";
@@ -40,13 +41,12 @@ function renderCell(field: string, wi: WorkItem, typeIconSvgMap: Record<string, 
     }
     case "System.WorkItemType": {
       const type = String(value ?? "");
-      const typeColor = typeColorMap[type];
-      return typeColor ? (
-        <span className="type-badge" style={{ background: `${typeColor}20`, color: typeColor, borderColor: `${typeColor}40` }}>
+      const apiColor = typeColorMap[type];
+      const { bg, fg } = colorForType(type, apiColor);
+      return (
+        <span className="type-badge" style={{ background: `${bg}20`, color: bg, borderColor: `${bg}40` }}>
           {type}
         </span>
-      ) : (
-        <span className={`type-badge ${getTypeBadgeClass(type)}`}>{type}</span>
       );
     }
     case "System.State": {

@@ -9,7 +9,6 @@ import {
   KNOWN_FIELD_WIDTHS,
   formatCellValue,
   compareCellValues,
-  getTypeBadgeClass,
   getPriorityBadgeClass,
   getWorkItemWebUrl,
   getStateClass,
@@ -130,20 +129,6 @@ describe("compareCellValues", () => {
 
   it("handles equal values", () => {
     expect(compareCellValues("System.Title", wiA, wiA, "asc")).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getTypeBadgeClass
-// ---------------------------------------------------------------------------
-describe("getTypeBadgeClass", () => {
-  it("returns correct badge class for known types", () => {
-    expect(getTypeBadgeClass("Bug")).toBe("type-bug");
-    expect(getTypeBadgeClass("Task")).toBe("type-task");
-  });
-
-  it("returns default for unknown types", () => {
-    expect(getTypeBadgeClass("SomeCustom")).toBe("type-default");
   });
 });
 

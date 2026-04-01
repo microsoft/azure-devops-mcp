@@ -95,47 +95,48 @@ export function PeoplePicker({ value, onChange, app, disabled, className = "peop
       abortRef.current = controller;
       setLoading(true);
 
-      const searchTerms = new Set<string>([filter]);
-      for (const w of filter.split(/\s+/)) {
-        if (w.length >= MIN_QUERY_LENGTH) searchTerms.add(w);
-      }
-
       try {
-        const allIdentities = new Map<string, Identity>();
+        let identities: Identity[] = [];
 
-        const fetchTerm = async (term: string) => {
-          try {
-            const result = await app.callServerTool({ name: "core_get_identity_ids", arguments: { searchFilter: term } });
-            if (controller.signal.aborted) return;
+        // Try the Identity Picker API (prefix/partial match)
+        try {
+          const result = await app.callServerTool({ name: "mcp_app_search_identities", arguments: { query: filter } });
+          if (controller.signal.aborted) return;
+          if (!result?.isError) {
             const text = result?.content?.find((c: { type: string }) => c.type === "text") as { text?: string } | undefined;
-            if (!text?.text || text.text.startsWith("No ") || text.text.startsWith("Error")) return;
-            const parsed = JSON.parse(text.text);
-            if (Array.isArray(parsed)) {
-              for (const identity of parsed) {
-                if (identity.id && identity.displayName) allIdentities.set(identity.id, identity);
+            if (text?.text && !text.text.startsWith("Error")) {
+              const parsed = JSON.parse(text.text);
+              if (Array.isArray(parsed)) {
+                identities = parsed.filter((id: { displayName?: string }) => id.displayName).slice(0, MAX_RESULTS);
+              }
+            }
+          }
+        } catch {
+          // Tool may not be available, fall through to legacy API
+        }
+
+        // Fallback: legacy General identity search
+        if (identities.length === 0 && !controller.signal.aborted) {
+          try {
+            const result = await app.callServerTool({ name: "core_get_identity_ids", arguments: { searchFilter: filter } });
+            if (controller.signal.aborted) return;
+            if (!result?.isError) {
+              const text = result?.content?.find((c: { type: string }) => c.type === "text") as { text?: string } | undefined;
+              if (text?.text && !text.text.startsWith("No ") && !text.text.startsWith("Error")) {
+                const parsed = JSON.parse(text.text);
+                if (Array.isArray(parsed)) {
+                  identities = parsed.filter((id: { displayName?: string }) => id.displayName).slice(0, MAX_RESULTS);
+                }
               }
             }
           } catch {
-            /* individual term failed */
+            // Both APIs failed
           }
-        };
+        }
 
-        await Promise.all([...searchTerms].map(fetchTerm));
         if (controller.signal.aborted) return;
-
-        const lowerWords = filter.toLowerCase().split(/\s+/).filter(Boolean);
-        const sorted = [...allIdentities.values()].sort((a, b) => {
-          const aName = a.displayName.toLowerCase();
-          const bName = b.displayName.toLowerCase();
-          const aAllMatch = lowerWords.every((w) => aName.includes(w));
-          const bAllMatch = lowerWords.every((w) => bName.includes(w));
-          if (aAllMatch !== bAllMatch) return aAllMatch ? -1 : 1;
-          return aName.localeCompare(bName);
-        });
-
-        const list = sorted.slice(0, MAX_RESULTS);
-        setResults(list);
-        setIsOpen(list.length > 0);
+        setResults(identities);
+        setIsOpen(identities.length > 0);
         setActiveIndex(-1);
       } catch {
         if (!controller.signal.aborted) {

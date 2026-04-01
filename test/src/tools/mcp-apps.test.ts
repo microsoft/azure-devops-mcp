@@ -72,13 +72,13 @@ describe("configureMcpAppsTools", () => {
     });
   });
 
-  // ======== mcp_my_work_items Tool ========
+  // ======== mcp_app_my_work_items Tool ========
 
-  describe("mcp_my_work_items tool", () => {
+  describe("mcp_app_my_work_items tool", () => {
     function getHandler() {
       configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.registerTool as jest.Mock).mock.calls.find(([toolName]: [string]) => toolName === MCP_APPS_TOOLS.my_work_items);
-      if (!call) throw new Error("mcp_my_work_items tool not registered");
+      if (!call) throw new Error("mcp_app_my_work_items tool not registered");
       const [, , handler] = call;
       return handler;
     }
@@ -420,7 +420,7 @@ describe("configureMcpAppsTools", () => {
     function getHandler() {
       configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.registerTool as jest.Mock).mock.calls.find(([toolName]: [string]) => toolName === MCP_APPS_TOOLS.get_work_item_type_icon);
-      if (!call) throw new Error("wit_get_work_item_type_icon tool not registered");
+      if (!call) throw new Error("mcp_app_get_work_item_type_icon tool not registered");
       const [, , handler] = call;
       return handler;
     }

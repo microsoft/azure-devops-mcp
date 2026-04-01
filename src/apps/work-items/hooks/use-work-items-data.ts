@@ -367,7 +367,7 @@ export function useWorkItemsData(app: App | null) {
         [...types].map(async (type) => {
           try {
             const [iconResult, typeResult] = await Promise.all([
-              app.callServerTool({ name: "wit_get_work_item_type_icon", arguments: { project, workItemType: type } }),
+              app.callServerTool({ name: "mcp_app_get_work_item_type_icon", arguments: { project, workItemType: type } }),
               app.callServerTool({ name: "wit_get_work_item_type", arguments: { project, workItemType: type } }),
             ]);
             const iconText = (iconResult.content as ContentItem[] | undefined)?.find((c) => c.type === "text");
