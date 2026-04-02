@@ -43,6 +43,10 @@ export function formatCellValue(field: string, wi: WorkItem): string {
       return String(value);
     }
   }
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    return String(obj.displayName ?? obj.uniqueName ?? JSON.stringify(value));
+  }
   return String(value);
 }
 
@@ -53,8 +57,15 @@ export function compareCellValues(field: string, a: WorkItem, b: WorkItem, direc
 
   if (typeof aVal === "number" && typeof bVal === "number") return (aVal - bVal) * dir;
 
-  const aStr = field === "System.AssignedTo" ? formatAssignedTo(aVal as string | { displayName?: string; uniqueName?: string }) : String(aVal);
-  const bStr = field === "System.AssignedTo" ? formatAssignedTo(bVal as string | { displayName?: string; uniqueName?: string }) : String(bVal);
+  const toStr = (val: unknown): string => {
+    if (typeof val === "object" && val !== null) {
+      const obj = val as Record<string, unknown>;
+      return String(obj.displayName ?? obj.uniqueName ?? "");
+    }
+    return String(val);
+  };
+  const aStr = field === "System.AssignedTo" ? formatAssignedTo(aVal as string | { displayName?: string; uniqueName?: string }) : toStr(aVal);
+  const bStr = field === "System.AssignedTo" ? formatAssignedTo(bVal as string | { displayName?: string; uniqueName?: string }) : toStr(bVal);
   return aStr.localeCompare(bStr) * dir;
 }
 

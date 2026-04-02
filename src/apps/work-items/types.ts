@@ -75,9 +75,16 @@ export interface WorkItemTypeState {
   category: string;
 }
 
+export interface WorkItemTypeFieldInfo {
+  referenceName: string;
+  name: string;
+  allowedValues: string[];
+}
+
 export interface WorkItemTypeMetadata {
   states: WorkItemTypeState[];
   transitions: Record<string, { to: string }[]>;
+  fields: WorkItemTypeFieldInfo[];
 }
 
 export interface FilterOptions {

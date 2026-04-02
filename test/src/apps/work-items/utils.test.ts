@@ -98,6 +98,16 @@ describe("formatCellValue", () => {
     const wi = { id: 1, fields: { "System.State": "Active" } };
     expect(formatCellValue("System.State", wi)).toBe("Active");
   });
+
+  it("formats object values with displayName", () => {
+    const wi = { id: 1, fields: { "Custom.Reviewer": { displayName: "Jane Doe", uniqueName: "jane@test.com" } } };
+    expect(formatCellValue("Custom.Reviewer", wi)).toBe("Jane Doe");
+  });
+
+  it("formats object values without displayName using uniqueName", () => {
+    const wi = { id: 1, fields: { "Custom.Field": { uniqueName: "user@test.com" } } };
+    expect(formatCellValue("Custom.Field", wi)).toBe("user@test.com");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -129,6 +139,12 @@ describe("compareCellValues", () => {
 
   it("handles equal values", () => {
     expect(compareCellValues("System.Title", wiA, wiA, "asc")).toBe(0);
+  });
+
+  it("sorts by object field values using displayName", () => {
+    const wiObjA = { id: 1, fields: { "Custom.Reviewer": { displayName: "Alice", uniqueName: "alice@test.com" } } };
+    const wiObjB = { id: 2, fields: { "Custom.Reviewer": { displayName: "Bob", uniqueName: "bob@test.com" } } };
+    expect(compareCellValues("Custom.Reviewer", wiObjA, wiObjB, "asc")).toBeLessThan(0);
   });
 });
 

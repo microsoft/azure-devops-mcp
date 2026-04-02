@@ -14,6 +14,7 @@ import { searchIdentities } from "./auth.js";
 const MCP_APPS_TOOLS = {
   my_work_items: "mcp_app_my_work_items",
   get_work_item_type_icon: "mcp_app_get_work_item_type_icon",
+  get_work_item_type_fields: "mcp_app_get_work_item_type_fields",
   search_identities: "mcp_app_search_identities",
 };
 
@@ -127,52 +128,9 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
           ids = ids.slice(0, args.top);
         }
 
-        // Fetch work items in two passes:
-        // 1. Core fields (guaranteed to exist in all process templates)
-        // 2. Extended fields (may not exist in all projects — errors are caught and ignored)
-        const coreFields = [
-          "System.Id",
-          "System.WorkItemType",
-          "System.Title",
-          "System.State",
-          "System.AssignedTo",
-          "System.Tags",
-          "System.AreaPath",
-          "System.IterationPath",
-          "System.CreatedDate",
-          "System.ChangedDate",
-          "System.Description",
-          "System.Reason",
-          "Microsoft.VSTS.Common.Priority",
-          "Microsoft.VSTS.Common.AcceptanceCriteria",
-          "Microsoft.VSTS.Common.Severity",
-          "Microsoft.VSTS.Common.Activity",
-          "Microsoft.VSTS.Common.ValueArea",
-          "Microsoft.VSTS.Scheduling.StoryPoints",
-          "Microsoft.VSTS.Scheduling.RemainingWork",
-          "Microsoft.VSTS.Scheduling.CompletedWork",
-          "Microsoft.VSTS.Scheduling.OriginalEstimate",
-        ];
-
-        const extendedFields = ["Microsoft.VSTS.TCM.ReproSteps", "Microsoft.VSTS.TCM.SystemInfo", "Microsoft.VSTS.Common.Risk"];
-
-        let workItems = await workItemApi.getWorkItemsBatch({ ids, fields: coreFields }, args.project);
-
-        // Try to fetch extended fields and merge them in (some may not exist in all project templates)
-        try {
-          const extendedItems = await workItemApi.getWorkItemsBatch({ ids, fields: extendedFields }, args.project);
-          if (extendedItems && Array.isArray(extendedItems) && workItems && Array.isArray(workItems)) {
-            const extMap = new Map(extendedItems.map((wi) => [wi.id, wi.fields]));
-            workItems.forEach((wi) => {
-              const ext = extMap.get(wi.id);
-              if (ext && wi.fields) {
-                Object.assign(wi.fields, ext);
-              }
-            });
-          }
-        } catch {
-          // Extended fields not available in this project — continue with core fields only
-        }
+        // Fetch all fields for work items (omitting fields parameter returns all fields,
+        // including custom fields for any work item type or process template)
+        let workItems = await workItemApi.getWorkItemsBatch({ ids }, args.project);
 
         // Apply server-side filters
         if (workItems && Array.isArray(workItems)) {
@@ -184,19 +142,20 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
           workItems = applyWorkItemFilters(workItems, filterArgs);
         }
 
-        // Format identity fields from objects to simple strings
-        const identityFields = ["System.AssignedTo"];
+        // Format identity fields from objects to simple strings (handles both standard and custom identity fields)
         if (workItems && Array.isArray(workItems)) {
           workItems.forEach((item) => {
             if (item.fields) {
-              identityFields.forEach((fieldName) => {
-                if (item.fields && item.fields[fieldName] && typeof item.fields[fieldName] === "object") {
-                  const identity = item.fields[fieldName];
-                  const name = identity.displayName || "";
-                  const email = identity.uniqueName || "";
-                  item.fields[fieldName] = `${name} <${email}>`.trim();
+              for (const [fieldName, fieldValue] of Object.entries(item.fields)) {
+                if (fieldValue && typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+                  const obj = fieldValue as Record<string, unknown>;
+                  if (obj.displayName !== undefined || obj.uniqueName !== undefined) {
+                    const name = String(obj.displayName || "");
+                    const email = String(obj.uniqueName || "");
+                    item.fields[fieldName] = email ? `${name} <${email}>`.trim() : name;
+                  }
                 }
-              });
+              }
             }
           });
         }
@@ -289,6 +248,38 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
           content: [{ type: "text", text: `Error retrieving work item type icon: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  // --- Identity Search (app-only, for people-picker typeahead) ---
+  registerAppTool(
+    server,
+    MCP_APPS_TOOLS.get_work_item_type_fields,
+    {
+      title: "Get Work Item Type Fields",
+      description: "Get field definitions with allowed values for a work item type. Uses the expanded field API to return proper allowed values for picklist fields like Priority and Severity.",
+      inputSchema: {
+        project: z.string().describe("The name or ID of the Azure DevOps project."),
+        workItemType: z.string().describe("The name of the work item type (e.g., 'Bug', 'Task', 'User Story')."),
+      },
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async (args) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        // expand=AllowedValues (1) returns proper allowedValues for all fields including integer picklists
+        const fields = await workItemApi.getWorkItemTypeFieldsWithReferences(args.project, args.workItemType, 1);
+        const result = (fields ?? []).map((f) => ({
+          referenceName: f.referenceName ?? "",
+          name: f.name ?? "",
+          allowedValues: Array.isArray(f.allowedValues) ? f.allowedValues.map(String) : [],
+        }));
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error retrieving field definitions: ${errorMessage}` }], isError: true };
       }
     }
   );

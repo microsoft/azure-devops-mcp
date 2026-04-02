@@ -34,35 +34,25 @@ function MetaIcon({ field }: { field: string }) {
 }
 
 /* ===== Dynamic field classification constants ===== */
-const SKIP_FIELDS = new Set([
-  "System.Id",
-  "System.Rev",
-  "System.Title",
-  "System.WorkItemType",
-  "System.Tags",
-  "System.TeamProject",
-  "System.NodeName",
-  "System.BoardColumn",
-  "System.BoardColumnDone",
-  "System.AreaId",
-  "System.IterationId",
-  "System.Watermark",
-  "System.AuthorizedAs",
-  "System.PersonId",
-  "System.AuthorizedDate",
-  "System.RevisedDate",
-  "System.ExternalLinkCount",
-  "System.HyperLinkCount",
-  "System.AttachedFileCount",
-  "System.RelatedLinkCount",
-  "System.CommentCount",
-  "System.AreaPath",
-  "System.IterationPath",
-  "System.CreatedDate",
-  "System.ChangedDate",
-  "System.CreatedBy",
-  "System.ChangedBy",
-  "System.Reason",
+
+/**
+ * Whitelist of meta fields to show as key-value pairs in the expanded view.
+ * Only these fields appear in the meta section — everything else is excluded
+ * unless it contains HTML (shown as a rich-text section).
+ * This approach is robust for custom work item types: unknown fields are
+ * silently ignored rather than accidentally displayed.
+ */
+const META_FIELDS_WHITELIST = new Set([
+  "System.AssignedTo",
+  "System.State",
+  "Microsoft.VSTS.Common.Priority",
+  "Microsoft.VSTS.Common.Severity",
+  "Microsoft.VSTS.Common.Activity",
+  "Microsoft.VSTS.Common.ValueArea",
+  "Microsoft.VSTS.Scheduling.StoryPoints",
+  "Microsoft.VSTS.Scheduling.RemainingWork",
+  "Microsoft.VSTS.Scheduling.CompletedWork",
+  "Microsoft.VSTS.Scheduling.OriginalEstimate",
 ]);
 
 const META_FIELD_ORDER = [
@@ -71,14 +61,22 @@ const META_FIELD_ORDER = [
   "System.State",
   "Microsoft.VSTS.Scheduling.StoryPoints",
   "Microsoft.VSTS.Scheduling.RemainingWork",
+  "Microsoft.VSTS.Scheduling.CompletedWork",
   "Microsoft.VSTS.Scheduling.OriginalEstimate",
 ];
 
-const META_FIELD_SET = new Set(META_FIELD_ORDER);
-
 const SECTION_FIELD_ORDER = ["System.Description", "Microsoft.VSTS.TCM.ReproSteps", "Microsoft.VSTS.Common.AcceptanceCriteria", "Microsoft.VSTS.TCM.SystemInfo"];
 
-const LONG_TEXT_THRESHOLD = 150;
+/** Fields whose values are always numeric (hours, points). Used to pick the right input type in edit mode. */
+const NUMERIC_FIELDS = new Set([
+  "Microsoft.VSTS.Scheduling.StoryPoints",
+  "Microsoft.VSTS.Scheduling.RemainingWork",
+  "Microsoft.VSTS.Scheduling.CompletedWork",
+  "Microsoft.VSTS.Scheduling.OriginalEstimate",
+]);
+
+/** Fields that should render as dropdowns in edit mode. Values come from server metadata at runtime. */
+const ENUM_FIELDS = new Set(["Microsoft.VSTS.Common.Priority", "Microsoft.VSTS.Common.Severity", "Microsoft.VSTS.Common.Activity", "Microsoft.VSTS.Common.ValueArea"]);
 
 /* ===== Rich Text Editor (RoosterJS) ===== */
 function RichEditorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
@@ -133,20 +131,37 @@ export function ExpandedContent({
   const metaConfigs: { field: string; label: string }[] = [];
   const sectionFields: { field: string; label: string; format: string }[] = [];
 
+  // Build set of whitelisted fields that actually exist in this work item type's metadata
+  const typeMeta = typeMetadataMap[type];
+  const typeFieldRefs = new Set(typeMeta?.fields?.map((f) => f.referenceName) ?? []);
+
   for (const [field, value] of Object.entries(fields)) {
-    if (SKIP_FIELDS.has(field) || value === undefined || value === null) continue;
+    if (value === undefined || value === null) continue;
     const strVal = String(value);
     if (strVal.trim() === "") continue;
-    // Check actual text content (strip HTML tags) to skip empty HTML shells
     const textContent = stripHtml(strVal).trim();
     if (!textContent) continue;
-    const label = getFieldLabel(field);
+
+    // Whitelist: show as meta field if in the curated set
+    if (META_FIELDS_WHITELIST.has(field)) {
+      metaConfigs.push({ field, label: getFieldLabel(field) });
+      continue;
+    }
+
+    // Auto-detect rich text / HTML fields — show as expandable sections
     if (isHtmlContent(value)) {
-      sectionFields.push({ field, label, format: "html" });
-    } else if (strVal.length > LONG_TEXT_THRESHOLD) {
-      sectionFields.push({ field, label, format: "text" });
-    } else if (META_FIELD_SET.has(field)) {
-      metaConfigs.push({ field, label });
+      sectionFields.push({ field, label: getFieldLabel(field), format: "html" });
+    }
+  }
+
+  // In edit mode, also include whitelisted fields that exist in the type schema
+  // but have no current value (e.g., RemainingWork=null on a new Task)
+  if (isEditing) {
+    const existingFields = new Set(metaConfigs.map((c) => c.field));
+    for (const field of META_FIELDS_WHITELIST) {
+      if (!existingFields.has(field) && typeFieldRefs.has(field)) {
+        metaConfigs.push({ field, label: getFieldLabel(field) });
+      }
     }
   }
 
@@ -173,24 +188,17 @@ export function ExpandedContent({
     if (raw === undefined || raw === null || raw === "") return null;
     if (cfg.field === "System.AssignedTo") return formatAssignedTo(raw as string | { displayName?: string; uniqueName?: string });
     if (cfg.field === "Microsoft.VSTS.Common.Priority") return getPriorityLabel(raw as number);
-    if (cfg.field.includes("Date")) {
-      try {
-        return new Date(String(raw)).toLocaleDateString();
-      } catch {
-        return String(raw);
-      }
-    }
     if (typeof raw === "object" && raw !== null) {
       const obj = raw as Record<string, unknown>;
       return String(obj.displayName ?? obj.uniqueName ?? JSON.stringify(raw));
     }
-    if (typeof raw === "number") return raw === 0 ? null : String(raw);
+    if (typeof raw === "number") return String(raw);
     return String(raw);
   };
 
   if (isEditing) {
     const ef = editState?.fields ?? {};
-    const EDIT_SPECIAL = new Set(["System.Title", "System.State", "Microsoft.VSTS.Common.Priority", "System.AssignedTo", "System.Tags"]);
+    const EDIT_SPECIAL = new Set(["System.Title", "System.State", "System.AssignedTo", "System.Tags"]);
     const editableMetaFields = metaConfigs.filter((cfg) => !EDIT_SPECIAL.has(cfg.field));
 
     return (
@@ -237,45 +245,68 @@ export function ExpandedContent({
               </select>
             </div>
           )}
-          {"Microsoft.VSTS.Common.Priority" in ef && (
-            <div className="edit-field">
-              <label className="edit-field-label">Priority</label>
-              <select className="edit-select" value={String(ef["Microsoft.VSTS.Common.Priority"] ?? "3")} onChange={(e) => onFieldChange("Microsoft.VSTS.Common.Priority", e.target.value)}>
-                {[
-                  { v: "1", l: "Critical" },
-                  { v: "2", l: "High" },
-                  { v: "3", l: "Medium" },
-                  { v: "4", l: "Low" },
-                ].map((p) => (
-                  <option key={p.v} value={p.v}>
-                    {p.l}
-                  </option>
-                ))}
-              </select>
+          {"System.AssignedTo" in ef && (
+            <div className="edit-field edit-field-wide">
+              <label className="edit-field-label">Assigned To</label>
+              <PeoplePicker value={String(ef["System.AssignedTo"] ?? "")} onChange={(v: string) => onFieldChange("System.AssignedTo", v)} app={app} />
             </div>
           )}
-        </div>
-        {"System.AssignedTo" in ef && (
-          <div className="edit-field">
-            <label className="edit-field-label">Assigned To</label>
-            <PeoplePicker value={String(ef["System.AssignedTo"] ?? "")} onChange={(v: string) => onFieldChange("System.AssignedTo", v)} app={app} />
-          </div>
-        )}
-        {editableMetaFields.length > 0 && (
-          <div className="edit-grid">
-            {editableMetaFields.map((cfg) => (
+          {editableMetaFields.map((cfg) => {
+            const isNumeric = NUMERIC_FIELDS.has(cfg.field);
+
+            // Enum fields — use allowedValues from server type metadata
+            if (ENUM_FIELDS.has(cfg.field)) {
+              const typeMeta = typeMetadataMap[type];
+              const fieldDef = typeMeta?.fields?.find((f) => f.referenceName === cfg.field);
+              const allowedValues = fieldDef?.allowedValues ?? [];
+              const currentVal = String(ef[cfg.field] ?? "");
+              const isPriority = cfg.field === "Microsoft.VSTS.Common.Priority";
+
+              // Format display label: for Priority, append human-readable label (e.g. "1" → "1 - Critical")
+              const formatOptionLabel = (v: string) => {
+                if (isPriority) {
+                  const label = getPriorityLabel(Number(v));
+                  return label !== `P${v}` ? `${v} - ${label}` : v;
+                }
+                return v;
+              };
+
+              return (
+                <div key={cfg.field} className="edit-field">
+                  <label className="edit-field-label">{cfg.label}</label>
+                  <select className="edit-select" value={currentVal} onChange={(e) => onFieldChange(cfg.field, isPriority ? Number(e.target.value) : e.target.value)}>
+                    {!isPriority && <option value="">— None —</option>}
+                    {allowedValues.map((o) => (
+                      <option key={o} value={o}>
+                        {formatOptionLabel(o)}
+                      </option>
+                    ))}
+                    {currentVal && !allowedValues.includes(currentVal) && (
+                      <option key={currentVal} value={currentVal}>
+                        {formatOptionLabel(currentVal)}
+                      </option>
+                    )}
+                  </select>
+                </div>
+              );
+            }
+
+            // Numeric fields (StoryPoints, RemainingWork, etc.)
+            return (
               <div key={cfg.field} className="edit-field">
                 <label className="edit-field-label">{cfg.label}</label>
                 <input
                   className="edit-input"
-                  type={typeof fields[cfg.field] === "number" ? "number" : "text"}
+                  type={isNumeric ? "number" : "text"}
+                  step={isNumeric ? "any" : undefined}
+                  min={isNumeric ? "0" : undefined}
                   value={String(ef[cfg.field] ?? "")}
-                  onChange={(e) => onFieldChange(cfg.field, typeof fields[cfg.field] === "number" ? Number(e.target.value) : e.target.value)}
+                  onChange={(e) => onFieldChange(cfg.field, isNumeric ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
                 />
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
         {"System.Tags" in ef && <TagEditor tags={String(ef["System.Tags"] ?? "")} onChange={(val) => onFieldChange("System.Tags", val)} />}
         {sectionFields.map((cfg) => (
           <RichEditorField key={cfg.field} label={cfg.label} value={String(ef[cfg.field] ?? "")} onChange={(v) => onFieldChange(cfg.field, v)} />

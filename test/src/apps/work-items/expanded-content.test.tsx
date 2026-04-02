@@ -233,13 +233,20 @@ describe("ExpandedContent", () => {
       expect(screen.getByRole("option", { name: "Closed" })).toBeInTheDocument();
     });
 
-    it("renders priority dropdown with all options", () => {
-      render(<ExpandedContent wi={sampleWorkItem} editState={editState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+    it("renders priority dropdown with allowed values from server metadata", () => {
+      const metadataMap = {
+        Bug: {
+          states: [],
+          transitions: {},
+          fields: [{ referenceName: "Microsoft.VSTS.Common.Priority", name: "Priority", allowedValues: ["1", "2", "3", "4"] }],
+        },
+      };
+      render(<ExpandedContent wi={sampleWorkItem} editState={editState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={metadataMap} />);
 
-      expect(screen.getByRole("option", { name: "Critical" })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "High" })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "Medium" })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "Low" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "1 - Critical" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "2 - High" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "3 - Medium" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "4 - Low" })).toBeInTheDocument();
     });
 
     it("renders tag editor in edit mode", () => {
@@ -260,6 +267,106 @@ describe("ExpandedContent", () => {
       render(<ExpandedContent wi={sampleWorkItem} editState={editState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
 
       expect(screen.getByTestId("rooster-editor")).toBeInTheDocument();
+    });
+
+    it("renders enum field dropdown with allowedValues from server metadata", () => {
+      const wi: WorkItem = {
+        ...sampleWorkItem,
+        fields: { ...sampleWorkItem.fields, "Microsoft.VSTS.Common.Severity": "2 - High" },
+      };
+      const editSt: EditState = {
+        ...editState,
+        fields: { ...editState.fields, "Microsoft.VSTS.Common.Severity": "2 - High" },
+      };
+      const metadataMap = {
+        Bug: {
+          states: [],
+          transitions: {},
+          fields: [
+            { referenceName: "Microsoft.VSTS.Common.Severity", name: "Severity", allowedValues: ["1 - Critical", "2 - High", "3 - Medium", "4 - Low"] },
+            { referenceName: "Microsoft.VSTS.Common.Priority", name: "Priority", allowedValues: ["1", "2", "3", "4"] },
+          ],
+        },
+      };
+      render(<ExpandedContent wi={wi} editState={editSt} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={metadataMap} />);
+
+      // Check that Severity label and its dropdown options exist
+      expect(screen.getByText("Severity")).toBeInTheDocument();
+      const severitySelect = screen.getByDisplayValue("2 - High");
+      expect(severitySelect).toBeInTheDocument();
+      // Count options within the severity select (4 severity values + 1 "None")
+      const options = severitySelect.querySelectorAll("option");
+      expect(options.length).toBe(5); // "— None —" + 4 values
+    });
+
+    it("renders numeric input for StoryPoints with type=number", () => {
+      render(<ExpandedContent wi={sampleWorkItem} editState={editState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      const spInput = screen.getByDisplayValue("5");
+      expect(spInput).toHaveAttribute("type", "number");
+    });
+
+    it("shows whitelisted fields from type schema even when not set on work item", () => {
+      const taskWi: WorkItem = {
+        id: 99,
+        fields: {
+          "System.Id": 99,
+          "System.Title": "Task with no estimate",
+          "System.State": "Active",
+          "System.WorkItemType": "Task",
+          "System.AssignedTo": "Jane Doe",
+          "Microsoft.VSTS.Common.Priority": 2,
+        },
+      };
+      const taskEditState: EditState = {
+        id: 99,
+        fields: { "System.Title": "Task with no estimate", "System.State": "Active", "System.AssignedTo": "Jane Doe", "Microsoft.VSTS.Common.Priority": 2 },
+        saving: false,
+        statusMsg: "",
+        statusType: "",
+      };
+      const metadataMap = {
+        Task: {
+          states: [{ name: "Active", color: "", category: "" }],
+          transitions: {},
+          fields: [
+            { referenceName: "Microsoft.VSTS.Common.Priority", name: "Priority", allowedValues: ["1", "2", "3", "4"] },
+            { referenceName: "Microsoft.VSTS.Scheduling.RemainingWork", name: "Remaining Work", allowedValues: [] },
+            { referenceName: "Microsoft.VSTS.Scheduling.OriginalEstimate", name: "Original Estimate", allowedValues: [] },
+          ],
+        },
+      };
+      render(<ExpandedContent wi={taskWi} editState={taskEditState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={metadataMap} />);
+
+      // These fields should appear in edit mode even though they have no value on the work item
+      expect(screen.getByText("Remaining Work")).toBeInTheDocument();
+      expect(screen.getByText("Original Estimate")).toBeInTheDocument();
+    });
+
+    it("renders view mode with object-type meta values", () => {
+      const wi: WorkItem = {
+        ...sampleWorkItem,
+        fields: {
+          ...sampleWorkItem.fields,
+          "System.AssignedTo": { displayName: "Object User", uniqueName: "obj@test.com" },
+        },
+      };
+      render(<ExpandedContent wi={wi} editState={null} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      expect(screen.getByText("Object User")).toBeInTheDocument();
+    });
+
+    it("renders view mode with numeric zero value displayed", () => {
+      const wi: WorkItem = {
+        ...sampleWorkItem,
+        fields: {
+          ...sampleWorkItem.fields,
+          "Microsoft.VSTS.Scheduling.RemainingWork": 0,
+        },
+      };
+      render(<ExpandedContent wi={wi} editState={null} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      expect(screen.getByText("0")).toBeInTheDocument();
     });
   });
 });

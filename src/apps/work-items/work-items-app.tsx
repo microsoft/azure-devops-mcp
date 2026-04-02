@@ -92,6 +92,7 @@ function formatSuggestionValue(suggestion: SuggestedValue): string {
 
 export function WorkItemsApp() {
   const [isQueryOpen, setIsQueryOpen] = useState(false);
+  const [displayMode, setDisplayMode] = useState<"inline" | "fullscreen">("inline");
   const handleToolResultRef = useRef<((result: { content?: any[]; isError?: boolean }) => void) | null>(null);
 
   const onAppCreated = useCallback((createdApp: import("@modelcontextprotocol/ext-apps").App) => {
@@ -99,6 +100,9 @@ export function WorkItemsApp() {
       if (ctx.safeAreaInsets) {
         const { top, right, bottom, left } = ctx.safeAreaInsets;
         document.body.style.padding = `${top}px ${right}px ${bottom}px ${left}px`;
+      }
+      if (ctx.displayMode) {
+        setDisplayMode(ctx.displayMode === "fullscreen" ? "fullscreen" : "inline");
       }
     };
 
@@ -144,7 +148,7 @@ export function WorkItemsApp() {
     createdApp.onteardown = async () => ({});
   }, []);
 
-  const { app, error: connectionError } = useApp({ appInfo: { name: "Work Items App", version: "1.0.0" }, capabilities: {}, onAppCreated });
+  const { app, error: connectionError } = useApp({ appInfo: { name: "Work Items App", version: "1.0.0" }, capabilities: { availableDisplayModes: ["inline", "fullscreen"] }, onAppCreated });
   useHostStyles(app, app?.getHostContext());
 
   const data = useWorkItemsData(app);
@@ -200,10 +204,11 @@ export function WorkItemsApp() {
 
   if (data.status !== "table") return <StatusScreen status={data.status} />;
 
+  const isFullscreen = displayMode === "fullscreen";
   const tableMinWidth = data.columns.reduce((sum, c) => sum + (c.width ?? 120), 32);
 
   return (
-    <div className="content">
+    <div className={`content${isFullscreen ? " fullscreen" : ""}`}>
       <FilterBar
         filters={data.filters}
         onChange={data.handleFilterChange}

@@ -196,6 +196,38 @@ describe("configureMcpAppsTools", () => {
       expect(assignedTo).toContain("Test User");
     });
 
+    it("should format custom identity fields from objects to strings", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            fields: {
+              "System.Id": 1,
+              "System.Title": "Test",
+              "System.State": "Active",
+              "System.AssignedTo": { displayName: "Test User", uniqueName: "test@example.com" },
+              "System.CreatedBy": { displayName: "Creator User", uniqueName: "creator@example.com" },
+              "Custom.Reviewer": { displayName: "Reviewer User", uniqueName: "reviewer@example.com" },
+            },
+          },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      const parsed = JSON.parse(result.content[0].text);
+      const wi = parsed.workItems[0];
+      // All identity fields should be converted to strings
+      expect(typeof wi.fields["System.CreatedBy"]).toBe("string");
+      expect(wi.fields["System.CreatedBy"]).toContain("Creator User");
+      expect(typeof wi.fields["Custom.Reviewer"]).toBe("string");
+      expect(wi.fields["Custom.Reviewer"]).toContain("Reviewer User");
+    });
+
     it("should include displayConfig when columns, sort, suggestedValues are provided", async () => {
       mockConnection.getWorkApi.mockResolvedValue({
         getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
@@ -247,10 +279,8 @@ describe("configureMcpAppsTools", () => {
       expect(result.content[0].text).toContain("Error retrieving work items");
     });
 
-    it("should gracefully handle extended field fetch failures", async () => {
-      const mockGetWorkItemsBatch = jest.fn();
-      // First call succeeds (core fields), second call fails (extended fields)
-      mockGetWorkItemsBatch.mockResolvedValueOnce([
+    it("should return all fields including custom fields in a single batch call", async () => {
+      const mockGetWorkItemsBatch = jest.fn().mockResolvedValue([
         {
           id: 1,
           fields: {
@@ -258,10 +288,11 @@ describe("configureMcpAppsTools", () => {
             "System.Title": "Test",
             "System.State": "Active",
             "System.AssignedTo": { displayName: "Test User", uniqueName: "test@example.com" },
+            "Custom.BusinessValue": "High",
+            "Custom.ReleaseTarget": "v2.0",
           },
         },
       ]);
-      mockGetWorkItemsBatch.mockRejectedValueOnce(new Error("Extended fields not available"));
 
       mockConnection.getWorkApi.mockResolvedValue({
         getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
@@ -273,10 +304,14 @@ describe("configureMcpAppsTools", () => {
       const handler = getHandler();
       const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
 
-      // Should still succeed despite extended field failure
       expect(result.isError).toBeUndefined();
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.workItems).toHaveLength(1);
+      // Custom fields are preserved in the result
+      expect(parsed.workItems[0].fields["Custom.BusinessValue"]).toBe("High");
+      expect(parsed.workItems[0].fields["Custom.ReleaseTarget"]).toBe("v2.0");
+      // Only one batch call made (no separate extended fields call)
+      expect(mockGetWorkItemsBatch).toHaveBeenCalledTimes(1);
     });
 
     it("should apply top limit for team iteration queries", async () => {
@@ -507,6 +542,70 @@ describe("configureMcpAppsTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error retrieving work item type icon");
+    });
+  });
+
+  // ======== mcp_app_get_work_item_type_fields Tool ========
+
+  describe("mcp_app_get_work_item_type_fields tool", () => {
+    function getHandler() {
+      configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.registerTool as jest.Mock).mock.calls.find(([toolName]: [string]) => toolName === MCP_APPS_TOOLS.get_work_item_type_fields);
+      if (!call) throw new Error("mcp_app_get_work_item_type_fields tool not registered");
+      const [, , handler] = call;
+      return handler;
+    }
+
+    it("should return field definitions with allowed values", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemTypeFieldsWithReferences: jest.fn().mockResolvedValue([
+          { referenceName: "Microsoft.VSTS.Common.Priority", name: "Priority", allowedValues: [1, 2, 3, 4] },
+          { referenceName: "Microsoft.VSTS.Common.Severity", name: "Severity", allowedValues: ["1 - Critical", "2 - High", "3 - Medium", "4 - Low"] },
+          { referenceName: "System.Title", name: "Title", allowedValues: [] },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", workItemType: "Bug" });
+
+      expect(result.isError).toBeUndefined();
+      const fields = JSON.parse(result.content[0].text);
+      expect(fields).toHaveLength(3);
+      // Integer allowed values should be converted to strings
+      expect(fields[0].allowedValues).toEqual(["1", "2", "3", "4"]);
+      expect(fields[1].allowedValues).toEqual(["1 - Critical", "2 - High", "3 - Medium", "4 - Low"]);
+      expect(fields[2].allowedValues).toEqual([]);
+    });
+
+    it("should handle null response gracefully", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemTypeFieldsWithReferences: jest.fn().mockResolvedValue(null),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", workItemType: "Bug" });
+
+      expect(result.isError).toBeUndefined();
+      const fields = JSON.parse(result.content[0].text);
+      expect(fields).toEqual([]);
+    });
+
+    it("should handle API errors", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemTypeFieldsWithReferences: jest.fn().mockRejectedValue(new Error("API Error")),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", workItemType: "Bug" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error retrieving field definitions");
+    });
+
+    it("should be registered as an app tool", () => {
+      configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const registeredNames = (server.registerTool as jest.Mock).mock.calls.map(([name]: [string]) => name);
+      expect(registeredNames).toContain(MCP_APPS_TOOLS.get_work_item_type_fields);
     });
   });
 

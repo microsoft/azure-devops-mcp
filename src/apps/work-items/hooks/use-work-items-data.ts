@@ -366,9 +366,10 @@ export function useWorkItemsData(app: App | null) {
       await Promise.all(
         [...types].map(async (type) => {
           try {
-            const [iconResult, typeResult] = await Promise.all([
+            const [iconResult, typeResult, fieldsResult] = await Promise.all([
               app.callServerTool({ name: "mcp_app_get_work_item_type_icon", arguments: { project, workItemType: type } }),
               app.callServerTool({ name: "wit_get_work_item_type", arguments: { project, workItemType: type } }),
+              app.callServerTool({ name: "mcp_app_get_work_item_type_fields", arguments: { project, workItemType: type } }),
             ]);
             const iconText = (iconResult.content as ContentItem[] | undefined)?.find((c) => c.type === "text");
             if (iconText?.text) {
@@ -378,8 +379,31 @@ export function useWorkItemsData(app: App | null) {
             const typeText = (typeResult.content as ContentItem[] | undefined)?.find((c) => c.type === "text");
             if (typeText?.text) {
               const data = JSON.parse(typeText.text);
-              if (data.states || data.transitions) newMeta[type] = { states: data.states ?? [], transitions: data.transitions ?? {} };
+              if (data.states || data.transitions) {
+                newMeta[type] = {
+                  states: data.states ?? [],
+                  transitions: data.transitions ?? {},
+                  fields: [],
+                };
+              }
               if (data.color) newColors[type] = `#${data.color}`;
+            }
+            // Merge field definitions with allowedValues from the dedicated fields API
+            const fieldsText = (fieldsResult.content as ContentItem[] | undefined)?.find((c) => c.type === "text");
+            if (fieldsText?.text) {
+              const fieldDefs = JSON.parse(fieldsText.text);
+              if (Array.isArray(fieldDefs)) {
+                const parsed = fieldDefs.map((f: { referenceName?: string; name?: string; allowedValues?: string[] }) => ({
+                  referenceName: f.referenceName ?? "",
+                  name: f.name ?? "",
+                  allowedValues: Array.isArray(f.allowedValues) ? f.allowedValues : [],
+                }));
+                if (newMeta[type]) {
+                  newMeta[type].fields = parsed;
+                } else {
+                  newMeta[type] = { states: [], transitions: {}, fields: parsed };
+                }
+              }
             }
           } catch {
             /* skip failed fetches */
