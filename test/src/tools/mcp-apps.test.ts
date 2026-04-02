@@ -4,6 +4,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureMcpAppsTools, MCP_APPS_TOOLS } from "../../../src/tools/mcp-apps";
+import * as authModule from "../../../src/tools/auth";
 import { WebApi } from "azure-devops-node-api";
 
 jest.mock("../../../src/logger.js", () => ({
@@ -506,6 +507,132 @@ describe("configureMcpAppsTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error retrieving work item type icon");
+    });
+  });
+
+  // ======== mcp_app_search_identities Tool ========
+
+  describe("mcp_app_search_identities tool", () => {
+    function getHandler() {
+      configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.registerTool as jest.Mock).mock.calls.find(([toolName]: [string]) => toolName === MCP_APPS_TOOLS.search_identities);
+      if (!call) throw new Error("mcp_app_search_identities tool not registered");
+      const [, , handler] = call;
+      return handler;
+    }
+
+    it("should return identities from search results", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue({
+        value: [
+          {
+            id: "id-1",
+            providerDisplayName: "Jane Doe",
+            properties: {
+              SchemaClassName: { $type: "System.String", $value: "User" },
+              Mail: { $type: "System.String", $value: "jane@example.com" },
+            },
+          },
+        ],
+      } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "Jane" });
+
+      expect(result.isError).toBeUndefined();
+      const identities = JSON.parse(result.content[0].text);
+      expect(identities).toHaveLength(1);
+      expect(identities[0].displayName).toBe("Jane Doe");
+      expect(identities[0].mail).toBe("jane@example.com");
+    });
+
+    it("should filter out groups", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue({
+        value: [
+          {
+            id: "id-1",
+            providerDisplayName: "Jane Doe",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+          {
+            id: "id-2",
+            providerDisplayName: "Project Admins",
+            properties: { SchemaClassName: { $type: "System.String", $value: "Group" } },
+          },
+        ],
+      } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "Jane" });
+
+      const identities = JSON.parse(result.content[0].text);
+      expect(identities).toHaveLength(1);
+      expect(identities[0].displayName).toBe("Jane Doe");
+    });
+
+    it("should search multiple terms and deduplicate", async () => {
+      const searchSpy = jest.spyOn(authModule, "searchIdentities");
+      searchSpy.mockResolvedValue({
+        value: [
+          {
+            id: "id-1",
+            providerDisplayName: "Jane Doe",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+        ],
+      } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "Jane Doe" });
+
+      // Should be called for "Jane Doe", "Jane", and "Doe"
+      expect(searchSpy).toHaveBeenCalledTimes(3);
+      const identities = JSON.parse(result.content[0].text);
+      // Deduplicated by id
+      expect(identities).toHaveLength(1);
+    });
+
+    it("should return empty results when all term searches fail", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockRejectedValue(new Error("Network error"));
+
+      const handler = getHandler();
+      const result = await handler({ query: "test" });
+
+      // Individual term failures are caught silently, returns empty array
+      const identities = JSON.parse(result.content[0].text);
+      expect(identities).toHaveLength(0);
+    });
+
+    it("should handle empty results", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue({ value: [] } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "nonexistent" });
+
+      const identities = JSON.parse(result.content[0].text);
+      expect(identities).toHaveLength(0);
+    });
+
+    it("should sort results prioritizing full query match", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue({
+        value: [
+          {
+            id: "id-1",
+            providerDisplayName: "Bob Smith",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+          {
+            id: "id-2",
+            providerDisplayName: "Jane Smith",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+        ],
+      } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "Jane" });
+
+      const identities = JSON.parse(result.content[0].text);
+      expect(identities[0].displayName).toBe("Jane Smith");
     });
   });
 });

@@ -5,7 +5,7 @@
 // Licensed under the MIT License.
 
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { FilterBar } from "../../../../src/apps/work-items/components/filter-bar";
 import type { ActiveFilters, FilterOptions } from "../../../../src/apps/work-items/types";
@@ -78,5 +78,60 @@ describe("FilterBar", () => {
 
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText(/of 10/)).toBeInTheDocument();
+  });
+
+  it("calls onChange for type filter", () => {
+    const onChange = jest.fn();
+    render(<FilterBar filters={EMPTY} onChange={onChange} onClear={jest.fn()} filterOptions={OPTIONS} totalCount={10} filteredCount={10} />);
+
+    const typeSelect = screen.getAllByRole("combobox")[1]; // Second select is type
+    fireEvent.change(typeSelect, { target: { value: "Bug" } });
+    expect(onChange).toHaveBeenCalledWith("type", "Bug");
+  });
+
+  it("calls onChange for assignee filter", () => {
+    const onChange = jest.fn();
+    render(<FilterBar filters={EMPTY} onChange={onChange} onClear={jest.fn()} filterOptions={OPTIONS} totalCount={10} filteredCount={10} />);
+
+    const assigneeSelect = screen.getAllByRole("combobox")[2];
+    fireEvent.change(assigneeSelect, { target: { value: "Alice" } });
+    expect(onChange).toHaveBeenCalledWith("assignedTo", "Alice");
+  });
+
+  it("calls onChange for priority filter", () => {
+    const onChange = jest.fn();
+    render(<FilterBar filters={EMPTY} onChange={onChange} onClear={jest.fn()} filterOptions={OPTIONS} totalCount={10} filteredCount={10} />);
+
+    const prioritySelect = screen.getAllByRole("combobox")[3];
+    fireEvent.change(prioritySelect, { target: { value: "Critical" } });
+    expect(onChange).toHaveBeenCalledWith("priority", "Critical");
+  });
+
+  it("calls onChange for tag filter", () => {
+    const onChange = jest.fn();
+    render(<FilterBar filters={EMPTY} onChange={onChange} onClear={jest.fn()} filterOptions={OPTIONS} totalCount={10} filteredCount={10} />);
+
+    const tagSelect = screen.getAllByRole("combobox")[4];
+    fireEvent.change(tagSelect, { target: { value: "frontend" } });
+    expect(onChange).toHaveBeenCalledWith("tag", "frontend");
+  });
+
+  it("debounces search input", async () => {
+    const onChange = jest.fn();
+    render(<FilterBar filters={EMPTY} onChange={onChange} onClear={jest.fn()} filterOptions={OPTIONS} totalCount={10} filteredCount={10} />);
+
+    const searchInput = screen.getByPlaceholderText(/search by title/i);
+    fireEvent.change(searchInput, { target: { value: "test query" } });
+
+    // Should not be called immediately
+    expect(onChange).not.toHaveBeenCalled();
+
+    // Wait for debounce
+    await waitFor(
+      () => {
+        expect(onChange).toHaveBeenCalledWith("search", "test query");
+      },
+      { timeout: 500 }
+    );
   });
 });

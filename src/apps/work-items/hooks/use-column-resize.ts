@@ -23,7 +23,7 @@ export function useColumnResize() {
       if (!resizeRef.current) return;
       const diff = ev.clientX - resizeRef.current.startX;
       const newW = Math.max(40, resizeRef.current.startW + diff);
-      setColumnWidths((prev) => ({ ...prev, [resizeRef.current!.field]: newW }));
+      setColumnWidths((prev) => ({ ...prev, [resizeRef.current?.field ?? ""]: newW }));
     };
 
     const onMouseUp = () => {

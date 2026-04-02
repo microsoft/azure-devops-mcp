@@ -77,7 +77,7 @@ export interface WorkItemTypeState {
 
 export interface WorkItemTypeMetadata {
   states: WorkItemTypeState[];
-  transitions: Record<string, Array<{ to: string }>>;
+  transitions: Record<string, { to: string }[]>;
 }
 
 export interface FilterOptions {

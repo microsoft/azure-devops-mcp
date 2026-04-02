@@ -29,6 +29,7 @@ export function useApp(options: { appInfo: any; capabilities: any; onAppCreated?
   return { app: appRef.current, error: null };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function useHostStyles(_app: any) {
   // no-op in tests
 }

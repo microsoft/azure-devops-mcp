@@ -67,7 +67,6 @@ module.exports = {
     // Apps module mocks for React component testing
     "@modelcontextprotocol/ext-apps/react$": "<rootDir>/test/mocks/mcp-apps/ext-apps-react.ts",
     "^@modelcontextprotocol/ext-apps$": "<rootDir>/test/mocks/mcp-apps/ext-apps.ts",
-    "^react-quill-new$": "<rootDir>/test/mocks/mcp-apps/react-quill-new.tsx",
     "\\.css$": "<rootDir>/test/mocks/mcp-apps/style-mock.ts",
   },
 };

@@ -543,6 +543,161 @@ describe("useWorkItemsData", () => {
     act(() => result.current.setStatus("loading"));
     expect(result.current.status).toBe("loading");
   });
+
+  // ---- Save ----
+
+  it("saves edited work item successfully", async () => {
+    const mockApp = {
+      callServerTool: jest.fn().mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify({ id: 1, fields: { "System.Title": "Updated" } }) }],
+        isError: false,
+      }),
+    };
+    const { result } = renderHook(() => useWorkItemsData(mockApp as any));
+
+    act(() => {
+      result.current.handleToolResult({
+        content: [{ type: "text", text: JSON.stringify({ workItems: [{ id: 1, fields: { "System.Id": 1, "System.Title": "Original", "System.State": "Active" } }] }) }],
+      });
+    });
+
+    act(() => result.current.handleStartEdit(1));
+    act(() => result.current.handleFieldChange("System.Title", "Updated"));
+
+    await act(async () => {
+      await result.current.handleSave(1);
+    });
+
+    expect(mockApp.callServerTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "wit_update_work_item",
+        arguments: expect.objectContaining({ id: 1 }),
+      })
+    );
+    expect(result.current.editState).toBeNull();
+  });
+
+  it("shows no changes message when nothing changed", async () => {
+    jest.useFakeTimers();
+    const mockApp = {
+      callServerTool: jest.fn(),
+    };
+    const { result } = renderHook(() => useWorkItemsData(mockApp as any));
+
+    act(() => {
+      result.current.handleToolResult({
+        content: [{ type: "text", text: JSON.stringify({ workItems: [{ id: 1, fields: { "System.Id": 1, "System.Title": "Same" } }] }) }],
+      });
+    });
+
+    act(() => result.current.handleStartEdit(1));
+
+    await act(async () => {
+      await result.current.handleSave(1);
+    });
+
+    expect(result.current.editState?.statusMsg).toBe("No changes to save");
+    jest.useRealTimers();
+  });
+
+  it("handles save failure", async () => {
+    const mockApp = {
+      callServerTool: jest.fn().mockResolvedValue({
+        content: [{ type: "text", text: "Update failed" }],
+        isError: true,
+      }),
+    };
+    const { result } = renderHook(() => useWorkItemsData(mockApp as any));
+
+    act(() => {
+      result.current.handleToolResult({
+        content: [{ type: "text", text: JSON.stringify({ workItems: [{ id: 1, fields: { "System.Id": 1, "System.Title": "Original" } }] }) }],
+      });
+    });
+
+    act(() => result.current.handleStartEdit(1));
+    act(() => result.current.handleFieldChange("System.Title", "Changed"));
+
+    await act(async () => {
+      await result.current.handleSave(1);
+    });
+
+    expect(result.current.editState?.statusType).toBe("error");
+    expect(result.current.editState?.statusMsg).toContain("Update failed");
+  });
+
+  it("handles save network error", async () => {
+    const mockApp = {
+      callServerTool: jest.fn().mockRejectedValue(new Error("Network error")),
+    };
+    const { result } = renderHook(() => useWorkItemsData(mockApp as any));
+
+    act(() => {
+      result.current.handleToolResult({
+        content: [{ type: "text", text: JSON.stringify({ workItems: [{ id: 1, fields: { "System.Id": 1, "System.Title": "Original" } }] }) }],
+      });
+    });
+
+    act(() => result.current.handleStartEdit(1));
+    act(() => result.current.handleFieldChange("System.Title", "Changed"));
+
+    await act(async () => {
+      await result.current.handleSave(1);
+    });
+
+    expect(result.current.editState?.statusType).toBe("error");
+  });
+
+  // ---- Accept Suggestion ----
+
+  it("accepts a suggestion and updates work item", async () => {
+    const mockApp = {
+      callServerTool: jest.fn().mockResolvedValue({
+        content: [{ type: "text", text: "OK" }],
+        isError: false,
+      }),
+    };
+    const { result } = renderHook(() => useWorkItemsData(mockApp as any));
+
+    act(() => {
+      result.current.handleToolResult({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              workItems: [{ id: 1, fields: { "System.Id": 1, "System.Title": "Test", "Microsoft.VSTS.Common.Priority": 3 } }],
+              displayConfig: { suggestedValues: [{ workItemId: 1, field: "Microsoft.VSTS.Common.Priority", value: 1 }] },
+            }),
+          },
+        ],
+      });
+    });
+
+    expect(result.current.suggestions).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.handleAcceptSuggestion({ workItemId: 1, field: "Microsoft.VSTS.Common.Priority", value: 1 });
+    });
+
+    expect(mockApp.callServerTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "wit_update_work_item",
+      })
+    );
+    expect(result.current.suggestions).toHaveLength(0);
+  });
+
+  // ---- Query Context ----
+
+  it("sets query context", () => {
+    const { result } = renderHook(() => useWorkItemsData(null));
+
+    act(() => {
+      result.current.setQueryContext({ project: "TestProject", queryType: "assignedtome" });
+    });
+
+    expect(result.current.queryContext).toEqual({ project: "TestProject", queryType: "assignedtome" });
+  });
 });
 
 // ======== useColumnResize ========
@@ -573,5 +728,63 @@ describe("useColumnResize", () => {
     });
 
     expect(result.current.columnWidths).toEqual({});
+  });
+
+  it("updates column width on mouse drag", () => {
+    const { result } = renderHook(() => useColumnResize());
+
+    const mockTh = { getBoundingClientRect: () => ({ width: 100 }) };
+    const mockEvent = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      target: { closest: jest.fn().mockReturnValue(mockTh) },
+      clientX: 200,
+    } as unknown as React.MouseEvent;
+
+    act(() => {
+      result.current.handleResizeStart("System.Title", mockEvent);
+    });
+
+    // Simulate mouse move
+    act(() => {
+      const moveEvent = new MouseEvent("mousemove", { clientX: 250 });
+      document.dispatchEvent(moveEvent);
+    });
+
+    expect(result.current.columnWidths["System.Title"]).toBe(150); // 100 + (250-200)
+
+    // Simulate mouse up
+    act(() => {
+      const upEvent = new MouseEvent("mouseup");
+      document.dispatchEvent(upEvent);
+    });
+
+    // Width should remain after mouseup
+    expect(result.current.columnWidths["System.Title"]).toBe(150);
+  });
+
+  it("enforces minimum width of 40px", () => {
+    const { result } = renderHook(() => useColumnResize());
+
+    const mockTh = { getBoundingClientRect: () => ({ width: 80 }) };
+    const mockEvent = {
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+      target: { closest: jest.fn().mockReturnValue(mockTh) },
+      clientX: 200,
+    } as unknown as React.MouseEvent;
+
+    act(() => {
+      result.current.handleResizeStart("System.Id", mockEvent);
+    });
+
+    // Drag far left to go below minimum
+    act(() => {
+      const moveEvent = new MouseEvent("mousemove", { clientX: 100 });
+      document.dispatchEvent(moveEvent);
+    });
+
+    // Should clamp to 40
+    expect(result.current.columnWidths["System.Id"]).toBe(40);
   });
 });

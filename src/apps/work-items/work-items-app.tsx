@@ -42,7 +42,7 @@ function renderCell(field: string, wi: WorkItem, typeIconSvgMap: Record<string, 
     case "System.WorkItemType": {
       const type = String(value ?? "");
       const apiColor = typeColorMap[type];
-      const { bg, fg } = colorForType(type, apiColor);
+      const { bg } = colorForType(type, apiColor);
       return (
         <span className="type-badge" style={{ background: `${bg}20`, color: bg, borderColor: `${bg}40` }}>
           {type}
@@ -131,17 +131,21 @@ export function WorkItemsApp() {
     createdApp.ontoolresult = (result) => handleToolResultRef.current?.(result);
     createdApp.ontoolcancelled = () => {
       dataRef.current?.setStatus("error");
-      createdApp.updateModelContext({ content: [{ type: "text", text: "Error: Tool execution was cancelled." }] }).catch(() => {});
+      createdApp.updateModelContext({ content: [{ type: "text", text: "Error: Tool execution was cancelled." }] }).catch(() => {
+        /* noop */
+      });
     };
     createdApp.onerror = (error) => {
       dataRef.current?.setStatus("error");
-      createdApp.updateModelContext({ content: [{ type: "text", text: `Error: ${error?.message ?? "Connection error."}` }] }).catch(() => {});
+      createdApp.updateModelContext({ content: [{ type: "text", text: `Error: ${error?.message ?? "Connection error."}` }] }).catch(() => {
+        /* noop */
+      });
     };
     createdApp.onteardown = async () => ({});
   }, []);
 
   const { app, error: connectionError } = useApp({ appInfo: { name: "Work Items App", version: "1.0.0" }, capabilities: {}, onAppCreated });
-  useHostStyles(app);
+  useHostStyles(app, app?.getHostContext());
 
   const data = useWorkItemsData(app);
   const { columnWidths, handleResizeStart } = useColumnResize();

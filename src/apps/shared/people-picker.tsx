@@ -222,7 +222,7 @@ export function PeoplePicker({ value, onChange, app, disabled, className = "peop
     const list = containerRef.current?.querySelector(`.${cx("dropdown")}`);
     const item = list?.children[activeIndex] as HTMLElement | undefined;
     item?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeIndex, cx]);
 
   useEffect(
     () => () => {

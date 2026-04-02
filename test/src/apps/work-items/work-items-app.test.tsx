@@ -36,7 +36,9 @@ jest.mock("@modelcontextprotocol/ext-apps/react", () => ({
     }
     return { app: appRef.current, error: null };
   },
-  useHostStyles: () => {},
+  useHostStyles: () => {
+    /* no-op in tests */
+  },
 }));
 
 const sampleWorkItems = [
@@ -85,6 +87,7 @@ function renderAndLoadData() {
   let capturedApp: any;
 
   // Override useApp to capture the app reference
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const useAppModule = require("@modelcontextprotocol/ext-apps/react");
   const originalUseApp = useAppModule.useApp;
   useAppModule.useApp = (options: any) => {
@@ -127,6 +130,7 @@ describe("WorkItemsApp", () => {
   describe("error state", () => {
     it("shows error state when tool result has error", () => {
       let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const useAppModule = require("@modelcontextprotocol/ext-apps/react");
       const originalUseApp = useAppModule.useApp;
       useAppModule.useApp = (options: any) => {
@@ -152,6 +156,7 @@ describe("WorkItemsApp", () => {
   describe("empty state", () => {
     it("shows empty state when no work items returned", () => {
       let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const useAppModule = require("@modelcontextprotocol/ext-apps/react");
       const originalUseApp = useAppModule.useApp;
       useAppModule.useApp = (options: any) => {
@@ -245,6 +250,7 @@ describe("WorkItemsApp", () => {
   describe("displayConfig handling", () => {
     it("applies displayConfig from tool result", () => {
       let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const useAppModule = require("@modelcontextprotocol/ext-apps/react");
       const originalUseApp = useAppModule.useApp;
       useAppModule.useApp = (options: any) => {

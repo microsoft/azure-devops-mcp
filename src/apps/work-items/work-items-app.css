@@ -548,103 +548,366 @@ tbody tr.wi-row:hover .expand-btn {
   line-height: 1.6;
 }
 
-/* ===== Quill Rich Text Editor ===== */
-.quill-wrapper {
+/* ===== RoosterJS Rich Text Editor (shared component) ===== */
+.rooster-editor-container {
   margin-bottom: 12px;
+  border: 1px solid var(--color-border-primary, var(--vscode-input-border, #3c3c3c));
+  border-radius: var(--border-radius-md, 6px);
+  position: relative;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
-.quill-wrapper .quill {
-  border-radius: var(--border-radius-sm, 4px);
-  overflow: hidden;
+.rooster-editor-container:focus-within {
+  border-color: var(--color-accent-primary, var(--vscode-focusBorder, #007acc));
+  box-shadow: 0 0 0 1px var(--color-accent-primary, var(--vscode-focusBorder, #007acc));
 }
-.quill-wrapper .ql-toolbar.ql-snow {
-  border: 1px solid var(--color-border-default, var(--vscode-input-border, #3c3c3c));
-  border-radius: var(--border-radius-sm, 4px) var(--border-radius-sm, 4px) 0 0;
-  background: var(--vscode-editorGroupHeader-tabsBackground, rgba(128, 128, 128, 0.08));
+
+/* Toolbar */
+.rooster-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   padding: 4px 6px;
+  background: var(--color-background-secondary, rgba(128, 128, 128, 0.06));
+  border-bottom: 1px solid var(--color-border-primary, var(--vscode-input-border, #3c3c3c));
+  flex-wrap: wrap;
+  border-radius: var(--border-radius-md, 6px) var(--border-radius-md, 6px) 0 0;
 }
-.quill-wrapper .ql-toolbar .ql-stroke {
-  stroke: var(--color-text-secondary, var(--vscode-descriptionForeground, #8b8b8b));
+.rooster-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--border-radius-sm, 4px);
+  background: transparent;
+  color: var(--color-text-primary, var(--vscode-editor-foreground, #cccccc));
+  cursor: pointer;
+  font-family: var(--font-sans, inherit);
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
 }
-.quill-wrapper .ql-toolbar .ql-fill {
-  fill: var(--color-text-secondary, var(--vscode-descriptionForeground, #8b8b8b));
+.rooster-toolbar-btn:hover {
+  background: var(--color-background-tertiary, var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12)));
 }
-.quill-wrapper .ql-toolbar .ql-picker-label {
-  color: var(--color-text-secondary, var(--vscode-descriptionForeground, #8b8b8b));
+.rooster-toolbar-btn:active {
+  background: rgba(128, 128, 128, 0.2);
 }
-.quill-wrapper .ql-toolbar button:hover .ql-stroke,
-.quill-wrapper .ql-toolbar .ql-picker-label:hover .ql-stroke {
-  stroke: var(--color-text-primary, var(--vscode-editor-foreground, #ccc));
+.rooster-icon-text {
+  font-size: 13px;
+  font-family: var(--font-sans, inherit);
 }
-.quill-wrapper .ql-toolbar button:hover .ql-fill,
-.quill-wrapper .ql-toolbar .ql-picker-label:hover .ql-fill {
-  fill: var(--color-text-primary, var(--vscode-editor-foreground, #ccc));
+.rooster-toolbar-separator {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border-primary, var(--vscode-input-border, #3c3c3c));
+  margin: 0 3px;
+  flex-shrink: 0;
 }
-.quill-wrapper .ql-toolbar button.ql-active .ql-stroke {
-  stroke: var(--color-accent-primary, var(--vscode-textLink-foreground, #3794ff));
+
+/* Overflow / More menu */
+.rooster-overflow-wrapper {
+  position: relative;
+  flex-shrink: 0;
 }
-.quill-wrapper .ql-toolbar button.ql-active .ql-fill {
-  fill: var(--color-accent-primary, var(--vscode-textLink-foreground, #3794ff));
+.rooster-overflow-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  min-width: 180px;
+  padding: 4px 0;
+  margin-top: 4px;
+  background: var(--color-background-primary, var(--vscode-dropdown-background, #252526));
+  border: 1px solid var(--color-border-primary, var(--vscode-input-border, #3c3c3c));
+  border-radius: var(--border-radius-md, 6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
-.quill-wrapper .ql-container.ql-snow {
-  border: 1px solid var(--color-border-default, var(--vscode-input-border, #3c3c3c));
-  border-top: none;
-  border-radius: 0 0 var(--border-radius-sm, 4px) var(--border-radius-sm, 4px);
-  background: var(--color-background-input, var(--vscode-input-background, #1e1e1e));
+.rooster-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary, var(--vscode-editor-foreground, #cccccc));
+  font-size: 12px;
+  font-family: var(--font-sans, inherit);
+  cursor: pointer;
+  text-align: left;
+}
+.rooster-overflow-item:hover {
+  background: var(--color-background-tertiary, var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12)));
+}
+.rooster-overflow-item-active {
+  background: rgba(0, 120, 212, 0.1);
+  color: var(--color-accent-primary, #007acc);
+}
+.rooster-overflow-label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+/* Dropdown button (font size, heading) */
+.rooster-dropdown-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+.rooster-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: auto;
+  padding: 0 4px;
+  min-width: 32px;
+}
+.rooster-dropdown-label {
+  font-size: 12px;
+  font-family: var(--font-sans, inherit);
+  font-weight: 500;
+  line-height: 1;
+}
+.rooster-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  min-width: 70px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 4px 0;
+  margin-top: 4px;
+  background: var(--color-background-primary, var(--vscode-dropdown-background, #252526));
+  border: 1px solid var(--color-border-primary, var(--vscode-input-border, #3c3c3c));
+  border-radius: var(--border-radius-md, 6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+.rooster-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary, var(--vscode-editor-foreground, #cccccc));
+  font-size: 12px;
+  font-family: var(--font-sans, inherit);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.rooster-dropdown-item:hover {
+  background: var(--color-background-tertiary, var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12)));
+}
+
+/* Inline link dialog */
+.rooster-link-dialog {
+  padding: 8px 10px;
+  background: var(--color-background-secondary, rgba(128, 128, 128, 0.06));
+  border-bottom: 1px solid var(--color-border-primary, var(--vscode-input-border, #3c3c3c));
+}
+.rooster-link-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.rooster-link-input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--font-sans, inherit);
+  border: 1px solid var(--color-border-primary, var(--vscode-input-border, #3c3c3c));
+  border-radius: var(--border-radius-sm, 4px);
+  background: var(--color-background-primary, var(--vscode-input-background, #1e1e1e));
+  color: var(--color-text-primary, var(--vscode-input-foreground, #cccccc));
+  outline: none;
+}
+.rooster-link-input:focus {
+  border-color: var(--color-accent-primary, var(--vscode-focusBorder, #007acc));
+}
+.rooster-link-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.rooster-link-btn-insert,
+.rooster-link-btn-cancel {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--font-sans, inherit);
+  border: none;
+  border-radius: var(--border-radius-sm, 4px);
+  cursor: pointer;
+}
+.rooster-link-btn-insert {
+  background: var(--color-accent-primary, var(--vscode-button-background, #0e639c));
+  color: #fff;
+}
+.rooster-link-btn-insert:hover {
+  opacity: 0.9;
+}
+.rooster-link-btn-cancel {
+  background: transparent;
+  color: var(--color-text-secondary, var(--vscode-descriptionForeground, #9e9e9e));
+}
+.rooster-link-btn-cancel:hover {
+  color: var(--color-text-primary, var(--vscode-editor-foreground, #cccccc));
+}
+
+/* Editor content area */
+.rooster-content {
+  background: var(--color-background-primary, var(--vscode-input-background, #1e1e1e));
   color: var(--color-text-primary, var(--vscode-input-foreground, #cccccc));
   font-size: 13px;
-  font-family: inherit;
-}
-.quill-wrapper .ql-editor {
-  min-height: 120px;
+  font-family: var(--font-sans, inherit);
+  line-height: 1.6;
+  padding: 12px 16px;
   max-height: 350px;
   overflow-y: auto;
-  line-height: 1.6;
-  padding: 10px 12px;
+  overflow-x: hidden;
+  outline: none;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  border-radius: 0 0 var(--border-radius-md, 6px) var(--border-radius-md, 6px);
 }
-.quill-wrapper .ql-editor.ql-blank::before {
-  color: var(--color-text-secondary, var(--vscode-input-placeholderForeground, #6b7280));
-  font-style: italic;
+.rooster-content:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-secondary, var(--vscode-descriptionForeground, #9e9e9e));
+  pointer-events: none;
 }
-.quill-wrapper .ql-editor a {
+/* Lists — ensure bullets/numbers are visible inside the content box */
+.rooster-content ul,
+.rooster-content ol {
+  padding-left: 24px;
+  margin: 4px 0;
+  list-style-position: outside;
+}
+.rooster-content ul {
+  list-style-type: disc;
+}
+.rooster-content ol {
+  list-style-type: decimal;
+}
+.rooster-content li {
+  padding-left: 4px;
+  white-space: normal;
+}
+.rooster-content a {
   color: var(--color-accent-primary, var(--vscode-textLink-foreground, #3794ff));
 }
-.quill-wrapper .ql-editor blockquote {
+.rooster-content blockquote {
   border-left: 3px solid var(--color-accent-primary, var(--vscode-textLink-foreground, #3794ff));
   padding-left: 12px;
   color: var(--color-text-secondary, var(--vscode-descriptionForeground, #9e9e9e));
 }
-.quill-wrapper .ql-editor code,
-.quill-wrapper .ql-editor pre.ql-syntax {
+.rooster-content code {
   background: rgba(128, 128, 128, 0.15);
   border-radius: 3px;
   font-family: var(--font-mono, "Consolas", "Courier New", monospace);
   font-size: 12px;
+  padding: 1px 5px;
 }
-.quill-wrapper .ql-editor pre.ql-syntax {
+.rooster-content pre {
+  background: rgba(128, 128, 128, 0.15);
+  border-radius: 3px;
+  font-family: var(--font-mono, "Consolas", "Courier New", monospace);
+  font-size: 12px;
   padding: 8px 12px;
   margin: 6px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
-.quill-wrapper .ql-snow .ql-picker-options {
-  background: var(--color-background-input, var(--vscode-input-background, #1e1e1e));
-  border-color: var(--color-border-default, var(--vscode-input-border, #3c3c3c));
+.rooster-content img {
+  max-width: 100%;
+  height: auto;
 }
-.quill-wrapper .ql-snow .ql-picker-options .ql-picker-item {
-  color: var(--color-text-primary, var(--vscode-editor-foreground, #ccc));
+.rooster-content table {
+  max-width: 100%;
+  table-layout: fixed;
+  word-break: break-word;
 }
-.quill-wrapper .ql-snow .ql-tooltip {
-  background: var(--color-background-input, var(--vscode-input-background, #1e1e1e));
-  border-color: var(--color-border-default, var(--vscode-input-border, #3c3c3c));
-  color: var(--color-text-primary, var(--vscode-editor-foreground, #ccc));
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+/* Toolbar button active state */
+.rooster-toolbar-btn-active {
+  background: var(--color-accent-primary, var(--vscode-focusBorder, #007acc));
+  color: #fff;
 }
-.quill-wrapper .ql-snow .ql-tooltip input[type="text"] {
-  background: var(--vscode-input-background, #1e1e1e);
-  border-color: var(--color-border-default, var(--vscode-input-border, #3c3c3c));
-  color: var(--color-text-primary, var(--vscode-input-foreground, #ccc));
+.rooster-toolbar-btn-active:hover {
+  background: var(--color-accent-primary, var(--vscode-focusBorder, #007acc));
+  opacity: 0.85;
 }
-.quill-wrapper .ql-snow .ql-tooltip a.ql-action::after,
-.quill-wrapper .ql-snow .ql-tooltip a.ql-remove::before {
-  color: var(--color-accent-primary, var(--vscode-textLink-foreground, #3794ff));
+
+/* ===== Light theme overrides ===== */
+[data-theme="light"] .rooster-editor-container {
+  border-color: var(--color-border-primary, #d1d5db);
+}
+[data-theme="light"] .rooster-toolbar {
+  background: var(--color-background-secondary, #f3f4f6);
+  border-bottom-color: var(--color-border-primary, #d1d5db);
+}
+[data-theme="light"] .rooster-toolbar-btn {
+  color: var(--color-text-primary, #1f2937);
+}
+[data-theme="light"] .rooster-toolbar-btn:hover {
+  background: var(--color-background-tertiary, rgba(0, 0, 0, 0.06));
+}
+[data-theme="light"] .rooster-link-dialog {
+  background: var(--color-background-secondary, #f3f4f6);
+  border-bottom-color: var(--color-border-primary, #d1d5db);
+}
+[data-theme="light"] .rooster-link-input {
+  background: var(--color-background-primary, #fff);
+  color: var(--color-text-primary, #1f2937);
+  border-color: var(--color-border-primary, #d1d5db);
+}
+[data-theme="light"] .rooster-toolbar-btn-active {
+  background: var(--color-accent-primary, #0078d4);
+  color: #fff;
+}
+[data-theme="light"] .rooster-toolbar-btn-active:hover {
+  background: var(--color-accent-primary, #0078d4);
+  opacity: 0.85;
+}
+[data-theme="light"] .rooster-content {
+  background: var(--color-background-primary, #ffffff);
+  color: var(--color-text-primary, #1f2937);
+}
+[data-theme="light"] .rooster-content:empty::before {
+  color: var(--color-text-secondary, #6b7280);
+}
+[data-theme="light"] .rooster-toolbar-separator {
+  background: var(--color-border-primary, #d1d5db);
+}
+[data-theme="light"] .rooster-overflow-menu {
+  background: var(--color-background-primary, #fff);
+  border-color: var(--color-border-primary, #d1d5db);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .rooster-overflow-item {
+  color: var(--color-text-primary, #1f2937);
+}
+[data-theme="light"] .rooster-overflow-item:hover {
+  background: var(--color-background-tertiary, rgba(0, 0, 0, 0.04));
+}
+[data-theme="light"] .rooster-overflow-item-active {
+  background: rgba(0, 120, 212, 0.08);
+}
+[data-theme="light"] .rooster-dropdown-menu {
+  background: var(--color-background-primary, #fff);
+  border-color: var(--color-border-primary, #d1d5db);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .rooster-dropdown-item {
+  color: var(--color-text-primary, #1f2937);
+}
+[data-theme="light"] .rooster-dropdown-item:hover {
+  background: var(--color-background-tertiary, rgba(0, 0, 0, 0.04));
 }
 .edit-grid {
   display: grid;

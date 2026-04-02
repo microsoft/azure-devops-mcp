@@ -40,7 +40,7 @@ export function colorForType(type: string, apiColor?: string): { bg: string; fg:
   return { bg: `hsl(${hue}, 55%, 45%)`, fg: "#fff" };
 }
 
-/** Normalize Quill/HTML for ADO comments: convert <p> to <div>, fill empty <div>s with <br>. */
+/** Normalize editor HTML for ADO comments: convert <p> to <div>, fill empty <div>s with <br>. */
 export function normalizeAdoHtml(html: string): string {
   if (!html) return html;
   let result = html;

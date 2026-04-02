@@ -14,6 +14,7 @@ export interface App {
   onteardown: (() => Promise<any>) | null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function applyDocumentTheme(_theme: "light" | "dark"): void {
   // no-op in tests
 }

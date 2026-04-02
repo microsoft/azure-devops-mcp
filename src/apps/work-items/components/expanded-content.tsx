@@ -1,14 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { useMemo } from "react";
-import ReactQuill from "react-quill-new";
-import "react-quill-new/dist/quill.snow.css";
+import React from "react";
 import type { App } from "@modelcontextprotocol/ext-apps";
 import type { WorkItem, EditState, WorkItemTypeMetadata } from "../types.ts";
 import { formatAssignedTo, getPriorityLabel, getWorkItemId, getWorkItemWebUrl, stripHtml, renderSafeHtml, getFieldLabel, isHtmlContent } from "../utils.ts";
 import { TagEditor } from "./tag-editor.tsx";
 import { PeoplePicker } from "./people-picker.tsx";
+import { RoosterEditor } from "../../shared/rooster-editor/index.ts";
 
 /* ===== SVG icon paths for meta field labels ===== */
 const META_ICONS: Record<string, string> = {
@@ -81,54 +80,12 @@ const SECTION_FIELD_ORDER = ["System.Description", "Microsoft.VSTS.TCM.ReproStep
 
 const LONG_TEXT_THRESHOLD = 150;
 
-/* ===== Quill Rich Text Editor ===== */
-const QUILL_MODULES = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ["bold", "italic", "underline", "strike"],
-    [{ list: "ordered" }, { list: "bullet" }],
-    [{ indent: "-1" }, { indent: "+1" }],
-    [{ align: [] }],
-    ["blockquote", "code-block"],
-    ["link", "image"],
-    [{ color: [] }, { background: [] }],
-    ["clean"],
-  ],
-};
-
-const QUILL_FORMATS = [
-  "header",
-  "bold",
-  "italic",
-  "underline",
-  "strike",
-  "list",
-  "blockquote",
-  "code-block",
-  "link",
-  "image",
-  "video",
-  "color",
-  "background",
-  "indent",
-  "align",
-  "size",
-  "font",
-  "direction",
-];
-
+/* ===== Rich Text Editor (RoosterJS) ===== */
 function RichEditorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const modules = useMemo(() => QUILL_MODULES, []);
-  const handleChange = (html: string) => {
-    // Quill generates <p><br></p> for empty content — normalize to empty string
-    const normalized = html === "<p><br></p>" || html === "<p><br/></p>" ? "" : html;
-    onChange(normalized);
-  };
-
   return (
-    <div className="edit-field quill-wrapper">
+    <div className="edit-field">
       <label className="edit-field-label">{label}</label>
-      <ReactQuill theme="snow" value={value} onChange={handleChange} modules={modules} formats={QUILL_FORMATS} placeholder={`Enter ${label.toLowerCase()}...`} />
+      <RoosterEditor initialContent={value} onChange={onChange} placeholder={`Enter ${label.toLowerCase()}…`} />
     </div>
   );
 }
@@ -173,8 +130,8 @@ export function ExpandedContent({
   const isEditing = editState !== null && editState.id === wiId;
   const webUrl = getWorkItemWebUrl(wi);
 
-  const metaConfigs: Array<{ field: string; label: string }> = [];
-  const sectionFields: Array<{ field: string; label: string; format: string }> = [];
+  const metaConfigs: { field: string; label: string }[] = [];
+  const sectionFields: { field: string; label: string; format: string }[] = [];
 
   for (const [field, value] of Object.entries(fields)) {
     if (SKIP_FIELDS.has(field) || value === undefined || value === null) continue;
@@ -232,21 +189,21 @@ export function ExpandedContent({
   };
 
   if (isEditing) {
-    const ef = editState!.fields;
+    const ef = editState?.fields ?? {};
     const EDIT_SPECIAL = new Set(["System.Title", "System.State", "Microsoft.VSTS.Common.Priority", "System.AssignedTo", "System.Tags"]);
     const editableMetaFields = metaConfigs.filter((cfg) => !EDIT_SPECIAL.has(cfg.field));
 
     return (
       <div className="expanded-content" onClick={(e) => e.stopPropagation()}>
-        {editState!.statusMsg && <div className={`edit-status-msg ${editState!.statusType}`}>{editState!.statusMsg}</div>}
+        {editState?.statusMsg && <div className={`edit-status-msg ${editState?.statusType}`}>{editState?.statusMsg}</div>}
         <div className="expanded-actions">
-          <button className="btn-save" onClick={() => onSave(wiId)} disabled={editState!.saving}>
+          <button className="btn-save" onClick={() => onSave(wiId)} disabled={editState?.saving ?? false}>
             <svg viewBox="0 0 16 16">
               <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" />
             </svg>
-            {editState!.saving ? "Saving\u2026" : "Save"}
+            {editState?.saving ? "Saving\u2026" : "Save"}
           </button>
-          <button className="btn-cancel" onClick={onCancel} disabled={editState!.saving}>
+          <button className="btn-cancel" onClick={onCancel} disabled={editState?.saving ?? false}>
             <svg viewBox="0 0 16 16">
               <path d="M8 8.707l3.646 3.647.708-.708L8.707 8l3.647-3.646-.708-.708L8 7.293 4.354 3.646l-.708.708L7.293 8l-3.647 3.646.708.708L8 8.707z" />
             </svg>

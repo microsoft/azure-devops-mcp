@@ -10,21 +10,21 @@ import "@testing-library/jest-dom";
 import { ExpandedContent } from "../../../../src/apps/work-items/components/expanded-content";
 import type { WorkItem, EditState } from "../../../../src/apps/work-items/types";
 
-// Mock react-quill-new for jsdom (no real Quill editor in tests)
-jest.mock("react-quill-new", () => {
-  const MockQuill = (props: any) =>
-    React.createElement("div", { "data-testid": "react-quill" }, [
-      React.createElement("textarea", {
-        key: "editor",
-        value: props.value ?? "",
-        onChange: (e: any) => props.onChange?.(e.target.value),
-        placeholder: props.placeholder,
-      }),
-    ]);
-  MockQuill.displayName = "ReactQuill";
-  return { __esModule: true, default: MockQuill };
+// Mock the shared RoosterEditor component for jsdom (no real RoosterJS editor in tests)
+jest.mock("../../../../src/apps/shared/rooster-editor/index", () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const MockRoosterEditor = (props: any) =>
+    React.createElement(
+      "div",
+      { "data-testid": "rooster-editor" },
+      React.createElement("div", { "data-testid": "rooster-toolbar" }),
+      React.createElement("div", { "data-testid": "rooster-content", "contentEditable": true })
+    );
+  return {
+    __esModule: true,
+    RoosterEditor: MockRoosterEditor,
+  };
 });
-jest.mock("react-quill-new/dist/quill.snow.css", () => ({}));
 
 const sampleWorkItem: WorkItem = {
   id: 42,
@@ -256,10 +256,10 @@ describe("ExpandedContent", () => {
       expect(screen.getByText("Assigned To")).toBeInTheDocument();
     });
 
-    it("renders rich text editor (ReactQuill) for description in edit mode", () => {
+    it("renders rich text editor (RoosterEditor) for description in edit mode", () => {
       render(<ExpandedContent wi={sampleWorkItem} editState={editState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
 
-      expect(screen.getByTestId("react-quill")).toBeInTheDocument();
+      expect(screen.getByTestId("rooster-editor")).toBeInTheDocument();
     });
   });
 });
