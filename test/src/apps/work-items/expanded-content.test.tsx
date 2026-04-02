@@ -368,5 +368,128 @@ describe("ExpandedContent", () => {
 
       expect(screen.getByText("0")).toBeInTheDocument();
     });
+
+    it("uses typeMetadataMap states when allowedStates is empty", () => {
+      const metadataMap = {
+        Bug: {
+          states: [
+            { name: "New", color: "", category: "" },
+            { name: "Active", color: "", category: "" },
+            { name: "Resolved", color: "", category: "" },
+          ],
+          transitions: {},
+          fields: [{ referenceName: "Microsoft.VSTS.Common.Priority", name: "Priority", allowedValues: ["1", "2", "3", "4"] }],
+        },
+      };
+      render(<ExpandedContent wi={sampleWorkItem} editState={editState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={metadataMap} />);
+
+      expect(screen.getByRole("option", { name: "New" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Resolved" })).toBeInTheDocument();
+    });
+
+    it("falls back to current state value when no allowedStates or metadata", () => {
+      render(<ExpandedContent wi={sampleWorkItem} editState={editState} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      // Should still have at least the current value as an option
+      expect(screen.getByRole("option", { name: "Active" })).toBeInTheDocument();
+    });
+
+    it("fires onFieldChange with Number for Priority dropdown", () => {
+      const onFieldChange = jest.fn();
+      const metadataMap = {
+        Bug: {
+          states: [],
+          transitions: {},
+          fields: [{ referenceName: "Microsoft.VSTS.Common.Priority", name: "Priority", allowedValues: ["1", "2", "3", "4"] }],
+        },
+      };
+      render(
+        <ExpandedContent
+          wi={sampleWorkItem}
+          editState={editState}
+          onEdit={jest.fn()}
+          onSave={jest.fn()}
+          onCancel={jest.fn()}
+          onFieldChange={onFieldChange}
+          app={undefined}
+          allowedStates={[]}
+          typeMetadataMap={metadataMap}
+        />
+      );
+
+      const prioritySelect = screen.getByDisplayValue("1 - Critical");
+      fireEvent.change(prioritySelect, { target: { value: "3" } });
+      expect(onFieldChange).toHaveBeenCalledWith("Microsoft.VSTS.Common.Priority", 3);
+    });
+
+    it("fires onFieldChange with Number for numeric StoryPoints input", () => {
+      const onFieldChange = jest.fn();
+      render(
+        <ExpandedContent
+          wi={sampleWorkItem}
+          editState={editState}
+          onEdit={jest.fn()}
+          onSave={jest.fn()}
+          onCancel={jest.fn()}
+          onFieldChange={onFieldChange}
+          app={undefined}
+          allowedStates={[]}
+          typeMetadataMap={{}}
+        />
+      );
+
+      const spInput = screen.getByDisplayValue("5");
+      fireEvent.change(spInput, { target: { value: "8" } });
+      expect(onFieldChange).toHaveBeenCalledWith("Microsoft.VSTS.Scheduling.StoryPoints", 8);
+    });
+
+    it("fires onFieldChange with empty string when numeric field is cleared", () => {
+      const onFieldChange = jest.fn();
+      render(
+        <ExpandedContent
+          wi={sampleWorkItem}
+          editState={editState}
+          onEdit={jest.fn()}
+          onSave={jest.fn()}
+          onCancel={jest.fn()}
+          onFieldChange={onFieldChange}
+          app={undefined}
+          allowedStates={[]}
+          typeMetadataMap={{}}
+        />
+      );
+
+      const spInput = screen.getByDisplayValue("5");
+      fireEvent.change(spInput, { target: { value: "" } });
+      expect(onFieldChange).toHaveBeenCalledWith("Microsoft.VSTS.Scheduling.StoryPoints", "");
+    });
+
+    it("opens link via app.openLink when app is provided", () => {
+      const mockApp = { openLink: jest.fn().mockResolvedValue(undefined) };
+      render(<ExpandedContent wi={sampleWorkItem} editState={null} {...noopHandlers} app={mockApp as any} allowedStates={[]} typeMetadataMap={{}} />);
+
+      fireEvent.click(screen.getByText("Open in Azure DevOps"));
+      expect(mockApp.openLink).toHaveBeenCalled();
+    });
+
+    it("falls back to window.open when app.openLink rejects", async () => {
+      const mockApp = { openLink: jest.fn().mockRejectedValue(new Error("fail")) };
+      const windowSpy = jest.spyOn(window, "open").mockImplementation(() => null);
+      render(<ExpandedContent wi={sampleWorkItem} editState={null} {...noopHandlers} app={mockApp as any} allowedStates={[]} typeMetadataMap={{}} />);
+
+      fireEvent.click(screen.getByText("Open in Azure DevOps"));
+      await new Promise((r) => setTimeout(r, 10));
+      expect(windowSpy).toHaveBeenCalled();
+      windowSpy.mockRestore();
+    });
+
+    it("uses window.open directly when app is undefined", () => {
+      const windowSpy = jest.spyOn(window, "open").mockImplementation(() => null);
+      render(<ExpandedContent wi={sampleWorkItem} editState={null} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      fireEvent.click(screen.getByText("Open in Azure DevOps"));
+      expect(windowSpy).toHaveBeenCalledWith(expect.stringContaining("dev.azure.com"), "_blank", "noopener,noreferrer");
+      windowSpy.mockRestore();
+    });
   });
 });

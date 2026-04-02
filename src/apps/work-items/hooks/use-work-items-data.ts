@@ -16,6 +16,7 @@ import {
   compareCellValues,
   prepareEditFields,
   READ_ONLY_FIELDS,
+  sanitizeSvg,
 } from "../utils.ts";
 
 type AppStatus = "loading" | "error" | "empty" | "table";
@@ -374,7 +375,7 @@ export function useWorkItemsData(app: App | null) {
             const iconText = (iconResult.content as ContentItem[] | undefined)?.find((c) => c.type === "text");
             if (iconText?.text) {
               const data = JSON.parse(iconText.text);
-              if (data.svg) newIcons[type] = data.svg;
+              if (data.svg) newIcons[type] = sanitizeSvg(data.svg);
             }
             const typeText = (typeResult.content as ContentItem[] | undefined)?.find((c) => c.type === "text");
             if (typeText?.text) {

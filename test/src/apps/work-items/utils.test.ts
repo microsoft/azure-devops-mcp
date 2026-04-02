@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
@@ -108,6 +111,11 @@ describe("formatCellValue", () => {
     const wi = { id: 1, fields: { "Custom.Field": { uniqueName: "user@test.com" } } };
     expect(formatCellValue("Custom.Field", wi)).toBe("user@test.com");
   });
+
+  it("JSON-stringifies object values without displayName or uniqueName", () => {
+    const wi = { id: 1, fields: { "Custom.Field": { key: "val" } } };
+    expect(formatCellValue("Custom.Field", wi)).toContain("val");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -214,6 +222,16 @@ describe("getWorkItemWebUrl", () => {
     expect(result).toBe("https://dev.azure.com/org/proj/_workitems/edit/42");
   });
 
+  it("converts visualstudio.com REST API URL to web URL", () => {
+    const wi = { id: 10, url: "https://org.visualstudio.com/proj/_apis/wit/workItems/10" };
+    expect(getWorkItemWebUrl(wi)).toBe("https://org.visualstudio.com/proj/_workitems/edit/10");
+  });
+
+  it("returns null for non-ADO domain even if URL pattern matches", () => {
+    const wi = { id: 1, url: "https://evil.com/proj/_apis/wit/workItems/1" };
+    expect(getWorkItemWebUrl(wi)).toBeNull();
+  });
+
   it("returns null when no url", () => {
     expect(getWorkItemWebUrl({ id: 1 })).toBeNull();
   });
@@ -255,6 +273,27 @@ describe("prepareEditFields", () => {
   it("preserves string values", () => {
     const result = prepareEditFields({ "System.State": "Active" });
     expect(result["System.State"]).toBe("Active");
+  });
+
+  it("sanitizes HTML content fields", () => {
+    const result = prepareEditFields({ "System.Description": "<p>Hello <strong>world</strong></p>" });
+    expect(result["System.Description"]).toContain("Hello");
+    expect(result["System.Description"]).toContain("strong");
+  });
+
+  it("formats object fields with displayName", () => {
+    const result = prepareEditFields({ "Custom.Reviewer": { displayName: "Bob", uniqueName: "bob@test.com" } });
+    expect(result["Custom.Reviewer"]).toBe("Bob");
+  });
+
+  it("formats object fields without displayName using uniqueName", () => {
+    const result = prepareEditFields({ "Custom.Reviewer": { uniqueName: "bob@test.com" } });
+    expect(result["Custom.Reviewer"]).toBe("bob@test.com");
+  });
+
+  it("converts boolean values to string", () => {
+    const result = prepareEditFields({ "Custom.Flag": true as any });
+    expect(result["Custom.Flag"]).toBe("true");
   });
 });
 
