@@ -5,6 +5,10 @@ import validateToolNamesRule from "./eslint-rules/tool-name-lint-rule.js";
 
 pluginHeader.rules.header.meta.schema = false; // workaround for https://github.com/Stuk/eslint-plugin-header/issues/57
 
+// Patch eslint-plugin-header for ESLint 10 (context.getSourceCode() was removed)
+const _origCreate = pluginHeader.rules.header.create;
+pluginHeader.rules.header.create = (ctx) => _origCreate({ ...ctx, getSourceCode: () => ctx.sourceCode });
+
 export default tseslint.config(
   // Global ignores
   {
