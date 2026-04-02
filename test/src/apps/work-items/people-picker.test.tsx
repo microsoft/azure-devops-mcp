@@ -162,4 +162,97 @@ describe("PeoplePicker", () => {
     await new Promise((r) => setTimeout(r, 350));
     expect(mockApp.callServerTool).not.toHaveBeenCalled();
   });
+
+  it("navigates dropdown with keyboard ArrowDown and ArrowUp", async () => {
+    const mockIdentities = [
+      { id: "1", displayName: "Alice", mail: "a@test.com" },
+      { id: "2", displayName: "Bob", mail: "b@test.com" },
+    ];
+    const mockApp = {
+      callServerTool: jest.fn().mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(mockIdentities) }],
+      }),
+    };
+
+    render(<PeoplePicker value="" onChange={jest.fn()} app={mockApp as any} />);
+
+    const input = screen.getByPlaceholderText(/type a name to search/i);
+    fireEvent.change(input, { target: { value: "test" } });
+
+    // Wait for results
+    await screen.findAllByRole("option", {}, { timeout: 2000 });
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    // Should navigate without error
+  });
+
+  it("selects identity with Enter key", async () => {
+    const mockIdentities = [{ id: "1", displayName: "Alice", mail: "a@test.com" }];
+    const mockApp = {
+      callServerTool: jest.fn().mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(mockIdentities) }],
+      }),
+    };
+    const onChange = jest.fn();
+
+    render(<PeoplePicker value="" onChange={onChange} app={mockApp as any} />);
+
+    const input = screen.getByPlaceholderText(/type a name to search/i);
+    fireEvent.change(input, { target: { value: "Alice" } });
+
+    await screen.findByRole("option", {}, { timeout: 2000 });
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith("Alice");
+  });
+
+  it("closes dropdown with Escape key", async () => {
+    const mockIdentities = [{ id: "1", displayName: "Alice", mail: "a@test.com" }];
+    const mockApp = {
+      callServerTool: jest.fn().mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(mockIdentities) }],
+      }),
+    };
+
+    render(<PeoplePicker value="" onChange={jest.fn()} app={mockApp as any} />);
+
+    const input = screen.getByPlaceholderText(/type a name to search/i);
+    fireEvent.change(input, { target: { value: "Alice" } });
+
+    await screen.findByRole("option", {}, { timeout: 2000 });
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    // Dropdown should close - no options visible
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+
+  it("closes dropdown on click outside", async () => {
+    const mockIdentities = [{ id: "1", displayName: "Alice", mail: "a@test.com" }];
+    const mockApp = {
+      callServerTool: jest.fn().mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(mockIdentities) }],
+      }),
+    };
+
+    render(
+      <div>
+        <div data-testid="outside">Outside</div>
+        <PeoplePicker value="" onChange={jest.fn()} app={mockApp as any} />
+      </div>
+    );
+
+    const input = screen.getByPlaceholderText(/type a name to search/i);
+    fireEvent.change(input, { target: { value: "Alice" } });
+
+    await screen.findByRole("option", {}, { timeout: 2000 });
+
+    // Click outside the picker
+    fireEvent.mouseDown(screen.getByTestId("outside"));
+    await waitFor(() => {
+      expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    });
+  });
 });

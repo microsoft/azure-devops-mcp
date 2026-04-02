@@ -6,6 +6,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureMcpAppsTools, MCP_APPS_TOOLS } from "../../../src/tools/mcp-apps";
 import * as authModule from "../../../src/tools/auth";
 import { WebApi } from "azure-devops-node-api";
+import fs from "node:fs/promises";
+
+jest.mock("node:fs/promises");
 
 jest.mock("../../../src/logger.js", () => ({
   logger: {
@@ -69,7 +72,10 @@ describe("configureMcpAppsTools", () => {
       configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const registeredNames = (server.registerTool as jest.Mock).mock.calls.map(([name]: [string]) => name);
       expect(registeredNames).toContain(MCP_APPS_TOOLS.my_work_items);
+      expect(registeredNames).toContain(MCP_APPS_TOOLS.preview_work_items);
       expect(registeredNames).toContain(MCP_APPS_TOOLS.get_work_item_type_icon);
+      expect(registeredNames).toContain(MCP_APPS_TOOLS.get_work_item_type_fields);
+      expect(registeredNames).toContain(MCP_APPS_TOOLS.search_identities);
     });
   });
 
@@ -448,6 +454,179 @@ describe("configureMcpAppsTools", () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.workItems.length).toBe(1);
     });
+
+    it("should use customDisplayName fallback when providerDisplayName is absent", async () => {
+      mockConnection.connect.mockResolvedValue({
+        authenticatedUser: { customDisplayName: "Custom User" },
+      });
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            fields: {
+              "System.Id": 1,
+              "System.Title": "Test",
+              "System.State": "Active",
+              "System.AssignedTo": { displayName: "Custom User", uniqueName: "custom@example.com" },
+            },
+          },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems).toBeDefined();
+    });
+
+    it("should handle query results as direct array", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue([{ id: 1 }]),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            fields: {
+              "System.Id": 1,
+              "System.Title": "Test",
+              "System.State": "Active",
+              "System.AssignedTo": { displayName: "Test User", uniqueName: "test@example.com" },
+            },
+          },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems).toHaveLength(1);
+    });
+
+    it("should handle query results in results property", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            fields: {
+              "System.Id": 1,
+              "System.Title": "Test",
+              "System.State": "Active",
+              "System.AssignedTo": { displayName: "Test User", uniqueName: "test@example.com" },
+            },
+          },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems).toHaveLength(1);
+    });
+
+    it("should handle null workItems from batch API", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(null),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems).toEqual([]);
+    });
+
+    it("should handle non-Error thrown exceptions", async () => {
+      (connectionProvider as jest.Mock).mockRejectedValue("string error");
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown error occurred");
+    });
+
+    it("should handle identity field with only displayName and no uniqueName", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            fields: {
+              "System.Id": 1,
+              "System.Title": "Test",
+              "System.State": "Active",
+              "System.AssignedTo": { displayName: "Test User" },
+            },
+          },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems[0].fields["System.AssignedTo"]).toBe("Test User");
+    });
+
+    it("should handle work item with no fields property", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([{ id: 1 }]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false, pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should omit displayConfig keys that are not provided", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({
+        getPredefinedQueryResults: jest.fn().mockResolvedValue({ workItems: [{ id: 1 }] }),
+      });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            fields: {
+              "System.Id": 1,
+              "System.Title": "Test",
+              "System.State": "Active",
+              "System.AssignedTo": { displayName: "Test User", uniqueName: "test@example.com" },
+            },
+          },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", type: "assignedtome", top: 50, includeCompleted: false });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.displayConfig.columns).toBeUndefined();
+      expect(parsed.displayConfig.sort).toBeUndefined();
+      expect(parsed.displayConfig.suggestedValues).toBeUndefined();
+    });
   });
 
   // ======== get_work_item_type_icon Tool ========
@@ -543,6 +722,30 @@ describe("configureMcpAppsTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error retrieving work item type icon");
     });
+
+    it("should handle non-Error thrown exceptions", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemType: jest.fn().mockRejectedValue("unexpected"),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", workItemType: "Bug" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown error occurred");
+    });
+
+    it("should return error when icon object is missing", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemType: jest.fn().mockResolvedValue({}),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", workItemType: "Bug" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("No icon URL found");
+    });
   });
 
   // ======== mcp_app_get_work_item_type_fields Tool ========
@@ -606,6 +809,68 @@ describe("configureMcpAppsTools", () => {
       configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const registeredNames = (server.registerTool as jest.Mock).mock.calls.map(([name]: [string]) => name);
       expect(registeredNames).toContain(MCP_APPS_TOOLS.get_work_item_type_fields);
+    });
+
+    it("should handle fields with missing referenceName and name", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemTypeFieldsWithReferences: jest.fn().mockResolvedValue([{ allowedValues: ["a", "b"] }, { referenceName: "System.Title", name: "Title" }]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", workItemType: "Bug" });
+
+      expect(result.isError).toBeUndefined();
+      const fields = JSON.parse(result.content[0].text);
+      expect(fields[0].referenceName).toBe("");
+      expect(fields[0].name).toBe("");
+      expect(fields[0].allowedValues).toEqual(["a", "b"]);
+      expect(fields[1].allowedValues).toEqual([]);
+    });
+
+    it("should handle non-Error thrown exceptions", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemTypeFieldsWithReferences: jest.fn().mockRejectedValue(42),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", workItemType: "Bug" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown error occurred");
+    });
+  });
+
+  // ======== Work Items App Resource ========
+
+  describe("work items app resource", () => {
+    function getResourceHandler() {
+      configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.resource as jest.Mock).mock.calls[0];
+      if (!call) throw new Error("resource not registered");
+      // registerAppResource passes: name, uri, config, readCallback
+      const readCallback = call[3];
+      return readCallback;
+    }
+
+    it("should return fallback HTML when app file is not found", async () => {
+      (fs.readFile as jest.Mock).mockRejectedValue(new Error("ENOENT"));
+
+      const handler = getResourceHandler();
+      const result = await handler();
+
+      expect(result.contents).toBeDefined();
+      expect(result.contents[0].text).toContain("Work Items App UI not built");
+    });
+
+    it("should return HTML content when app file exists", async () => {
+      const htmlContent = "<html><body>Work Items App</body></html>";
+      (fs.readFile as jest.Mock).mockResolvedValue(htmlContent);
+
+      const handler = getResourceHandler();
+      const result = await handler();
+
+      expect(result.contents).toBeDefined();
+      expect(result.contents[0].text).toBe(htmlContent);
     });
   });
 
@@ -732,6 +997,427 @@ describe("configureMcpAppsTools", () => {
 
       const identities = JSON.parse(result.content[0].text);
       expect(identities[0].displayName).toBe("Jane Smith");
+    });
+
+    it("should sort alphabetically when both results equally match query", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue({
+        value: [
+          {
+            id: "id-1",
+            providerDisplayName: "Zoe Smith",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+          {
+            id: "id-2",
+            providerDisplayName: "Alice Smith",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+        ],
+      } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "Smith" });
+
+      const identities = JSON.parse(result.content[0].text);
+      // Both match "Smith", so they should be sorted alphabetically
+      expect(identities[0].displayName).toBe("Alice Smith");
+      expect(identities[1].displayName).toBe("Zoe Smith");
+    });
+
+    it("should handle outer error in search_identities", async () => {
+      // Trigger the outer catch by causing the sort comparator to fail
+      // We do this by injecting a value with displayName = undefined via prototype pollution
+      const searchSpy = jest.spyOn(authModule, "searchIdentities");
+      let callCount = 0;
+      searchSpy.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // Return valid data on first call, but poison the Map afterward
+          return {
+            value: [
+              {
+                id: "id-1",
+                providerDisplayName: "User",
+                properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+              },
+            ],
+          } as any;
+        }
+        return { value: [] } as any;
+      });
+
+      // Override Map to throw during values() iteration to trigger outer catch
+      const OriginalMap = global.Map;
+      const MockMap = class extends OriginalMap {
+        values(): never {
+          throw new Error("Map iteration failed");
+        }
+      };
+      global.Map = MockMap as any;
+
+      const handler = getHandler();
+      const result = await handler({ query: "User" });
+
+      global.Map = OriginalMap;
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error searching identities");
+    });
+
+    it("should handle non-Error thrown in outer search_identities catch", async () => {
+      // Override Map to throw a non-Error during values() iteration
+      const OriginalMap = global.Map;
+      const MockMap = class extends OriginalMap {
+        values(): never {
+          throw 42;
+        }
+      };
+      global.Map = MockMap as any;
+
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue({
+        value: [
+          {
+            id: "id-1",
+            providerDisplayName: "User",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+        ],
+      } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "User" });
+
+      global.Map = OriginalMap;
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown error occurred");
+    });
+
+    it("should skip identities without id or providerDisplayName", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue({
+        value: [
+          {
+            id: null,
+            providerDisplayName: "No ID User",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+          {
+            id: "id-1",
+            providerDisplayName: null,
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+          {
+            id: "id-2",
+            providerDisplayName: "Valid User",
+            properties: { SchemaClassName: { $type: "System.String", $value: "User" } },
+          },
+        ],
+      } as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "user" });
+
+      const identities = JSON.parse(result.content[0].text);
+      expect(identities).toHaveLength(1);
+      expect(identities[0].displayName).toBe("Valid User");
+    });
+
+    it("should handle null result from searchIdentities", async () => {
+      jest.spyOn(authModule, "searchIdentities").mockResolvedValue(null as any);
+
+      const handler = getHandler();
+      const result = await handler({ query: "test" });
+
+      const identities = JSON.parse(result.content[0].text);
+      expect(identities).toHaveLength(0);
+    });
+  });
+
+  // ======== mcp_app_preview_work_items Tool ========
+
+  describe("mcp_app_preview_work_items tool", () => {
+    function getHandler() {
+      configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.registerTool as jest.Mock).mock.calls.find(([toolName]: [string]) => toolName === MCP_APPS_TOOLS.preview_work_items);
+      if (!call) throw new Error("mcp_app_preview_work_items tool not registered");
+      const [, , handler] = call;
+      return handler;
+    }
+
+    const sampleWorkItems = [
+      {
+        id: 1,
+        fields: {
+          "System.Id": 1,
+          "System.Title": "Fix login bug",
+          "System.State": "Active",
+          "System.WorkItemType": "Bug",
+          "System.AssignedTo": { displayName: "Test User", uniqueName: "test@example.com" },
+          "Microsoft.VSTS.Common.Priority": 2,
+          "System.Tags": "frontend; security",
+        },
+      },
+      {
+        id: 2,
+        fields: {
+          "System.Id": 2,
+          "System.Title": "Add feature X",
+          "System.State": "New",
+          "System.WorkItemType": "User Story",
+          "System.AssignedTo": { displayName: "Other User", uniqueName: "other@example.com" },
+          "Microsoft.VSTS.Common.Priority": 3,
+          "System.Tags": "backend",
+        },
+      },
+    ];
+
+    it("should be registered as a tool", () => {
+      configureMcpAppsTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const registeredNames = (server.registerTool as jest.Mock).mock.calls.map(([name]: [string]) => name);
+      expect(registeredNames).toContain(MCP_APPS_TOOLS.preview_work_items);
+    });
+
+    it("should return work items for provided IDs", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems).toBeDefined();
+      expect(parsed.workItems).toHaveLength(2);
+      expect(parsed.displayConfig).toBeDefined();
+    });
+
+    it("should not filter by current user", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10 });
+
+      const parsed = JSON.parse(result.content[0].text);
+      // Both items should be present regardless of who they are assigned to
+      expect(parsed.workItems).toHaveLength(2);
+      const assignees = parsed.workItems.map((wi: any) => wi.fields["System.AssignedTo"]);
+      expect(assignees).toContain("Test User <test@example.com>");
+      expect(assignees).toContain("Other User <other@example.com>");
+    });
+
+    it("should format identity fields from objects to strings", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            fields: {
+              "System.Id": 1,
+              "System.Title": "Test",
+              "System.State": "Active",
+              "System.AssignedTo": { displayName: "Test User", uniqueName: "test@example.com" },
+              "System.CreatedBy": { displayName: "Creator", uniqueName: "creator@example.com" },
+            },
+          },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1], pageSize: 10 });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(typeof parsed.workItems[0].fields["System.AssignedTo"]).toBe("string");
+      expect(typeof parsed.workItems[0].fields["System.CreatedBy"]).toBe("string");
+    });
+
+    it("should include displayConfig when columns, sort, suggestedValues are provided", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const columns = [{ field: "System.Id", label: "ID" }];
+      const sort = { field: "System.Id", direction: "asc" as const };
+      const suggestedValues = [{ workItemId: 1, field: "Microsoft.VSTS.Common.Priority", value: 1 }];
+
+      const handler = getHandler();
+      const result = await handler({
+        project: "TestProject",
+        ids: [1, 2],
+        columns,
+        sort,
+        suggestedValues,
+        pageSize: 25,
+      });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.displayConfig.columns).toEqual(columns);
+      expect(parsed.displayConfig.sort).toEqual(sort);
+      expect(parsed.displayConfig.suggestedValues).toEqual(suggestedValues);
+      expect(parsed.displayConfig.pageSize).toBe(25);
+    });
+
+    it("should filter by stateFilter", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10, stateFilter: ["Active"] });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems.every((wi: any) => wi.fields["System.State"] === "Active")).toBe(true);
+    });
+
+    it("should filter by workItemType", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10, workItemType: ["Bug"] });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems.every((wi: any) => wi.fields["System.WorkItemType"] === "Bug")).toBe(true);
+    });
+
+    it("should filter by tags", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10, tags: ["security"] });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems.length).toBeGreaterThan(0);
+      parsed.workItems.forEach((wi: any) => {
+        expect(wi.fields["System.Tags"].toLowerCase()).toContain("security");
+      });
+    });
+
+    it("should filter by priorityFilter", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10, priorityFilter: [2] });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems.every((wi: any) => wi.fields["Microsoft.VSTS.Common.Priority"] === 2)).toBe(true);
+    });
+
+    it("should handle connection errors", async () => {
+      (connectionProvider as jest.Mock).mockRejectedValue(new Error("Connection failed"));
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1], pageSize: 10 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error previewing work items");
+    });
+
+    it("should pass IDs directly to getWorkItemsBatch", async () => {
+      const mockBatch = jest.fn().mockResolvedValue([]);
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: mockBatch,
+      });
+
+      const handler = getHandler();
+      await handler({ project: "TestProject", ids: [10, 20, 30], pageSize: 10 });
+
+      expect(mockBatch).toHaveBeenCalledWith({ ids: [10, 20, 30] }, "TestProject");
+    });
+
+    it("should not call connect() for user resolution", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      await handler({ project: "TestProject", ids: [1, 2], pageSize: 10 });
+
+      // preview_work_items should not need to resolve the current user
+      expect(mockConnection.connect).not.toHaveBeenCalled();
+    });
+
+    it("should handle null workItems from batch API", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(null),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1], pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems).toEqual([]);
+    });
+
+    it("should handle non-Error thrown exceptions", async () => {
+      (connectionProvider as jest.Mock).mockRejectedValue("string error");
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1], pageSize: 10 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown error occurred");
+    });
+
+    it("should handle work items with no fields property", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10 });
+
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should filter by searchText", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue(sampleWorkItems),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10, searchText: "login" });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems.length).toBe(1);
+      expect(parsed.workItems[0].fields["System.Title"]).toContain("login");
+    });
+
+    it("should filter by areaPath prefix", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          { id: 1, fields: { ...sampleWorkItems[0].fields, "System.AreaPath": "Project\\Team\\Frontend" } },
+          { id: 2, fields: { ...sampleWorkItems[1].fields, "System.AreaPath": "Project\\Other" } },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10, areaPath: "Project\\Team" });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems.length).toBe(1);
+    });
+
+    it("should filter by iterationPath prefix", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({
+        getWorkItemsBatch: jest.fn().mockResolvedValue([
+          { id: 1, fields: { ...sampleWorkItems[0].fields, "System.IterationPath": "Project\\Sprint 1" } },
+          { id: 2, fields: { ...sampleWorkItems[1].fields, "System.IterationPath": "Project\\Sprint 2" } },
+        ]),
+      });
+
+      const handler = getHandler();
+      const result = await handler({ project: "TestProject", ids: [1, 2], pageSize: 10, iterationPath: "Project\\Sprint 1" });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItems.length).toBe(1);
     });
   });
 });

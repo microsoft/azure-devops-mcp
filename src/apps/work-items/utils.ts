@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import type { ActiveFilters, ColumnConfig, WorkItem } from "./types.ts";
-export { formatAssignedTo, getFieldLabel, getPriorityLabel, renderSafeHtml, isHtmlContent, stripHtml } from "../shared/utils.ts";
+export { formatAssignedTo, getFieldLabel, getPriorityLabel, renderSafeHtml, isHtmlContent, stripHtml, sanitizeSvg } from "../shared/utils.ts";
 import { formatAssignedTo, getPriorityLabel, isHtmlContent, renderSafeHtml } from "../shared/utils.ts";
 
 export const PAGE_SIZE = 10;
@@ -78,7 +78,16 @@ export function getPriorityBadgeClass(priority: number): string {
 export function getWorkItemWebUrl(wi: WorkItem): string | null {
   if (wi.url) {
     const webUrl = wi.url.replace(/_apis\/wit\/workItems\/\d+/, `_workitems/edit/${getWorkItemId(wi)}`);
-    if (webUrl !== wi.url) return webUrl;
+    if (webUrl !== wi.url) {
+      try {
+        const parsed = new URL(webUrl);
+        if (parsed.hostname.endsWith(".visualstudio.com") || parsed.hostname === "dev.azure.com" || parsed.hostname.endsWith(".dev.azure.com")) {
+          return webUrl;
+        }
+      } catch {
+        /* invalid URL */
+      }
+    }
   }
   return null;
 }

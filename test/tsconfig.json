@@ -1,0 +1,7 @@
+{
+  "extends": "../tsconfig.jest.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["../src/**/*", "../test/**/*"]
+}

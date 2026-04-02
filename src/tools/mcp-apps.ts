@@ -13,6 +13,7 @@ import { searchIdentities } from "./auth.js";
 
 const MCP_APPS_TOOLS = {
   my_work_items: "mcp_app_my_work_items",
+  preview_work_items: "mcp_app_preview_work_items",
   get_work_item_type_icon: "mcp_app_get_work_item_type_icon",
   get_work_item_type_fields: "mcp_app_get_work_item_type_fields",
   search_identities: "mcp_app_search_identities",
@@ -20,6 +21,98 @@ const MCP_APPS_TOOLS = {
 
 function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): void {
   const distDir = path.join(import.meta.dirname, "..");
+
+  // ========== Shared schemas for work items display tools ==========
+
+  const workItemFilterSchema = {
+    stateFilter: z.array(z.string()).optional().describe("Optional list of states to include (e.g. ['New', 'Active', 'In Progress']). If not provided, all states are returned."),
+    workItemType: z.array(z.string()).optional().describe("Optional list of work item types to include (e.g. ['Bug', 'Task', 'User Story']). If not provided, all types are returned."),
+    tags: z.array(z.string()).optional().describe("Optional list of tags to filter by. Returns work items that have ANY of the specified tags."),
+    priorityFilter: z.array(z.number()).optional().describe("Optional list of priority values to include (1=Critical, 2=High, 3=Medium, 4=Low). If not provided, all priorities are returned."),
+    areaPath: z.string().optional().describe("Optional area path prefix to filter by (e.g. 'OneITVSO\\My Area'). Matches work items whose area path starts with this value."),
+    iterationPath: z.string().optional().describe("Optional iteration path prefix to filter by (e.g. 'OneITVSO\\Sprint 1'). Matches work items whose iteration path starts with this value."),
+    searchText: z.string().optional().describe("Optional text to search for in work item title or description. Case-insensitive partial match."),
+  };
+
+  const columnSchema = z
+    .array(
+      z.object({
+        field: z.string().describe("Azure DevOps field reference name (e.g., 'System.Title', 'Microsoft.VSTS.Common.Priority')."),
+        label: z.string().optional().describe("Custom display label for the column header. Defaults to a human-readable name derived from the field."),
+        width: z.number().optional().describe("Column width in pixels. Omit for auto-sized columns."),
+      })
+    )
+    .optional();
+
+  const sortSchema = z
+    .object({
+      field: z.string().describe("Field reference name to sort by (e.g., 'Microsoft.VSTS.Common.Priority')."),
+      direction: z.enum(["asc", "desc"]).default("desc").describe("Sort direction. Defaults to 'desc'."),
+    })
+    .optional()
+    .describe("Initial sort configuration. Users can change the sort by clicking column headers.");
+
+  const suggestedValuesSchema = z
+    .array(
+      z.object({
+        workItemId: z.number().describe("Work item ID to apply suggestion to."),
+        field: z.string().describe("Field reference name to suggest a value for (e.g., 'Microsoft.VSTS.Common.Priority')."),
+        value: z.union([z.string(), z.number()]).describe("Suggested field value."),
+        reason: z.string().optional().describe("Brief explanation of why this value is suggested."),
+      })
+    )
+    .optional()
+    .describe("Agent-provided suggested field values for specific work items. These are shown with visual distinction and can be accepted or dismissed by the user.");
+
+  const workItemDisplaySchema = {
+    columns: columnSchema.describe(
+      "Columns to display in the table. Do NOT populate this parameter unless the user EXPLICITLY requests specific columns. The UI defaults to ID, Title, Type, State, Assigned To when this is omitted — which is the preferred behavior for most requests. Only populate when the user explicitly names columns (e.g. 'show me ID, title, and story points'). Map common names: ID=System.Id, Title=System.Title, State=System.State, Type=System.WorkItemType, Assigned To=System.AssignedTo, Priority=Microsoft.VSTS.Common.Priority, Tags=System.Tags, Area Path=System.AreaPath, Iteration Path=System.IterationPath."
+    ),
+    sort: sortSchema,
+    suggestedValues: suggestedValuesSchema,
+    pageSize: z.number().optional().default(10).describe("Number of items per page. Defaults to 10. Use higher values (50-100) for bulk review workflows."),
+  };
+
+  // ========== Shared helpers for work items display ==========
+
+  /** Format identity fields from objects to simple "Name <email>" strings */
+  function formatIdentityFields(workItems: any[]): void {
+    for (const item of workItems) {
+      if (!item.fields) continue;
+      for (const [fieldName, fieldValue] of Object.entries(item.fields)) {
+        if (fieldValue && typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+          const obj = fieldValue as Record<string, unknown>;
+          if (obj.displayName !== undefined || obj.uniqueName !== undefined) {
+            const name = String(obj.displayName || "");
+            const email = String(obj.uniqueName || "");
+            item.fields[fieldName] = email ? `${name} <${email}>`.trim() : name;
+          }
+        }
+      }
+    }
+  }
+
+  /** Build displayConfig with only explicitly-set keys */
+  function buildDisplayConfig(args: { columns?: unknown; sort?: unknown; suggestedValues?: unknown; pageSize?: number | null }): Record<string, unknown> {
+    const config: Record<string, unknown> = {};
+    if (args.columns) config.columns = args.columns;
+    if (args.sort) config.sort = args.sort;
+    if (args.suggestedValues) config.suggestedValues = args.suggestedValues;
+    if (args.pageSize != null) config.pageSize = args.pageSize;
+    return config;
+  }
+
+  /** Build the standard work items response with displayConfig */
+  function buildWorkItemsResponse(workItems: any[], displayConfig: Record<string, unknown>) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({ workItems, displayConfig }, null, 2),
+        },
+      ],
+    };
+  }
 
   // ========== WORK ITEMS APP (MCP App with interactive UI) ==========
   const workItemsAppResourceUri = "ui://work-items/app.html";
@@ -46,44 +139,8 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
           .describe("The ID of the iteration (sprint) to retrieve the current user's work items for. Must be used together with 'team'. Get this via the work_list_team_iterations tool."),
         top: z.number().default(50).describe("The maximum number of work items to return. Defaults to 50."),
         includeCompleted: z.boolean().default(false).describe("Whether to include completed work items. Defaults to false."),
-        stateFilter: z.array(z.string()).optional().describe("Optional list of states to include (e.g. ['New', 'Active', 'In Progress']). If not provided, all non-completed states are returned."),
-        workItemType: z.array(z.string()).optional().describe("Optional list of work item types to include (e.g. ['Bug', 'Task', 'User Story']). If not provided, all types are returned."),
-        tags: z.array(z.string()).optional().describe("Optional list of tags to filter by. Returns work items that have ANY of the specified tags."),
-        priorityFilter: z.array(z.number()).optional().describe("Optional list of priority values to include (1=Critical, 2=High, 3=Medium, 4=Low). If not provided, all priorities are returned."),
-        areaPath: z.string().optional().describe("Optional area path prefix to filter by (e.g. 'OneITVSO\\My Area'). Matches work items whose area path starts with this value."),
-        iterationPath: z.string().optional().describe("Optional iteration path prefix to filter by (e.g. 'OneITVSO\\Sprint 1'). Matches work items whose iteration path starts with this value."),
-        searchText: z.string().optional().describe("Optional text to search for in work item title or description. Case-insensitive partial match."),
-        columns: z
-          .array(
-            z.object({
-              field: z.string().describe("Azure DevOps field reference name (e.g., 'System.Title', 'Microsoft.VSTS.Common.Priority')."),
-              label: z.string().optional().describe("Custom display label for the column header. Defaults to a human-readable name derived from the field."),
-              width: z.number().optional().describe("Column width in pixels. Omit for auto-sized columns."),
-            })
-          )
-          .optional()
-          .describe(
-            "Columns to display in the table. Do NOT populate this parameter unless the user EXPLICITLY requests specific columns. The UI defaults to ID, Title, Type, State, Assigned To when this is omitted — which is the preferred behavior for most requests. Only populate when the user explicitly names columns (e.g. 'show me ID, title, and story points'). Map common names: ID=System.Id, Title=System.Title, State=System.State, Type=System.WorkItemType, Assigned To=System.AssignedTo, Priority=Microsoft.VSTS.Common.Priority, Tags=System.Tags, Area Path=System.AreaPath, Iteration Path=System.IterationPath."
-          ),
-        sort: z
-          .object({
-            field: z.string().describe("Field reference name to sort by (e.g., 'Microsoft.VSTS.Common.Priority')."),
-            direction: z.enum(["asc", "desc"]).default("desc").describe("Sort direction. Defaults to 'desc'."),
-          })
-          .optional()
-          .describe("Initial sort configuration. Users can change the sort by clicking column headers."),
-        suggestedValues: z
-          .array(
-            z.object({
-              workItemId: z.number().describe("Work item ID to apply suggestion to."),
-              field: z.string().describe("Field reference name to suggest a value for (e.g., 'Microsoft.VSTS.Common.Priority')."),
-              value: z.union([z.string(), z.number()]).describe("Suggested field value."),
-              reason: z.string().optional().describe("Brief explanation of why this value is suggested."),
-            })
-          )
-          .optional()
-          .describe("Agent-provided suggested field values for specific work items. These are shown with visual distinction and can be accepted or dismissed by the user."),
-        pageSize: z.number().optional().default(10).describe("Number of items per page. Defaults to 10. Use higher values (50-100) for bulk review workflows."),
+        ...workItemFilterSchema,
+        ...workItemDisplaySchema,
       },
       _meta: { ui: { resourceUri: workItemsAppResourceUri } },
     },
@@ -128,64 +185,63 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
           ids = ids.slice(0, args.top);
         }
 
-        // Fetch all fields for work items (omitting fields parameter returns all fields,
-        // including custom fields for any work item type or process template)
+        // Fetch all fields for work items
         let workItems = await workItemApi.getWorkItemsBatch({ ids }, args.project);
 
-        // Apply server-side filters
+        // Apply filters scoped to current user
         if (workItems && Array.isArray(workItems)) {
-          // Always filter to current user's items (this tool is "My Work Items")
           const filterArgs: Record<string, unknown> = { ...args };
           if (currentUserName) {
             filterArgs.assignedTo = [currentUserName];
           }
           workItems = applyWorkItemFilters(workItems, filterArgs);
+          formatIdentityFields(workItems);
         }
 
-        // Format identity fields from objects to simple strings (handles both standard and custom identity fields)
-        if (workItems && Array.isArray(workItems)) {
-          workItems.forEach((item) => {
-            if (item.fields) {
-              for (const [fieldName, fieldValue] of Object.entries(item.fields)) {
-                if (fieldValue && typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
-                  const obj = fieldValue as Record<string, unknown>;
-                  if (obj.displayName !== undefined || obj.uniqueName !== undefined) {
-                    const name = String(obj.displayName || "");
-                    const email = String(obj.uniqueName || "");
-                    item.fields[fieldName] = email ? `${name} <${email}>`.trim() : name;
-                  }
-                }
-              }
-            }
-          });
-        }
-
-        // Build displayConfig with only explicitly-set keys
-        const displayConfig: Record<string, unknown> = {};
-        if (args.columns) displayConfig.columns = args.columns;
-        if (args.sort) displayConfig.sort = args.sort;
-        if (args.suggestedValues) displayConfig.suggestedValues = args.suggestedValues;
-        if (args.pageSize != null) displayConfig.pageSize = args.pageSize;
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  workItems,
-                  displayConfig,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
+        return buildWorkItemsResponse(workItems ?? [], buildDisplayConfig(args));
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [{ type: "text", text: `Error retrieving work items: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ========== PREVIEW WORK ITEMS (Generic work items preview via IDs) ==========
+  registerAppTool(
+    server,
+    MCP_APPS_TOOLS.preview_work_items,
+    {
+      title: "Preview Work Items",
+      description:
+        "Opens an interactive work items table UI to preview any Azure DevOps work items by their IDs. Use this tool to display work items returned by other MCP tools (e.g. from queries, search results, or linked items) in a rich interactive table. Unlike 'My Work Items', this tool is NOT scoped to the current user — it displays whatever work item IDs are provided. Callers should pass work item IDs obtained from other tool responses. Supports configurable columns, sorting, filtering, and optional agent-suggested values. IMPORTANT: Do NOT populate the 'columns' parameter unless the user EXPLICITLY requests specific columns to display.",
+      inputSchema: {
+        project: z.string().describe("The name or ID of the Azure DevOps project."),
+        ids: z.array(z.number()).min(1).describe("Array of work item IDs to preview. Obtain these from other MCP tool responses (e.g. work item queries, search results, linked items)."),
+        ...workItemFilterSchema,
+        ...workItemDisplaySchema,
+      },
+      _meta: { ui: { resourceUri: workItemsAppResourceUri } },
+    },
+    async (args) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+
+        let workItems = await workItemApi.getWorkItemsBatch({ ids: args.ids }, args.project);
+
+        if (workItems && Array.isArray(workItems)) {
+          workItems = applyWorkItemFilters(workItems, args);
+          formatIdentityFields(workItems);
+        }
+
+        return buildWorkItemsResponse(workItems ?? [], buildDisplayConfig(args));
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error previewing work items: ${errorMessage}` }],
           isError: true,
         };
       }

@@ -118,10 +118,17 @@ export function formatAssignedTo(value: string | { displayName?: string; uniqueN
 export function renderSafeHtml(html: string): string {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
-  tmp.querySelectorAll("script, style, link").forEach((el) => el.remove());
+  tmp.querySelectorAll("script, style, link, iframe, object, embed, form, math, svg, base, meta").forEach((el) => el.remove());
   tmp.querySelectorAll("*").forEach((el) => {
     for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith("on") || attr.name === "style") el.removeAttribute(attr.name);
+      if (attr.name.startsWith("on") || attr.name === "style") {
+        el.removeAttribute(attr.name);
+      } else if (["href", "src", "srcdoc", "data", "action", "formaction", "xlink:href"].includes(attr.name.toLowerCase())) {
+        const val = attr.value.replace(/[\s\u0000-\u001f]/g, "").toLowerCase();
+        if (val.startsWith("javascript:") || val.startsWith("vbscript:") || val.startsWith("data:text/html")) {
+          el.removeAttribute(attr.name);
+        }
+      }
     }
   });
   return tmp.innerHTML;
@@ -136,4 +143,24 @@ export function stripHtml(html: string): string {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
   return tmp.textContent ?? tmp.innerText ?? "";
+}
+
+/** Sanitize SVG content by removing script elements, event handlers, and foreignObject. */
+export function sanitizeSvg(svg: string): string {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = svg;
+  tmp.querySelectorAll("script, foreignObject").forEach((el) => el.remove());
+  tmp.querySelectorAll("*").forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.startsWith("on")) {
+        el.removeAttribute(attr.name);
+      } else if (["href", "src", "xlink:href"].includes(attr.name.toLowerCase())) {
+        const val = attr.value.replace(/[\s\u0000-\u001f]/g, "").toLowerCase();
+        if (val.startsWith("javascript:") || val.startsWith("vbscript:") || val.startsWith("data:text/html")) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    }
+  });
+  return tmp.innerHTML;
 }

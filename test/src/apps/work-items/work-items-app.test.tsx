@@ -287,4 +287,202 @@ describe("WorkItemsApp", () => {
       useAppModule.useApp = originalUseApp;
     });
   });
+
+  describe("renderCell branches", () => {
+    it("renders tag pills for System.Tags column", () => {
+      let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const useAppModule = require("@modelcontextprotocol/ext-apps/react");
+      const originalUseApp = useAppModule.useApp;
+      useAppModule.useApp = (options: any) => {
+        const result = originalUseApp(options);
+        capturedApp = result.app;
+        return result;
+      };
+
+      render(<WorkItemsApp />);
+
+      act(() => {
+        capturedApp?.ontoolresult?.({
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                workItems: sampleWorkItems,
+                displayConfig: {
+                  columns: [
+                    { field: "System.Id", label: "ID" },
+                    { field: "System.Title", label: "Title" },
+                    { field: "System.Tags", label: "Tags" },
+                  ],
+                },
+              }),
+            },
+          ],
+          isError: false,
+        });
+      });
+
+      // Tag pills should be rendered
+      expect(screen.getAllByText("frontend").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("security").length).toBeGreaterThan(0);
+      useAppModule.useApp = originalUseApp;
+    });
+
+    it("renders default cell value via formatCellValue for unknown fields", () => {
+      let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const useAppModule = require("@modelcontextprotocol/ext-apps/react");
+      const originalUseApp = useAppModule.useApp;
+      useAppModule.useApp = (options: any) => {
+        const result = originalUseApp(options);
+        capturedApp = result.app;
+        return result;
+      };
+
+      render(<WorkItemsApp />);
+
+      act(() => {
+        capturedApp?.ontoolresult?.({
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                workItems: [
+                  {
+                    id: 1,
+                    fields: {
+                      "System.Id": 1,
+                      "System.Title": "Test",
+                      "System.State": "Active",
+                      "System.WorkItemType": "Bug",
+                      "System.AssignedTo": "Alice",
+                      "Custom.MyField": "custom-value",
+                    },
+                  },
+                ],
+                displayConfig: {
+                  columns: [
+                    { field: "System.Id", label: "ID" },
+                    { field: "Custom.MyField", label: "My Field" },
+                  ],
+                },
+              }),
+            },
+          ],
+          isError: false,
+        });
+      });
+
+      expect(screen.getByText("custom-value")).toBeInTheDocument();
+      useAppModule.useApp = originalUseApp;
+    });
+  });
+
+  describe("event handlers", () => {
+    it("handles ontoolinput with tool arguments", () => {
+      let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const useAppModule = require("@modelcontextprotocol/ext-apps/react");
+      const originalUseApp = useAppModule.useApp;
+      useAppModule.useApp = (options: any) => {
+        const result = originalUseApp(options);
+        capturedApp = result.app;
+        return result;
+      };
+
+      render(<WorkItemsApp />);
+
+      // ontoolinput should not throw when arguments are provided
+      act(() => {
+        capturedApp?.ontoolinput?.({
+          arguments: {
+            project: "TestProject",
+            type: "assignedtome",
+            columns: [{ field: "System.Id", label: "ID" }],
+            sort: { field: "System.Id", direction: "asc" },
+            pageSize: 25,
+          },
+        });
+      });
+
+      // Should still be in loading state after ontoolinput
+      expect(screen.getByText(/loading work items/i)).toBeInTheDocument();
+      useAppModule.useApp = originalUseApp;
+    });
+
+    it("handles ontoolcancelled event", () => {
+      let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const useAppModule = require("@modelcontextprotocol/ext-apps/react");
+      const originalUseApp = useAppModule.useApp;
+      useAppModule.useApp = (options: any) => {
+        const result = originalUseApp(options);
+        capturedApp = result.app;
+        return result;
+      };
+
+      render(<WorkItemsApp />);
+
+      act(() => {
+        capturedApp?.ontoolcancelled?.();
+      });
+
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+      useAppModule.useApp = originalUseApp;
+    });
+
+    it("handles onerror event", () => {
+      let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const useAppModule = require("@modelcontextprotocol/ext-apps/react");
+      const originalUseApp = useAppModule.useApp;
+      useAppModule.useApp = (options: any) => {
+        const result = originalUseApp(options);
+        capturedApp = result.app;
+        return result;
+      };
+
+      render(<WorkItemsApp />);
+
+      act(() => {
+        capturedApp?.onerror?.(new Error("test error"));
+      });
+
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+      useAppModule.useApp = originalUseApp;
+    });
+
+    it("handles ontoolinputpartial event (sets loading)", () => {
+      let capturedApp: any;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const useAppModule = require("@modelcontextprotocol/ext-apps/react");
+      const originalUseApp = useAppModule.useApp;
+      useAppModule.useApp = (options: any) => {
+        const result = originalUseApp(options);
+        capturedApp = result.app;
+        return result;
+      };
+
+      render(<WorkItemsApp />);
+
+      act(() => {
+        capturedApp?.ontoolinputpartial?.({});
+      });
+
+      // Should show loading state
+      expect(screen.getByText(/loading work items/i)).toBeInTheDocument();
+      useAppModule.useApp = originalUseApp;
+    });
+
+    it("toggles query panel when View query is clicked", () => {
+      renderAndLoadData();
+
+      const viewQueryBtn = screen.getByText(/view query/i);
+      fireEvent.click(viewQueryBtn);
+
+      // Query panel should show WIQL
+      expect(screen.getByText(/SELECT/)).toBeInTheDocument();
+    });
+  });
 });
