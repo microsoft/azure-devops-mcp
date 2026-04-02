@@ -336,4 +336,34 @@ describe("sanitizeSvg", () => {
     expect(result).toContain("fill");
     expect(result).toContain("viewBox");
   });
+
+  it("removes javascript: protocol from href", () => {
+    const svg = '<svg><a href="javascript:alert(1)"><text>click</text></a></svg>';
+    const result = sanitizeSvg(svg);
+    expect(result).not.toContain("javascript:");
+  });
+
+  it("removes javascript: protocol from xlink:href", () => {
+    const svg = '<svg><use xlink:href="javascript:alert(1)"/></svg>';
+    const result = sanitizeSvg(svg);
+    expect(result).not.toContain("javascript:");
+  });
+
+  it("removes vbscript: protocol from href", () => {
+    const svg = '<svg><a href="vbscript:MsgBox(1)"><text>click</text></a></svg>';
+    const result = sanitizeSvg(svg);
+    expect(result).not.toContain("vbscript:");
+  });
+
+  it("removes data:text/html from src", () => {
+    const svg = '<svg><image src="data:text/html,<script>alert(1)</script>"/></svg>';
+    const result = sanitizeSvg(svg);
+    expect(result).not.toContain("data:text/html");
+  });
+
+  it("preserves safe href in SVG links", () => {
+    const svg = '<svg><a href="https://dev.azure.com"><text>link</text></a></svg>';
+    const result = sanitizeSvg(svg);
+    expect(result).toContain("https://dev.azure.com");
+  });
 });

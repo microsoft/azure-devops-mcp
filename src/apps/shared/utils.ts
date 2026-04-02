@@ -152,7 +152,14 @@ export function sanitizeSvg(svg: string): string {
   tmp.querySelectorAll("script, foreignObject").forEach((el) => el.remove());
   tmp.querySelectorAll("*").forEach((el) => {
     for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith("on")) el.removeAttribute(attr.name);
+      if (attr.name.startsWith("on")) {
+        el.removeAttribute(attr.name);
+      } else if (["href", "src", "xlink:href"].includes(attr.name.toLowerCase())) {
+        const val = attr.value.replace(/[\s\u0000-\u001f]/g, "").toLowerCase();
+        if (val.startsWith("javascript:") || val.startsWith("vbscript:") || val.startsWith("data:text/html")) {
+          el.removeAttribute(attr.name);
+        }
+      }
     }
   });
   return tmp.innerHTML;

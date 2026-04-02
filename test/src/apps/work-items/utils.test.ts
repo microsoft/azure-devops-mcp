@@ -227,6 +227,11 @@ describe("getWorkItemWebUrl", () => {
     expect(getWorkItemWebUrl(wi)).toBe("https://org.visualstudio.com/proj/_workitems/edit/10");
   });
 
+  it("accepts ADO subdomain URLs", () => {
+    const wi = { id: 5, url: "https://vssps.dev.azure.com/org/proj/_apis/wit/workItems/5" };
+    expect(getWorkItemWebUrl(wi)).toBe("https://vssps.dev.azure.com/org/proj/_workitems/edit/5");
+  });
+
   it("returns null for non-ADO domain even if URL pattern matches", () => {
     const wi = { id: 1, url: "https://evil.com/proj/_apis/wit/workItems/1" };
     expect(getWorkItemWebUrl(wi)).toBeNull();

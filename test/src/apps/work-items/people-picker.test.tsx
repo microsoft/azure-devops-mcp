@@ -237,7 +237,7 @@ describe("PeoplePicker", () => {
       }),
     };
 
-    const { container } = render(
+    render(
       <div>
         <div data-testid="outside">Outside</div>
         <PeoplePicker value="" onChange={jest.fn()} app={mockApp as any} />

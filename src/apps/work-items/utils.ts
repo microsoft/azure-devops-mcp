@@ -81,7 +81,7 @@ export function getWorkItemWebUrl(wi: WorkItem): string | null {
     if (webUrl !== wi.url) {
       try {
         const parsed = new URL(webUrl);
-        if (parsed.hostname.endsWith(".visualstudio.com") || parsed.hostname.endsWith("dev.azure.com")) {
+        if (parsed.hostname.endsWith(".visualstudio.com") || parsed.hostname === "dev.azure.com" || parsed.hostname.endsWith(".dev.azure.com")) {
           return webUrl;
         }
       } catch {
