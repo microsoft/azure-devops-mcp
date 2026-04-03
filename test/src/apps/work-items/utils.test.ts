@@ -116,6 +116,18 @@ describe("formatCellValue", () => {
     const wi = { id: 1, fields: { "Custom.Field": { key: "val" } } };
     expect(formatCellValue("Custom.Field", wi)).toContain("val");
   });
+
+  it("returns string for invalid date values", () => {
+    // Override Date.prototype.toLocaleDateString to throw for testing the catch branch
+    const origToLocale = Date.prototype.toLocaleDateString;
+    Date.prototype.toLocaleDateString = () => {
+      throw new Error("invalid");
+    };
+    const wi = { id: 1, fields: { "System.CreatedDate": "bad-date" } };
+    const result = formatCellValue("System.CreatedDate", wi);
+    expect(result).toBe("bad-date");
+    Date.prototype.toLocaleDateString = origToLocale;
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -153,6 +165,43 @@ describe("compareCellValues", () => {
     const wiObjA = { id: 1, fields: { "Custom.Reviewer": { displayName: "Alice", uniqueName: "alice@test.com" } } };
     const wiObjB = { id: 2, fields: { "Custom.Reviewer": { displayName: "Bob", uniqueName: "bob@test.com" } } };
     expect(compareCellValues("Custom.Reviewer", wiObjA, wiObjB, "asc")).toBeLessThan(0);
+  });
+
+  it("sorts by AssignedTo field using formatAssignedTo", () => {
+    const wiA = { id: 1, fields: { "System.AssignedTo": "Alice <alice@test.com>" } };
+    const wiB = { id: 2, fields: { "System.AssignedTo": "Bob <bob@test.com>" } };
+    expect(compareCellValues("System.AssignedTo", wiA, wiB, "asc")).toBeLessThan(0);
+  });
+
+  it("sorts by AssignedTo with missing field values", () => {
+    const wiA = { id: 1, fields: {} };
+    const wiB = { id: 2, fields: { "System.AssignedTo": "Bob" } };
+    expect(compareCellValues("System.AssignedTo", wiA, wiB, "asc")).not.toBe(0);
+  });
+
+  it("falls back to 0 when both id and fields System.Id are missing", () => {
+    const wiA = { fields: {} };
+    const wiB = { fields: {} };
+    expect(compareCellValues("System.Id", wiA, wiB, "asc")).toBe(0);
+  });
+
+  it("falls back to fields System.Id when id is missing", () => {
+    const wiA = { fields: { "System.Id": 10 } };
+    const wiB = { fields: { "System.Id": 20 } };
+    expect(compareCellValues("System.Id", wiA, wiB, "asc")).toBeLessThan(0);
+  });
+
+  it("falls back to 0 when work item has no fields at all", () => {
+    const wiA = {};
+    const wiB = { id: 5 };
+    expect(compareCellValues("System.Id", wiA, wiB, "asc")).toBeLessThan(0);
+  });
+
+  it("sorts by object field with no displayName or uniqueName", () => {
+    const wiA = { id: 1, fields: { "Custom.Field": { other: "a" } } };
+    const wiB = { id: 2, fields: { "Custom.Field": { other: "b" } } };
+    // Both fall back to "" via toStr
+    expect(compareCellValues("Custom.Field", wiA, wiB, "asc")).toBe(0);
   });
 });
 
@@ -244,6 +293,11 @@ describe("getWorkItemWebUrl", () => {
   it("returns null when url doesn't match pattern", () => {
     expect(getWorkItemWebUrl({ id: 1, url: "https://example.com/other" })).toBeNull();
   });
+
+  it("returns null for invalid URL", () => {
+    const wi = { id: 1, url: "not-a-valid-url/_apis/wit/workItems/1" };
+    expect(getWorkItemWebUrl(wi)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -299,6 +353,11 @@ describe("prepareEditFields", () => {
   it("converts boolean values to string", () => {
     const result = prepareEditFields({ "Custom.Flag": true as any });
     expect(result["Custom.Flag"]).toBe("true");
+  });
+
+  it("JSON-stringifies object fields without displayName or uniqueName", () => {
+    const result = prepareEditFields({ "Custom.Data": { key: "val" } as any });
+    expect(result["Custom.Data"]).toContain("val");
   });
 });
 
@@ -361,6 +420,16 @@ describe("generateWiql", () => {
   it("adds UI filter for priority", () => {
     const wiql = generateWiql({ ...EMPTY_FILTERS, priority: "Critical" });
     expect(wiql).toContain("[Microsoft.VSTS.Common.Priority] = 1");
+  });
+
+  it("skips unknown priority label", () => {
+    const wiql = generateWiql({ ...EMPTY_FILTERS, priority: "Unknown" });
+    expect(wiql).not.toContain("Priority");
+  });
+
+  it("adds UI filter for assignedTo", () => {
+    const wiql = generateWiql({ ...EMPTY_FILTERS, assignedTo: "Jane Doe" });
+    expect(wiql).toContain("[System.AssignedTo] = 'Jane Doe'");
   });
 
   it("adds UI filter for tag", () => {
