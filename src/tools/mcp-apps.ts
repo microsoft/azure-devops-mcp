@@ -219,7 +219,7 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
         "Opens an interactive work items table UI to preview any Azure DevOps work items by their IDs. Use this tool to display work items returned by other MCP tools (e.g. from queries, search results, or linked items) in a rich interactive table. Unlike 'My Work Items', this tool is NOT scoped to the current user — it displays whatever work item IDs are provided. Callers should pass work item IDs obtained from other tool responses. Supports configurable columns, sorting, filtering, and optional agent-suggested values. IMPORTANT: Do NOT populate the 'columns' parameter unless the user EXPLICITLY requests specific columns to display.",
       inputSchema: {
         project: z.string().describe("The name or ID of the Azure DevOps project."),
-        ids: z.array(z.number()).min(1).describe("Array of work item IDs to preview. Obtain these from other MCP tool responses (e.g. work item queries, search results, linked items)."),
+        ids: z.array(z.number()).min(1).max(200).describe("Array of work item IDs to preview. Obtain these from other MCP tool responses (e.g. work item queries, search results, linked items)."),
         ...workItemFilterSchema,
         ...workItemDisplaySchema,
       },
