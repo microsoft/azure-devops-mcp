@@ -18,7 +18,7 @@ const Test_Plan_Tools = {
   create_test_suite: "testplan_create_test_suite",
 };
 
-function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
+function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider?: () => string) {
   server.tool(
     Test_Plan_Tools.list_test_plans,
     "Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.",
@@ -331,15 +331,45 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       planid: z.coerce.number().min(1).describe("The ID of the test plan."),
       suiteid: z.coerce.number().min(1).describe("The ID of the test suite."),
+      continuationToken: z.string().optional().describe("Token to continue fetching test cases from a previous request."),
     },
-    async ({ project, planid, suiteid }) => {
+    async ({ project, planid, suiteid, continuationToken }) => {
       try {
         const connection = await connectionProvider();
-        const coreApi = await connection.getTestPlanApi();
-        const testcases = await coreApi.getTestCaseList(project, planid, suiteid);
+        const accessToken = await tokenProvider();
+        const url = `${connection.serverUrl}/${project}/_apis/testplan/Plans/${planid}/Suites/${suiteid}/TestCase?api-version=7.2-preview.3${continuationToken ? `&continuationToken=${encodeURIComponent(continuationToken)}` : ""}`;
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        };
+
+        const userAgent = userAgentProvider?.();
+        if (userAgent) {
+          headers["User-Agent"] = userAgent;
+        }
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Azure DevOps Test Plan API error: ${res.status} ${res.statusText}`);
+        }
+
+        const body = await res.json();
+        const testcases = body.value ?? [];
+        const nextToken = res.headers.get("x-ms-continuationtoken") ?? undefined;
+
+        const response: { testCases: typeof testcases; continuationToken?: string } = {
+          testCases: testcases,
+        };
+        if (nextToken) {
+          response.continuationToken = nextToken;
+        }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testcases, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
