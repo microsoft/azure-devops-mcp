@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import DOMPurify from "dompurify";
+
 /** Canonical ADO work item type colors — shared across all MCP apps. */
 export const TYPE_COLORS: Record<string, { bg: string; fg: string }> = {
   bug: { bg: "#cc293d", fg: "#fff" },
@@ -115,23 +117,63 @@ export function formatAssignedTo(value: string | { displayName?: string; uniqueN
   return value.displayName ?? value.uniqueName ?? "Unassigned";
 }
 
+const SAFE_HTML_TAGS = [
+  "p",
+  "div",
+  "span",
+  "br",
+  "hr",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "ul",
+  "ol",
+  "li",
+  "dl",
+  "dt",
+  "dd",
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "td",
+  "th",
+  "caption",
+  "col",
+  "colgroup",
+  "a",
+  "img",
+  "strong",
+  "em",
+  "b",
+  "i",
+  "u",
+  "s",
+  "del",
+  "ins",
+  "sub",
+  "sup",
+  "small",
+  "mark",
+  "blockquote",
+  "pre",
+  "code",
+  "abbr",
+  "cite",
+  "details",
+  "summary",
+  "figure",
+  "figcaption",
+];
+
+const SAFE_HTML_ATTRS = ["href", "src", "alt", "title", "class", "id", "colspan", "rowspan", "width", "height"];
+
 export function renderSafeHtml(html: string): string {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  tmp.querySelectorAll("script, style, link, iframe, object, embed, form, math, svg, base, meta").forEach((el) => el.remove());
-  tmp.querySelectorAll("*").forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith("on") || attr.name === "style") {
-        el.removeAttribute(attr.name);
-      } else if (["href", "src", "srcdoc", "data", "action", "formaction", "xlink:href"].includes(attr.name.toLowerCase())) {
-        const val = attr.value.replace(/[\s\u0000-\u001f]/g, "").toLowerCase();
-        if (val.startsWith("javascript:") || val.startsWith("vbscript:") || val.startsWith("data:text/html")) {
-          el.removeAttribute(attr.name);
-        }
-      }
-    }
-  });
-  return tmp.innerHTML;
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: SAFE_HTML_TAGS, ALLOWED_ATTR: SAFE_HTML_ATTRS });
 }
 
 export function isHtmlContent(value: unknown): boolean {
@@ -147,20 +189,8 @@ export function stripHtml(html: string): string {
 
 /** Sanitize SVG content by removing script elements, event handlers, and foreignObject. */
 export function sanitizeSvg(svg: string): string {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = svg;
-  tmp.querySelectorAll("script, foreignObject").forEach((el) => el.remove());
-  tmp.querySelectorAll("*").forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith("on")) {
-        el.removeAttribute(attr.name);
-      } else if (["href", "src", "xlink:href"].includes(attr.name.toLowerCase())) {
-        const val = attr.value.replace(/[\s\u0000-\u001f]/g, "").toLowerCase();
-        if (val.startsWith("javascript:") || val.startsWith("vbscript:") || val.startsWith("data:text/html")) {
-          el.removeAttribute(attr.name);
-        }
-      }
-    }
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    FORBID_TAGS: ["foreignObject", "style"],
   });
-  return tmp.innerHTML;
 }

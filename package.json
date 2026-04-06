@@ -48,6 +48,7 @@
     "azure-devops-extension-api": "^4.264.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "azure-devops-node-api": "^15.1.2",
+    "dompurify": "^3.3.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "roosterjs": "^9.49.0",
@@ -65,6 +66,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/dompurify": "^3.0.5",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.19.8",
     "@types/react": "^19.2.14",
