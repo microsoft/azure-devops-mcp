@@ -185,12 +185,30 @@ describe("configureTestPlanTools", () => {
             { id: 102, name: "Child Suite 2", parentSuite: { id: 100 } },
           ],
         },
-        { id: 101, name: "Child Suite 1", hasChildren: true, parentSuite: { id: 100 }, children: [{ id: 103, name: "Grandchild Suite", parentSuite: { id: 101 } }] },
-        { id: 102, name: "Child Suite 2", parentSuite: { id: 100 } },
-        { id: 103, name: "Grandchild Suite", parentSuite: { id: 101 } },
+        {
+          id: 101,
+          name: "Child Suite 1",
+          hasChildren: true,
+          parentSuite: { id: 100 },
+          children: [{ id: 103, name: "Grandchild Suite", parentSuite: { id: 101 } }],
+        },
+        {
+          id: 102,
+          name: "Child Suite 2",
+          parentSuite: { id: 100 },
+        },
+        {
+          id: 103,
+          name: "Grandchild Suite",
+          parentSuite: { id: 101 },
+        },
       ]);
 
-      const result = await handler({ project: "proj1", planId: 1 });
+      const params = {
+        project: "proj1",
+        planId: 1,
+      };
+      const result = await handler(params);
 
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("proj1/_apis/testplan/Plans/1/Suites?"), expect.objectContaining({ method: "GET" }));
       const parsed = JSON.parse(result.content[0].text);
@@ -199,8 +217,20 @@ describe("configureTestPlanTools", () => {
         id: 100,
         name: "Root Suite",
         children: [
-          { id: 101, name: "Child Suite 1", children: [{ id: 103, name: "Grandchild Suite" }] },
-          { id: 102, name: "Child Suite 2" },
+          {
+            id: 101,
+            name: "Child Suite 1",
+            children: [
+              {
+                id: 103,
+                name: "Grandchild Suite",
+              },
+            ],
+          },
+          {
+            id: 102,
+            name: "Child Suite 2",
+          },
         ],
       });
     });
@@ -213,7 +243,11 @@ describe("configureTestPlanTools", () => {
 
       mockFetchSuitesResponse([{ id: 200, name: "Single Suite", hasChildren: false }]);
 
-      const result = await handler({ project: "proj1", planId: 2 });
+      const params = {
+        project: "proj1",
+        planId: 2,
+      };
+      const result = await handler(params);
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.testSuites).toHaveLength(1);
@@ -228,7 +262,11 @@ describe("configureTestPlanTools", () => {
 
       mockFetchSuitesResponse([]);
 
-      const result = await handler({ project: "proj1", planId: 3 });
+      const params = {
+        project: "proj1",
+        planId: 3,
+      };
+      const result = await handler(params);
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.testSuites).toEqual([]);
@@ -241,19 +279,61 @@ describe("configureTestPlanTools", () => {
       const [, , , handler] = call;
 
       mockFetchSuitesResponse([
-        { id: 300, name: "Root", hasChildren: true, children: [{ id: 301, name: "Level 1", parentSuite: { id: 300 } }] },
-        { id: 301, name: "Level 1", hasChildren: true, parentSuite: { id: 300 }, children: [{ id: 302, name: "Level 2", parentSuite: { id: 301 } }] },
-        { id: 302, name: "Level 2", hasChildren: true, parentSuite: { id: 301 }, children: [{ id: 303, name: "Level 3", parentSuite: { id: 302 } }] },
-        { id: 303, name: "Level 3", parentSuite: { id: 302 } },
+        {
+          id: 300,
+          name: "Root",
+          hasChildren: true,
+          children: [{ id: 301, name: "Level 1", parentSuite: { id: 300 } }],
+        },
+        {
+          id: 301,
+          name: "Level 1",
+          hasChildren: true,
+          parentSuite: { id: 300 },
+          children: [{ id: 302, name: "Level 2", parentSuite: { id: 301 } }],
+        },
+        {
+          id: 302,
+          name: "Level 2",
+          hasChildren: true,
+          parentSuite: { id: 301 },
+          children: [{ id: 303, name: "Level 3", parentSuite: { id: 302 } }],
+        },
+        {
+          id: 303,
+          name: "Level 3",
+          parentSuite: { id: 302 },
+        },
       ]);
 
-      const result = await handler({ project: "proj1", planId: 4 });
+      const params = {
+        project: "proj1",
+        planId: 4,
+      };
+      const result = await handler(params);
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.testSuites[0]).toMatchObject({
         id: 300,
         name: "Root",
-        children: [{ id: 301, name: "Level 1", children: [{ id: 302, name: "Level 2", children: [{ id: 303, name: "Level 3" }] }] }],
+        children: [
+          {
+            id: 301,
+            name: "Level 1",
+            children: [
+              {
+                id: 302,
+                name: "Level 2",
+                children: [
+                  {
+                    id: 303,
+                    name: "Level 3",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       });
     });
 
@@ -265,7 +345,11 @@ describe("configureTestPlanTools", () => {
 
       (global.fetch as jest.Mock) = jest.fn().mockRejectedValue(new Error("API Error"));
 
-      const result = await handler({ project: "proj1", planId: 5 });
+      const params = {
+        project: "proj1",
+        planId: 5,
+      };
+      const result = await handler(params);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error listing test suites: API Error");
@@ -279,7 +363,12 @@ describe("configureTestPlanTools", () => {
 
       mockFetchSuitesResponse([{ id: 400, name: "Suite with Token" }], "nextSuiteToken");
 
-      const result = await handler({ project: "proj1", planId: 6, continuationToken: "token123" });
+      const params = {
+        project: "proj1",
+        planId: 6,
+        continuationToken: "token123",
+      };
+      const result = await handler(params);
 
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("continuationToken=token123"), expect.anything());
       const parsed = JSON.parse(result.content[0].text);
@@ -293,11 +382,25 @@ describe("configureTestPlanTools", () => {
       const [, , , handler] = call;
 
       mockFetchSuitesResponse([
-        { id: 500, name: "Parent", hasChildren: true, children: [{ id: 501, name: "Child with no children", parentSuite: { id: 500 } }] },
-        { id: 501, name: "Child with no children", parentSuite: { id: 500 }, hasChildren: false },
+        {
+          id: 500,
+          name: "Parent",
+          hasChildren: true,
+          children: [{ id: 501, name: "Child with no children", parentSuite: { id: 500 } }],
+        },
+        {
+          id: 501,
+          name: "Child with no children",
+          parentSuite: { id: 500 },
+          hasChildren: false,
+        },
       ]);
 
-      const result = await handler({ project: "proj1", planId: 7 });
+      const params = {
+        project: "proj1",
+        planId: 7,
+      };
+      const result = await handler(params);
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.testSuites[0].children[0]).toEqual({ id: 501, name: "Child with no children" });
