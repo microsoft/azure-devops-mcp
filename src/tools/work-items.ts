@@ -7,6 +7,7 @@ import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfac
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
+import { elicitProject } from "../shared/elicitations.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -31,6 +32,7 @@ const WORKITEM_TOOLS = {
   work_item_unlink: "wit_work_item_unlink",
   add_artifact_link: "wit_add_artifact_link",
   get_work_item_attachment: "wit_get_work_item_attachment",
+  query_by_wiql: "wit_query_by_wiql",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -1261,6 +1263,45 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         return {
           content: [{ type: "text", text: `Error adding artifact link to work item: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.query_by_wiql,
+    "Execute a WIQL (Work Item Query Language) query and return the matching work items. If a project is not specified, you will be prompted to select one.",
+    {
+      wiql: z.string().describe('The WIQL query string to execute, e.g., "SELECT [System.Id], [System.Title] FROM WorkItems WHERE [System.TeamProject] = @project"'),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team context will be used."),
+      timePrecision: z.boolean().optional().describe("Whether to include time precision in date fields. Defaults to false."),
+      top: z.coerce.number().default(200).describe("The maximum number of results to return. Defaults to 50."),
+    },
+    async ({ wiql, project, team, timePrecision, top }) => {
+      try {
+        const connection = await connectionProvider();
+
+        let resolvedProject = project;
+
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to run the WIQL query against.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const teamContext = { project: resolvedProject, team };
+        const queryResult = await workItemApi.queryByWiql({ query: wiql }, teamContext, timePrecision, top);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error executing WIQL query: ${errorMessage}` }],
           isError: true,
         };
       }
