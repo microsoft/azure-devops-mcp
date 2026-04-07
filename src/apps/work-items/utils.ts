@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import type { ActiveFilters, ColumnConfig, WorkItem } from "./types.ts";
-export { formatAssignedTo, getFieldLabel, getPriorityLabel, renderSafeHtml, isHtmlContent, stripHtml, sanitizeSvg } from "../shared/utils.ts";
+export { formatAssignedTo, getFieldLabel, getPriorityLabel, renderSafeHtml, renderMarkdownToHtml, isHtmlContent, stripHtml, sanitizeSvg } from "../shared/utils.ts";
 import { formatAssignedTo, getPriorityLabel, isHtmlContent, renderSafeHtml } from "../shared/utils.ts";
 
 export const PAGE_SIZE = 10;

@@ -4,7 +4,7 @@
 import React from "react";
 import type { App } from "@modelcontextprotocol/ext-apps";
 import type { WorkItem, EditState, WorkItemTypeMetadata } from "../types.ts";
-import { formatAssignedTo, getPriorityLabel, getWorkItemId, getWorkItemWebUrl, stripHtml, renderSafeHtml, getFieldLabel, isHtmlContent } from "../utils.ts";
+import { formatAssignedTo, getPriorityLabel, getWorkItemId, getWorkItemWebUrl, stripHtml, renderSafeHtml, renderMarkdownToHtml, getFieldLabel, isHtmlContent } from "../utils.ts";
 import { TagEditor } from "./tag-editor.tsx";
 import { PeoplePicker } from "./people-picker.tsx";
 import { RoosterEditor } from "../../shared/rooster-editor/index.ts";
@@ -148,9 +148,10 @@ export function ExpandedContent({
       continue;
     }
 
-    // Auto-detect rich text / HTML fields — show as expandable sections
-    if (isHtmlContent(value)) {
-      sectionFields.push({ field, label: getFieldLabel(field), format: "html" });
+    // Multiline rich text fields — show as expandable sections
+    const fieldFormat = wi.multilineFieldsFormat?.[field];
+    if (isHtmlContent(value) || fieldFormat) {
+      sectionFields.push({ field, label: getFieldLabel(field), format: fieldFormat ?? "html" });
     }
   }
 
@@ -161,6 +162,16 @@ export function ExpandedContent({
     for (const field of META_FIELDS_WHITELIST) {
       if (!existingFields.has(field) && typeFieldRefs.has(field)) {
         metaConfigs.push({ field, label: getFieldLabel(field) });
+      }
+    }
+
+    // Include empty multiline fields from the type schema for editing
+    const existingSections = new Set(sectionFields.map((c) => c.field));
+    if (wi.multilineFieldsFormat) {
+      for (const [field, format] of Object.entries(wi.multilineFieldsFormat)) {
+        if (!existingSections.has(field) && typeFieldRefs.has(field)) {
+          sectionFields.push({ field, label: getFieldLabel(field), format });
+        }
       }
     }
   }
@@ -385,8 +396,9 @@ export function ExpandedContent({
         if (!raw || String(raw).trim() === "") return null;
         const rawStr = String(raw);
         let bodyHtml: string;
-        if (cfg.format === "html" || cfg.format === "bullets") bodyHtml = renderSafeHtml(rawStr);
-        else bodyHtml = stripHtml(rawStr);
+        if (cfg.format === "markdown") bodyHtml = renderMarkdownToHtml(rawStr);
+        else if (cfg.format === "html" || cfg.format === "bullets") bodyHtml = renderSafeHtml(rawStr);
+        else bodyHtml = renderSafeHtml(rawStr);
         if (!bodyHtml.trim()) return null;
         return (
           <div key={cfg.field}>
