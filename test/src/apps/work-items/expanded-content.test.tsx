@@ -421,6 +421,210 @@ describe("ExpandedContent", () => {
       fireEvent.change(prioritySelect, { target: { value: "3" } });
       expect(onFieldChange).toHaveBeenCalledWith("Microsoft.VSTS.Common.Priority", 3);
     });
+  });
+
+  describe("multilineFieldsFormat support", () => {
+    it("renders markdown description via multilineFieldsFormat", () => {
+      const wi: WorkItem = {
+        id: 100,
+        url: "https://dev.azure.com/org/proj/_apis/wit/workItems/100",
+        fields: {
+          "System.Id": 100,
+          "System.Title": "Feature with markdown",
+          "System.State": "Active",
+          "System.WorkItemType": "Feature",
+          "System.Description": "# Heading\n\n- Item 1\n- Item 2",
+        },
+        multilineFieldsFormat: {
+          "System.Description": "markdown",
+        },
+      };
+      render(<ExpandedContent wi={wi} editState={null} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      expect(screen.getByText("Description")).toBeInTheDocument();
+      // markdown-it converts # Heading to <h1>
+      const sectionBody = document.querySelector(".section-body");
+      expect(sectionBody).not.toBeNull();
+      expect(sectionBody!.innerHTML).toContain("<h1>");
+      expect(sectionBody!.innerHTML).toContain("Heading");
+    });
+
+    it("renders HTML description without multilineFieldsFormat using isHtmlContent detection", () => {
+      const wi: WorkItem = {
+        id: 101,
+        fields: {
+          "System.Id": 101,
+          "System.Title": "Bug with HTML desc",
+          "System.State": "Active",
+          "System.WorkItemType": "Bug",
+          "System.Description": "<div>HTML content here</div>",
+        },
+      };
+      render(<ExpandedContent wi={wi} editState={null} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      expect(screen.getByText("Description")).toBeInTheDocument();
+      expect(screen.getByText("HTML content here")).toBeInTheDocument();
+    });
+
+    it("detects section fields via multilineFieldsFormat even without HTML tags", () => {
+      const wi: WorkItem = {
+        id: 102,
+        fields: {
+          "System.Id": 102,
+          "System.Title": "Plain text feature",
+          "System.State": "New",
+          "System.WorkItemType": "Feature",
+          "System.Description": "Just plain text, no HTML tags, no markdown",
+        },
+        multilineFieldsFormat: {
+          "System.Description": "html",
+        },
+      };
+      render(<ExpandedContent wi={wi} editState={null} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      expect(screen.getByText("Description")).toBeInTheDocument();
+    });
+
+    it("includes empty multiline fields in edit mode from type schema", () => {
+      const wi: WorkItem = {
+        id: 103,
+        fields: {
+          "System.Id": 103,
+          "System.Title": "New Feature",
+          "System.State": "New",
+          "System.WorkItemType": "Feature",
+        },
+        multilineFieldsFormat: {
+          "System.Description": "markdown",
+        },
+      };
+      const editState: EditState = {
+        id: 103,
+        fields: {
+          "System.Title": "New Feature",
+          "System.State": "New",
+        },
+        saving: false,
+        statusMsg: "",
+        statusType: "",
+      };
+      const metadataMap = {
+        Feature: {
+          states: [{ name: "New", color: "b2b2b2", category: "Proposed" }],
+          transitions: {},
+          fields: [
+            { referenceName: "System.Description", name: "Description", allowedValues: [] },
+            { referenceName: "System.Title", name: "Title", allowedValues: [] },
+          ],
+        },
+      };
+      render(
+        <ExpandedContent
+          wi={wi}
+          editState={editState}
+          onEdit={jest.fn()}
+          onSave={jest.fn()}
+          onCancel={jest.fn()}
+          onFieldChange={jest.fn()}
+          app={undefined}
+          allowedStates={["New"]}
+          typeMetadataMap={metadataMap}
+        />
+      );
+
+      // Should show the rooster editor for Description even though it has no value
+      const editors = screen.getAllByTestId("rooster-editor");
+      expect(editors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("does not duplicate section fields that already exist from content detection", () => {
+      const wi: WorkItem = {
+        id: 104,
+        fields: {
+          "System.Id": 104,
+          "System.Title": "Feature with existing desc",
+          "System.State": "Active",
+          "System.WorkItemType": "Feature",
+          "System.Description": "# Has content",
+        },
+        multilineFieldsFormat: {
+          "System.Description": "markdown",
+        },
+      };
+      const editState: EditState = {
+        id: 104,
+        fields: {
+          "System.Title": "Feature with existing desc",
+          "System.State": "Active",
+          "System.Description": "# Has content",
+        },
+        saving: false,
+        statusMsg: "",
+        statusType: "",
+      };
+      const metadataMap = {
+        Feature: {
+          states: [{ name: "Active", color: "007acc", category: "InProgress" }],
+          transitions: {},
+          fields: [{ referenceName: "System.Description", name: "Description", allowedValues: [] }],
+        },
+      };
+      render(
+        <ExpandedContent
+          wi={wi}
+          editState={editState}
+          onEdit={jest.fn()}
+          onSave={jest.fn()}
+          onCancel={jest.fn()}
+          onFieldChange={jest.fn()}
+          app={undefined}
+          allowedStates={["Active"]}
+          typeMetadataMap={metadataMap}
+        />
+      );
+
+      // Should have exactly 1 rooster editor for Description, not duplicated
+      const editors = screen.getAllByTestId("rooster-editor");
+      expect(editors).toHaveLength(1);
+    });
+
+    it("renders section fields with unknown format using renderSafeHtml fallback", () => {
+      const wi: WorkItem = {
+        id: 105,
+        fields: {
+          "System.Id": 105,
+          "System.Title": "Work item with custom format",
+          "System.State": "Active",
+          "System.WorkItemType": "Task",
+          "System.Description": "Some content",
+        },
+        multilineFieldsFormat: {
+          "System.Description": "plaintext",
+        },
+      };
+      render(<ExpandedContent wi={wi} editState={null} {...noopHandlers} app={undefined} allowedStates={[]} typeMetadataMap={{}} />);
+
+      expect(screen.getByText("Description")).toBeInTheDocument();
+      expect(screen.getByText("Some content")).toBeInTheDocument();
+    });
+  });
+
+  describe("edit mode - continued", () => {
+    const editState: EditState = {
+      id: 42,
+      fields: {
+        "System.Title": "Fix critical bug",
+        "System.State": "Active",
+        "System.AssignedTo": "Jane Doe",
+        "System.Tags": "frontend; critical",
+        "Microsoft.VSTS.Common.Priority": 1,
+        "System.Description": "<div>This is a detailed description of the bug.</div>",
+        "Microsoft.VSTS.Scheduling.StoryPoints": 5,
+      },
+      saving: false,
+      statusMsg: "",
+      statusType: "",
+    };
 
     it("fires onFieldChange with Number for numeric StoryPoints input", () => {
       const onFieldChange = jest.fn();

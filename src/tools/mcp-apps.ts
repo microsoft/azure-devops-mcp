@@ -10,6 +10,7 @@ import { z } from "zod";
 import { logger } from "../logger.js";
 import { applyWorkItemFilters } from "../apps/shared/work-item-filters.js";
 import { searchIdentities } from "./auth.js";
+import { WorkItemExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 
 const MCP_APPS_TOOLS = {
   my_work_items: "mcp_app_my_work_items",
@@ -186,7 +187,7 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
         }
 
         // Fetch all fields for work items
-        let workItems = await workItemApi.getWorkItemsBatch({ ids }, args.project);
+        let workItems = await workItemApi.getWorkItemsBatch({ ids, $expand: WorkItemExpand.Fields }, args.project);
 
         // Apply filters scoped to current user
         if (workItems && Array.isArray(workItems)) {
@@ -230,7 +231,7 @@ function configureMcpAppsTools(server: McpServer, tokenProvider: () => Promise<s
         const connection = await connectionProvider();
         const workItemApi = await connection.getWorkItemTrackingApi();
 
-        let workItems = await workItemApi.getWorkItemsBatch({ ids: args.ids }, args.project);
+        let workItems = await workItemApi.getWorkItemsBatch({ ids: args.ids, $expand: WorkItemExpand.Fields }, args.project);
 
         if (workItems && Array.isArray(workItems)) {
           workItems = applyWorkItemFilters(workItems, args);

@@ -37,6 +37,7 @@ export interface WorkItemFields {
 export interface WorkItem {
   id?: number;
   fields?: WorkItemFields;
+  multilineFieldsFormat?: Record<string, string>;
   url?: string;
 }
 

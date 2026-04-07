@@ -1328,7 +1328,7 @@ describe("configureMcpAppsTools", () => {
       const handler = getHandler();
       await handler({ project: "TestProject", ids: [10, 20, 30], pageSize: 10 });
 
-      expect(mockBatch).toHaveBeenCalledWith({ ids: [10, 20, 30] }, "TestProject");
+      expect(mockBatch).toHaveBeenCalledWith({ ids: [10, 20, 30], $expand: 2 }, "TestProject");
     });
 
     it("should not call connect() for user resolution", async () => {

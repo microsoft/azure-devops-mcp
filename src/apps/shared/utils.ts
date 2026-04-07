@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import DOMPurify from "dompurify";
+import MarkdownIt from "markdown-it";
 
 /** Canonical ADO work item type colors — shared across all MCP apps. */
 export const TYPE_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -178,6 +179,13 @@ export function renderSafeHtml(html: string): string {
 
 export function isHtmlContent(value: unknown): boolean {
   return typeof value === "string" && /<(?:p|div|span|br|ul|ol|li|h[1-6]|table|tr|td|th|a|img|strong|em|b|i|u|s|blockquote|pre|code|hr)\b/i.test(value);
+}
+
+const mdParser = new MarkdownIt({ html: true, linkify: true, typographer: false });
+
+export function renderMarkdownToHtml(md: string): string {
+  const raw = mdParser.render(md);
+  return DOMPurify.sanitize(raw, { ALLOWED_TAGS: SAFE_HTML_TAGS, ALLOWED_ATTR: SAFE_HTML_ATTRS });
 }
 
 export function stripHtml(html: string): string {

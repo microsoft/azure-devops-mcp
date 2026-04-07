@@ -5,7 +5,18 @@
 // Licensed under the MIT License.
 
 import { describe, expect, it } from "@jest/globals";
-import { colorForType, normalizeAdoHtml, getFieldLabel, formatAssignedTo, getPriorityLabel, renderSafeHtml, isHtmlContent, stripHtml, sanitizeSvg } from "../../../../src/apps/shared/utils";
+import {
+  colorForType,
+  normalizeAdoHtml,
+  getFieldLabel,
+  formatAssignedTo,
+  getPriorityLabel,
+  renderSafeHtml,
+  renderMarkdownToHtml,
+  isHtmlContent,
+  stripHtml,
+  sanitizeSvg,
+} from "../../../../src/apps/shared/utils";
 
 // ---------------------------------------------------------------------------
 // colorForType
@@ -365,5 +376,256 @@ describe("sanitizeSvg", () => {
     const svg = '<svg><a href="https://dev.azure.com"><text>link</text></a></svg>';
     const result = sanitizeSvg(svg);
     expect(result).toContain("https://dev.azure.com");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderMarkdownToHtml
+// ---------------------------------------------------------------------------
+describe("renderMarkdownToHtml", () => {
+  describe("headings", () => {
+    it("converts ATX headings h1-h6", () => {
+      expect(renderMarkdownToHtml("# H1")).toContain("<h1>H1</h1>");
+      expect(renderMarkdownToHtml("## H2")).toContain("<h2>H2</h2>");
+      expect(renderMarkdownToHtml("### H3")).toContain("<h3>H3</h3>");
+      expect(renderMarkdownToHtml("#### H4")).toContain("<h4>H4</h4>");
+      expect(renderMarkdownToHtml("##### H5")).toContain("<h5>H5</h5>");
+      expect(renderMarkdownToHtml("###### H6")).toContain("<h6>H6</h6>");
+    });
+
+    it("converts setext headings", () => {
+      expect(renderMarkdownToHtml("Title\n=====")).toContain("<h1>Title</h1>");
+      expect(renderMarkdownToHtml("Subtitle\n-----")).toContain("<h2>Subtitle</h2>");
+    });
+
+    it("applies inline formatting in headings", () => {
+      const result = renderMarkdownToHtml("## **Bold** heading");
+      expect(result).toContain("<h2>");
+      expect(result).toContain("<strong>Bold</strong>");
+    });
+  });
+
+  describe("inline formatting", () => {
+    it("converts bold with asterisks", () => {
+      expect(renderMarkdownToHtml("**bold**")).toContain("<strong>bold</strong>");
+    });
+
+    it("converts bold with underscores", () => {
+      expect(renderMarkdownToHtml("__bold__")).toContain("<strong>bold</strong>");
+    });
+
+    it("converts italic with asterisks", () => {
+      expect(renderMarkdownToHtml("*italic*")).toContain("<em>italic</em>");
+    });
+
+    it("converts italic with underscores", () => {
+      expect(renderMarkdownToHtml("_italic_")).toContain("<em>italic</em>");
+    });
+
+    it("converts bold+italic", () => {
+      const result = renderMarkdownToHtml("***both***");
+      expect(result).toContain("<em>");
+      expect(result).toContain("<strong>");
+      expect(result).toContain("both");
+    });
+
+    it("converts strikethrough", () => {
+      const result = renderMarkdownToHtml("~~deleted~~");
+      expect(result).toMatch(/<(?:del|s)>deleted<\/(?:del|s)>/);
+    });
+
+    it("converts inline code", () => {
+      const result = renderMarkdownToHtml("Use `console.log()`");
+      expect(result).toContain("<code>console.log()</code>");
+    });
+
+    it("escapes HTML inside inline code", () => {
+      const result = renderMarkdownToHtml("`<script>alert(1)</script>`");
+      expect(result).toContain("&lt;script&gt;");
+      expect(result).not.toContain("<script>");
+    });
+  });
+
+  describe("links and images", () => {
+    it("converts links", () => {
+      const result = renderMarkdownToHtml("[Click here](https://example.com)");
+      expect(result).toContain('<a href="https://example.com">Click here</a>');
+    });
+
+    it("converts images", () => {
+      const result = renderMarkdownToHtml("![Alt text](https://example.com/img.png)");
+      expect(result).toContain("<img");
+      expect(result).toContain('src="https://example.com/img.png"');
+      expect(result).toContain('alt="Alt text"');
+    });
+
+    it("converts autolinks", () => {
+      const result = renderMarkdownToHtml("<https://example.com>");
+      expect(result).toContain('<a href="https://example.com">');
+    });
+  });
+
+  describe("code blocks", () => {
+    it("converts fenced code blocks with backticks", () => {
+      const md = "```js\nconst x = 1;\n```";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<pre>");
+      expect(result).toContain("<code");
+      expect(result).toContain("const x = 1;");
+    });
+
+    it("converts fenced code blocks with tildes", () => {
+      const md = "~~~\ncode here\n~~~";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<pre><code>");
+      expect(result).toContain("code here");
+    });
+
+    it("escapes HTML in code blocks", () => {
+      const md = "```\n<div>test</div>\n```";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("&lt;div&gt;");
+    });
+  });
+
+  describe("lists", () => {
+    it("converts unordered lists", () => {
+      const md = "- Item 1\n- Item 2\n- Item 3";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<ul>");
+      expect(result).toContain("<li>Item 1</li>");
+      expect(result).toContain("<li>Item 2</li>");
+      expect(result).toContain("<li>Item 3</li>");
+    });
+
+    it("converts ordered lists", () => {
+      const md = "1. First\n2. Second\n3. Third";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<ol>");
+      expect(result).toContain("<li>First</li>");
+      expect(result).toContain("<li>Second</li>");
+    });
+
+    it("converts nested unordered lists", () => {
+      const md = "- Parent\n  - Child\n  - Child 2\n- Parent 2";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<ul>");
+      expect(result).toContain("<li>Parent");
+      expect(result).toContain("<li>Child</li>");
+      // Should have nested ul
+      expect((result.match(/<ul>/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("handles different bullet markers", () => {
+      const md = "* Star\n+ Plus\n- Dash";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<li>Star</li>");
+      expect(result).toContain("<li>Plus</li>");
+      expect(result).toContain("<li>Dash</li>");
+    });
+  });
+
+  describe("blockquotes", () => {
+    it("converts single-line blockquotes", () => {
+      const result = renderMarkdownToHtml("> This is a quote");
+      expect(result).toContain("<blockquote>");
+      expect(result).toContain("This is a quote");
+    });
+
+    it("converts multi-line blockquotes", () => {
+      const md = "> Line 1\n> Line 2";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<blockquote>");
+      expect(result).toContain("Line 1");
+      expect(result).toContain("Line 2");
+    });
+  });
+
+  describe("tables", () => {
+    it("converts simple tables", () => {
+      const md = "| Name | Value |\n| --- | --- |\n| A | 1 |\n| B | 2 |";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<table>");
+      expect(result).toContain("<th>Name</th>");
+      expect(result).toContain("<th>Value</th>");
+      expect(result).toContain("<td>A</td>");
+      expect(result).toContain("<td>1</td>");
+    });
+
+    it("applies inline formatting in table cells", () => {
+      const md = "| Col |\n| --- |\n| **bold** |";
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<strong>bold</strong>");
+    });
+  });
+
+  describe("horizontal rules", () => {
+    it("converts --- to hr", () => {
+      expect(renderMarkdownToHtml("---")).toContain("<hr>");
+    });
+
+    it("converts *** to hr", () => {
+      expect(renderMarkdownToHtml("***")).toContain("<hr>");
+    });
+
+    it("converts ___ to hr", () => {
+      expect(renderMarkdownToHtml("___")).toContain("<hr>");
+    });
+  });
+
+  describe("paragraphs", () => {
+    it("wraps plain text in p tags", () => {
+      expect(renderMarkdownToHtml("Hello world")).toContain("<p>Hello world</p>");
+    });
+
+    it("separates paragraphs on double newline", () => {
+      const result = renderMarkdownToHtml("Para 1\n\nPara 2");
+      expect(result).toContain("<p>Para 1</p>");
+      expect(result).toContain("<p>Para 2</p>");
+    });
+
+    it("preserves single newlines within paragraph", () => {
+      const result = renderMarkdownToHtml("Line 1\nLine 2");
+      expect(result).toContain("Line 1");
+      expect(result).toContain("Line 2");
+    });
+  });
+
+  describe("security", () => {
+    it("strips script tags", () => {
+      const result = renderMarkdownToHtml("<script>alert(1)</script>");
+      expect(result).not.toContain("<script>");
+    });
+
+    it("strips event handlers from HTML in markdown", () => {
+      const result = renderMarkdownToHtml('<div onclick="alert(1)">click</div>');
+      expect(result).not.toContain("onclick");
+    });
+  });
+
+  describe("real-world ADO content", () => {
+    it("converts a typical ADO Feature description", () => {
+      const md = [
+        "# Feature: Privacy Management",
+        "",
+        "## Owner",
+        "Privacy Team",
+        "",
+        "## Acceptance Criteria",
+        "- Microsoft Priva deployed",
+        "- Data subject request automation implemented",
+        "- Privacy impact assessment workflows established",
+        "",
+        "## Dependencies &amp; Constraints",
+        "- Legal team for privacy policy definitions",
+      ].join("\n");
+      const result = renderMarkdownToHtml(md);
+      expect(result).toContain("<h1>Feature: Privacy Management</h1>");
+      expect(result).toContain("<h2>Owner</h2>");
+      expect(result).toContain("<h2>Acceptance Criteria</h2>");
+      expect(result).toContain("<li>Microsoft Priva deployed</li>");
+      expect(result).toContain("<li>Data subject request automation implemented</li>");
+      expect(result).toContain("<p>Privacy Team</p>");
+    });
   });
 });
