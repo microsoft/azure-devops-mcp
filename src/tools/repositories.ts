@@ -28,6 +28,7 @@ import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { getEnumKeys, streamToString } from "../utils.js";
+import { stringArrayParam } from "../shared/schemas.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -177,7 +178,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a repository name instead of a GUID."),
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
-      labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
+      labels: stringArrayParam("Array of label names to add to the pull request after creation."),
     },
     async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, project, workItems, forkSourceRepositoryId, labels }) => {
       try {
@@ -369,7 +370,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
-      labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
+      labels: stringArrayParam("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
     },
     async ({
       repositoryId,

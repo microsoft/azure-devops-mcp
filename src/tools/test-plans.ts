@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
+import { stringArrayParam } from "../shared/schemas.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
@@ -357,7 +358,7 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       buildid: z.coerce.number().min(1).describe("The ID of the build."),
-      outcomes: z.array(z.string()).optional().describe("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
+      outcomes: stringArrayParam("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
     },
     async ({ project, buildid, outcomes }) => {
       try {
