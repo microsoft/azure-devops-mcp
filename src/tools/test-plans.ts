@@ -3,7 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
 
 const Test_Plan_Tools = {
@@ -30,14 +30,45 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     },
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
       try {
-        const owner = ""; //making owner an empty string untill we can figure out how to get owner id
         const connection = await connectionProvider();
-        const testPlanApi = await connection.getTestPlanApi();
+        const accessToken = await tokenProvider();
+        const params = new URLSearchParams({ "api-version": "7.2-preview.1" });
+        if (filterActivePlans) params.append("filterActivePlans", "true");
+        if (includePlanDetails) params.append("includePlanDetails", "true");
+        if (continuationToken) params.append("continuationToken", continuationToken);
+        const url = `${connection.serverUrl}/${project}/_apis/testplan/Plans?${params.toString()}`;
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        };
 
-        const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
+        const userAgent = userAgentProvider?.();
+        if (userAgent) {
+          headers["User-Agent"] = userAgent;
+        }
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Azure DevOps Test Plan API error: ${res.status} ${res.statusText}`);
+        }
+
+        const body = await res.json();
+        const testPlans = body.value ?? [];
+        const nextToken = res.headers.get("x-ms-continuationtoken") ?? undefined;
+
+        const response: { testPlans: typeof testPlans; continuationToken?: string } = {
+          testPlans: testPlans,
+        };
+        if (nextToken) {
+          response.continuationToken = nextToken;
+        }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testPlans, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -457,10 +488,32 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, planId, continuationToken }) => {
       try {
         const connection = await connectionProvider();
-        const testPlanApi = await connection.getTestPlanApi();
-        const expand: SuiteExpand = SuiteExpand.Children;
+        const accessToken = await tokenProvider();
+        const params = new URLSearchParams({ "api-version": "7.2-preview.1", "expand": "children" });
+        if (continuationToken) params.append("continuationToken", continuationToken);
+        const url = `${connection.serverUrl}/${project}/_apis/testplan/Plans/${planId}/Suites?${params.toString()}`;
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        };
 
-        const testSuites = await testPlanApi.getTestSuitesForPlan(project, planId, expand, continuationToken);
+        const userAgent = userAgentProvider?.();
+        if (userAgent) {
+          headers["User-Agent"] = userAgent;
+        }
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Azure DevOps Test Plan API error: ${res.status} ${res.statusText}`);
+        }
+
+        const body = await res.json();
+        const testSuites = body.value ?? [];
+        const nextToken = res.headers.get("x-ms-continuationtoken") ?? undefined;
 
         // The API returns a flat list where the root suite is first, followed by all nested suites
         // We need to build a proper hierarchy by creating a map and assembling the tree
@@ -503,8 +556,15 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
 
         const result = roots.map((root: any) => cleanSuite(root));
 
+        const response: { testSuites: typeof result; continuationToken?: string } = {
+          testSuites: result,
+        };
+        if (nextToken) {
+          response.continuationToken = nextToken;
+        }
+
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
