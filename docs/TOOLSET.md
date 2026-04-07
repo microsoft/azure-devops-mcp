@@ -299,7 +299,7 @@ Lists pull requests by commit IDs to find which pull requests contain specific c
 Get a pull request by its ID.
 
 - **Required**: `repositoryId`, `pullRequestId`
-- **Optional**: `includeWorkItemRefs`
+- **Optional**: `project`, `includeWorkItemRefs`, `includeLabels`, `includeChangedFiles`
 
 ### mcp_ado_repo_get_pull_request_changes
 
