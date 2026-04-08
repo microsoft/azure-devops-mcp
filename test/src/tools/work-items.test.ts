@@ -3770,13 +3770,14 @@ describe("configureWorkItemTools", () => {
         project: "Contoso",
         team: undefined,
         timePrecision: undefined,
-        top: 200,
+        top: 50,
       };
 
       const result = await handler(params);
 
-      expect(mockWorkItemTrackingApi.queryByWiql).toHaveBeenCalledWith({ query: params.wiql }, { project: params.project, team: undefined }, undefined, 200);
-      expect(result.content[0].text).toBe(JSON.stringify(_mockWiqlQueryResults, null, 2));
+      expect(mockWorkItemTrackingApi.queryByWiql).toHaveBeenCalledWith({ query: params.wiql }, { project: params.project, team: undefined }, undefined, 50);
+      expect(result.content[0].text).toContain("UNTRUSTED");
+      expect(result.content[0].text).toContain(JSON.stringify(_mockWiqlQueryResults, null, 2));
     });
 
     it("should call queryByWiql with all optional params when provided", async () => {
@@ -3799,7 +3800,8 @@ describe("configureWorkItemTools", () => {
       const result = await handler(params);
 
       expect(mockWorkItemTrackingApi.queryByWiql).toHaveBeenCalledWith({ query: params.wiql }, { project: "Contoso", team: "Fabrikam" }, true, 100);
-      expect(result.content[0].text).toBe(JSON.stringify(_mockWiqlQueryResults, null, 2));
+      expect(result.content[0].text).toContain("UNTRUSTED");
+      expect(result.content[0].text).toContain(JSON.stringify(_mockWiqlQueryResults, null, 2));
     });
 
     it("should elicit project when project is not provided and user accepts", async () => {
@@ -3824,14 +3826,15 @@ describe("configureWorkItemTools", () => {
         project: undefined,
         team: undefined,
         timePrecision: undefined,
-        top: 200,
+        top: 50,
       };
 
       const result = await handler(params);
 
       expect((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput).toHaveBeenCalled();
-      expect(mockWorkItemTrackingApi.queryByWiql).toHaveBeenCalledWith({ query: params.wiql }, { project: "Contoso", team: undefined }, undefined, 200);
-      expect(result.content[0].text).toBe(JSON.stringify(_mockWiqlQueryResults, null, 2));
+      expect(mockWorkItemTrackingApi.queryByWiql).toHaveBeenCalledWith({ query: params.wiql }, { project: "Contoso", team: undefined }, undefined, 50);
+      expect(result.content[0].text).toContain("UNTRUSTED");
+      expect(result.content[0].text).toContain(JSON.stringify(_mockWiqlQueryResults, null, 2));
     });
 
     it("should return cancellation message when user declines project elicitation", async () => {
@@ -3853,7 +3856,7 @@ describe("configureWorkItemTools", () => {
         project: undefined,
         team: undefined,
         timePrecision: undefined,
-        top: 200,
+        top: 50,
       };
 
       const result = await handler(params);
@@ -3876,7 +3879,7 @@ describe("configureWorkItemTools", () => {
         project: "Contoso",
         team: undefined,
         timePrecision: undefined,
-        top: 200,
+        top: 50,
       };
 
       const result = await handler(params);

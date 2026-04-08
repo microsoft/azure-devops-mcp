@@ -8,6 +8,7 @@ import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingIn
 import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 import { elicitProject } from "../shared/elicitations.js";
+import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -1273,11 +1274,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.query_by_wiql,
     "Execute a WIQL (Work Item Query Language) query and return the matching work items. If a project is not specified, you will be prompted to select one.",
     {
-      wiql: z.string().describe('The WIQL query string to execute, e.g., "SELECT [System.Id], [System.Title] FROM WorkItems WHERE [System.TeamProject] = @project"'),
+      wiql: z.string().max(32768).describe('The WIQL query string to execute, e.g., "SELECT [System.Id], [System.Title] FROM WorkItems WHERE [System.TeamProject] = @project"'),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team context will be used."),
       timePrecision: z.boolean().optional().describe("Whether to include time precision in date fields. Defaults to false."),
-      top: z.coerce.number().default(200).describe("The maximum number of results to return. Defaults to 50."),
+      top: z.coerce.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
     },
     async ({ wiql, project, team, timePrecision, top }) => {
       try {
@@ -1295,9 +1296,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const teamContext = { project: resolvedProject, team };
         const queryResult = await workItemApi.queryByWiql({ query: wiql }, teamContext, timePrecision, top);
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
-        };
+        return createExternalContentResponse(queryResult, "wiql query results");
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
