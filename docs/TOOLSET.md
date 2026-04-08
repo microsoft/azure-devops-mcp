@@ -455,7 +455,7 @@ Adds existing test cases to a test suite.
 Gets a list of test cases in the test plan.
 
 - **Required**: `project`, `planid`, `suiteid`
-- **Optional**: None
+- **Optional**: `continuationToken`
 
 ### mcp_ado_testplan_create_test_case
 
