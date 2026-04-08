@@ -388,7 +388,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     pipelines: z.record(
       z.string().describe("Name of the pipeline resource."),
       z.object({
-        runId: z.coerce.number().min(1).describe("Id of the source pipeline run that triggered or is referenced by this pipeline run."),
+        runId: z.coerce.number().min(1).optional().describe("Id of the source pipeline run that triggered or is referenced by this pipeline run."),
         version: z.string().optional().describe("Version of the source pipeline run."),
       })
     ),
@@ -440,6 +440,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, pipelineId, pipelineVersion);
       const queuedBuild = { id: pipelineRun.id };
       const buildId = queuedBuild.id;
+
       if (buildId === undefined) {
         throw new Error("Failed to get build ID from pipeline run");
       }
