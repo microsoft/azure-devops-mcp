@@ -1283,7 +1283,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ wiql, project, team, timePrecision, top }) => {
       try {
         const connection = await connectionProvider();
-
         let resolvedProject = project;
 
         if (!resolvedProject) {
@@ -1299,6 +1298,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         return createExternalContentResponse(queryResult, "wiql query results");
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
         return {
           content: [{ type: "text", text: `Error executing WIQL query: ${errorMessage}` }],
           isError: true,
