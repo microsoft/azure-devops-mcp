@@ -84,7 +84,7 @@ describe("configureTestPlanTools", () => {
   });
 
   describe("list_test_plans tool", () => {
-    function mockFetchPlansResponse(value: any[], continuationToken?: string, ok = true, status = 200) {
+    function mockFetchPlansResponse(value: any[], continuationToken?: string, ok = true, status = 200, errorText = "Not Found") {
       const headers = new Map<string, string>();
       if (continuationToken) {
         headers.set("x-ms-continuationtoken", continuationToken);
@@ -94,6 +94,7 @@ describe("configureTestPlanTools", () => {
         status,
         statusText: ok ? "OK" : "Not Found",
         json: jest.fn().mockResolvedValue({ value }),
+        text: jest.fn().mockResolvedValue(errorText),
         headers: { get: (key: string) => headers.get(key) ?? null },
       });
     }
@@ -152,10 +153,24 @@ describe("configureTestPlanTools", () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.continuationToken).toBe("nextPageToken");
     });
+
+    it("should handle non-ok response with status and error text", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_plans");
+      if (!call) throw new Error("testplan_list_test_plans tool not registered");
+      const [, , , handler] = call;
+
+      mockFetchPlansResponse([], undefined, false, 404, "Resource not found");
+
+      const result = await handler({ project: "proj1", filterActivePlans: true, includePlanDetails: false });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to list test plans (404)");
+      expect(result.content[0].text).toContain("Resource not found");
+    });
   });
 
   describe("list_test_suites tool", () => {
-    function mockFetchSuitesResponse(value: any[], continuationToken?: string, ok = true, status = 200) {
+    function mockFetchSuitesResponse(value: any[], continuationToken?: string, ok = true, status = 200, errorText = "Not Found") {
       const headers = new Map<string, string>();
       if (continuationToken) {
         headers.set("x-ms-continuationtoken", continuationToken);
@@ -165,6 +180,7 @@ describe("configureTestPlanTools", () => {
         status,
         statusText: ok ? "OK" : "Not Found",
         json: jest.fn().mockResolvedValue({ value }),
+        text: jest.fn().mockResolvedValue(errorText),
         headers: { get: (key: string) => headers.get(key) ?? null },
       });
     }
@@ -406,6 +422,20 @@ describe("configureTestPlanTools", () => {
       expect(parsed.testSuites[0].children[0]).toEqual({ id: 501, name: "Child with no children" });
       expect(parsed.testSuites[0].children[0].children).toBeUndefined();
     });
+
+    it("should handle non-ok response with status and error text", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_suites");
+      if (!call) throw new Error("testplan_list_test_suites tool not registered");
+      const [, , , handler] = call;
+
+      mockFetchSuitesResponse([], undefined, false, 404, "Suite not found");
+
+      const result = await handler({ project: "proj1", planId: 1 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to list test suites (404)");
+      expect(result.content[0].text).toContain("Suite not found");
+    });
   });
 
   describe("create_test_plan tool", () => {
@@ -578,7 +608,7 @@ describe("configureTestPlanTools", () => {
   });
 
   describe("list_test_cases tool", () => {
-    function mockFetchResponse(value: any[], continuationToken?: string, ok = true, status = 200) {
+    function mockFetchResponse(value: any[], continuationToken?: string, ok = true, status = 200, errorText = "Not Found") {
       const headers = new Map<string, string>();
       if (continuationToken) {
         headers.set("x-ms-continuationtoken", continuationToken);
@@ -588,6 +618,7 @@ describe("configureTestPlanTools", () => {
         status,
         statusText: ok ? "OK" : "Not Found",
         json: jest.fn().mockResolvedValue({ value }),
+        text: jest.fn().mockResolvedValue(errorText),
         headers: { get: (key: string) => headers.get(key) ?? null },
       });
     }
@@ -648,6 +679,20 @@ describe("configureTestPlanTools", () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.continuationToken).toBeUndefined();
       expect(parsed.testCases).toEqual([{ id: 1, name: "Test Case 1" }]);
+    });
+
+    it("should handle non-ok response with status and error text", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_list_test_cases");
+      if (!call) throw new Error("testplan_list_test_cases tool not registered");
+      const [, , , handler] = call;
+
+      mockFetchResponse([], undefined, false, 404, "Test case not found");
+
+      const result = await handler({ project: "proj1", planid: 1, suiteid: 2 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to list test cases (404)");
+      expect(result.content[0].text).toContain("Test case not found");
     });
   });
 
