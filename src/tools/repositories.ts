@@ -27,8 +27,7 @@ import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { getEnumKeys, streamToString } from "../utils.js";
-import { stringArrayParam } from "../shared/schemas.js";
+import { getEnumKeys, streamToString, stringArrayParam } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",

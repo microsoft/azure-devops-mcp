@@ -1,11 +1,4 @@
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
   "servers": {
     "ado": {
       "type": "stdio",
@@ -14,6 +7,18 @@
       "env": {
         "LOG_LEVEL": "debug"
       }
+    },
+    "test plan tool list": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:\\adomcp\\azure-devops-mcp\\dist\\index.js", "tfspfcusctest"]
     }
-  }
+  },
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name  (e.g. 'contoso')"
+    }
+  ]
 }

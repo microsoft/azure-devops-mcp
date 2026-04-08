@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
+import { apiVersion, getEnumKeys, safeEnumConvert, stringArrayParam } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
@@ -10,7 +10,6 @@ import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterface
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 import { mkdirSync, createWriteStream } from "fs";
 import { createExternalContentResponse } from "../shared/content-safety.js";
-import { stringArrayParam } from "../shared/schemas.js";
 import { join, posix, resolve, win32 } from "path";
 
 const PIPELINE_TOOLS = {

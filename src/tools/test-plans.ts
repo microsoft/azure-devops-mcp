@@ -5,8 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
-import { stringArrayParam } from "../shared/schemas.js";
-import { apiVersion } from "../utils.js";
+import { apiVersion, stringArrayParam } from "../utils.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
