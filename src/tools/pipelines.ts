@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiVersion, getEnumKeys, safeEnumConvert, stringArrayParam } from "../utils.js";
+import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
@@ -193,8 +193,8 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       reasonFilter: z.number().optional().describe("Reason filter for the build (see BuildReason enum)"),
       statusFilter: z.number().optional().describe("Status filter for the build (see BuildStatus enum)"),
       resultFilter: z.number().optional().describe("Result filter for the build (see BuildResult enum)"),
-      tagFilters: stringArrayParam("Array of tags to filter builds"),
-      properties: stringArrayParam("Array of property names to include in the results"),
+      tagFilters: z.array(z.string()).optional().describe("Array of tags to filter builds"),
+      properties: z.array(z.string()).optional().describe("Array of property names to include in the results"),
       top: z.number().optional().describe("Maximum number of builds to return"),
       continuationToken: z.string().optional().describe("Token for continuing paged results"),
       maxBuildsPerDefinition: z.number().optional().describe("Maximum number of builds per definition"),
@@ -413,7 +413,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       pipelineVersion: z.coerce.number().min(1).optional().describe("Version of the pipeline to run. If not provided, the latest version will be used."),
       previewRun: z.boolean().optional().describe("If true, returns the final YAML document after parsing templates without creating a new run."),
       resources: resourcesSchema.optional().describe("A dictionary of resources to pass to the pipeline."),
-      stagesToSkip: stringArrayParam("A list of stages to skip."),
+      stagesToSkip: z.array(z.string()).optional().describe("A list of stages to skip."),
       templateParameters: z.record(z.string(), z.string()).optional().describe("Custom build parameters as key-value pairs"),
       variables: z.record(z.string(), variableSchema).optional().describe("A dictionary of variables to pass to the pipeline."),
       yamlOverride: z.string().optional().describe("YAML override for the pipeline run."),

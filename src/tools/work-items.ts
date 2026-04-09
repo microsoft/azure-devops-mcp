@@ -6,7 +6,7 @@ import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue, stringArrayParam } from "../utils.js";
+import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -156,7 +156,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       ids: z.array(z.coerce.number().min(1)).describe("The IDs of the work items to retrieve."),
-      fields: stringArrayParam("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
+      fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
     },
     async ({ project, ids, fields }) => {
       try {
@@ -216,7 +216,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       id: z.coerce.number().min(1).describe("The ID of the work item to retrieve."),
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      fields: stringArrayParam("Optional list of fields to include in the response. If not provided, all fields will be returned."),
+      fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, all fields will be returned."),
       asOf: z.coerce.date().optional().describe("Optional date string to retrieve the work item as of a specific time. If not provided, the current state will be returned."),
       expand: z
         .enum(["all", "fields", "links", "none", "relations"])

@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, encodeFormattedValue, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert, stringArrayParam } from "../../src/utils";
+import { createEnumMapping, encodeFormattedValue, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -465,25 +465,6 @@ describe("encodeFormattedValue", () => {
       const twice = encodeFormattedValue(once, "Markdown");
       expect(once).toBe("Already &lt;tag&gt; plus &lt;new&gt; and $cash");
       expect(twice).toBe(once);
-    });
-  });
-
-  describe("stringArrayParam", () => {
-    it("should transform a single string into an array", () => {
-      const schema = stringArrayParam("test description");
-      const result = schema.parse("hello");
-      expect(result).toEqual(["hello"]);
-    });
-
-    it("should pass through a string array as-is", () => {
-      const schema = stringArrayParam("test description");
-      const result = schema.parse(["a", "b", "c"]);
-      expect(result).toEqual(["a", "b", "c"]);
-    });
-
-    it("should reject non-string types", () => {
-      const schema = stringArrayParam("test description");
-      expect(() => schema.parse(123)).toThrow();
     });
   });
 });

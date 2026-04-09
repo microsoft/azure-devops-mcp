@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { IGitApi } from "azure-devops-node-api/GitApi.js";
 import { z } from "zod";
-import { apiVersion, stringArrayParam } from "../utils.js";
+import { apiVersion } from "../utils.js";
 import { orgName } from "../index.js";
 import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { GitItem } from "azure-devops-node-api/interfaces/GitInterfaces.js";
@@ -22,10 +22,13 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     "Search Azure DevOps Repositories for a given search text",
     {
       searchText: z.string().describe("Keywords to search for in code repositories"),
-      project: stringArrayParam("Filter by projects"),
-      repository: stringArrayParam("Filter by repositories"),
-      path: stringArrayParam("Filter by paths"),
-      branch: stringArrayParam("Filter by branches"),
+      project: z
+        .union([z.string().transform((value) => [value]), z.array(z.string())])
+        .optional()
+        .describe("Filter by projects"),
+      repository: z.array(z.string()).optional().describe("Filter by repositories"),
+      path: z.array(z.string()).optional().describe("Filter by paths"),
+      branch: z.array(z.string()).optional().describe("Filter by branches"),
       includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
       skip: z.coerce.number().default(0).describe("Number of results to skip"),
       top: z.coerce.number().default(5).describe("Maximum number of results to return"),
@@ -83,8 +86,8 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     "Search Azure DevOps Wiki for a given search text",
     {
       searchText: z.string().describe("Keywords to search for wiki pages"),
-      project: stringArrayParam("Filter by projects"),
-      wiki: stringArrayParam("Filter by wiki names"),
+      project: z.array(z.string()).optional().describe("Filter by projects"),
+      wiki: z.array(z.string()).optional().describe("Filter by wiki names"),
       includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
       skip: z.coerce.number().default(0).describe("Number of results to skip"),
       top: z.coerce.number().default(10).describe("Maximum number of results to return"),
@@ -134,11 +137,11 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     "Get Azure DevOps Work Item search results for a given search text",
     {
       searchText: z.string().describe("Search text to find in work items"),
-      project: stringArrayParam("Filter by projects"),
-      areaPath: stringArrayParam("Filter by area paths"),
-      workItemType: stringArrayParam("Filter by work item types"),
-      state: stringArrayParam("Filter by work item states"),
-      assignedTo: stringArrayParam("Filter by assigned to users"),
+      project: z.array(z.string()).optional().describe("Filter by projects"),
+      areaPath: z.array(z.string()).optional().describe("Filter by area paths"),
+      workItemType: z.array(z.string()).optional().describe("Filter by work item types"),
+      state: z.array(z.string()).optional().describe("Filter by work item states"),
+      assignedTo: z.array(z.string()).optional().describe("Filter by assigned to users"),
       includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
       skip: z.coerce.number().default(0).describe("Number of results to skip for pagination"),
       top: z.coerce.number().default(10).describe("Number of results to return"),
