@@ -10,8 +10,8 @@ resource "azurerm_container_app" "mcp" {
   }
 
   secret {
-    name  = "devops-pat-token"
-    value = var.ado_mcp_auth_token
+    name  = "ado-mcp-obo-client-secret"
+    value = var.ado_mcp_obo_client_secret
   }
 
   registry {
@@ -43,8 +43,18 @@ resource "azurerm_container_app" "mcp" {
       }
 
       env {
-        name        = "ADO_MCP_AUTH_TOKEN"
-        secret_name = "devops-pat-token"
+        name  = "ADO_MCP_OBO_CLIENT_ID"
+        value = var.ado_mcp_obo_client_id
+      }
+
+      env {
+        name        = "ADO_MCP_OBO_CLIENT_SECRET"
+        secret_name = "ado-mcp-obo-client-secret"
+      }
+
+      env {
+        name  = "ADO_MCP_OBO_TENANT_ID"
+        value = var.ado_mcp_obo_tenant_id
       }
 
       env {

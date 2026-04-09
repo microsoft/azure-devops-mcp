@@ -21,6 +21,7 @@ import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
+import { runWithRequestContext } from "./request-context.js";
 
 const defaultPort = Number(process.env["PORT"]) || 3000;
 
@@ -47,7 +48,7 @@ const argv = yargs(hideBin(process.argv))
     alias: "a",
     describe: "Type of authentication to use",
     type: "string",
-    choices: ["interactive", "azcli", "env", "envvar"],
+    choices: ["interactive", "azcli", "env", "envvar", "passthrough"],
     default: "envvar",
   })
   .option("tenant", {
@@ -97,8 +98,24 @@ function failFastIfEnvVarAuthMissing(): void {
   }
 }
 
+function failFastIfPassthroughMisconfigured(): void {
+  if (argv.authentication !== "passthrough") return;
+
+  const hasOBOConfig =
+    !!process.env["ADO_MCP_OBO_CLIENT_ID"] &&
+    !!process.env["ADO_MCP_OBO_CLIENT_SECRET"] &&
+    !!process.env["ADO_MCP_OBO_TENANT_ID"];
+
+  if (!hasOBOConfig) {
+    logger.warn(
+      "passthrough auth is enabled without complete OBO configuration; direct Azure DevOps audience tokens will still work, but app-audience tokens will fail"
+    );
+  }
+}
+
 async function main(): Promise<void> {
   failFastIfEnvVarAuthMissing();
+  failFastIfPassthroughMisconfigured();
 
   logger.info("Starting Azure DevOps MCP Server (HTTP)", {
     organization: orgName,
@@ -146,73 +163,75 @@ async function main(): Promise<void> {
   const mcpAuth = skipEasyAuth ? [] : [requireEasyAuth, makeAllowlistMiddleware()];
 
   app.all("/mcp", mcpAuth, async (req: Request, res: Response) => {
-    try {
-      const sessionId = req.headers["mcp-session-id"] as string | undefined;
-      const bodyMessages = Array.isArray(req.body) ? req.body : req.body ? [req.body] : [];
-      for (const message of bodyMessages) {
-        if (message && typeof message === "object" && "method" in message) {
-          logIncomingMcpMessage("http", message, {
-            httpMethod: req.method,
-            sessionId,
+    await runWithRequestContext(req.headers, async () => {
+      try {
+        const sessionId = req.headers["mcp-session-id"] as string | undefined;
+        const bodyMessages = Array.isArray(req.body) ? req.body : req.body ? [req.body] : [];
+        for (const message of bodyMessages) {
+          if (message && typeof message === "object" && "method" in message) {
+            logIncomingMcpMessage("http", message, {
+              httpMethod: req.method,
+              sessionId,
+            });
+          }
+        }
+
+        let transport: StreamableHTTPServerTransport;
+
+        if (sessionId && transports[sessionId]) {
+          transport = transports[sessionId];
+        } else if (!sessionId && req.method === "POST" && isInitializeRequest(req.body)) {
+          transport = new LoggingStreamableHTTPServerTransport({
+            sessionIdGenerator: () => randomUUID(),
+            enableJsonResponse: true,
+            onsessioninitialized: (sid) => {
+              if (sid) transports[sid] = transport;
+            },
+          });
+          transport.onclose = () => {
+            const sid = transport.sessionId;
+            if (sid && transports[sid]) delete transports[sid];
+          };
+          await server.connect(transport);
+          await transport.handleRequest(req, res, req.body);
+          return;
+        } else if (sessionId && !transports[sessionId]) {
+          res.status(404).json({
+            jsonrpc: "2.0",
+            error: { code: -32001, message: "Session not found" },
+            id: null,
+          });
+          return;
+        } else if (req.method !== "POST" && req.method !== "GET") {
+          res.status(405).json({ error: "Method Not Allowed" });
+          return;
+        } else if (!sessionId) {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            error: { code: -32000, message: "Bad Request: mcp-session-id required for non-initialize requests" },
+            id: null,
+          });
+          return;
+        } else {
+          transport = transports[sessionId];
+        }
+
+        if (req.method === "GET") {
+          await transport.handleRequest(req, res);
+        } else {
+          await transport.handleRequest(req, res, req.body);
+        }
+      } catch (error) {
+        logger.error("Error handling /mcp request", error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: "2.0",
+            error: { code: -32603, message: "Internal server error" },
+            id: null,
           });
         }
       }
-
-      let transport: StreamableHTTPServerTransport;
-
-      if (sessionId && transports[sessionId]) {
-        transport = transports[sessionId];
-      } else if (!sessionId && req.method === "POST" && isInitializeRequest(req.body)) {
-        transport = new LoggingStreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          enableJsonResponse: true,
-          onsessioninitialized: (sid) => {
-            if (sid) transports[sid] = transport;
-          },
-        });
-        transport.onclose = () => {
-          const sid = transport.sessionId;
-          if (sid && transports[sid]) delete transports[sid];
-        };
-        await server.connect(transport);
-        await transport.handleRequest(req, res, req.body);
-        return;
-      } else if (sessionId && !transports[sessionId]) {
-        res.status(404).json({
-          jsonrpc: "2.0",
-          error: { code: -32001, message: "Session not found" },
-          id: null,
-        });
-        return;
-      } else if (req.method !== "POST" && req.method !== "GET") {
-        res.status(405).json({ error: "Method Not Allowed" });
-        return;
-      } else if (!sessionId) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: { code: -32000, message: "Bad Request: mcp-session-id required for non-initialize requests" },
-          id: null,
-        });
-        return;
-      } else {
-        transport = transports[sessionId];
-      }
-
-      if (req.method === "GET") {
-        await transport.handleRequest(req, res);
-      } else {
-        await transport.handleRequest(req, res, req.body);
-      }
-    } catch (error) {
-      logger.error("Error handling /mcp request", error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: "2.0",
-          error: { code: -32603, message: "Internal server error" },
-          id: null,
-        });
-      }
-    }
+    });
   });
 
   const serverInstance = app.listen(argv.port, () => {

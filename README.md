@@ -16,8 +16,9 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 5. [🌏 Using Domains](#-using-domains)
 6. [📝 Troubleshooting](#-troubleshooting)
 7. [🎩 Examples & Best Practices](#-examples--best-practices)
-8. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-9. [📌 Contributing](#-contributing)
+8. [☁️ Remote Deployment](#️-remote-deployment)
+9. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+10. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -170,6 +171,10 @@ See the [Troubleshooting guide](./docs/TROUBLESHOOTING.md) for help with common 
 Explore example prompts in our [Examples documentation](./docs/EXAMPLES.md).
 
 For best practices and tips to enhance your experience with the MCP Server, refer to the [How-To guide](./docs/HOWTO.md).
+
+## ☁️ Remote Deployment
+
+For Azure Container Apps and Azure AI Foundry, use the remote deployment pattern with **OAuth identity passthrough** and **delegated Entra user tokens** instead of a shared PAT. See the deployment section in [REMOTE_DEPLOYMENT_README_SECTION.md](./REMOTE_DEPLOYMENT_README_SECTION.md), especially the **Foundry OAuth Identity Passthrough** subsection.
 
 ## 🙋‍♀️ Frequently Asked Questions
 

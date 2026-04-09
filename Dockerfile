@@ -27,6 +27,6 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-# Default: run HTTP server with envvar auth. Override CMD to pass your org and options.
-# Example: CMD ["node", "dist/http.js", "myorg", "--domains", "all", "--authentication", "envvar"]
-CMD ["node", "dist/http.js", "dcslsoftwareltd", "--domains", "all", "--authentication", "envvar"]
+# Default: run HTTP server with per-request OAuth passthrough auth. Override CMD to pass your org and options.
+# Example: CMD ["node", "dist/http.js", "myorg", "--domains", "all", "--authentication", "passthrough"]
+CMD ["node", "dist/http.js", "dcslsoftwareltd", "--domains", "all", "--authentication", "passthrough"]

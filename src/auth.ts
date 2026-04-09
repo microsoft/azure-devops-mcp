@@ -2,11 +2,12 @@
 // Licensed under the MIT License.
 
 import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
-import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
+import { AccountInfo, AuthenticationResult, ConfidentialClientApplication, PublicClientApplication } from "@azure/msal-node";
 import open from "open";
+import { azureDevOpsResourceAppId, getIncomingAccessToken, isAzureDevOpsAudienceToken } from "./http-auth.js";
 import { logger } from "./logger.js";
 
-const scopes = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
+const scopes = [`${azureDevOpsResourceAppId}/.default`];
 
 class OAuthAuthenticator {
   static clientId = "0d50963b-7bb9-4fe7-94c7-a99af00b5136";
@@ -113,6 +114,59 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
         logger.debug(`${type}: Successfully obtained Azure DevOps token`);
         return result.token;
       };
+
+    case "passthrough": {
+      const authorityTenant = process.env["ADO_MCP_OBO_TENANT_ID"] || tenantId || OAuthAuthenticator.zeroTenantId;
+      const clientId = process.env["ADO_MCP_OBO_CLIENT_ID"];
+      const clientSecret = process.env["ADO_MCP_OBO_CLIENT_SECRET"];
+      const canExchangeToken = !!clientId && !!clientSecret && authorityTenant !== OAuthAuthenticator.zeroTenantId;
+
+      const confidentialClient =
+        canExchangeToken
+          ? new ConfidentialClientApplication({
+              auth: {
+                clientId,
+                clientSecret,
+                authority: `https://login.microsoftonline.com/${authorityTenant}`,
+              },
+            })
+          : null;
+
+      return async () => {
+        const incomingToken = getIncomingAccessToken();
+        if (!incomingToken) {
+          logger.error("passthrough: No incoming user token found in the HTTP request");
+          throw new Error(
+            "No incoming Entra user token was found. Ensure the MCP endpoint receives a bearer token directly or enable Easy Auth token store so x-ms-token-aad-access-token is forwarded."
+          );
+        }
+
+        if (isAzureDevOpsAudienceToken(incomingToken)) {
+          logger.debug("passthrough: Using incoming Azure DevOps audience token directly");
+          return incomingToken;
+        }
+
+        if (!confidentialClient) {
+          logger.error("passthrough: OBO configuration missing for token exchange");
+          throw new Error(
+            "The incoming token is not an Azure DevOps token, and OBO exchange is not configured. Set ADO_MCP_OBO_CLIENT_ID, ADO_MCP_OBO_CLIENT_SECRET, and ADO_MCP_OBO_TENANT_ID."
+          );
+        }
+
+        const result = await confidentialClient.acquireTokenOnBehalfOf({
+          oboAssertion: incomingToken,
+          scopes,
+        });
+
+        if (!result?.accessToken) {
+          logger.error("passthrough: Failed to exchange incoming token for Azure DevOps token");
+          throw new Error("Failed to exchange the incoming Entra user token for an Azure DevOps delegated token.");
+        }
+
+        logger.debug("passthrough: Successfully exchanged incoming token for Azure DevOps token");
+        return result.accessToken;
+      };
+    }
 
     default:
       logger.debug(`Authenticator: Using OAuth interactive authentication (default)`);

@@ -6,7 +6,7 @@ Add this section to the main README.
 
 ## Remote Deployment (Azure Container Apps)
 
-You can run the MCP server over **Streamable HTTP** in Azure Container Apps, with authentication handled by **Azure Entra ID (Easy Auth)** at the platform. The server uses a **PAT** from the environment for Azure DevOps calls.
+You can run the MCP server over **Streamable HTTP** in Azure Container Apps, with authentication handled by **Azure Entra ID (Easy Auth)** at the platform. The recommended production configuration is **OAuth identity passthrough** with **delegated Entra user tokens** for Azure DevOps, using **On-Behalf-Of (OBO)** token exchange inside the MCP server.
 
 ### Running the HTTP server locally
 
@@ -14,18 +14,21 @@ You can run the MCP server over **Streamable HTTP** in Azure Container Apps, wit
 # Build
 npm run build
 
-# Run (PAT must be set)
-set ADO_MCP_AUTH_TOKEN=your_pat
-node dist/http.js myorg --domains all --authentication envvar
+# Run with OAuth passthrough
+node dist/http.js myorg --domains all --authentication passthrough
 
 # Or use the script
 npm run start:http -- myorg --domains all
 ```
 
-- **Required:** `ADO_MCP_AUTH_TOKEN` – Azure DevOps Personal Access Token (when using `--authentication envvar`).
 - **Optional:** `PORT` – HTTP port (default `3000`). Can also use `--port 3000`.
 - **Optional:** `ALLOWED_EMAILS` – Comma-separated list of user emails allowed to call the server. If set, only these users (from Easy Auth) can use `/mcp`.
 - **Optional (local only):** `MCP_HTTP_SKIP_EASY_AUTH=1` – Skip Easy Auth so clients can connect without the `x-ms-client-principal` header. Use only for local development; do not set in production.
+- **Required for OBO:** `ADO_MCP_OBO_CLIENT_ID` – Entra app registration client ID for the MCP server.
+- **Required for OBO:** `ADO_MCP_OBO_CLIENT_SECRET` – Client secret for the MCP server app registration.
+- **Required for OBO:** `ADO_MCP_OBO_TENANT_ID` – Tenant ID used for OBO token exchange.
+
+If the incoming access token already has Azure DevOps as its audience, the MCP server can use it directly. In typical Foundry deployments the incoming token audience is your MCP app, so the OBO settings above are required.
 
 Endpoints:
 
@@ -42,9 +45,8 @@ When running locally, set `MCP_HTTP_SKIP_EASY_AUTH=1` so clients can call `/mcp`
 
 **PowerShell (one session):**
 ```powershell
-$env:ADO_MCP_AUTH_TOKEN = "your_pat"
 $env:MCP_HTTP_SKIP_EASY_AUTH = "1"
-node dist/http.js myorg --domains all --authentication envvar
+node dist/http.js myorg --domains all --authentication passthrough
 ```
 
 - **Claude Desktop** – Claude Desktop talks to MCP over stdio, not HTTP. Use a bridge that speaks Streamable HTTP, e.g. the stdio→Streamable HTTP adapter. In `claude_desktop_config.json` (see [Claude config location](https://docs.anthropic.com/en/docs/build-with-claude/claude-desktop-config)):
@@ -84,7 +86,7 @@ Build and run with the included Dockerfile:
 
 ```bash
 docker build -t azure-devops-mcp-http .
-docker run -e ADO_MCP_AUTH_TOKEN=your_pat -p 3000:3000 azure-devops-mcp-http node dist/http.js myorg --domains all --authentication envvar
+docker run -e ADO_MCP_OBO_CLIENT_ID=<client-id> -e ADO_MCP_OBO_CLIENT_SECRET=<client-secret> -e ADO_MCP_OBO_TENANT_ID=<tenant-id> -p 3000:3000 azure-devops-mcp-http node dist/http.js myorg --domains all --authentication passthrough
 ```
 
 Override the default org by passing args after the image name.
@@ -94,10 +96,117 @@ Override the default org by passing args after the image name.
 1. Build and push the image to a container registry, then deploy to Azure Container Apps.
 2. In Container Apps, **enable Authentication** (Easy Auth) with **Entra ID** and require login.
 3. Configure the app with:
-   - **Required:** `ADO_MCP_AUTH_TOKEN` (secret or Key Vault reference).
+   - **Required:** `ADO_MCP_OBO_CLIENT_ID` (app registration client ID).
+   - **Required:** `ADO_MCP_OBO_CLIENT_SECRET` (secret or Key Vault reference).
+   - **Required:** `ADO_MCP_OBO_TENANT_ID` (tenant ID).
    - **Optional:** `PORT` (default 3000), `ALLOWED_EMAILS`.
 
 Do not expose the server publicly without authentication; Easy Auth should be used to require Entra ID sign-in before requests reach the app.
+
+### Foundry OAuth Identity Passthrough
+
+This is the recommended production setup when the MCP server is consumed from Azure AI Foundry.
+
+#### 1. Register an Entra app for the MCP server
+
+Create an Entra application that represents the remote MCP server.
+
+- Record the **Application (client) ID** and **Directory (tenant) ID**.
+- Create a **client secret** for the app.
+- Configure the app as a **web/API** app and expose it through Azure Container Apps authentication.
+- If your organization restricts user assignment, assign the users or groups who should be able to call the MCP.
+
+#### 2. Give the MCP app delegated Azure DevOps permission
+
+In the MCP app registration:
+
+- Go to **API permissions**.
+- Add a permission for **Azure DevOps**.
+- Choose the **delegated** permission needed for Azure DevOps user access.
+- Grant **admin consent** for the tenant.
+
+The MCP server requests an Azure DevOps delegated token for resource app ID `499b84ac-1321-427f-aa17-267ca6975798`.
+
+#### 3. Configure Azure Container Apps authentication
+
+In your Container App:
+
+- Enable **Authentication**.
+- Add **Microsoft** as the identity provider.
+- Use the MCP app registration created above.
+- Set **Unauthenticated requests** to require authentication.
+- Enable token forwarding / token store so the validated user access token is forwarded to the container. The MCP server reads either:
+  - `x-ms-token-aad-access-token`, or
+  - `Authorization: Bearer <token>`
+
+Easy Auth validates the incoming user token before the request reaches `/mcp`.
+
+#### 4. Configure container environment variables
+
+Set these app settings on the Container App:
+
+```text
+ADO_MCP_OBO_CLIENT_ID=<application-client-id-of-mcp-app>
+ADO_MCP_OBO_CLIENT_SECRET=<client-secret-for-mcp-app>
+ADO_MCP_OBO_TENANT_ID=<entra-tenant-id>
+ALLOWED_EMAILS=user1@contoso.com,user2@contoso.com    # optional
+PORT=3000                                             # optional
+```
+
+Start the server with:
+
+```bash
+node dist/http.js <your-org> --domains all --authentication passthrough
+```
+
+#### 5. Configure the Foundry connector
+
+In Azure AI Foundry, create the MCP connector pointing at:
+
+```text
+https://<your-container-app-fqdn>/mcp
+```
+
+Use:
+
+- **Authentication type:** OAuth
+- **Identity mode:** OAuth identity passthrough
+- **Audience / resource:** the MCP app registration used by Container Apps authentication
+
+With this configuration, Foundry sends the signed-in user’s Entra token to the MCP endpoint. The MCP server then:
+
+1. Receives the delegated user token.
+2. Detects whether it is already an Azure DevOps token.
+3. If not, performs an **On-Behalf-Of** exchange for Azure DevOps.
+4. Calls Azure DevOps with the user’s delegated token.
+
+This means Azure DevOps authorization is evaluated per user, not with a shared PAT.
+
+#### 6. Validate the end-to-end flow
+
+Use a test user who has access to both:
+
+- the Foundry project / connector
+- the target Azure DevOps organization
+
+Then verify:
+
+- The request reaches the Container App only after Entra sign-in.
+- The MCP server can list Azure DevOps projects without `ADO_MCP_AUTH_TOKEN`.
+- A user without Azure DevOps access receives an Azure DevOps authorization failure.
+- A user outside `ALLOWED_EMAILS` receives a 403 from the MCP server.
+
+#### 7. Troubleshooting
+
+- If Foundry sends a token for the MCP app instead of Azure DevOps, that is expected. OBO is what converts it to an Azure DevOps delegated token.
+- If OBO fails, check:
+  - `ADO_MCP_OBO_CLIENT_ID`
+  - `ADO_MCP_OBO_CLIENT_SECRET`
+  - `ADO_MCP_OBO_TENANT_ID`
+  - Azure DevOps delegated API permission on the MCP app
+  - tenant admin consent
+- If the app sees no token at all, verify Container Apps authentication is forwarding the validated access token to the container.
+- If Azure DevOps returns authorization errors, confirm the signed-in user actually has access inside the Azure DevOps organization.
 
 ### Connecting to the Container App
 
@@ -110,7 +219,7 @@ After deployment, your MCP endpoint is:
 
 - **Browser:** Opening the app URL in a browser redirects to Entra sign-in; after login, the session is cookie-based. MCP desktop clients do not use this session; they need a Bearer token (below).
 
-- **Programmatic clients (Claude Desktop, Cursor, ChatGPT):** Send an **Entra ID access token** in the request. Get a token with audience set to your Container App’s Entra app registration (the one used by Easy Auth).
+- **Programmatic clients (Claude Desktop, Cursor, ChatGPT):** Send an **Entra ID access token** in the request. Get a token with audience set to your MCP app registration / Container App authentication app. The MCP server will exchange it On-Behalf-Of for an Azure DevOps token when needed.
 
 **Getting a token (examples):**
 

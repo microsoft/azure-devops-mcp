@@ -16,13 +16,31 @@ variable "build_number" {
   }
 }
 
-variable "ado_mcp_auth_token" {
+variable "ado_mcp_obo_client_id" {
+  type        = string
+  description = "Microsoft Entra application (client) ID used by the MCP server for OBO token exchange."
+  validation {
+    condition     = length(var.ado_mcp_obo_client_id) > 0
+    error_message = "ADO MCP OBO client ID should be a non-empty string."
+  }
+}
+
+variable "ado_mcp_obo_client_secret" {
   type        = string
   sensitive   = true
-  description = "Azure DevOps PAT used by the MCP server."
+  description = "Client secret used by the MCP server for OBO token exchange."
   validation {
-    condition     = length(var.ado_mcp_auth_token) > 0
-    error_message = "ADO MCP auth token should be a non-empty string."
+    condition     = length(var.ado_mcp_obo_client_secret) > 0
+    error_message = "ADO MCP OBO client secret should be a non-empty string."
+  }
+}
+
+variable "ado_mcp_obo_tenant_id" {
+  type        = string
+  description = "Microsoft Entra tenant ID used by the MCP server for OBO token exchange."
+  validation {
+    condition     = length(var.ado_mcp_obo_tenant_id) > 0
+    error_message = "ADO MCP OBO tenant ID should be a non-empty string."
   }
 }
 
