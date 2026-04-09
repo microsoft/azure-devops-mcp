@@ -663,3 +663,37 @@ export const _mockWorkItemRevisions = [
     url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/299/revisions/2",
   },
 ];
+
+export const _mockWiqlQueryResults = {
+  queryType: 1,
+  queryResultType: 1,
+  asOf: "2026-04-07T00:00:00.000Z",
+  columns: [
+    {
+      referenceName: "System.Id",
+      name: "ID",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.Id",
+    },
+    {
+      referenceName: "System.Title",
+      name: "Title",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.Title",
+    },
+    {
+      referenceName: "System.State",
+      name: "State",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/fields/System.State",
+    },
+  ],
+  sortColumns: [],
+  workItems: [
+    {
+      id: 297,
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/297",
+    },
+    {
+      id: 299,
+      url: "https://dev.azure.com/fabrikam/_apis/wit/workItems/299",
+    },
+  ],
+};
