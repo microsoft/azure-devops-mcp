@@ -9,6 +9,13 @@ resource "azurerm_container_app" "mcp" {
     value = data.azurerm_container_registry.acr.admin_password
   }
 
+  # Keep the legacy secret to avoid Azure Container Apps failing updates when a
+  # previously configured secret is removed. It is intentionally no longer used.
+  secret {
+    name  = "devops-pat-token"
+    value = "unused-legacy-secret"
+  }
+
   secret {
     name  = "ado-mcp-obo-client-secret"
     value = var.ado_mcp_obo_client_secret
