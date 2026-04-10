@@ -4396,7 +4396,7 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue({ id: 1, relations: [] });
       (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 1 });
 
-      const result = await handler({ id: 1, type: "related" });
+      await handler({ id: 1, type: "related" });
       expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, undefined, undefined, 1, "Contoso");
     });
 
@@ -4446,7 +4446,7 @@ describe("configureWorkItemTools", () => {
       });
 
       // After the transform, "Replace" should become "replace"
-      expect((parsed as { updates: Array<{ op: string }> }).updates[0].op).toBe("replace");
+      expect((parsed as { updates: { op: string }[] }).updates[0].op).toBe("replace");
     });
   });
 
@@ -4456,7 +4456,7 @@ describe("configureWorkItemTools", () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === toolName);
       if (!call) throw new Error(`${toolName} not registered`);
-      return call[3] as (params: Record<string, unknown>) => Promise<{ content: Array<{ text: string }>; isError?: boolean }>;
+      return call[3] as (params: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
     }
 
     it("list_backlogs: should return unknown error message for non-Error throws", async () => {
