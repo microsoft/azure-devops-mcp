@@ -123,6 +123,69 @@ in the terminal before using MCP tools.
 
 And in case there are authorization/access errors when using the tools please check the [Multi-Tenant Authentication Problems guide](#multi-tenant-authentication-problems-when-using-azcli)
 
+### WSL2, SSH, Docker, and Other Headless Environments
+
+The default OAuth interactive authentication requires a browser to complete the login redirect. In headless environments — such as **WSL2**, **remote SSH sessions**, **Docker containers**, and **CI runners** — no browser is available, causing token acquisition to fail silently.
+
+#### Symptoms
+
+- The MCP server starts successfully and reports as "Connected"
+- All tool calls fail with:
+
+  ```
+  network_error: Network request failed: fetch failed
+  ```
+
+- Direct Azure DevOps REST API calls (e.g. via `az devops project list`) work on the same machine with the same credentials
+
+#### Root Cause
+
+The server defaults to `--authentication interactive`, which opens a browser for the OAuth redirect callback. In headless environments the browser redirect has nowhere to go. The token acquisition fails silently, and downstream API calls surface a generic `fetch failed` error instead of a clear authentication failure.
+
+#### Solution
+
+Use one of the non-interactive authentication methods:
+
+**Option 1: Environment variable with a Personal Access Token (recommended for headless)**
+
+1. Create a [Personal Access Token](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate) with the required scopes.
+
+2. Set the token in the `ADO_MCP_AUTH_TOKEN` environment variable:
+
+   ```bash
+   export ADO_MCP_AUTH_TOKEN="your-azure-devops-pat"
+   ```
+
+3. Start the server with `--authentication envvar`:
+
+   ```bash
+   npx -y @azure-devops/mcp myorg --authentication envvar
+   ```
+
+   For Claude Code:
+
+   ```bash
+   claude mcp add azure-devops -s user \
+     -e ADO_MCP_AUTH_TOKEN="your-azure-devops-pat" \
+     -- npx -y @azure-devops/mcp myorg --authentication envvar
+   ```
+
+**Option 2: Azure CLI authentication**
+
+1. Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) and log in:
+
+   ```bash
+   az login
+   ```
+
+2. Start the server with `--authentication azcli`:
+
+   ```bash
+   npx -y @azure-devops/mcp myorg --authentication azcli
+   ```
+
+   > **Note:** If your Azure DevOps organization is in a different tenant than your default `az` CLI tenant, you must also pass `--tenant <tenant-id>`. See the [Multi-Tenant Authentication Problems](#multi-tenant-authentication-problems-when-using-azcli) section below.
+
 ### OAuth
 
 Recent switch to OAuth flow is supposed to simplify authentication against ADO APIs and remove additional software dependency.

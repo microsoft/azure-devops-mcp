@@ -82,6 +82,7 @@
 | Work Items        | [mcp_ado_wit_list_backlog_work_items](#mcp_ado_wit_list_backlog_work_items)                               | Get work items in a backlog                              |
 | Work Items        | [mcp_ado_wit_get_query](#mcp_ado_wit_get_query)                                                           | Get a work item query by ID or path                      |
 | Work Items        | [mcp_ado_wit_get_query_results_by_id](#mcp_ado_wit_get_query_results_by_id)                               | Execute a query and get results                          |
+| Work Items        | [mcp_ado_wit_query_by_wiql](#mcp_ado_wit_query_by_wiql)                                                   | Execute a WIQL query and return matching work items      |
 | Work Items        | [mcp_ado_wit_get_work_item_attachment](#mcp_ado_wit_get_work_item_attachment)                             | Download a work item attachment as base64                |
 | Work              | [mcp_ado_work_list_iterations](#mcp_ado_work_list_iterations)                                             | List all iterations in a project                         |
 | Work              | [mcp_ado_work_create_iterations](#mcp_ado_work_create_iterations)                                         | Create new iterations in a project                       |
@@ -677,6 +678,13 @@ Retrieve the results of a work item query given the query ID.
 
 - **Required**: `id`
 - **Optional**: `project`, `responseType`, `team`, `timePrecision`, `top`
+
+### mcp_ado_wit_query_by_wiql
+
+Execute a WIQL (Work Item Query Language) query and return the matching work items. If a project is not specified, you will be prompted to select one.
+
+- **Required**: `wiql`
+- **Optional**: `project`, `team`, `timePrecision`, `top`
 
 ### mcp_ado_wit_get_work_item_attachment
 
