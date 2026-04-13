@@ -7,7 +7,7 @@ import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfac
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
-import { elicitProject } from "../shared/elicitations.js";
+import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const WORKITEM_TOOLS = {
@@ -70,16 +70,31 @@ function getLinkTypeFromName(name: string) {
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
-    "Receive a list of backlogs for a given project and team.",
+    "Receive a list of backlogs for a given project and team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      team: z.string().describe("The name or ID of the Azure DevOps team."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
     },
     async ({ project, team }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to list backlogs for.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        let resolvedTeam = team;
+        if (!resolvedTeam) {
+          const result = await elicitTeam(server, connection, resolvedProject, "Select the Azure DevOps team to list backlogs for.");
+          if ("response" in result) return result.response;
+          resolvedTeam = result.resolved;
+        }
+
         const workApi = await connection.getWorkApi();
-        const teamContext = { project, team };
+        const teamContext = { project: resolvedProject, team: resolvedTeam };
         const backlogs = await workApi.getBacklogs(teamContext);
 
         return {
@@ -97,17 +112,32 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.list_backlog_work_items,
-    "Retrieve a list of backlogs of for a given project, team, and backlog category",
+    "Retrieve a list of backlogs of for a given project, team, and backlog category. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      team: z.string().describe("The name or ID of the Azure DevOps team."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
       backlogId: z.string().describe("The ID of the backlog category to retrieve work items from."),
     },
     async ({ project, team, backlogId }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to list backlog work items for.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        let resolvedTeam = team;
+        if (!resolvedTeam) {
+          const result = await elicitTeam(server, connection, resolvedProject, "Select the Azure DevOps team to list backlog work items for.");
+          if ("response" in result) return result.response;
+          resolvedTeam = result.resolved;
+        }
+
         const workApi = await connection.getWorkApi();
-        const teamContext = { project, team };
+        const teamContext = { project: resolvedProject, team: resolvedTeam };
 
         const workItems = await workApi.getBacklogLevelWorkItems(teamContext, backlogId);
 
@@ -126,9 +156,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.my_work_items,
-    "Retrieve a list of work items relevent to the authenticated user.",
+    "Retrieve a list of work items relevent to the authenticated user. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       type: z.enum(["assignedtome", "myactivity"]).default("assignedtome").describe("The type of work items to retrieve. Defaults to 'assignedtome'."),
       top: z.coerce.number().default(50).describe("The maximum number of work items to return. Defaults to 50."),
       includeCompleted: z.boolean().default(false).describe("Whether to include completed work items. Defaults to false."),
@@ -136,9 +166,17 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, type, top, includeCompleted }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve work items for.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workApi = await connection.getWorkApi();
 
-        const workItems = await workApi.getPredefinedQueryResults(project, type, top, includeCompleted);
+        const workItems = await workApi.getPredefinedQueryResults(resolvedProject, type, top, includeCompleted);
 
         return {
           content: [{ type: "text", text: JSON.stringify(workItems, null, 2) }],
@@ -155,22 +193,30 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_items_batch_by_ids,
-    "Retrieve list of work items by IDs in batch.",
+    "Retrieve list of work items by IDs in batch. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       ids: z.array(z.coerce.number().min(1)).describe("The IDs of the work items to retrieve."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
     },
     async ({ project, ids, fields }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve work items for.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
         const defaultFields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
 
         // If no fields are provided, use the default set of fields
         const fieldsToUse = !fields || fields.length === 0 ? defaultFields : fields;
 
-        const workitems = await workItemApi.getWorkItemsBatch({ ids, fields: fieldsToUse }, project);
+        const workitems = await workItemApi.getWorkItemsBatch({ ids, fields: fieldsToUse }, resolvedProject);
 
         // List of identity fields that need to be transformed from objects to formatted strings
         const identityFields = [
@@ -215,10 +261,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_item,
-    "Get a single work item by ID.",
+    "Get a single work item by ID. If a project is not specified, you will be prompted to select one.",
     {
       id: z.coerce.number().min(1).describe("The ID of the work item to retrieve."),
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, all fields will be returned."),
       asOf: z.coerce.date().optional().describe("Optional date string to retrieve the work item as of a specific time. If not provided, the current state will be returned."),
       expand: z
@@ -230,8 +276,16 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ id, project, fields, asOf, expand }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve the work item from.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
-        const workItem = await workItemApi.getWorkItem(id, fields, asOf, expand as unknown as WorkItemExpand, project);
+        const workItem = await workItemApi.getWorkItem(id, fields, asOf, expand as unknown as WorkItemExpand, resolvedProject);
 
         return {
           content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
@@ -249,17 +303,25 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.list_work_item_comments,
-    "Retrieve list of comments for a work item by ID.",
+    "Retrieve list of comments for a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to retrieve comments for."),
       top: z.coerce.number().default(50).describe("Optional number of comments to retrieve. Defaults to all comments."),
     },
     async ({ project, workItemId, top }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to list work item comments for.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
-        const comments = await workItemApi.getComments(project, workItemId, top);
+        const comments = await workItemApi.getComments(resolvedProject, workItemId, top);
 
         return {
           content: [{ type: "text", text: JSON.stringify(comments, null, 2) }],
@@ -276,9 +338,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.add_work_item_comment,
-    "Add comment to a work item by ID.",
+    "Add comment to a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to add a comment to."),
       comment: z.string().describe("The text of the comment to add to the work item."),
       format: z.enum(["markdown", "html"]).optional().default("html"),
@@ -286,6 +348,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, workItemId, comment, format }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to add a work item comment in.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -294,15 +364,18 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         };
 
         const formatParameter = format === "markdown" ? 0 : 1;
-        const response = await fetch(`${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-            "User-Agent": userAgentProvider(),
-          },
-          body: JSON.stringify(body),
-        });
+        const response = await fetch(
+          `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+              "User-Agent": userAgentProvider(),
+            },
+            body: JSON.stringify(body),
+          }
+        );
 
         if (!response.ok) {
           throw new Error(`Failed to add a work item comment: ${response.statusText}}`);
@@ -325,9 +398,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.update_work_item_comment,
-    "Update an existing comment on a work item by ID.",
+    "Update an existing comment on a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemId: z.coerce.number().min(1).describe("The ID of the work item."),
       commentId: z.coerce.number().min(1).describe("The ID of the comment to update."),
       text: z.string().describe("The updated comment text."),
@@ -336,13 +409,21 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, workItemId, commentId, text, format }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to update the work item comment in.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
         const body: Record<string, string> = { text };
 
         const formatParameter = format === "markdown" ? 0 : 1;
         const response = await fetch(
-          `${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workItems/${workItemId}/comments/${commentId}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
+          `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments/${commentId}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
           {
             method: "PATCH",
             headers: {
@@ -375,9 +456,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.list_work_item_revisions,
-    "Retrieve list of revisions for a work item by ID.",
+    "Retrieve list of revisions for a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to retrieve revisions for."),
       top: z.coerce.number().default(50).describe("Optional number of revisions to retrieve. If not provided, all revisions will be returned."),
       skip: z.coerce.number().optional().describe("Optional number of revisions to skip for pagination. Defaults to 0."),
@@ -390,8 +471,16 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, workItemId, top, skip, expand }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to list work item revisions for.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
-        const revisions = await workItemApi.getRevisions(workItemId, top, skip, safeEnumConvert(WorkItemExpand, expand), project);
+        const revisions = await workItemApi.getRevisions(workItemId, top, skip, safeEnumConvert(WorkItemExpand, expand), resolvedProject);
 
         // Dynamically clean up identity objects in revision fields
         // Identity objects typically have properties like displayName, url, _links, id, uniqueName, imageUrl, descriptor
@@ -436,10 +525,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.add_child_work_items,
-    "Create one or many child work items from a parent by work item type and parent id.",
+    "Create one or many child work items from a parent by work item type and parent id. If a project is not specified, you will be prompted to select one.",
     {
       parentId: z.coerce.number().min(1).describe("The ID of the parent work item to create a child work item under."),
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemType: z.string().describe("The type of the child work item to create."),
       items: z.array(
         z.object({
@@ -454,6 +543,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ parentId, project, workItemType, items }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to create child work items in.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -493,7 +590,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               path: "/relations/-",
               value: {
                 rel: "System.LinkTypes.Hierarchy-Reverse",
-                url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${parentId}`,
+                url: `${connection.serverUrl}/${resolvedProject}/_apis/wit/workItems/${parentId}`,
               },
             },
           ];
@@ -530,7 +627,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
           return {
             method: "PATCH",
-            uri: `/${encodeURIComponent(project)}/_apis/wit/workitems/$${encodeURIComponent(workItemType)}?api-version=${batchApiVersion}`,
+            uri: `/${encodeURIComponent(resolvedProject)}/_apis/wit/workitems/$${encodeURIComponent(workItemType)}?api-version=${batchApiVersion}`,
             headers: {
               "Content-Type": "application/json-patch+json",
             },
@@ -640,19 +737,27 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_items_for_iteration,
-    "Retrieve a list of work items for a specified iteration.",
+    "Retrieve a list of work items for a specified iteration. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
       iterationId: z.string().describe("The ID of the iteration to retrieve work items for."),
     },
     async ({ project, team, iterationId }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve work items for iteration.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workApi = await connection.getWorkApi();
 
         //get the work items for the current iteration
-        const workItems = await workApi.getIterationWorkItems({ project, team }, iterationId);
+        const workItems = await workApi.getIterationWorkItems({ project: resolvedProject, team }, iterationId);
 
         return {
           content: [{ type: "text", text: JSON.stringify(workItems, null, 2) }],
@@ -715,17 +820,25 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_item_type,
-    "Get a specific work item type.",
+    "Get a specific work item type. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemType: z.string().describe("The name of the work item type to retrieve."),
     },
     async ({ project, workItemType }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve the work item type from.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
 
-        const workItemTypeInfo = await workItemApi.getWorkItemType(project, workItemType);
+        const workItemTypeInfo = await workItemApi.getWorkItemType(resolvedProject, workItemType);
 
         return {
           content: [{ type: "text", text: JSON.stringify(workItemTypeInfo, null, 2) }],
@@ -742,9 +855,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.create_work_item,
-    "Create a new work item in a specified project and work item type.",
+    "Create a new work item in a specified project and work item type. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemType: z.string().describe("The type of work item to create, e.g., 'Task', 'Bug', etc."),
       fields: z
         .array(
@@ -759,6 +872,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, workItemType, fields }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to create the work item in.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
 
         const document = fields.map(({ name, value, format }) => ({
@@ -780,7 +901,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           }
         });
 
-        const newWorkItem = await workItemApi.createWorkItem(null, document, project, workItemType);
+        const newWorkItem = await workItemApi.createWorkItem(null, document, resolvedProject, workItemType);
 
         if (!newWorkItem) {
           return { content: [{ type: "text", text: "Work item was not created" }], isError: true };
@@ -802,9 +923,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_query,
-    "Get a query by its ID or path.",
+    "Get a query by its ID or path. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       query: z.string().describe("The ID or path of the query to retrieve."),
       expand: z
         .enum(getEnumKeys(QueryExpand) as [string, ...string[]])
@@ -817,9 +938,17 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, query, expand, depth, includeDeleted, useIsoDateFormat }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve the query from.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
 
-        const queryDetails = await workItemApi.getQuery(project, query, safeEnumConvert(QueryExpand, expand), depth, includeDeleted, useIsoDateFormat);
+        const queryDetails = await workItemApi.getQuery(resolvedProject, query, safeEnumConvert(QueryExpand, expand), depth, includeDeleted, useIsoDateFormat);
 
         return {
           content: [{ type: "text", text: JSON.stringify(queryDetails, null, 2) }],
@@ -959,9 +1088,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.work_items_link,
-    "Link work items together in batch.",
+    "Link work items together in batch. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       updates: z
         .array(
           z.object({
@@ -981,6 +1110,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, updates }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to link work items in.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
 
@@ -1000,7 +1137,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               path: "/relations/-",
               value: {
                 rel: `${getLinkTypeFromName(type)}`,
-                url: `${orgUrl}/${project}/_apis/wit/workItems/${linkToId}`,
+                url: `${orgUrl}/${resolvedProject}/_apis/wit/workItems/${linkToId}`,
                 attributes: {
                   comment: comment || "",
                 },
@@ -1039,9 +1176,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.work_item_unlink,
-    "Remove one or many links from a single work item",
+    "Remove one or many links from a single work item. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       id: z.coerce.number().min(1).describe("The ID of the work item to remove the links from."),
       type: z
         .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
@@ -1054,8 +1191,16 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, id, type, url }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to unlink work items in.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
-        const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, project);
+        const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, resolvedProject);
         const relations: WorkItemRelation[] = workItem.relations ?? [];
         const linkType = getLinkTypeFromName(type);
 
@@ -1087,7 +1232,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           path: `/relations/${idx}`,
         }));
 
-        const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id, project);
+        const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id, resolvedProject);
 
         return {
           content: [
@@ -1118,10 +1263,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.add_artifact_link,
-    "Add artifact links (repository, branch, commit, builds) to work items. You can either provide the full vstfs URI or the individual components to build it automatically.",
+    "Add artifact links (repository, branch, commit, builds) to work items. You can either provide the full vstfs URI or the individual components to build it automatically. If a project is not specified, you will be prompted to select one.",
     {
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to add the artifact link to."),
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
 
       // Option 1: Provide full URI directly
       artifactUri: z.string().optional().describe("The complete VSTFS URI of the artifact to link. If provided, individual component parameters are ignored."),
@@ -1158,6 +1303,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, linkType, comment }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to add the artifact link in.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
         let finalArtifactUri: string;
@@ -1235,7 +1388,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         ];
 
         // Use the WorkItem API to update the work item with the new relation
-        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, project);
+        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
 
         if (!workItem) {
           return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
@@ -1309,17 +1462,25 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_item_attachment,
-    "Download a work item attachment by its ID and return the content as a base64-encoded resource. Useful for viewing images (e.g. screenshots) attached to work items such as bugs.",
+    "Download a work item attachment by its ID and return the content as a base64-encoded resource. Useful for viewing images (e.g. screenshots) attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
       fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type for the returned resource."),
     },
     async ({ project, attachmentId, fileName }) => {
       try {
         const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve the work item attachment from.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
         const workItemApi = await connection.getWorkItemTrackingApi();
-        const stream = await workItemApi.getAttachmentContent(attachmentId, fileName, project);
+        const stream = await workItemApi.getAttachmentContent(attachmentId, fileName, resolvedProject);
 
         const chunks: Buffer[] = [];
         await new Promise<void>((resolve, reject) => {
