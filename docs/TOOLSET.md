@@ -42,6 +42,7 @@
 | Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread           |
 | Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                          |
 | Repositories      | [mcp_ado_repo_list_directory](#mcp_ado_repo_list_directory)                                               | List files and folders in a directory                    |
+| Repositories      | [mcp_ado_repo_get_file_content](#mcp_ado_repo_get_file_content)                                           | Get file content at a specific version                   |
 | Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                      |
 | Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                            |
 | Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                    |
@@ -81,6 +82,7 @@
 | Work Items        | [mcp_ado_wit_list_backlog_work_items](#mcp_ado_wit_list_backlog_work_items)                               | Get work items in a backlog                              |
 | Work Items        | [mcp_ado_wit_get_query](#mcp_ado_wit_get_query)                                                           | Get a work item query by ID or path                      |
 | Work Items        | [mcp_ado_wit_get_query_results_by_id](#mcp_ado_wit_get_query_results_by_id)                               | Execute a query and get results                          |
+| Work Items        | [mcp_ado_wit_query_by_wiql](#mcp_ado_wit_query_by_wiql)                                                   | Execute a WIQL query and return matching work items      |
 | Work Items        | [mcp_ado_wit_get_work_item_attachment](#mcp_ado_wit_get_work_item_attachment)                             | Download a work item attachment as base64                |
 | Work              | [mcp_ado_work_list_iterations](#mcp_ado_work_list_iterations)                                             | List all iterations in a project                         |
 | Work              | [mcp_ado_work_create_iterations](#mcp_ado_work_create_iterations)                                         | Create new iterations in a project                       |
@@ -389,6 +391,13 @@ List files and folders in a directory within a repository.
 - **Required**: `repositoryId`
 - **Optional**: `path`, `project`, `version`, `versionType`, `recursive`, `recursionDepth`
 
+### mcp_ado_repo_get_file_content
+
+Get the content of a file from a Git repository at a specific version (branch, tag, or commit SHA).
+
+- **Required**: `repositoryId`, `path`
+- **Optional**: `project`, `version`, `versionType`
+
 ## Search
 
 ### mcp_ado_search_code
@@ -454,7 +463,7 @@ Adds existing test cases to a test suite.
 Gets a list of test cases in the test plan.
 
 - **Required**: `project`, `planid`, `suiteid`
-- **Optional**: None
+- **Optional**: `continuationToken`
 
 ### mcp_ado_testplan_create_test_case
 
@@ -669,6 +678,13 @@ Retrieve the results of a work item query given the query ID.
 
 - **Required**: `id`
 - **Optional**: `project`, `responseType`, `team`, `timePrecision`, `top`
+
+### mcp_ado_wit_query_by_wiql
+
+Execute a WIQL (Work Item Query Language) query and return the matching work items. If a project is not specified, you will be prompted to select one.
+
+- **Required**: `wiql`
+- **Optional**: `project`, `team`, `timePrecision`, `top`
 
 ### mcp_ado_wit_get_work_item_attachment
 

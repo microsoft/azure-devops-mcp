@@ -22,7 +22,10 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
     "Search Azure DevOps Repositories for a given search text",
     {
       searchText: z.string().describe("Keywords to search for in code repositories"),
-      project: z.array(z.string()).optional().describe("Filter by projects"),
+      project: z
+        .union([z.string().transform((value) => [value]), z.array(z.string())])
+        .optional()
+        .describe("Filter by projects"),
       repository: z.array(z.string()).optional().describe("Filter by repositories"),
       path: z.array(z.string()).optional().describe("Filter by paths"),
       branch: z.array(z.string()).optional().describe("Filter by branches"),

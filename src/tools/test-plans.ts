@@ -3,8 +3,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { SuiteExpand, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
+import { apiVersion } from "../utils.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
@@ -18,7 +19,7 @@ const Test_Plan_Tools = {
   create_test_suite: "testplan_create_test_suite",
 };
 
-function configureTestPlanTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
+function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider?: () => string) {
   server.tool(
     Test_Plan_Tools.list_test_plans,
     "Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.",
@@ -30,14 +31,45 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     },
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
       try {
-        const owner = ""; //making owner an empty string untill we can figure out how to get owner id
         const connection = await connectionProvider();
-        const testPlanApi = await connection.getTestPlanApi();
+        const accessToken = await tokenProvider();
+        const params = new URLSearchParams({ "api-version": apiVersion });
+        if (filterActivePlans) params.append("filterActivePlans", "true");
+        if (includePlanDetails) params.append("includePlanDetails", "true");
+        if (continuationToken) params.append("continuationToken", continuationToken);
+        const url = `${connection.serverUrl}/${encodeURIComponent(project)}/_apis/testplan/Plans?${params.toString()}`;
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${accessToken}`,
+        };
 
-        const testPlans = await testPlanApi.getTestPlans(project, owner, continuationToken, includePlanDetails, filterActivePlans);
+        const userAgent = userAgentProvider?.();
+        if (userAgent) {
+          headers["User-Agent"] = userAgent;
+        }
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to list test plans (${response.status}): ${errorText}`);
+        }
+
+        const body = await response.json();
+        const testPlans = body.value ?? [];
+        const nextToken = response.headers.get("x-ms-continuationtoken") ?? undefined;
+
+        const result: { testPlans: typeof testPlans; continuationToken?: string } = {
+          testPlans: testPlans,
+        };
+        if (nextToken) {
+          result.continuationToken = nextToken;
+        }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testPlans, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -331,15 +363,47 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       planid: z.coerce.number().min(1).describe("The ID of the test plan."),
       suiteid: z.coerce.number().min(1).describe("The ID of the test suite."),
+      continuationToken: z.string().optional().describe("Token to continue fetching test cases from a previous request."),
     },
-    async ({ project, planid, suiteid }) => {
+    async ({ project, planid, suiteid, continuationToken }) => {
       try {
         const connection = await connectionProvider();
-        const coreApi = await connection.getTestPlanApi();
-        const testcases = await coreApi.getTestCaseList(project, planid, suiteid);
+        const accessToken = await tokenProvider();
+        const params = new URLSearchParams({ "api-version": "7.2-preview.3" });
+        if (continuationToken) params.append("continuationToken", continuationToken);
+        const url = `${connection.serverUrl}/${encodeURIComponent(project)}/_apis/testplan/Plans/${planid}/Suites/${suiteid}/TestCase?${params.toString()}`;
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${accessToken}`,
+        };
+
+        const userAgent = userAgentProvider?.();
+        if (userAgent) {
+          headers["User-Agent"] = userAgent;
+        }
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to list test cases (${response.status}): ${errorText}`);
+        }
+
+        const body = await response.json();
+        const testcases = body.value ?? [];
+        const nextToken = response.headers.get("x-ms-continuationtoken") ?? undefined;
+
+        const result: { testCases: typeof testcases; continuationToken?: string } = {
+          testCases: testcases,
+        };
+        if (nextToken) {
+          result.continuationToken = nextToken;
+        }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(testcases, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -427,10 +491,32 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
     async ({ project, planId, continuationToken }) => {
       try {
         const connection = await connectionProvider();
-        const testPlanApi = await connection.getTestPlanApi();
-        const expand: SuiteExpand = SuiteExpand.Children;
+        const accessToken = await tokenProvider();
+        const params = new URLSearchParams({ "api-version": apiVersion, "expand": "children" });
+        if (continuationToken) params.append("continuationToken", continuationToken);
+        const url = `${connection.serverUrl}/${encodeURIComponent(project)}/_apis/testplan/Plans/${planId}/Suites?${params.toString()}`;
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${accessToken}`,
+        };
 
-        const testSuites = await testPlanApi.getTestSuitesForPlan(project, planId, expand, continuationToken);
+        const userAgent = userAgentProvider?.();
+        if (userAgent) {
+          headers["User-Agent"] = userAgent;
+        }
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to list test suites (${response.status}): ${errorText}`);
+        }
+
+        const body = await response.json();
+        const testSuites = body.value ?? [];
+        const nextToken = response.headers.get("x-ms-continuationtoken") ?? undefined;
 
         // The API returns a flat list where the root suite is first, followed by all nested suites
         // We need to build a proper hierarchy by creating a map and assembling the tree
@@ -471,7 +557,14 @@ function configureTestPlanTools(server: McpServer, _: () => Promise<string>, con
           return cleaned;
         };
 
-        const result = roots.map((root: any) => cleanSuite(root));
+        const cleanedSuites = roots.map((root: any) => cleanSuite(root));
+
+        const result: { testSuites: typeof cleanedSuites; continuationToken?: string } = {
+          testSuites: cleanedSuites,
+        };
+        if (nextToken) {
+          result.continuationToken = nextToken;
+        }
 
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
