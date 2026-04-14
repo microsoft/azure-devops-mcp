@@ -688,6 +688,82 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
     });
+
+    it("should call getWorkItem with fields and no expand when fields are provided but expand is empty", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item");
+
+      if (!call) throw new Error("wit_get_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      const params = {
+        id: 12,
+        fields: ["System.Title", "System.State"],
+        asOf: undefined,
+        expand: undefined,
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(params.id, params.fields, params.asOf, undefined, params.project);
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
+
+    it("should call getWorkItem with expand and no fields when expand is provided but fields are empty", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item");
+
+      if (!call) throw new Error("wit_get_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      const params = {
+        id: 12,
+        fields: undefined,
+        asOf: undefined,
+        expand: "relations",
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(params.id, params.fields, params.asOf, "relations", params.project);
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
+
+    it("should override expand to 'none' when both fields and expand are provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item");
+
+      if (!call) throw new Error("wit_get_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      const params = {
+        id: 12,
+        fields: ["System.Title", "System.State"],
+        asOf: undefined,
+        expand: "relations",
+        project: "Contoso",
+      };
+
+      const result = await handler(params);
+
+      // expand should be overridden to "none" because fields takes precedence
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(params.id, params.fields, params.asOf, "none", params.project);
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
   });
 
   describe("list_work_item_comments tool", () => {
