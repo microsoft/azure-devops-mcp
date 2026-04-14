@@ -265,23 +265,36 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       id: z.coerce.number().min(1).describe("The ID of the work item to retrieve."),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, all fields will be returned."),
+      fields: z
+        .array(z.string())
+        .optional()
+        .describe("Optional list of fields to include in the response. If not provided, all fields will be returned. Cannot be used together with the expand parameter."),
       asOf: z.coerce.date().optional().describe("Optional date string to retrieve the work item as of a specific time. If not provided, the current state will be returned."),
       expand: z
         .enum(["all", "fields", "links", "none", "relations"])
-        .describe("Optional expand parameter to include additional details in the response.")
+        .describe("Optional expand parameter to include additional details in the response. Cannot be used together with the fields parameter.")
         .optional()
-        .describe("Expand options include 'all', 'fields', 'links', 'none', and 'relations'. Relations can be used to get child workitems. Defaults to 'none'."),
+        .describe(
+          "Expand options include 'All', 'Fields', 'Links', 'None', and 'Relations'. Relations can be used to get child workitems. Defaults to 'None'. Cannot be used together with the fields parameter."
+        ),
     },
     async ({ id, project, fields, asOf, expand }) => {
       try {
         const connection = await connectionProvider();
 
         let resolvedProject = project;
+
         if (!resolvedProject) {
           const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve the work item from.");
+
           if ("response" in result) return result.response;
           resolvedProject = result.resolved;
+        }
+
+        // The Azure DevOps API does not support using expand and fields together.
+        // When both are provided, prefer fields as it is the more specific selection.
+        if (fields && fields.length > 0 && expand != null) {
+          expand = "none";
         }
 
         const workItemApi = await connection.getWorkItemTrackingApi();
