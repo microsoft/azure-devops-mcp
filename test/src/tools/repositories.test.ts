@@ -3862,6 +3862,168 @@ describe("repos tools", () => {
 
       expect(result.content[0].text).toBe(JSON.stringify(expectedResponse, null, 2));
     });
+
+    it("should include changed files when includeChangedFiles is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      if (!call) throw new Error("repo_get_pull_request_by_id tool not registered");
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        repository: { project: { id: "project123", name: "testproject" } },
+      };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+
+      const mockChangeEntries = [
+        { changeTrackingId: 1, item: { path: "/src/file1.ts" }, changeType: 2 },
+        { changeTrackingId: 2, item: { path: "/src/file2.ts" }, changeType: 1 },
+      ];
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: mockChangeEntries });
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeChangedFiles: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getPullRequestIterations).toHaveBeenCalledWith("repo123", 123, undefined);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined);
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData.changedFilesSummary).toEqual({
+        changeEntries: mockChangeEntries,
+        fileCount: 2,
+      });
+    });
+
+    it("should not fetch changed files when includeChangedFiles is false", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      const [, , , handler] = call;
+
+      const mockPR = { pullRequestId: 123, title: "Test PR" };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+
+      const result = await handler({ repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: false });
+
+      expect(mockGitApi.getPullRequestIterations).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+    });
+
+    it("should not fetch changed files when includeChangedFiles is not specified", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      const [, , , handler] = call;
+
+      const mockPR = { pullRequestId: 123, title: "Test PR" };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+
+      const result = await handler({ repositoryId: "repo123", pullRequestId: 123 });
+
+      expect(mockGitApi.getPullRequestIterations).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+    });
+
+    it("should handle empty iterations when includeChangedFiles is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      const [, , , handler] = call;
+
+      const mockPR = { pullRequestId: 123, title: "Test PR" };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestIterations.mockResolvedValue([]);
+
+      const result = await handler({ repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData.changedFilesSummary).toEqual({ changeEntries: [], fileCount: 0 });
+      expect(mockGitApi.getPullRequestIterationChanges).not.toHaveBeenCalled();
+    });
+
+    it("should handle getPullRequestIterationChanges API error gracefully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      const [, , , handler] = call;
+
+      const mockPR = { pullRequestId: 123, title: "Test PR" };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
+      mockGitApi.getPullRequestIterationChanges.mockRejectedValue(new Error("API Error: Changes not accessible"));
+
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+
+      const result = await handler({ repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+
+      expect(consoleSpy).toHaveBeenCalledWith("Error fetching PR changed files: API Error: Changes not accessible");
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData.pullRequestId).toBe(123);
+      expect(resultData.changedFilesSummary).toEqual({});
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle iteration with null id when includeChangedFiles is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      const [, , , handler] = call;
+
+      const mockPR = { pullRequestId: 123, title: "Test PR" };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: null }]);
+
+      const result = await handler({ repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData.changedFilesSummary).toEqual({ changeEntries: [], fileCount: 0 });
+      expect(mockGitApi.getPullRequestIterationChanges).not.toHaveBeenCalled();
+    });
+
+    it("should work with both includeLabels and includeChangedFiles enabled", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_by_id);
+      const [, , , handler] = call;
+
+      const mockPR = {
+        pullRequestId: 123,
+        title: "Test PR",
+        repository: { project: { id: "project123", name: "testproject" } },
+      };
+      mockGitApi.getPullRequest.mockResolvedValue(mockPR);
+
+      const mockLabels = [{ name: "bug", id: "label1" }];
+      mockGitApi.getPullRequestLabels.mockResolvedValue(mockLabels);
+
+      const mockChangeEntries = [{ changeTrackingId: 1, item: { path: "/src/app.ts" }, changeType: 2 }];
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: mockChangeEntries });
+
+      const result = await handler({
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        includeLabels: true,
+        includeChangedFiles: true,
+      });
+
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalled();
+      expect(mockGitApi.getPullRequestIterations).toHaveBeenCalled();
+
+      const resultData = JSON.parse(result.content[0].text);
+      expect(resultData.labelSummary).toEqual({ labels: ["bug"], labelCount: 1 });
+      expect(resultData.changedFilesSummary).toEqual({ changeEntries: mockChangeEntries, fileCount: 1 });
+    });
   });
 
   describe("repo_get_pull_request_changes", () => {

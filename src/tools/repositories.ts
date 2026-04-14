@@ -1010,12 +1010,15 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a repository name instead of a GUID."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to reference work items associated with the pull request."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include a summary of labels in the response."),
+      includeChangedFiles: z.boolean().optional().default(false).describe("Whether to include the list of files changed in the pull request."),
     },
-    async ({ repositoryId, pullRequestId, project, includeWorkItemRefs, includeLabels }) => {
+    async ({ repositoryId, pullRequestId, project, includeWorkItemRefs, includeLabels, includeChangedFiles }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
         const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project, undefined, undefined, undefined, undefined, includeWorkItemRefs);
+
+        let enhancedResponse: Record<string, unknown> = { ...pullRequest };
 
         if (includeLabels) {
           try {
@@ -1025,32 +1028,64 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
             const labelNames = labels.map((label) => label.name).filter((name) => name !== undefined);
 
-            const enhancedResponse = {
-              ...pullRequest,
+            enhancedResponse = {
+              ...enhancedResponse,
               labelSummary: {
                 labels: labelNames,
                 labelCount: labelNames.length,
               },
             };
-
-            return {
-              content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
-            };
           } catch (error) {
             console.warn(`Error fetching PR labels: ${error instanceof Error ? error.message : "Unknown error"}`);
-            // Fall back to the original response without labels
-            const enhancedResponse = {
-              ...pullRequest,
+            enhancedResponse = {
+              ...enhancedResponse,
               labelSummary: {},
-            };
-
-            return {
-              content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
             };
           }
         }
+
+        if (includeChangedFiles) {
+          try {
+            const iterations = await gitApi.getPullRequestIterations(repositoryId, pullRequestId, project);
+
+            if (iterations?.length) {
+              const latestIteration = iterations[iterations.length - 1];
+
+              if (latestIteration.id != null) {
+                const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, latestIteration.id, project);
+
+                enhancedResponse = {
+                  ...enhancedResponse,
+                  changedFilesSummary: {
+                    changeEntries: changes?.changeEntries ?? [],
+                    fileCount: changes?.changeEntries?.length ?? 0,
+                    nextSkip: changes?.nextSkip,
+                    nextTop: changes?.nextTop,
+                  },
+                };
+              } else {
+                enhancedResponse = {
+                  ...enhancedResponse,
+                  changedFilesSummary: { changeEntries: [], fileCount: 0 },
+                };
+              }
+            } else {
+              enhancedResponse = {
+                ...enhancedResponse,
+                changedFilesSummary: { changeEntries: [], fileCount: 0 },
+              };
+            }
+          } catch (error) {
+            console.warn(`Error fetching PR changed files: ${error instanceof Error ? error.message : "Unknown error"}`);
+            enhancedResponse = {
+              ...enhancedResponse,
+              changedFilesSummary: {},
+            };
+          }
+        }
+
         return {
-          content: [{ type: "text", text: JSON.stringify(pullRequest, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }],
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
