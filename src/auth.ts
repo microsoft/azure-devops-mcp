@@ -78,6 +78,20 @@ class OAuthAuthenticator {
 function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
   logger.debug(`Creating authenticator of type '${type}' with tenantId='${tenantId ?? "undefined"}'`);
   switch (type) {
+    case "pat":
+      logger.debug(`Authenticator: Using PAT authentication (PERSONAL_ACCESS_TOKEN)`);
+      return async () => {
+        logger.debug(`${type}: Reading token from PERSONAL_ACCESS_TOKEN environment variable`);
+        const b64Pat = process.env["PERSONAL_ACCESS_TOKEN"];
+        if (!b64Pat) {
+          logger.error(`${type}: PERSONAL_ACCESS_TOKEN environment variable is not set or empty`);
+          throw new Error("Environment variable 'PERSONAL_ACCESS_TOKEN' is not set or empty. Please set it with a valid base64-encoded Azure DevOps Personal Access Token.");
+        }
+        // Return base64 value as-is — caller uses it directly as the Basic auth credential
+        logger.debug(`${type}: Successfully retrieved PAT from environment variable`);
+        return b64Pat;
+      };
+
     case "envvar":
       logger.debug(`Authenticator: Using environment variable authentication (ADO_MCP_AUTH_TOKEN)`);
       // Read token from fixed environment variable
