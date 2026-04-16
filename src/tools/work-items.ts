@@ -356,7 +356,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to add a comment to."),
       comment: z.string().describe("The text of the comment to add to the work item."),
-      format: z.enum(["markdown", "html"]).optional().default("html"),
+      format: z.enum(["Markdown", "Html"]).optional().default("Markdown").describe("The format of the comment text, e.g., 'Markdown', 'Html'. Optional, defaults to 'Markdown'."),
     },
     async ({ project, workItemId, comment, format }) => {
       try {
@@ -376,7 +376,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           text: comment,
         };
 
-        const formatParameter = format === "markdown" ? 0 : 1;
+        const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
         const response = await fetch(
           `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
           {
@@ -417,7 +417,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemId: z.coerce.number().min(1).describe("The ID of the work item."),
       commentId: z.coerce.number().min(1).describe("The ID of the comment to update."),
       text: z.string().describe("The updated comment text."),
-      format: z.enum(["markdown", "html"]).optional().default("html"),
+      format: z.enum(["Markdown", "Html"]).optional().default("Markdown").describe("The format of the comment text, e.g., 'Markdown', 'Html'. Optional, defaults to 'Markdown'."),
     },
     async ({ project, workItemId, commentId, text, format }) => {
       try {
@@ -433,8 +433,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
         const body: Record<string, string> = { text };
+        const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
 
-        const formatParameter = format === "markdown" ? 0 : 1;
         const response = await fetch(
           `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments/${commentId}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
           {
@@ -547,7 +547,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         z.object({
           title: z.string().describe("The title of the child work item."),
           description: z.string().describe("The description of the child work item."),
-          format: z.enum(["Markdown", "Html"]).default("Html").describe("Format for the description on the child work item, e.g., 'Markdown', 'Html'. Defaults to 'Html'."),
+          format: z.enum(["Markdown", "Html"]).default("Markdown").describe("Format for the description on the child work item, e.g., 'Markdown', 'Html'. Defaults to 'Markdown'."),
           areaPath: z.string().optional().describe("Optional area path for the child work item."),
           iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
         })
@@ -877,7 +877,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           z.object({
             name: z.string().describe("The name of the field, e.g., 'System.Title'."),
             value: z.string().describe("The value of the field."),
-            format: z.enum(["Html", "Markdown"]).optional().describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Html'."),
+            format: z.enum(["Html", "Markdown"]).optional().default("Markdown").describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
         .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
@@ -1027,7 +1027,11 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             id: z.coerce.number().min(1).describe("The ID of the work item to update."),
             path: z.string().describe("The path of the field to update, e.g., '/fields/System.Title'."),
             value: z.string().describe("The new value for the field. This is required for 'add' and 'replace' operations, and should be omitted for 'remove' operations."),
-            format: z.enum(["Html", "Markdown"]).optional().describe("The format of the field value. Only to be used for large text fields. e.g., 'Html', 'Markdown'. Optional, defaults to 'Html'."),
+            format: z
+              .enum(["Html", "Markdown"])
+              .optional()
+              .default("Markdown")
+              .describe("The format of the field value. Only to be used for large text fields. e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
         .describe("An array of updates to apply to work items. Each update should include the operation (op), work item ID (id), field path (path), and new value (value)."),
