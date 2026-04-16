@@ -3,6 +3,7 @@
 This guide will help you get started with the Azure DevOps MCP Server in different environments.
 
 - [Prerequisites](#-prerequisites)
+- [Authentication Methods](#-authentication-methods)
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
 - [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
 - [Getting started with GitHub Copilot CLI](#-using-mcp-server-with-github-copilot-cli)
@@ -30,18 +31,156 @@ Before you begin, make sure you have:
 1. Install [VS Studio 2022 version 17.14](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history) or later
 2. Open a project in Visual Studio
 
+## 🔐 Authentication Methods
+
+The Azure DevOps MCP Server supports several authentication methods. Pass the desired method via the `--authentication` (`-a`) flag in your `mcp.json` configuration.
+
+| Method                        | Flag value    | Environment variable    | Best for                                              |
+| ----------------------------- | ------------- | ----------------------- | ----------------------------------------------------- |
+| Interactive (default)         | `interactive` | —                       | Local development, first-time setup                   |
+| Azure CLI                     | `azcli`       | —                       | Workstations already signed in with `az login`        |
+| Environment variable (bearer) | `envvar`      | `ADO_MCP_AUTH_TOKEN`    | CI/CD, automation                                     |
+| Personal Access Token         | `pat`         | `PERSONAL_ACCESS_TOKEN` | CI/CD, service accounts, non-interactive environments |
+
+### 🔵 Interactive (Default)
+
+Opens a browser window for Microsoft account login. No extra configuration needed — this is the default when `--authentication` is omitted.
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "<your-org>"]
+    }
+  }
+}
+```
+
+### 🟢 Azure CLI (`azcli`)
+
+Uses the token from an active `az login` session. Requires the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) to be installed and signed in.
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "<your-org>", "--authentication", "azcli"]
+    }
+  }
+}
+```
+
+### 🟡 Environment Variable — Bearer Token (`envvar`)
+
+Reads a raw bearer token from the `ADO_MCP_AUTH_TOKEN` environment variable. Useful when another tool or pipeline injects the token at runtime.
+
+1. Set the environment variable:
+
+   ```bash
+   export ADO_MCP_AUTH_TOKEN="<your-azure-devops-bearer-token>"
+   ```
+
+2. Configure `.vscode/mcp.json`:
+
+   ```json
+   {
+     "inputs": [
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization name (e.g. 'contoso')"
+       }
+     ],
+     "servers": {
+       "ado": {
+         "type": "stdio",
+         "command": "npx",
+         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
+       }
+     }
+   }
+   ```
+
+### 🔑 Personal Access Token (`pat`)
+
+Authenticates using an Azure DevOps [Personal Access Token (PAT)](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate). The token must be stored in the `PERSONAL_ACCESS_TOKEN` environment variable as a **base64-encoded** string.
+
+#### PAT format
+
+The value stored in `PERSONAL_ACCESS_TOKEN` must be the base64 encoding of `<email>:<pat>`, where `<email>` is any non-empty string (the Azure DevOps API only uses the token portion) and `<pat>` is the raw PAT you copied from Azure DevOps.
+
+```
+PERSONAL_ACCESS_TOKEN = base64("<email>:<pat>")
+```
+
+**Example — generate the value on the command line:**
+
+```bash
+# Linux / macOS
+export PERSONAL_ACCESS_TOKEN=$(echo -n "user@example.com:<your-pat>" | base64)
+
+# Windows PowerShell
+$env:PERSONAL_ACCESS_TOKEN = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("user@example.com:<your-pat>"))
+```
+
+#### `.vscode/mcp.json` configuration
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "env": {
+        "PERSONAL_ACCESS_TOKEN": "<base64-encoded-email:pat>"
+      },
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "pat"]
+    }
+  }
+}
+```
+
+> **Security note:** Avoid hard-coding the PAT value directly in `mcp.json` when committing to source control. Prefer injecting it via an environment variable set outside the config file, or use a secrets manager.
+
+#### Alternate: inject via shell environment
+
+If you set `PERSONAL_ACCESS_TOKEN` in your shell profile or CI pipeline before launching the MCP server, you can omit the `env` block from `mcp.json` and just pass the auth flag:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name (e.g. 'contoso')"
+    }
+  ],
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "pat"]
+    }
+  }
+}
+```
+
 ## 🍕 Installation Options
 
 ### ➡️ Visual Studio Code & GitHub Copilot
 
 For the best experience, use Visual Studio Code and GitHub Copilot.
-
-#### ✨ One-Click Install
-
-[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install_AzureDevops_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
-[![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_AzureDevops_MCP_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&quality=insiders&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
-
-After installation, select GitHub Copilot Agent Mode and refresh the tools list. Learn more about Agent Mode in the [VS Code Documentation](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode).
 
 #### 🧨 Install from Public Feed (Recommended)
 
