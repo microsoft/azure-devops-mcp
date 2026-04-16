@@ -113,20 +113,6 @@ Authenticates using an Azure DevOps [Personal Access Token (PAT)](https://learn.
 
 The value stored in `PERSONAL_ACCESS_TOKEN` must be the base64 encoding of `<email>:<pat>`, where `<email>` is any non-empty string (the Azure DevOps API only uses the token portion) and `<pat>` is the raw PAT you copied from Azure DevOps.
 
-```
-PERSONAL_ACCESS_TOKEN = base64("<email>:<pat>")
-```
-
-**Example — generate the value on the command line:**
-
-```bash
-# Linux / macOS
-export PERSONAL_ACCESS_TOKEN=$(echo -n "user@example.com:<your-pat>" | base64)
-
-# Windows PowerShell
-$env:PERSONAL_ACCESS_TOKEN = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("user@example.com:<your-pat>"))
-```
-
 #### `.vscode/mcp.json` configuration
 
 ```json
@@ -142,39 +128,16 @@ $env:PERSONAL_ACCESS_TOKEN = [Convert]::ToBase64String([Text.Encoding]::UTF8.Get
     "ado": {
       "type": "stdio",
       "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "pat"],
       "env": {
-        "PERSONAL_ACCESS_TOKEN": "<base64-encoded-email:pat>"
-      },
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "pat"]
+        "PERSONAL_ACCESS_TOKEN": "<base64encoded email:pat>"
+      }
     }
   }
 }
 ```
 
 > **Security note:** Avoid hard-coding the PAT value directly in `mcp.json` when committing to source control. Prefer injecting it via an environment variable set outside the config file, or use a secrets manager.
-
-#### Alternate: inject via shell environment
-
-If you set `PERSONAL_ACCESS_TOKEN` in your shell profile or CI pipeline before launching the MCP server, you can omit the `env` block from `mcp.json` and just pass the auth flag:
-
-```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "pat"]
-    }
-  }
-}
-```
 
 ## 🍕 Installation Options
 
