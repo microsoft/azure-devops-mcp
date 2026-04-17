@@ -69,6 +69,8 @@ See [TOOLSET.md](./docs/TOOLSET.md) for a comprehensive list.
 
 For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, Cursor, Opencode, and Kilocode.
 
+If you are using this fork for Azure DevOps Server (on-prem) with PAT auth, see [docs/FORK-ONPREM-PAT.md](./docs/FORK-ONPREM-PAT.md).
+
 ### Prerequisites
 
 1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)

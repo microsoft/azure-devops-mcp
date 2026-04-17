@@ -10,6 +10,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
+import { resolveDeploymentContext } from "./deployment.js";
 import { logger } from "./logger.js";
 import { getOrgTenant } from "./org-tenants.js";
 //import { configurePrompts } from "./prompts.js";
@@ -31,7 +32,7 @@ const argv = yargs(hideBin(process.argv))
   .version(packageVersion)
   .command("$0 <organization> [options]", "Azure DevOps MCP Server", (yargs) => {
     yargs.positional("organization", {
-      describe: "Azure DevOps organization name",
+      describe: "Azure DevOps organization name or full organization URL",
       type: "string",
       demandOption: true,
     });
@@ -58,8 +59,9 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .parseSync();
 
-export const orgName = argv.organization as string;
-const orgUrl = "https://dev.azure.com/" + orgName;
+const deployment = resolveDeploymentContext(argv.organization as string);
+export const orgName = deployment.organizationName ?? deployment.organizationInput;
+const orgUrl = deployment.organizationUrl;
 
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
@@ -67,9 +69,7 @@ export const enabledDomains = domainsManager.getEnabledDomains();
 function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAgentComposer: UserAgentComposer, authType: string): () => Promise<WebApi> {
   return async () => {
     const accessToken = await getAzureDevOpsToken();
-    // For pat, accessToken is base64("{email}:{token}"). Decode to extract the token part,
-    // since getPersonalAccessTokenHandler prepends ":" internally and just needs the raw token.
-    const authHandler = authType === "pat" ? getPersonalAccessTokenHandler(Buffer.from(accessToken, "base64").toString("utf8").split(":").slice(1).join(":")) : getBearerHandler(accessToken);
+    const authHandler = authType === "pat" ? getPersonalAccessTokenHandler(accessToken) : getBearerHandler(accessToken);
     const connection = new WebApi(orgUrl, authHandler, undefined, {
       productName: "AzureDevOps.MCP",
       productVersion: packageVersion,
@@ -81,8 +81,10 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 
 async function main() {
   logger.info("Starting Azure DevOps MCP Server", {
-    organization: orgName,
+    organization: deployment.organizationInput,
+    organizationName: deployment.organizationName,
     organizationUrl: orgUrl,
+    isHosted: deployment.isHosted,
     authentication: argv.authentication,
     tenant: argv.tenant,
     domains: argv.domains,
@@ -105,19 +107,23 @@ async function main() {
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
-  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
+  const shouldResolveTenant = deployment.isHosted && ["interactive", "azcli", "env"].includes(argv.authentication);
+  const tenantId = shouldResolveTenant && deployment.organizationName ? ((await getOrgTenant(deployment.organizationName)) ?? argv.tenant) : argv.tenant;
   const authenticator = createAuthenticator(argv.authentication, tenantId);
 
   if (argv.authentication === "pat") {
-    const basicValue = await authenticator();
-    // basicValue is already base64("{email}:{token}") — use it directly in the Authorization header
+    const rawPat = await authenticator();
+    const basicValue = Buffer.from(`:${rawPat}`, "utf8").toString("base64");
     const _originalFetch = globalThis.fetch;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.headers) {
-        const headers = new Headers(init.headers as HeadersInit);
-        if (headers.get("Authorization")?.startsWith("Bearer ")) {
-          headers.set("Authorization", `Basic ${basicValue}`);
-          init = { ...init, headers };
+      const requestHeaders = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      if (requestHeaders.get("Authorization")?.startsWith("Bearer ")) {
+        requestHeaders.set("Authorization", `Basic ${basicValue}`);
+        if (input instanceof Request) {
+          input = new Request(input, { headers: requestHeaders });
+          init = undefined;
+        } else {
+          init = { ...init, headers: requestHeaders };
         }
       }
       return _originalFetch(input, init);

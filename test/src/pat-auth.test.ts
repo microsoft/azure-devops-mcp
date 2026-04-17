@@ -32,6 +32,8 @@ describe("PAT authentication", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    delete process.env["ADO_PAT"];
+    delete process.env["PERSONAL_ACCESS_TOKEN"];
   });
 
   afterEach(() => {
@@ -39,83 +41,60 @@ describe("PAT authentication", () => {
   });
 
   describe("createAuthenticator('pat')", () => {
-    it("should return the base64 value as-is from PERSONAL_ACCESS_TOKEN", async () => {
-      const b64Pat = Buffer.from("user@example.com:myrawpat").toString("base64");
-      process.env["PERSONAL_ACCESS_TOKEN"] = b64Pat;
+    it("should return raw PAT from ADO_PAT", async () => {
+      process.env["ADO_PAT"] = "raw-pat-token";
 
       const authenticator = createAuthenticator("pat");
       const result = await authenticator();
 
-      expect(result).toBe(b64Pat);
+      expect(result).toBe("raw-pat-token");
     });
 
-    it("should throw if PERSONAL_ACCESS_TOKEN is not set", async () => {
+    it("should use PERSONAL_ACCESS_TOKEN when ADO_PAT is not set", async () => {
+      process.env["PERSONAL_ACCESS_TOKEN"] = "raw-pat-from-personal-access-token";
+
+      const authenticator = createAuthenticator("pat");
+      const result = await authenticator();
+
+      expect(result).toBe("raw-pat-from-personal-access-token");
+    });
+
+    it("should decode legacy base64(email:pat) from PERSONAL_ACCESS_TOKEN", async () => {
+      const legacy = Buffer.from("user@example.com:legacy-pat-token").toString("base64");
+      process.env["PERSONAL_ACCESS_TOKEN"] = legacy;
+
+      const authenticator = createAuthenticator("pat");
+      const result = await authenticator();
+
+      expect(result).toBe("legacy-pat-token");
+    });
+
+    it("should prefer ADO_PAT over PERSONAL_ACCESS_TOKEN", async () => {
+      process.env["ADO_PAT"] = "preferred-pat";
+      process.env["PERSONAL_ACCESS_TOKEN"] = "fallback-pat";
+
+      const authenticator = createAuthenticator("pat");
+      const result = await authenticator();
+
+      expect(result).toBe("preferred-pat");
+    });
+
+    it("should throw if neither ADO_PAT nor PERSONAL_ACCESS_TOKEN is set", async () => {
+      delete process.env["ADO_PAT"];
       delete process.env["PERSONAL_ACCESS_TOKEN"];
 
       const authenticator = createAuthenticator("pat");
 
-      await expect(authenticator()).rejects.toThrow("Environment variable 'PERSONAL_ACCESS_TOKEN' is not set or empty");
+      await expect(authenticator()).rejects.toThrow("Environment variable 'ADO_PAT' or 'PERSONAL_ACCESS_TOKEN' must be set");
     });
 
-    it("should throw if PERSONAL_ACCESS_TOKEN is an empty string", async () => {
+    it("should throw if ADO_PAT is an empty string", async () => {
+      process.env["ADO_PAT"] = "";
       process.env["PERSONAL_ACCESS_TOKEN"] = "";
 
       const authenticator = createAuthenticator("pat");
 
-      await expect(authenticator()).rejects.toThrow("Environment variable 'PERSONAL_ACCESS_TOKEN' is not set or empty");
-    });
-
-    it("should return a different value each call if env var changes between calls", async () => {
-      const b64PatA = Buffer.from("user@example.com:token-a").toString("base64");
-      const b64PatB = Buffer.from("user@example.com:token-b").toString("base64");
-
-      process.env["PERSONAL_ACCESS_TOKEN"] = b64PatA;
-      const authenticator = createAuthenticator("pat");
-      const resultA = await authenticator();
-
-      process.env["PERSONAL_ACCESS_TOKEN"] = b64PatB;
-      const resultB = await authenticator();
-
-      expect(resultA).toBe(b64PatA);
-      expect(resultB).toBe(b64PatB);
-    });
-  });
-
-  describe("PAT token extraction for WebApi handler", () => {
-    it("should correctly extract raw PAT from base64(email:pat)", () => {
-      const email = "user@example.com";
-      const rawPat = "myRawPatToken123";
-      const b64 = Buffer.from(`${email}:${rawPat}`).toString("base64");
-
-      const decoded = Buffer.from(b64, "base64").toString("utf8");
-      const extractedPat = decoded.split(":").slice(1).join(":");
-
-      expect(extractedPat).toBe(rawPat);
-    });
-
-    it("should correctly extract raw PAT when PAT itself contains colons", () => {
-      const email = "user@example.com";
-      const rawPat = "part1:part2:part3";
-      const b64 = Buffer.from(`${email}:${rawPat}`).toString("base64");
-
-      const decoded = Buffer.from(b64, "base64").toString("utf8");
-      const extractedPat = decoded.split(":").slice(1).join(":");
-
-      expect(extractedPat).toBe(rawPat);
-    });
-
-    it("should produce a valid Basic auth header value from base64(email:pat)", () => {
-      const email = "user@example.com";
-      const rawPat = "myRawPatToken123";
-      const b64Pat = Buffer.from(`${email}:${rawPat}`).toString("base64");
-
-      // The fetch interceptor uses b64Pat directly as the Basic credential
-      const authHeaderValue = `Basic ${b64Pat}`;
-
-      // Verify the header can be decoded back to the expected credentials
-      const decoded = Buffer.from(b64Pat, "base64").toString("utf8");
-      expect(decoded).toBe(`${email}:${rawPat}`);
-      expect(authHeaderValue).toBe(`Basic ${b64Pat}`);
+      await expect(authenticator()).rejects.toThrow("Environment variable 'ADO_PAT' or 'PERSONAL_ACCESS_TOKEN' must be set");
     });
   });
 });

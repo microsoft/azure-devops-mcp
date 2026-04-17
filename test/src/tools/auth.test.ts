@@ -126,6 +126,23 @@ describe("auth functions", () => {
       expect(result).toEqual(mockIdentities);
     });
 
+    it("should use on-prem identity endpoint when serverUrl is not Azure DevOps Services", async () => {
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      mockConnection.serverUrl = "https://ado.contoso.local/tfs/DefaultCollection";
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ value: [] }),
+      });
+
+      await searchIdentities("john.doe@example.com", tokenProvider, connectionProvider, userAgentProvider);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://ado.contoso.local/tfs/DefaultCollection/_apis/identities?api-version=7.2-preview.1&searchFilter=General&filterValue=john.doe%40example.com",
+        expect.any(Object)
+      );
+    });
+
     it("should handle HTTP error responses correctly", async () => {
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
 

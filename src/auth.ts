@@ -75,21 +75,51 @@ class OAuthAuthenticator {
   }
 }
 
+function tryExtractLegacyPatFromBase64(value: string): string | undefined {
+  if (value.includes(":")) {
+    return undefined;
+  }
+
+  try {
+    const decoded = Buffer.from(value, "base64").toString("utf8");
+    const separatorIndex = decoded.indexOf(":");
+    if (separatorIndex <= 0 || separatorIndex === decoded.length - 1) {
+      return undefined;
+    }
+
+    if (!/^[\x20-\x7E]+$/.test(decoded)) {
+      return undefined;
+    }
+
+    return decoded.slice(separatorIndex + 1);
+  } catch {
+    return undefined;
+  }
+}
+
 function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
   logger.debug(`Creating authenticator of type '${type}' with tenantId='${tenantId ?? "undefined"}'`);
   switch (type) {
     case "pat":
-      logger.debug(`Authenticator: Using PAT authentication (PERSONAL_ACCESS_TOKEN)`);
+      logger.debug(`Authenticator: Using PAT authentication (ADO_PAT or PERSONAL_ACCESS_TOKEN)`);
       return async () => {
-        logger.debug(`${type}: Reading token from PERSONAL_ACCESS_TOKEN environment variable`);
-        const b64Pat = process.env["PERSONAL_ACCESS_TOKEN"];
-        if (!b64Pat) {
-          logger.error(`${type}: PERSONAL_ACCESS_TOKEN environment variable is not set or empty`);
-          throw new Error("Environment variable 'PERSONAL_ACCESS_TOKEN' is not set or empty. Please set it with a valid base64-encoded Azure DevOps Personal Access Token.");
+        logger.debug(`${type}: Reading PAT from ADO_PAT or PERSONAL_ACCESS_TOKEN environment variables`);
+        const patValue = process.env["ADO_PAT"] ?? process.env["PERSONAL_ACCESS_TOKEN"];
+        if (!patValue?.trim()) {
+          logger.error(`${type}: Neither ADO_PAT nor PERSONAL_ACCESS_TOKEN environment variables are set`);
+          throw new Error("Environment variable 'ADO_PAT' or 'PERSONAL_ACCESS_TOKEN' must be set with a valid Azure DevOps Personal Access Token.");
         }
-        // Return base64 value as-is — caller uses it directly as the Basic auth credential
+
+        const normalizedPat = patValue.trim();
+        const legacyPat = tryExtractLegacyPatFromBase64(normalizedPat);
+
+        if (legacyPat) {
+          logger.warn(`${type}: Detected legacy base64 PAT format in PERSONAL_ACCESS_TOKEN. Consider switching to raw PAT in ADO_PAT.`);
+          return legacyPat;
+        }
+
         logger.debug(`${type}: Successfully retrieved PAT from environment variable`);
-        return b64Pat;
+        return normalizedPat;
       };
 
     case "envvar":

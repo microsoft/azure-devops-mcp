@@ -4,7 +4,9 @@ Before you get started, ensure you follow the steps in the `README.md` file. Thi
 
 ## Does the MCP Server support both Azure DevOps Services and on-premises deployments?
 
-This MCP Server supports only Azure DevOps Services. Several required API endpoints are not yet available for on-premises deployments. We currently do not have plans to support Azure DevOps on-prem.
+In this fork, both Azure DevOps Services and Azure DevOps Server (on-premises) are supported, with some limitations.
+
+For on-prem details, see [FORK-ONPREM-PAT.md](./FORK-ONPREM-PAT.md).
 
 ## Can I connect to more than one organization at a time?
 
@@ -16,7 +18,13 @@ Currently, you need to fetch the list of projects so the LLM has context about t
 
 ## Are PAT's supported?
 
-Sorry, PAT's are currently not supported in this local MCP Sever.
+Yes. This fork supports PAT authentication with:
+
+- `ADO_PAT` (recommended, raw PAT value)
+- `PERSONAL_ACCESS_TOKEN` (raw PAT value)
+- legacy compatibility for base64 `email:pat` in `PERSONAL_ACCESS_TOKEN`
+
+For setup examples and caveats, see [FORK-ONPREM-PAT.md](./FORK-ONPREM-PAT.md).
 
 ## Is there a remote supported version of the MCP Server?
 

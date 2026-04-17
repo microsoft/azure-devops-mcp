@@ -357,6 +357,40 @@ Replace `<your-org>` with your Azure DevOps organization name (e.g. `contoso`).
 
 > **Note:** On first use, Opencode will trigger browser-based Microsoft account login.
 
+For this fork, you can also use Azure DevOps Server (on-prem) with PAT auth by passing a full collection URL and `--authentication pat`.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "azure-devops-onprem": {
+      "type": "local",
+      "command": [
+        "node",
+        "/absolute/path/to/azure-devops-mcp/dist/index.js",
+        "https://ado.company.local/tfs/DefaultCollection",
+        "--authentication",
+        "pat",
+        "-d",
+        "core",
+        "work",
+        "work-items",
+        "repositories",
+        "wiki",
+        "pipelines",
+        "test-plans"
+      ],
+      "enabled": true,
+      "environment": {
+        "ADO_PAT": "<your-pat>"
+      }
+    }
+  }
+}
+```
+
+See [FORK-ONPREM-PAT.md](./FORK-ONPREM-PAT.md) for the full fork-specific setup and limitations.
+
 > **Tip:** Limit loaded tools using domain filtering by appending `-d` flags to the command:
 >
 > ```json
