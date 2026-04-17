@@ -1225,7 +1225,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (url && url.trim().length > 0) {
           // If url is provided, find relations matching both rel type and url
-          relationIndexes = relations.map((relation, idx) => (relation.url === url ? idx : -1)).filter((idx) => idx !== -1);
+          relationIndexes = relations.map((relation, idx) => (relation.rel === linkType && relation.url === url ? idx : -1)).filter((idx) => idx !== -1);
         } else {
           // If url is not provided, find all relations matching rel type
           relationIndexes = relations.map((relation, idx) => (relation.rel === linkType ? idx : -1)).filter((idx) => idx !== -1);
