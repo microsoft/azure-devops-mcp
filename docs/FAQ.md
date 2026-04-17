@@ -16,7 +16,7 @@ Currently, you need to fetch the list of projects so the LLM has context about t
 
 ## Are PAT's supported?
 
-Sorry, PAT's are currently not supported in this local MCP Sever.
+Yes! Personal Access Tokens (PATs) are supported via the `pat` authentication type. See the [Authentication Methods](./GETTINGSTARTED.md#-authentication-methods) section in the Getting Started guide for setup instructions, including the required base64 encoding format.
 
 ## Is there a remote supported version of the MCP Server?
 
