@@ -2406,6 +2406,48 @@ describe("configureWorkItemTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error unlinking work item: Unknown error occurred");
     });
+
+    describe("type + url matching", () => {
+      const artifactUrl = "vstfs:///Git/Ref/project%2Frepo%2FGBmain";
+      const relatedUrl = "https://dev.azure.com/contoso/_apis/wit/workItems/2";
+      const relations = [
+        { rel: "ArtifactLink", url: artifactUrl, attributes: { name: "Branch" } },
+        { rel: "System.LinkTypes.Related", url: relatedUrl, attributes: { isLocked: false, name: "Related" } },
+      ];
+
+      const getUnlinkHandler = () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
+        if (!call) throw new Error("wit_work_item_unlink tool not registered");
+        return call[3];
+      };
+
+      it.each([
+        { name: "type=related + ArtifactLink url (type bypass)", type: "related", url: artifactUrl },
+        { name: "type=child + ArtifactLink url (type bypass)", type: "child", url: artifactUrl },
+      ])("should NOT remove a relation when url matches but type does not ($name)", async ({ type, url }) => {
+        const handler = getUnlinkHandler();
+        (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue({ id: 1, relations });
+
+        const result = await handler({ project: "TestProject", id: 1, type, url });
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).not.toHaveBeenCalled();
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("No matching relations found");
+      });
+
+      it("should remove a relation when both url and type match", async () => {
+        const handler = getUnlinkHandler();
+        (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue({ id: 1, relations });
+        (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 1, rev: 10 });
+
+        const result = await handler({ project: "TestProject", id: 1, type: "related", url: relatedUrl });
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/1" }], 1, "TestProject");
+        expect(result.isError).toBe(false);
+        expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
+      });
+    });
   });
 
   // Add error handling tests for existing tools
