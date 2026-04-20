@@ -903,9 +903,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
         // this should only happen for large text fields, but since we dont't know by field name, lets assume if the users
-        // passes a value longer than 50 characters, then we can set the format to Markdown
+        // passes a value longer than 100 characters, then we can set the format to Markdown
         fields.forEach(({ name, value, format }) => {
-          if (value.length > 50 && format === "Markdown") {
+          if (value.length > 100 && format === "Markdown") {
             document.push({
               op: "add",
               path: `/multilineFieldsFormat/${name}`,
@@ -1055,7 +1055,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
           // Add format operations for Markdown fields
           workItemUpdates.forEach(({ path, value, format }) => {
-            if (format === "Markdown" && value && value.length > 50) {
+            if (format === "Markdown" && value && value.length > 100) {
               operations.push({
                 op: "Add",
                 path: `/multilineFieldsFormat${path.replace("/fields", "")}`,
