@@ -429,7 +429,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
         const testResultsApi = await connection.getTestResultsApi();
 
         // Build filter expression for outcomes if specified
-        const outcomeFilter = outcomes?.map((o) => `Outcome eq '${o}'`).join(" or ");
+        const outcomeFilter = outcomes?.map((o) => `Outcome eq ${o}`).join(" or ");
 
         // Fetch test result details for the build in a single API call
         // This is more efficient than getTestRuns + getTestResults per run,
