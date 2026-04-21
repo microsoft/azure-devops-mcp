@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import * as fs from "fs";
+import * as path from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
@@ -500,8 +502,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         if (revisions && Array.isArray(revisions)) {
           revisions.forEach((revision) => {
             if (revision.fields) {
-              Object.keys(revision.fields).forEach((fieldName) => {
-                const fieldValue = revision.fields ? revision.fields[fieldName] : undefined;
+              const fields = revision.fields;
+              Object.keys(fields).forEach((fieldName) => {
+                const fieldValue = fields[fieldName];
                 // Check if this is an identity object by looking for common identity properties
                 if (
                   fieldValue &&
@@ -1478,13 +1481,19 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_item_attachment,
-    "Download a work item attachment by its ID and return the content as a base64-encoded resource. Useful for viewing images (e.g. screenshots) attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
+    "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If savePath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
-      fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type for the returned resource."),
+      fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type or the saved file's name."),
+      savePath: z
+        .string()
+        .optional()
+        .describe(
+          "Optional local directory path where the file should be saved. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
+        ),
     },
-    async ({ project, attachmentId, fileName }) => {
+    async ({ project, attachmentId, fileName, savePath }) => {
       try {
         const connection = await connectionProvider();
 
@@ -1506,9 +1515,27 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         });
 
         const buffer = Buffer.concat(chunks);
-        const base64Data = buffer.toString("base64");
+
+        if (savePath) {
+          const resolvedFileName = fileName ?? attachmentId;
+          const localFilePath = path.join(savePath, resolvedFileName);
+
+          fs.writeFileSync(localFilePath, buffer);
+
+          return {
+            content: [{ type: "text", text: `Attachment saved to: ${localFilePath}` }],
+          };
+        }
+
         const mimeType = getMimeType(fileName);
 
+        if (mimeType.startsWith("text/")) {
+          return {
+            content: [{ type: "text", text: buffer.toString("utf-8") }],
+          };
+        }
+
+        const base64Data = buffer.toString("base64");
         return {
           content: [
             {
@@ -1544,6 +1571,15 @@ function getMimeType(fileName: string | undefined): string {
     webp: "image/webp",
     pdf: "application/pdf",
     txt: "text/plain",
+    md: "text/markdown",
+    markdown: "text/markdown",
+    csv: "text/csv",
+    html: "text/html",
+    htm: "text/html",
+    xml: "text/xml",
+    json: "application/json",
+    yaml: "text/yaml",
+    yml: "text/yaml",
     zip: "application/zip",
   };
   return (ext && mimeTypes[ext]) ?? "application/octet-stream";

@@ -6,7 +6,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
 import { Readable } from "stream";
+import * as fs from "fs";
+import * as path from "path";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+
+jest.mock("fs");
 import {
   _mockBacklogs,
   _mockQuery,
@@ -3887,6 +3891,103 @@ describe("configureWorkItemTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error retrieving work item attachment: Not found");
+    });
+
+    it("should save file to disk and return path text when savePath is provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeData = Buffer.from("fake-png-bytes");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "/tmp/attachments",
+      };
+
+      const result = await handler(params);
+
+      const expectedPath = path.join("/tmp/attachments", "screenshot.png");
+      expect(writeFileSyncMock).toHaveBeenCalledWith(expectedPath, fakeData);
+      expect(result.content[0].type).toBe("text");
+      expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
+
+      writeFileSyncMock.mockRestore();
+    });
+
+    it("should use attachmentId as filename when savePath is provided but fileName is omitted", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeData = Buffer.from("binary-data");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+
+      const attachmentId = "12341234-1234-1234-1234-123412341234";
+      const params = {
+        project: "TestProject",
+        attachmentId,
+        savePath: "/tmp/attachments",
+      };
+
+      const result = await handler(params);
+
+      const expectedPath = path.join("/tmp/attachments", attachmentId);
+      expect(writeFileSyncMock).toHaveBeenCalledWith(expectedPath, fakeData);
+      expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
+
+      writeFileSyncMock.mockRestore();
+    });
+
+    it("should return text content for markdown files when savePath is not provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const markdownContent = "# Hello\n\nThis is a markdown file.";
+      const fakeData = Buffer.from(markdownContent, "utf-8");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "notes.md",
+      });
+
+      expect(result.content[0].type).toBe("text");
+      expect(result.content[0].text).toBe(markdownContent);
+    });
+
+    it("should return text content for plain text files when savePath is not provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const textContent = "Hello, world!";
+      const fakeData = Buffer.from(textContent, "utf-8");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "readme.txt",
+      });
+
+      expect(result.content[0].type).toBe("text");
+      expect(result.content[0].text).toBe(textContent);
     });
   });
 
