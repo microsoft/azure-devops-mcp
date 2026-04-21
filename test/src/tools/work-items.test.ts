@@ -3902,7 +3902,7 @@ describe("configureWorkItemTools", () => {
 
       const fakeData = Buffer.from("fake-png-bytes");
       mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
-      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
 
       const params = {
         project: "TestProject",
@@ -3930,7 +3930,7 @@ describe("configureWorkItemTools", () => {
 
       const fakeData = Buffer.from("binary-data");
       mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
-      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
 
       const attachmentId = "12341234-1234-1234-1234-123412341234";
       const params = {
