@@ -877,7 +877,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           z.object({
             name: z.string().describe("The name of the field, e.g., 'System.Title'."),
             value: z.string().describe("The value of the field."),
-            format: z.enum(["Html", "Markdown"]).optional().default("Markdown").describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
+            format: z.enum(["Html", "Markdown"]).optional().describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
         .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
@@ -903,9 +903,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
         // this should only happen for large text fields, but since we dont't know by field name, lets assume if the users
-        // passes a value longer than 50 characters, then we can set the format to Markdown
+        // passes a value longer than 100 characters, then we can set the format to Markdown
         fields.forEach(({ name, value, format }) => {
-          if (value.length > 50 && format === "Markdown") {
+          if (value.length > 100 && format === "Markdown") {
             document.push({
               op: "add",
               path: `/multilineFieldsFormat/${name}`,
@@ -1030,7 +1030,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             format: z
               .enum(["Html", "Markdown"])
               .optional()
-              .default("Markdown")
               .describe("The format of the field value. Only to be used for large text fields. e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
@@ -1055,7 +1054,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
           // Add format operations for Markdown fields
           workItemUpdates.forEach(({ path, value, format }) => {
-            if (format === "Markdown" && value && value.length > 50) {
+            if (format === "Markdown" && value && value.length > 100) {
               operations.push({
                 op: "Add",
                 path: `/multilineFieldsFormat${path.replace("/fields", "")}`,
