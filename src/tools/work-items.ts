@@ -877,7 +877,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           z.object({
             name: z.string().describe("The name of the field, e.g., 'System.Title'."),
             value: z.string().describe("The value of the field."),
-            format: z.enum(["Html", "Markdown"]).optional().default("Markdown").describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
+            format: z.enum(["Html", "Markdown"]).optional().describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
         .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
@@ -1030,7 +1030,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             format: z
               .enum(["Html", "Markdown"])
               .optional()
-              .default("Markdown")
               .describe("The format of the field value. Only to be used for large text fields. e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
