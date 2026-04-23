@@ -3795,6 +3795,56 @@ describe("configureWorkItemTools", () => {
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe("Work item update failed");
       });
+
+      it("should emit attributes.name = 'Wiki Page' for Wiki linkType", async () => {
+        // Regression test: Azure DevOps rejects the ArtifactLink relation with
+        // TF401028 "Unrecognized Resource link" unless the attribute name is
+        // the exact category name "Wiki Page" — not the enum value "Wiki".
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const wikiUri = "vstfs:///Wiki/WikiPage/12341234-1234-1234-1234-123412341234%2F56785678-5678-5678-5678-567856785678%2FFeatures/MyFeature";
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          artifactUri: wikiUri,
+          linkType: "Wiki",
+          comment: "Feature spec",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: wikiUri,
+                attributes: {
+                  name: "Wiki Page",
+                  comment: "Feature spec",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+        expect(response.linkType).toBe("Wiki");
+      });
     });
   });
 

@@ -67,6 +67,29 @@ function getLinkTypeFromName(name: string) {
   }
 }
 
+/**
+ * Maps the user-facing `linkType` enum accepted by wit_add_artifact_link to
+ * the `attributes.name` value that Azure DevOps expects on the ArtifactLink
+ * relation.
+ *
+ * Most link types are 1:1 (e.g. "Branch" -> "Branch", "Pull Request" ->
+ * "Pull Request"). The exception is wiki pages: the MCP tool exposes them as
+ * `linkType: "Wiki"` for discoverability, but Azure DevOps' relation
+ * attribute name is `"Wiki Page"`. Using anything else produces a
+ * TF401028 "Unrecognized Resource link" rejection from the REST API.
+ *
+ * Keep this map narrow on purpose: only override when the ADO-required name
+ * differs from the enum value, so unexpected values pass through unchanged.
+ */
+function getArtifactLinkAttributeName(linkType: string): string {
+  switch (linkType) {
+    case "Wiki":
+      return "Wiki Page";
+    default:
+      return linkType;
+  }
+}
+
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
@@ -1387,7 +1410,15 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           }
         }
 
-        // Create the patch document for adding an artifact link relation
+        // Create the patch document for adding an artifact link relation.
+        //
+        // The `attributes.name` field must match Azure DevOps' internal link
+        // category name, which is NOT always the same as the user-facing
+        // `linkType` enum value. For example, a wiki page link renders under
+        // the "Wiki Page" category on the work item, not "Wiki". Passing the
+        // enum value verbatim for mismatched types produces a
+        // TF401028 "Unrecognized Resource link" rejection from the REST API.
+        // See getArtifactLinkAttributeName for the full mapping.
         const patchDocument = [
           {
             op: "add",
@@ -1396,7 +1427,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               rel: "ArtifactLink",
               url: finalArtifactUri,
               attributes: {
-                name: linkType,
+                name: getArtifactLinkAttributeName(linkType),
                 ...(comment && { comment }),
               },
             },
