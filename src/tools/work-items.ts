@@ -1481,24 +1481,24 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_item_attachment,
-    "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If saveToPath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
+    "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If savePath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
       fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type or the saved file's name."),
-      saveToPath: z
+      savePath: z
         .string()
         .optional()
         .describe(
           "Optional local directory path where the file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
         ),
     },
-    async ({ project, attachmentId, fileName, saveToPath }) => {
+    async ({ project, attachmentId, fileName, savePath }) => {
       const isAbsolutePath = (value: string) => path.posix.isAbsolute(value) || path.win32.isAbsolute(value);
       const hasDriveLetter = (value: string) => /^[a-zA-Z]:/.test(value);
 
-      if (saveToPath !== undefined && (saveToPath.includes("..") || isAbsolutePath(saveToPath) || hasDriveLetter(saveToPath))) {
-        throw new Error("Invalid saveToPath: only relative paths are allowed (e.g. 'temp' or 'downloads/attachments'). Absolute paths and path traversals are not permitted.");
+      if (savePath !== undefined && (savePath.includes("..") || isAbsolutePath(savePath) || hasDriveLetter(savePath))) {
+        throw new Error("Invalid savePath: absolute paths and path traversals are not allowed.");
       }
 
       if (fileName !== undefined && fileName.includes("..")) {
@@ -1527,9 +1527,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         const buffer = Buffer.concat(chunks);
 
-        if (saveToPath) {
+        if (savePath) {
           const resolvedFileName = fileName ?? attachmentId;
-          const localFilePath = path.join(saveToPath, resolvedFileName);
+          const localFilePath = path.join(savePath, resolvedFileName);
 
           if (fs.existsSync(localFilePath)) {
             throw new Error(`File already exists: ${localFilePath}`);
