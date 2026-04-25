@@ -745,7 +745,7 @@ describe("configureTestPlanTools", () => {
       expect(parsed[1].outcome).toBe("Passed");
     });
 
-    it("should pass outcome filter expression for server-side filtering", async () => {
+    it("should filter outcomes after fetching test results", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
@@ -754,22 +754,29 @@ describe("configureTestPlanTools", () => {
       (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
         resultsForGroup: [
           {
-            results: [{ id: 1, testCaseTitle: "FailingTest", outcome: "Failed", errorMessage: "error" }],
+            results: [
+              { id: 1, testCaseTitle: "FailingTest", outcome: "Failed", errorMessage: "error" },
+              { id: 2, testCaseTitle: "PassingTest", outcome: "Passed" },
+              { id: 3, testCaseTitle: "AbortedTest", outcome: "Aborted" },
+            ],
           },
         ],
       });
 
-      await handler({ project: "proj1", buildid: 123, outcomes: ["Failed", "Aborted"] });
+      const result = await handler({ project: "proj1", buildid: 123, outcomes: ["Failed", "Aborted"] });
 
       expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith(
         "proj1",
         123,
         undefined, // publishContext
         undefined, // groupBy
-        "Outcome eq 'Failed' or Outcome eq 'Aborted'", // filter expression
+        undefined, // filter
         undefined, // orderby
         true // shouldIncludeResults
       );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(2);
+      expect(parsed.map((r: { outcome: string }) => r.outcome)).toEqual(["Failed", "Aborted"]);
     });
 
     it("should handle API errors when fetching test results", async () => {

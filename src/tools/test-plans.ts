@@ -428,9 +428,6 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
         const connection = await connectionProvider();
         const testResultsApi = await connection.getTestResultsApi();
 
-        // Build filter expression for outcomes if specified
-        const outcomeFilter = outcomes?.map((o) => `Outcome eq '${o}'`).join(" or ");
-
         // Fetch test result details for the build in a single API call
         // This is more efficient than getTestRuns + getTestResults per run,
         // especially for builds with many test runs (e.g., cloud testing with one run per test case)
@@ -439,7 +436,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           buildid,
           undefined, // publishContext
           undefined, // groupBy
-          outcomeFilter, // filter by outcome
+          undefined, // filter
           undefined, // orderby
           true // shouldIncludeResults - get individual test results, not just aggregates
         );
@@ -455,17 +452,20 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
         }
 
         // Format results to extract useful fields
-        const formattedResults = allResults.map((r) => ({
-          id: r.id,
-          testCaseTitle: r.testCaseTitle,
-          outcome: r.outcome,
-          errorMessage: r.errorMessage,
-          stackTrace: r.stackTrace,
-          automatedTestName: r.automatedTestName,
-          automatedTestStorage: r.automatedTestStorage,
-          durationInMs: r.durationInMs,
-          runId: r.testRun?.id,
-        }));
+        const outcomeFilter = outcomes?.length ? new Set(outcomes.map((outcome) => outcome.toLowerCase())) : undefined;
+        const formattedResults = allResults
+          .filter((r) => !outcomeFilter || (typeof r.outcome === "string" && outcomeFilter.has(r.outcome.toLowerCase())))
+          .map((r) => ({
+            id: r.id,
+            testCaseTitle: r.testCaseTitle,
+            outcome: r.outcome,
+            errorMessage: r.errorMessage,
+            stackTrace: r.stackTrace,
+            automatedTestName: r.automatedTestName,
+            automatedTestStorage: r.automatedTestStorage,
+            durationInMs: r.durationInMs,
+            runId: r.testRun?.id,
+          }));
 
         return {
           content: [{ type: "text", text: JSON.stringify(formattedResults, null, 2) }],
