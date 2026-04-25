@@ -537,18 +537,20 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       project: z.string().describe("The name or ID of the project."),
       buildId: z.coerce.number().min(1).describe("The ID of the build."),
       artifactName: z.string().describe("The name of the artifact to download."),
-      destinationPath: z.string().optional().describe("The local path to download the artifact to. If not provided, returns binary content as base64."),
+      destinationPath: z.string().optional().describe("The relative local path to download the artifact to. If not provided, returns binary content as base64."),
     },
     async ({ project, buildId, artifactName, destinationPath }) => {
-      const isAbsolutePath = (value: string) => posix.isAbsolute(value) || win32.isAbsolute(value);
+      const hasUnsafePathSegment = (value: string) => value.split(/[\\/]+/).some((segment) => segment === "." || segment === "..");
+      const hasPathSeparators = (value: string) => /[\\/]/.test(value);
       const hasDriveLetter = (value: string) => /^[a-zA-Z]:/.test(value);
+      const isAbsolutePath = (value: string) => posix.isAbsolute(value) || win32.isAbsolute(value);
 
-      if (artifactName.includes("..")) {
-        throw new Error("Invalid artifactName: path traversal is not allowed.");
+      if (hasUnsafePathSegment(artifactName) || hasPathSeparators(artifactName) || hasDriveLetter(artifactName) || isAbsolutePath(artifactName)) {
+        throw new Error("Invalid artifactName: artifactName must be a file name, not a path.");
       }
 
-      if (destinationPath && (destinationPath.includes("..") || isAbsolutePath(destinationPath) || hasDriveLetter(destinationPath))) {
-        throw new Error("Invalid destinationPath: absolute paths and path traversals are not allowed.");
+      if (destinationPath && (hasUnsafePathSegment(destinationPath) || isAbsolutePath(destinationPath) || hasDriveLetter(destinationPath))) {
+        throw new Error("Invalid destinationPath: use a relative path without path traversal.");
       }
 
       const connection = await connectionProvider();
