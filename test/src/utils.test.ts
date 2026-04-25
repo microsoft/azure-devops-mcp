@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, encodeFormattedValue, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
+import { createEnumMapping, encodeFormattedValue, extractAdoStreamError, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -429,6 +429,65 @@ describe("utils", () => {
       expect(safeEnumConvert(mockEnum, "B")).toBe(1);
       expect(safeEnumConvert(mockEnum, "0")).toBeUndefined(); // Numeric strings aren't valid keys
     });
+  });
+});
+
+describe("extractAdoStreamError", () => {
+  const ADO_ERROR_JSON = JSON.stringify({
+    $id: "1",
+    innerException: null,
+    message: "Page '/nonexistent' does not exist in wiki 'my-wiki'",
+    typeName: "Microsoft.TeamFoundation.Wiki.Server.WikiPageNotFoundException, Microsoft.TeamFoundation.Wiki.Server",
+    typeKey: "WikiPageNotFoundException",
+    errorCode: 0,
+    eventId: 3000,
+  });
+
+  it("returns the message from a valid ADO error JSON string", () => {
+    expect(extractAdoStreamError(ADO_ERROR_JSON)).toBe(
+      "Page '/nonexistent' does not exist in wiki 'my-wiki'"
+    );
+  });
+
+  it("returns null for normal (non-error) content", () => {
+    expect(extractAdoStreamError("# Hello World\nSome markdown content")).toBeNull();
+  });
+
+  it("returns null for a non-JSON string", () => {
+    expect(extractAdoStreamError("plain text content")).toBeNull();
+  });
+
+  it("returns null for an empty string", () => {
+    expect(extractAdoStreamError("")).toBeNull();
+  });
+
+  it("returns null for JSON that lacks typeName", () => {
+    const json = JSON.stringify({ message: "Something went wrong" });
+    expect(extractAdoStreamError(json)).toBeNull();
+  });
+
+  it("returns null for JSON that lacks message", () => {
+    const json = JSON.stringify({
+      typeName: "Microsoft.SomeException",
+      errorCode: 0,
+    });
+    expect(extractAdoStreamError(json)).toBeNull();
+  });
+
+  it("returns null for JSON where typeName is not a string", () => {
+    const json = JSON.stringify({ typeName: 42, message: "oops" });
+    expect(extractAdoStreamError(json)).toBeNull();
+  });
+
+  it("returns null for JSON where message is not a string", () => {
+    const json = JSON.stringify({ typeName: "SomeException", message: { nested: true } });
+    expect(extractAdoStreamError(json)).toBeNull();
+  });
+
+  it("handles whitespace around the JSON string", () => {
+    expect(extractAdoStreamError(`  ${ADO_ERROR_JSON}  `)).toBe(
+      "Page '/nonexistent' does not exist in wiki 'my-wiki'"
+    );
   });
 });
 
