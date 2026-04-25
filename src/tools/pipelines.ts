@@ -532,7 +532,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     PIPELINE_TOOLS.pipelines_download_artifact,
-    "Downloads a pipeline artifact.",
+    "Downloads a pipeline artifact. When destinationPath is provided, it must be a relative local path; absolute paths and path traversal are not allowed.",
     {
       project: z.string().describe("The name or ID of the project."),
       buildId: z.coerce.number().min(1).describe("The ID of the build."),
