@@ -27,7 +27,7 @@ import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { getEnumKeys, streamToString } from "../utils.js";
+import { extractAdoStreamError, getEnumKeys, streamToString } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -2105,6 +2105,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         );
 
         const content = await streamToString(stream);
+
+        const streamError = extractAdoStreamError(content);
+        if (streamError) {
+          return {
+            content: [{ type: "text", text: `Error getting file content for '${path}': ${streamError}` }],
+            isError: true,
+          };
+        }
 
         return {
           content: [{ type: "text", text: content }],
