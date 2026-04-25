@@ -7892,7 +7892,51 @@ describe("repos tools", () => {
       });
     });
 
-    describe("repo_get_file_content isError on ADO error stream", () => {
+    describe("repo_get_file_content", () => {
+      it("returns file content on success", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+        if (!call) throw new Error("repo_get_file_content tool not registered");
+        const [, , , handler] = call;
+
+        const fileContent = "# Hello World\nThis is a test file.";
+        const { Readable } = await import("stream");
+        const contentStream = new Readable();
+        contentStream.push(fileContent);
+        contentStream.push(null);
+
+        mockGitApi.getItemText.mockResolvedValue(contentStream);
+
+        const result = await handler({
+          repositoryId: "test-repo",
+          path: "README.md",
+          project: "test-project",
+        });
+
+        expect(result.isError).toBeFalsy();
+        expect(result.content[0].text).toBe(fileContent);
+      });
+
+      it("returns isError: true when getItemText throws", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+        if (!call) throw new Error("repo_get_file_content tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getItemText.mockRejectedValue(new Error("Network error"));
+
+        const result = await handler({
+          repositoryId: "test-repo",
+          path: "README.md",
+          project: "test-project",
+        });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("Network error");
+      });
+
       it("returns isError: true when getItemText stream contains ADO error JSON (e.g. file not found)", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
