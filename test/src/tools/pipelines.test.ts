@@ -1507,7 +1507,7 @@ describe("configurePipelineTools", () => {
         destinationPath: "C:\\temp\\artifacts",
       };
 
-      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and path traversals are not allowed.");
+      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: use a relative path without path traversal.");
       expect(connectionProvider).not.toHaveBeenCalled();
     });
 
@@ -1524,7 +1524,7 @@ describe("configurePipelineTools", () => {
         destinationPath: "/tmp/artifacts",
       };
 
-      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and path traversals are not allowed.");
+      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: use a relative path without path traversal.");
       expect(connectionProvider).not.toHaveBeenCalled();
     });
 
@@ -1541,11 +1541,18 @@ describe("configurePipelineTools", () => {
         destinationPath: "..\\..\\temp\\artifacts",
       };
 
-      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and path traversals are not allowed.");
+      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: use a relative path without path traversal.");
       expect(connectionProvider).not.toHaveBeenCalled();
     });
 
-    it("should reject artifactName with path traversal segments", async () => {
+    it.each([
+      ["path traversal segments", "..\\..\\drop"],
+      ["Windows path separators", "folder\\drop"],
+      ["Unix path separators", "folder/drop"],
+      ["Windows absolute path", "C:\\temp\\drop"],
+      ["Unix absolute path", "/tmp/drop"],
+      ["current directory segment", "."],
+    ])("should reject artifactName with %s", async (_description, artifactName) => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
       if (!call) throw new Error("pipelines_download_artifact tool not registered");
@@ -1554,15 +1561,25 @@ describe("configurePipelineTools", () => {
       const params = {
         project: "test-project",
         buildId: 12345,
-        artifactName: "..\\..\\drop",
+        artifactName,
         destinationPath: "temp\\artifacts",
       };
 
-      await expect(handler(params)).rejects.toThrow("Invalid artifactName: path traversal is not allowed.");
+      await expect(handler(params)).rejects.toThrow("Invalid artifactName: artifactName must be a file name, not a path.");
       expect(connectionProvider).not.toHaveBeenCalled();
     });
 
-    it("should reject destinationPath with a Windows drive-relative path", async () => {
+    it.each([
+      ["Windows drive-relative path", "D:artifacts"],
+      ["Windows drive-relative path with subdirectory", "E:sub\\deep"],
+      ["only a drive letter and colon", "D:"],
+      ["Windows root-relative path", "\\temp\\artifacts"],
+      ["Windows UNC path", "\\\\server\\share\\artifacts"],
+      ["Windows extended-length path", "\\\\?\\C:\\temp\\artifacts"],
+      ["segment-level traversal", "temp\\..\\artifacts"],
+      ["current directory segment", "."],
+      ["segment-level current directory", "temp\\.\\artifacts"],
+    ])("should reject destinationPath with %s", async (_description, destinationPath) => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
       if (!call) throw new Error("pipelines_download_artifact tool not registered");
@@ -1572,44 +1589,10 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         buildId: 12345,
         artifactName: "drop",
-        destinationPath: "D:artifacts",
+        destinationPath,
       };
 
-      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and path traversals are not allowed.");
-      expect(connectionProvider).not.toHaveBeenCalled();
-    });
-
-    it("should reject destinationPath with a drive-relative path with subdirectory", async () => {
-      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
-      if (!call) throw new Error("pipelines_download_artifact tool not registered");
-      const [, , , handler] = call;
-
-      const params = {
-        project: "test-project",
-        buildId: 12345,
-        artifactName: "drop",
-        destinationPath: "E:sub\\deep",
-      };
-
-      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and path traversals are not allowed.");
-      expect(connectionProvider).not.toHaveBeenCalled();
-    });
-
-    it("should reject destinationPath with only a drive letter and colon", async () => {
-      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_download_artifact");
-      if (!call) throw new Error("pipelines_download_artifact tool not registered");
-      const [, , , handler] = call;
-
-      const params = {
-        project: "test-project",
-        buildId: 12345,
-        artifactName: "drop",
-        destinationPath: "D:",
-      };
-
-      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: absolute paths and path traversals are not allowed.");
+      await expect(handler(params)).rejects.toThrow("Invalid destinationPath: use a relative path without path traversal.");
       expect(connectionProvider).not.toHaveBeenCalled();
     });
 
