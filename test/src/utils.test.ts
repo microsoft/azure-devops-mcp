@@ -444,9 +444,7 @@ describe("extractAdoStreamError", () => {
   });
 
   it("returns the message from a valid ADO error JSON string", () => {
-    expect(extractAdoStreamError(ADO_ERROR_JSON)).toBe(
-      "Page '/nonexistent' does not exist in wiki 'my-wiki'"
-    );
+    expect(extractAdoStreamError(ADO_ERROR_JSON)).toBe("Page '/nonexistent' does not exist in wiki 'my-wiki'");
   });
 
   it("returns null for normal (non-error) content", () => {
@@ -485,9 +483,7 @@ describe("extractAdoStreamError", () => {
   });
 
   it("handles whitespace around the JSON string", () => {
-    expect(extractAdoStreamError(`  ${ADO_ERROR_JSON}  `)).toBe(
-      "Page '/nonexistent' does not exist in wiki 'my-wiki'"
-    );
+    expect(extractAdoStreamError(`  ${ADO_ERROR_JSON}  `)).toBe("Page '/nonexistent' does not exist in wiki 'my-wiki'");
   });
 });
 
