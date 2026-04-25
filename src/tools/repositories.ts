@@ -762,17 +762,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
 
-        const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
+        const threads = (await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration)) ?? [];
 
         let filteredThreads = threads;
 
         if (status !== undefined) {
           const statusValue = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
-          filteredThreads = filteredThreads?.filter((thread) => thread.status === statusValue);
+          filteredThreads = filteredThreads.filter((thread) => thread.status === statusValue);
         }
 
         if (authorEmail !== undefined) {
-          filteredThreads = filteredThreads?.filter((thread) => {
+          filteredThreads = filteredThreads.filter((thread) => {
             const firstComment = thread.comments?.[0];
             return firstComment?.author?.uniqueName?.toLowerCase() === authorEmail.toLowerCase();
           });
@@ -780,13 +780,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (authorDisplayName !== undefined) {
           const lowerAuthorName = authorDisplayName.toLowerCase();
-          filteredThreads = filteredThreads?.filter((thread) => {
+          filteredThreads = filteredThreads.filter((thread) => {
             const firstComment = thread.comments?.[0];
             return firstComment?.author?.displayName?.toLowerCase().includes(lowerAuthorName);
           });
         }
 
-        const paginatedThreads = filteredThreads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
+        const paginatedThreads = filteredThreads.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
         if (fullResponse) {
           return {
@@ -795,7 +795,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         // Return trimmed thread data focusing on essential information
-        const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
+        const trimmedThreads = paginatedThreads.map((thread) => trimPullRequestThread(thread));
 
         return {
           content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
