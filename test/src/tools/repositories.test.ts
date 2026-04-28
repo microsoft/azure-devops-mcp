@@ -2612,6 +2612,49 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(mockThreads, null, 2));
     });
 
+    it("should return an empty array when no pull request threads are returned", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_threads);
+      if (!call) throw new Error("repo_list_pull_request_threads tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getThreads.mockResolvedValue(undefined);
+
+      const result = await handler({
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        top: 100,
+        skip: 0,
+      });
+
+      expect(mockGitApi.getThreads).toHaveBeenCalledWith("repo123", 456, undefined, undefined, undefined);
+      expect(result).not.toHaveProperty("isError");
+      expect(result.content[0].text).toBe(JSON.stringify([], null, 2));
+    });
+
+    it("should return an empty full response when no pull request threads are returned", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_threads);
+      if (!call) throw new Error("repo_list_pull_request_threads tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getThreads.mockResolvedValue(undefined);
+
+      const result = await handler({
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        fullResponse: true,
+        top: 100,
+        skip: 0,
+      });
+
+      expect(mockGitApi.getThreads).toHaveBeenCalledWith("repo123", 456, undefined, undefined, undefined);
+      expect(result).not.toHaveProperty("isError");
+      expect(result.content[0].text).toBe(JSON.stringify([], null, 2));
+    });
+
     it("should filter threads by status (Active)", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
