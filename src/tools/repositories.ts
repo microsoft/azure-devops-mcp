@@ -962,7 +962,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.get_branch_by_name,
-    "Get a branch by its name.",
+    "Get a branch by its name. Returns isError: true if the branch is not found.",
     {
       repositoryId: z.string().describe("The ID or name of the repository where the branch is located. When using a repository name instead of a GUID, the project parameter must also be provided."),
       branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
@@ -1976,7 +1976,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_directory,
-    "List files and folders in a directory within a repository. Useful for exploring the structure of a codebase or finding related files.",
+    "List files and folders in a directory within a repository. Useful for exploring the structure of a codebase or finding related files. Returns isError: true if the path is not found.",
     {
       repositoryId: z.string().describe("The ID or name of the repository."),
       path: z.string().optional().default("/").describe("The directory path to list (e.g., '/src' or '/src/components'). Defaults to repository root."),
@@ -2062,7 +2062,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   server.tool(
     REPO_TOOLS.get_file_content,
     "Get the content of a file from a Git repository at a specific version (branch, tag, or commit SHA). " +
-      "Useful for reading source files from PR branches, specific commits, or tags without having them checked out locally.",
+      "Useful for reading source files from PR branches, specific commits, or tags without having them checked out locally. " +
+      "Returns isError: true if the file is not found.",
     {
       repositoryId: z.string().describe("The ID (GUID) or name of the repository."),
       path: z.string().describe("The full path to the file in the repository, e.g., '/src/main.ts' or 'src/main.ts'."),
