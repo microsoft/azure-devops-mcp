@@ -35,7 +35,12 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     "Retrieves a list of build definitions for a given project.",
     {
       project: z.string().describe("Project ID or name to get build definitions for"),
-      repositoryId: z.string().optional().describe("Repository ID to filter build definitions"),
+      repositoryId: z
+        .string()
+        .optional()
+        .describe(
+          "Repository ID to filter build definitions. Can be a GUID or a repository name; when a name is provided, it is auto-resolved to the repository GUID using the project parameter (Azure Repos / TfsGit only)."
+        ),
       repositoryType: z.enum(["TfsGit", "GitHub", "BitbucketCloud"]).optional().describe("Type of repository to filter build definitions"),
       name: z.string().optional().describe("Name of the build definition to filter"),
       path: z.string().optional().describe("Path of the build definition to filter"),
@@ -76,10 +81,29 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
+
+      // Auto-resolve repositoryId from name to GUID for Azure Repos
+      let resolvedRepositoryId = repositoryId;
+      if (repositoryId) {
+        const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repositoryId);
+        if (!isGuid && (!repositoryType || repositoryType === "TfsGit")) {
+          const gitApi = await connection.getGitApi();
+          const repositories = await gitApi.getRepositories(project);
+          const repo = repositories?.find((r) => r.name === repositoryId);
+          if (!repo?.id) {
+            return {
+              content: [{ type: "text", text: `Error: Repository '${repositoryId}' not found in project '${project}'.` }],
+              isError: true,
+            };
+          }
+          resolvedRepositoryId = repo.id;
+        }
+      }
+
       const buildDefinitions = await buildApi.getDefinitions(
         project,
         name,
-        repositoryId,
+        resolvedRepositoryId,
         repositoryType,
         safeEnumConvert(DefinitionQueryOrder, queryOrder),
         top,
