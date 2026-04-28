@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
-import { apiVersion } from "../utils.js";
+import { apiVersion, extractAdoStreamError } from "../utils.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const WIKI_TOOLS = {
@@ -266,6 +266,14 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
             return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
           }
           pageContent = await streamToString(stream);
+
+          const streamError = extractAdoStreamError(pageContent);
+          if (streamError) {
+            return {
+              content: [{ type: "text", text: `Error fetching wiki page content: ${streamError}` }],
+              isError: true,
+            };
+          }
         }
 
         return createExternalContentResponse(pageContent, "wiki page");
