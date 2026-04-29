@@ -492,6 +492,63 @@ describe("repos tools", () => {
       expect(parsedResult.pullRequestId).toBe(123);
     });
 
+    it("should set merge commit message when autocomplete is enabled", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      if (!call) throw new Error("repo_update_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockUpdatedPR = {
+        pullRequestId: 123,
+        title: "Updated PR",
+        autoCompleteSetBy: { id: "user-id" },
+        completionOptions: {
+          mergeStrategy: 2, // Squash
+          deleteSourceBranch: true,
+          transitionWorkItems: false,
+          bypassPolicy: false,
+          mergeCommitMessage: "Merged PR 123: Update dependencies",
+        },
+      };
+
+      mockGitApi.updatePullRequest.mockResolvedValue(mockUpdatedPR);
+      mockGetCurrentUserDetails.mockResolvedValue({
+        authenticatedUser: { id: "current-user-id" },
+        authorizedUser: { id: "current-user-id" },
+      });
+
+      const params = {
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        project: "test-project",
+        autoComplete: true,
+        mergeStrategy: "Squash",
+        mergeCommitMessage: "Merged PR 123: Update dependencies",
+        deleteSourceBranch: true,
+        transitionWorkItems: false,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoCompleteSetBy: { id: "current-user-id" },
+          completionOptions: expect.objectContaining({
+            mergeStrategy: 2, // GitPullRequestMergeStrategy.Squash
+            mergeCommitMessage: "Merged PR 123: Update dependencies",
+            deleteSourceBranch: true,
+            transitionWorkItems: false,
+            bypassPolicy: false,
+          }),
+        }),
+        "test-repo-id",
+        123,
+        "test-project"
+      );
+      expect(result.isError).toBeFalsy();
+    });
+
     it("should disable autocomplete when autoComplete is false", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
