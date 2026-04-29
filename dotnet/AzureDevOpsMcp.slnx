@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AzureDevOps.Mcp.Application/AzureDevOps.Mcp.Application.csproj" />
+    <Project Path="src/AzureDevOps.Mcp.Domain/AzureDevOps.Mcp.Domain.csproj" />
+    <Project Path="src/AzureDevOps.Mcp.Infrastructure.AzureDevOps/AzureDevOps.Mcp.Infrastructure.AzureDevOps.csproj" />
+    <Project Path="src/AzureDevOps.Mcp.Infrastructure.Configuration/AzureDevOps.Mcp.Infrastructure.Configuration.csproj" />
+    <Project Path="src/AzureDevOps.Mcp.Server/AzureDevOps.Mcp.Server.csproj" />
+    <Project Path="src/AzureDevOps.Mcp.Tools/AzureDevOps.Mcp.Tools.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AzureDevOps.Mcp.IntegrationTests/AzureDevOps.Mcp.IntegrationTests.csproj" />
+    <Project Path="tests/AzureDevOps.Mcp.UnitTests/AzureDevOps.Mcp.UnitTests.csproj" />
+  </Folder>
+</Solution>

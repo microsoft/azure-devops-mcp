@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AzureDevOps.Mcp.Application\AzureDevOps.Mcp.Application.csproj" />
+    <ProjectReference Include="..\AzureDevOps.Mcp.Tools\AzureDevOps.Mcp.Tools.csproj" />
+    <ProjectReference Include="..\AzureDevOps.Mcp.Infrastructure.Configuration\AzureDevOps.Mcp.Infrastructure.Configuration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.2.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
