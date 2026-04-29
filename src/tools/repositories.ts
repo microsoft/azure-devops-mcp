@@ -27,7 +27,7 @@ import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { getEnumKeys, streamToString } from "../utils.js";
+import { extractAdoStreamError, getEnumKeys, streamToString } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -762,17 +762,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
 
-        const threads = await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration);
+        const threads = (await gitApi.getThreads(repositoryId, pullRequestId, project, iteration, baseIteration)) ?? [];
 
         let filteredThreads = threads;
 
         if (status !== undefined) {
           const statusValue = CommentThreadStatus[status as keyof typeof CommentThreadStatus];
-          filteredThreads = filteredThreads?.filter((thread) => thread.status === statusValue);
+          filteredThreads = filteredThreads.filter((thread) => thread.status === statusValue);
         }
 
         if (authorEmail !== undefined) {
-          filteredThreads = filteredThreads?.filter((thread) => {
+          filteredThreads = filteredThreads.filter((thread) => {
             const firstComment = thread.comments?.[0];
             return firstComment?.author?.uniqueName?.toLowerCase() === authorEmail.toLowerCase();
           });
@@ -780,13 +780,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (authorDisplayName !== undefined) {
           const lowerAuthorName = authorDisplayName.toLowerCase();
-          filteredThreads = filteredThreads?.filter((thread) => {
+          filteredThreads = filteredThreads.filter((thread) => {
             const firstComment = thread.comments?.[0];
             return firstComment?.author?.displayName?.toLowerCase().includes(lowerAuthorName);
           });
         }
 
-        const paginatedThreads = filteredThreads?.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
+        const paginatedThreads = filteredThreads.sort((a, b) => (a.id ?? 0) - (b.id ?? 0)).slice(skip, skip + top);
 
         if (fullResponse) {
           return {
@@ -795,7 +795,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         // Return trimmed thread data focusing on essential information
-        const trimmedThreads = paginatedThreads?.map((thread) => trimPullRequestThread(thread));
+        const trimmedThreads = paginatedThreads.map((thread) => trimPullRequestThread(thread));
 
         return {
           content: [{ type: "text", text: JSON.stringify(trimmedThreads, null, 2) }],
@@ -860,7 +860,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_branches_by_repo,
-    "Retrieve a list of branches for a given repository.",
+    "Retrieve a list of branch names for a given repository. Returns an array of branch name strings, not full branch objects. Use repo_get_branch_by_name to get full details for a specific branch.",
     {
       repositoryId: z
         .string()
@@ -893,7 +893,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_my_branches_by_repo,
-    "Retrieve a list of my branches for a given repository Id.",
+    "Retrieve a list of my branch names for a given repository Id. Returns an array of branch name strings, not full branch objects. Use repo_get_branch_by_name to get full details for a specific branch.",
     {
       repositoryId: z
         .string()
@@ -962,7 +962,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.get_branch_by_name,
-    "Get a branch by its name.",
+    "Get a branch by its name. Returns isError: true if the branch is not found.",
     {
       repositoryId: z.string().describe("The ID or name of the repository where the branch is located. When using a repository name instead of a GUID, the project parameter must also be provided."),
       branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
@@ -1976,7 +1976,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_directory,
-    "List files and folders in a directory within a repository. Useful for exploring the structure of a codebase or finding related files.",
+    "List files and folders in a directory within a repository. Useful for exploring the structure of a codebase or finding related files. Returns isError: true if the path is not found.",
     {
       repositoryId: z.string().describe("The ID or name of the repository."),
       path: z.string().optional().default("/").describe("The directory path to list (e.g., '/src' or '/src/components'). Defaults to repository root."),
@@ -2004,7 +2004,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (!items || items.length === 0) {
           return {
-            content: [{ type: "text", text: `No items found at path: ${path}` }],
+            content: [{ type: "text", text: `No items found at path: ${path}. The path may not exist in the repository.` }],
+            isError: true,
           };
         }
 
@@ -2062,7 +2063,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   server.tool(
     REPO_TOOLS.get_file_content,
     "Get the content of a file from a Git repository at a specific version (branch, tag, or commit SHA). " +
-      "Useful for reading source files from PR branches, specific commits, or tags without having them checked out locally.",
+      "Useful for reading source files from PR branches, specific commits, or tags without having them checked out locally. " +
+      "Returns isError: true if the file is not found.",
     {
       repositoryId: z.string().describe("The ID (GUID) or name of the repository."),
       path: z.string().describe("The full path to the file in the repository, e.g., '/src/main.ts' or 'src/main.ts'."),
@@ -2105,6 +2107,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         );
 
         const content = await streamToString(stream);
+
+        const streamError = extractAdoStreamError(content);
+        if (streamError) {
+          return {
+            content: [{ type: "text", text: `Error getting file content for '${path}': ${streamError}` }],
+            isError: true,
+          };
+        }
 
         return {
           content: [{ type: "text", text: content }],

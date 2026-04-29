@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
-import { apiVersion } from "../utils.js";
+import { apiVersion, extractAdoStreamError } from "../utils.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const WIKI_TOOLS = {
@@ -122,7 +122,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     WIKI_TOOLS.get_wiki_page,
-    "Retrieve wiki page metadata by path. This tool does not return page content.",
+    "Retrieve wiki page metadata by path. This tool does not return page content. Returns isError: true if the page is not found.",
     {
       wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
       project: z.string().describe("The project name or ID where the wiki is located."),
@@ -184,7 +184,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     WIKI_TOOLS.get_wiki_page_content,
-    "Retrieve wiki page content. Provide either a 'url' parameter OR the combination of 'wikiIdentifier' and 'project' parameters.",
+    "Retrieve wiki page content. Provide either a 'url' parameter OR the combination of 'wikiIdentifier' and 'project' parameters. " + "Returns isError: true if the wiki page is not found.",
     {
       url: z
         .string()
@@ -266,6 +266,14 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
             return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
           }
           pageContent = await streamToString(stream);
+
+          const streamError = extractAdoStreamError(pageContent);
+          if (streamError) {
+            return {
+              content: [{ type: "text", text: `Error fetching wiki page content: ${streamError}` }],
+              isError: true,
+            };
+          }
         }
 
         return createExternalContentResponse(pageContent, "wiki page");
