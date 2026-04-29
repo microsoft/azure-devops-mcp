@@ -2004,7 +2004,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (!items || items.length === 0) {
           return {
-            content: [{ type: "text", text: `No items found at path: ${path}` }],
+            content: [{ type: "text", text: `No items found at path: ${path}. The path may not exist in the repository.` }],
+            isError: true,
           };
         }
 
