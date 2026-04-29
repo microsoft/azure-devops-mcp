@@ -2612,6 +2612,49 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(mockThreads, null, 2));
     });
 
+    it("should return an empty array when no pull request threads are returned", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_threads);
+      if (!call) throw new Error("repo_list_pull_request_threads tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getThreads.mockResolvedValue(undefined);
+
+      const result = await handler({
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        top: 100,
+        skip: 0,
+      });
+
+      expect(mockGitApi.getThreads).toHaveBeenCalledWith("repo123", 456, undefined, undefined, undefined);
+      expect(result).not.toHaveProperty("isError");
+      expect(result.content[0].text).toBe(JSON.stringify([], null, 2));
+    });
+
+    it("should return an empty full response when no pull request threads are returned", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_request_threads);
+      if (!call) throw new Error("repo_list_pull_request_threads tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getThreads.mockResolvedValue(undefined);
+
+      const result = await handler({
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        fullResponse: true,
+        top: 100,
+        skip: 0,
+      });
+
+      expect(mockGitApi.getThreads).toHaveBeenCalledWith("repo123", 456, undefined, undefined, undefined);
+      expect(result).not.toHaveProperty("isError");
+      expect(result.content[0].text).toBe(JSON.stringify([], null, 2));
+    });
+
     it("should filter threads by status (Active)", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -7836,7 +7879,7 @@ describe("repos tools", () => {
         );
       });
 
-      it("should return no items found message", async () => {
+      it("should return isError when no items found (empty array)", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
         const [, , , handler] = call;
@@ -7846,7 +7889,44 @@ describe("repos tools", () => {
         const result = await handler({ repositoryId: "repo123", path: "/missing" });
 
         expect(result).toEqual({
-          content: [{ type: "text", text: "No items found at path: /missing" }],
+          content: [{ type: "text", text: "No items found at path: /missing. The path may not exist in the repository." }],
+          isError: true,
+        });
+      });
+
+      it("should succeed for empty directory (folder entry only)", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        const items = [
+          {
+            path: "/empty-dir",
+            isFolder: true,
+            gitObjectType: 2,
+            commitId: "abc123",
+          },
+        ];
+        mockGitApi.getItems.mockResolvedValue(items);
+
+        const result = await handler({ repositoryId: "repo123", path: "/empty-dir" });
+
+        expect(result.isError).toBeFalsy();
+        expect(result.content[0].text).toContain('"count": 1');
+      });
+
+      it("should return isError when getItems returns null", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        mockGitApi.getItems.mockResolvedValue(null);
+
+        const result = await handler({ repositoryId: "repo123", path: "/nonexistent" });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "No items found at path: /nonexistent. The path may not exist in the repository." }],
+          isError: true,
         });
       });
     });
@@ -7889,6 +7969,88 @@ describe("repos tools", () => {
           content: [{ type: "text", text: "Error creating pull request: Unknown error occurred" }],
           isError: true,
         });
+      });
+    });
+
+    describe("repo_get_file_content", () => {
+      it("returns file content on success", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+        if (!call) throw new Error("repo_get_file_content tool not registered");
+        const [, , , handler] = call;
+
+        const fileContent = "# Hello World\nThis is a test file.";
+        const { Readable } = await import("stream");
+        const contentStream = new Readable();
+        contentStream.push(fileContent);
+        contentStream.push(null);
+
+        mockGitApi.getItemText.mockResolvedValue(contentStream);
+
+        const result = await handler({
+          repositoryId: "test-repo",
+          path: "README.md",
+          project: "test-project",
+        });
+
+        expect(result.isError).toBeFalsy();
+        expect(result.content[0].text).toBe(fileContent);
+      });
+
+      it("returns isError: true when getItemText throws", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+        if (!call) throw new Error("repo_get_file_content tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getItemText.mockRejectedValue(new Error("Network error"));
+
+        const result = await handler({
+          repositoryId: "test-repo",
+          path: "README.md",
+          project: "test-project",
+        });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("Network error");
+      });
+
+      it("returns isError: true when getItemText stream contains ADO error JSON (e.g. file not found)", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_file_content);
+        if (!call) throw new Error("repo_get_file_content tool not registered");
+        const [, , , handler] = call;
+
+        const adoErrorBody = JSON.stringify({
+          $id: "1",
+          innerException: null,
+          message: "The file 'nonexistent.md' does not exist in the repository.",
+          typeName: "Microsoft.TeamFoundation.Git.Server.GitItemNotFoundException",
+          typeKey: "GitItemNotFoundException",
+          errorCode: 0,
+          eventId: 3000,
+        });
+
+        const { Readable } = await import("stream");
+        const errorStream = new Readable();
+        errorStream.push(adoErrorBody);
+        errorStream.push(null);
+
+        mockGitApi.getItemText.mockResolvedValue(errorStream);
+
+        const params = {
+          repositoryId: "test-repo",
+          path: "nonexistent.md",
+          project: "test-project",
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("The file 'nonexistent.md' does not exist in the repository.");
       });
     });
   });

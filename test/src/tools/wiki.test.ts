@@ -924,6 +924,37 @@ describe("configureWikiTools", () => {
         expect(calledUrl).toContain(encodeURIComponent("../../_apis/connectionData"));
       }
     });
+
+    it("should return isError: true when getPageText stream contains an ADO error JSON (e.g. page not found)", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const adoErrorBody = JSON.stringify({
+        $id: "1",
+        innerException: null,
+        message: "Page '/nonexistent' does not exist in wiki 'my-wiki'",
+        typeName: "Microsoft.TeamFoundation.Wiki.Server.WikiPageNotFoundException",
+        typeKey: "WikiPageNotFoundException",
+        errorCode: 0,
+        eventId: 3000,
+      });
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb(adoErrorBody));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const result = await handler({ wikiIdentifier: "my-wiki", project: "proj1", path: "/nonexistent" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Page '/nonexistent' does not exist in wiki 'my-wiki'");
+    });
   });
 
   describe("create_or_update_page tool", () => {
