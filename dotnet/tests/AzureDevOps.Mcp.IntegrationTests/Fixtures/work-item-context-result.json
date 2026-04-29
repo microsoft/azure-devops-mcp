@@ -1,0 +1,17 @@
+{
+  "Id": 1,
+  "Title": "Als ontwikkelaar wil ik work items ophalen via een MCP server zodat mijn AI-assistent context heeft over mijn taken",
+  "Type": "User Story",
+  "State": "New",
+  "Description": "<div>## Achtergrond</div><div>In moderne AI-assisted development workflows heeft een Large Language Model (LLM) toegang nodig tot project context.</div>",
+  "AssignedTo": "Gadeyne Bram",
+  "Url": "https://example.invalid/UZGent-IZ/_apis/wit/workItems/1",
+  "Comments": [
+    {
+      "Id": 1,
+      "Author": "Gadeyne Bram",
+      "Content": "<div>Spike afgerond — architectuurbeslissing genomen.</div>",
+      "CreatedDate": "2026-04-29T13:41:44.7600000Z"
+    }
+  ]
+}

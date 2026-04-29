@@ -11,4 +11,15 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AzureDevOps.Mcp.Application\AzureDevOps.Mcp.Application.csproj" />
+    <ProjectReference Include="..\..\src\AzureDevOps.Mcp.Tools\AzureDevOps.Mcp.Tools.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Fixtures\work-item-context-result.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
