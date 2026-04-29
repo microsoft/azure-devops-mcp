@@ -2,9 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AzureDevOps.Mcp.Application\AzureDevOps.Mcp.Application.csproj" />
+    <ProjectReference Include="..\AzureDevOps.Mcp.Infrastructure.Configuration\AzureDevOps.Mcp.Infrastructure.Configuration.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.TeamFoundationServer.Client" />
     <PackageReference Include="Microsoft.VisualStudio.Services.Client" />
     <PackageReference Include="System.Configuration.ConfigurationManager" />
   </ItemGroup>
