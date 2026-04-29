@@ -1,5 +1,6 @@
 using AzureDevOps.Mcp.Application.Services;
 using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 
@@ -60,7 +61,9 @@ public class AzureDevOpsWorkItemContextService : IWorkItemContextService
             Type = GetField(workItem, "System.WorkItemType"),
             State = GetField(workItem, "System.State"),
             Description = workItem.Fields.TryGetValue("System.Description", out var desc) ? desc?.ToString() : null,
-            AssignedTo = workItem.Fields.TryGetValue("System.AssignedTo", out var assignee) ? assignee?.ToString() : null,
+            AssignedTo = workItem.Fields.TryGetValue("System.AssignedTo", out var assignee)
+                ? (assignee is IdentityRef identity ? identity.DisplayName : assignee?.ToString())
+                : null,
             Url = workItem.Url,
             Comments = comments
         };
