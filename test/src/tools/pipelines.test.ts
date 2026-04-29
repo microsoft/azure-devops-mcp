@@ -25,7 +25,7 @@ describe("configurePipelineTools", () => {
   let tokenProvider: TokenProviderMock;
   let connectionProvider: ConnectionProviderMock;
   let userAgentProvider: () => string;
-  let mockConnection: { getBuildApi: jest.Mock; getPipelinesApi: jest.Mock; serverUrl: string };
+  let mockConnection: { getBuildApi: jest.Mock; getPipelinesApi: jest.Mock; getGitApi: jest.Mock; serverUrl: string };
 
   beforeEach(() => {
     server = { tool: jest.fn() } as unknown as McpServer;
@@ -34,6 +34,7 @@ describe("configurePipelineTools", () => {
     mockConnection = {
       getBuildApi: jest.fn(),
       getPipelinesApi: jest.fn(),
+      getGitApi: jest.fn(),
       serverUrl: "https://dev.azure.com/test-org",
     };
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
@@ -380,7 +381,7 @@ describe("configurePipelineTools", () => {
 
       const params = {
         project: "test-project",
-        repositoryId: "repo-123",
+        repositoryId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         repositoryType: "TfsGit" as const,
         name: "test-build",
         top: 10,
@@ -391,7 +392,7 @@ describe("configurePipelineTools", () => {
       expect(mockBuildApi.getDefinitions).toHaveBeenCalledWith(
         "test-project",
         "test-build",
-        "repo-123",
+        "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         "TfsGit",
         undefined, // queryOrder
         10, // top
@@ -434,6 +435,183 @@ describe("configurePipelineTools", () => {
       const params = { project: "test-project" };
 
       await expect(handler(params)).rejects.toThrow("API Error");
+    });
+
+    it("should auto-resolve repository name to GUID for TfsGit", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
+      if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
+      const [, , , handler] = call;
+
+      const mockGitApi = {
+        getRepositories: jest.fn().mockResolvedValue([
+          { id: "resolved-guid-1234", name: "my-repo" },
+          { id: "other-guid-5678", name: "other-repo" },
+        ]),
+      };
+      const mockBuildApi = {
+        getDefinitions: jest.fn().mockResolvedValue([{ id: 1, name: "Build" }]),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+      mockConnection.getGitApi = jest.fn().mockResolvedValue(mockGitApi);
+
+      const params = {
+        project: "test-project",
+        repositoryId: "my-repo",
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.getRepositories).toHaveBeenCalledWith("test-project");
+      expect(mockBuildApi.getDefinitions).toHaveBeenCalledWith(
+        "test-project",
+        undefined, // name
+        "resolved-guid-1234", // resolved repositoryId
+        undefined, // repositoryType
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined
+      );
+      expect(result.isError).toBeFalsy();
+    });
+
+    it("should return error when repository name is not found", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
+      if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
+      const [, , , handler] = call;
+
+      const mockGitApi = {
+        getRepositories: jest.fn().mockResolvedValue([{ id: "some-guid", name: "other-repo" }]),
+      };
+      const mockBuildApi = {
+        getDefinitions: jest.fn(),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+      mockConnection.getGitApi = jest.fn().mockResolvedValue(mockGitApi);
+
+      const params = {
+        project: "test-project",
+        repositoryId: "nonexistent-repo",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("nonexistent-repo");
+      expect(result.content[0].text).toContain("not found");
+      expect(mockBuildApi.getDefinitions).not.toHaveBeenCalled();
+    });
+
+    it("should pass GUID repositoryId through without resolution", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
+      if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
+      const [, , , handler] = call;
+
+      const mockBuildApi = {
+        getDefinitions: jest.fn().mockResolvedValue([]),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        repositoryId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getDefinitions).toHaveBeenCalledWith(
+        "test-project",
+        undefined,
+        "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined
+      );
+      expect(result.isError).toBeFalsy();
+    });
+
+    it("should not resolve repository name for GitHub repositoryType", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
+      if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
+      const [, , , handler] = call;
+
+      const mockBuildApi = {
+        getDefinitions: jest.fn().mockResolvedValue([]),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        repositoryId: "owner/repo",
+        repositoryType: "GitHub" as const,
+      };
+
+      const result = await handler(params);
+
+      // Should pass through without attempting resolution
+      expect(mockBuildApi.getDefinitions).toHaveBeenCalledWith(
+        "test-project",
+        undefined,
+        "owner/repo",
+        "GitHub",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined
+      );
+      expect(result.isError).toBeFalsy();
+    });
+
+    it("should propagate error when getRepositories fails during name resolution", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_get_build_definitions");
+      if (!call) throw new Error("pipelines_get_build_definitions tool not registered");
+      const [, , , handler] = call;
+
+      const mockGitApi = {
+        getRepositories: jest.fn().mockRejectedValue(new Error("Project access denied")),
+      };
+      mockConnection.getGitApi = jest.fn().mockResolvedValue(mockGitApi);
+
+      const params = {
+        project: "test-project",
+        repositoryId: "my-repo",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Project access denied");
     });
   });
 
