@@ -860,7 +860,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_branches_by_repo,
-    "Retrieve a list of branches for a given repository.",
+    "Retrieve a list of branch names for a given repository. Returns an array of branch name strings, not full branch objects. Use repo_get_branch_by_name to get full details for a specific branch.",
     {
       repositoryId: z
         .string()
@@ -893,7 +893,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_my_branches_by_repo,
-    "Retrieve a list of my branches for a given repository Id.",
+    "Retrieve a list of my branch names for a given repository Id. Returns an array of branch name strings, not full branch objects. Use repo_get_branch_by_name to get full details for a specific branch.",
     {
       repositoryId: z
         .string()
