@@ -450,7 +450,9 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
         if (testResultDetails.resultsForGroup) {
           for (const group of testResultDetails.resultsForGroup) {
             if (group.results) {
-              allResults.push(...group.results);
+              for (const result of group.results) {
+                allResults.push(result);
+              }
             }
           }
         }
