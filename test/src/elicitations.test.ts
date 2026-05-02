@@ -45,8 +45,8 @@ describe("elicitations", () => {
       expect(result).toEqual({ resolved: "ProjectAlpha" });
     });
 
-    it("should return DEFAULT_PROJECT from environment variable without prompting", async () => {
-      process.env.DEFAULT_PROJECT = "DefaultProject";
+    it("should return project from environment variable without prompting", async () => {
+      process.env.project = "DefaultProject";
 
       const result = await elicitProject(server, mockConnection as unknown as WebApi);
 
@@ -59,8 +59,8 @@ describe("elicitations", () => {
       expect(result).toEqual({ resolved: "DefaultProject" });
     });
 
-    it("should ignore DEFAULT_PROJECT if empty string", async () => {
-      process.env.DEFAULT_PROJECT = "";
+    it("should ignore project if empty string", async () => {
+      process.env.project = "";
       (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
 
       const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
@@ -106,8 +106,8 @@ describe("elicitations", () => {
       expect(result).toEqual({ resolved: "team-1" });
     });
 
-    it("should return DEFAULT_TEAM from environment variable without prompting", async () => {
-      process.env.DEFAULT_TEAM = "DefaultTeam";
+    it("should return team from environment variable without prompting", async () => {
+      process.env.team = "DefaultTeam";
 
       const result = await elicitTeam(server, mockConnection as unknown as WebApi, "ProjectAlpha");
 
@@ -120,8 +120,8 @@ describe("elicitations", () => {
       expect(result).toEqual({ resolved: "DefaultTeam" });
     });
 
-    it("should ignore DEFAULT_TEAM if empty string", async () => {
-      process.env.DEFAULT_TEAM = "";
+    it("should ignore team if empty string", async () => {
+      process.env.team = "";
       (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
 
       const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;

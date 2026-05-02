@@ -16,7 +16,7 @@ export type ElicitResult = ElicitResolved | ElicitResponse;
 
 export async function elicitProject(server: McpServer, connection: WebApi, message?: string): Promise<ElicitResult> {
   // Check for default project from environment variable
-  const defaultProject = process.env.DEFAULT_PROJECT;
+  const defaultProject = process.env.project;
   if (defaultProject) {
     return { resolved: defaultProject };
   }
@@ -57,7 +57,7 @@ export async function elicitProject(server: McpServer, connection: WebApi, messa
 
 export async function elicitTeam(server: McpServer, connection: WebApi, project: string, message?: string): Promise<ElicitResult> {
   // Check for default team from environment variable
-  const defaultTeam = process.env.DEFAULT_TEAM;
+  const defaultTeam = process.env.team;
   if (defaultTeam) {
     return { resolved: defaultTeam };
   }
