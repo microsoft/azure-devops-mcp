@@ -7936,7 +7936,7 @@ describe("repos tools", () => {
         );
       });
 
-      it("should return no items found message", async () => {
+      it("should return isError when no items found (empty array)", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
         const [, , , handler] = call;
@@ -7946,7 +7946,44 @@ describe("repos tools", () => {
         const result = await handler({ repositoryId: "repo123", path: "/missing" });
 
         expect(result).toEqual({
-          content: [{ type: "text", text: "No items found at path: /missing" }],
+          content: [{ type: "text", text: "No items found at path: /missing. The path may not exist in the repository." }],
+          isError: true,
+        });
+      });
+
+      it("should succeed for empty directory (folder entry only)", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        const items = [
+          {
+            path: "/empty-dir",
+            isFolder: true,
+            gitObjectType: 2,
+            commitId: "abc123",
+          },
+        ];
+        mockGitApi.getItems.mockResolvedValue(items);
+
+        const result = await handler({ repositoryId: "repo123", path: "/empty-dir" });
+
+        expect(result.isError).toBeFalsy();
+        expect(result.content[0].text).toContain('"count": 1');
+      });
+
+      it("should return isError when getItems returns null", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_directory);
+        const [, , , handler] = call;
+
+        mockGitApi.getItems.mockResolvedValue(null);
+
+        const result = await handler({ repositoryId: "repo123", path: "/nonexistent" });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "No items found at path: /nonexistent. The path may not exist in the repository." }],
+          isError: true,
         });
       });
     });

@@ -229,7 +229,7 @@ Lists artifacts for a given build.
 Downloads a pipeline artifact.
 
 - **Required**: `project`, `buildId`, `artifactName`
-- **Optional**: `destinationPath`
+- **Optional**: `destinationPath` (relative local path; absolute paths and path traversal are not allowed)
 
 ## Repositories
 
