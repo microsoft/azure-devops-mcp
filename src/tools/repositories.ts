@@ -27,7 +27,7 @@ import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { extractAdoStreamError, getEnumKeys, streamToString } from "../utils.js";
+import { extractAdoStreamError, getEnumKeys, normalizeNewlines, streamToString } from "../utils.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -202,7 +202,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
         // Normalize literal \n sequences that AI agents may produce via JSON-RPC serialization
-        const normalizedDescription = description?.replace(/\\n/g, "\n");
+        const normalizedDescription = description ? normalizeNewlines(description) : description;
 
         let pullRequest = await gitApi.createPullRequest(
           {
@@ -412,7 +412,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         if (title !== undefined) updateRequest.title = title;
         if (description !== undefined) {
           // Normalize literal \n sequences that AI agents may produce via JSON-RPC serialization
-          updateRequest.description = description.replace(/\\n/g, "\n");
+          updateRequest.description = normalizeNewlines(description);
         }
         if (isDraft !== undefined) updateRequest.isDraft = isDraft;
         if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
@@ -1487,7 +1487,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
-        const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
+        const comment = await gitApi.createComment({ content: normalizeNewlines(content) }, repositoryId, pullRequestId, threadId, project);
 
         // Check if the comment was successfully created
         if (!comment) {
@@ -1649,7 +1649,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         const thread = await gitApi.createThread(
-          { comments: [{ content: content }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
+          { comments: [{ content: normalizeNewlines(content) }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
           repositoryId,
           pullRequestId,
           project

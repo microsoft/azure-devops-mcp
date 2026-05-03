@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
-import { apiVersion, extractAdoStreamError } from "../utils.js";
+import { apiVersion, extractAdoStreamError, normalizeNewlines } from "../utils.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const WIKI_TOOLS = {
@@ -304,6 +304,9 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         const connection = await connectionProvider();
         const accessToken = await tokenProvider();
 
+        // Normalize literal \n sequences that AI agents may produce
+        const normalizedContent = normalizeNewlines(content);
+
         // Normalize the path
         const normalizedPath = path.startsWith("/") ? path : `/${path}`;
         const encodedPath = encodeURIComponent(normalizedPath);
@@ -322,7 +325,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
               "Content-Type": "application/json",
               "User-Agent": userAgentProvider(),
             },
-            body: JSON.stringify({ content: content }),
+            body: JSON.stringify({ content: normalizedContent }),
           });
 
           if (createResponse.ok) {
@@ -374,7 +377,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
                 "User-Agent": userAgentProvider(),
                 "If-Match": currentEtag,
               },
-              body: JSON.stringify({ content: content }),
+              body: JSON.stringify({ content: normalizedContent }),
             });
 
             if (updateResponse.ok) {

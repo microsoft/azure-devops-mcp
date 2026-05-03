@@ -8,7 +8,7 @@ import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
-import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
+import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, normalizeNewlines, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 
@@ -375,7 +375,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const accessToken = await tokenProvider();
 
         const body = {
-          text: comment,
+          text: normalizeNewlines(comment),
         };
 
         const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
@@ -434,7 +434,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
-        const body: Record<string, string> = { text };
+        const body: Record<string, string> = { text: normalizeNewlines(text) };
         const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
 
         const response = await fetch(

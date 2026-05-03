@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, encodeFormattedValue, extractAdoStreamError, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
+import { createEnumMapping, encodeFormattedValue, extractAdoStreamError, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, normalizeNewlines, safeEnumConvert } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -521,5 +521,33 @@ describe("encodeFormattedValue", () => {
       expect(once).toBe("Already &lt;tag&gt; plus &lt;new&gt; and $cash");
       expect(twice).toBe(once);
     });
+  });
+
+  it("normalizes literal backslash-n sequences in Markdown format", () => {
+    const input = "Line 1\\nLine 2\\nLine 3";
+    const result = encodeFormattedValue(input, "Markdown");
+    expect(result).toBe("Line 1\nLine 2\nLine 3");
+  });
+});
+
+describe("normalizeNewlines", () => {
+  it("replaces literal backslash-n with real newlines", () => {
+    expect(normalizeNewlines("Line 1\\nLine 2")).toBe("Line 1\nLine 2");
+  });
+
+  it("handles multiple occurrences", () => {
+    expect(normalizeNewlines("a\\nb\\nc")).toBe("a\nb\nc");
+  });
+
+  it("does not affect real newlines", () => {
+    expect(normalizeNewlines("a\nb")).toBe("a\nb");
+  });
+
+  it("returns unchanged text when no literal backslash-n present", () => {
+    expect(normalizeNewlines("no newlines here")).toBe("no newlines here");
+  });
+
+  it("handles empty string", () => {
+    expect(normalizeNewlines("")).toBe("");
   });
 });

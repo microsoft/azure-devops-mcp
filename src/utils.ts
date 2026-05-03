@@ -61,6 +61,21 @@ export function safeEnumConvert<T extends Record<string, string | number>>(enumO
 }
 
 /**
+ * Normalizes literal backslash-n sequences (`\n`) into real newline characters.
+ *
+ * AI agents communicating over JSON-RPC often produce the two-character sequence
+ * `\n` (backslash + n) instead of an actual newline (U+000A) in multi-line text
+ * fields.  This helper normalizes those sequences so that descriptions, comments,
+ * and wiki content render correctly in Azure DevOps.
+ *
+ * @param text The input text that may contain literal `\n` sequences
+ * @returns The text with literal `\n` replaced by real newlines
+ */
+export function normalizeNewlines(text: string): string {
+  return text.replace(/\\n/g, "\n");
+}
+
+/**
  * Encodes `>` and `<` for Markdown formatted fields.
  *
  * @param value The text value to encode
@@ -69,7 +84,7 @@ export function safeEnumConvert<T extends Record<string, string | number>>(enumO
  */
 export function encodeFormattedValue(value: string, format?: "Markdown" | "Html"): string {
   if (!value || format !== "Markdown") return value;
-  const result = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const result = normalizeNewlines(value).replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return result;
 }
 

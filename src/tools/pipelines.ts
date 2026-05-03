@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
+import { apiVersion, getEnumKeys, normalizeNewlines, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
@@ -457,7 +457,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         stagesToSkip: stagesToSkip,
         templateParameters: templateParameters,
         variables: variables,
-        yamlOverride: yamlOverride,
+        yamlOverride: yamlOverride ? normalizeNewlines(yamlOverride) : yamlOverride,
       };
 
       const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, pipelineId, pipelineVersion);
