@@ -172,7 +172,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       sourceRefName: z.string().describe("The source branch name for the pull request, e.g., 'refs/heads/feature-branch'."),
       targetRefName: z.string().describe("The target branch name for the pull request, e.g., 'refs/heads/main'."),
       title: z.string().describe("The title of the pull request."),
-      description: z.string().max(4000).optional().describe("The description of the pull request. Must not be longer than 4000 characters. Optional."),
+      description: z
+        .string()
+        .max(4000)
+        .optional()
+        .describe(
+          "The description of the pull request. Must not be longer than 4000 characters. Supports markdown formatting. Use actual newline characters (not literal backslash-n sequences) for line breaks. Optional."
+        ),
       isDraft: z.boolean().optional().default(false).describe("Indicates whether the pull request is a draft. Defaults to false."),
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a repository name instead of a GUID."),
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
@@ -195,12 +201,15 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
+        // Normalize literal \n sequences that AI agents may produce via JSON-RPC serialization
+        const normalizedDescription = description?.replace(/\\n/g, "\n");
+
         let pullRequest = await gitApi.createPullRequest(
           {
             sourceRefName,
             targetRefName,
             title,
-            description,
+            description: normalizedDescription,
             isDraft,
             workItemRefs: workItemRefs,
             forkSource,
@@ -357,7 +366,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       pullRequestId: z.coerce.number().min(1).describe("The ID of the pull request to update."),
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a repository name instead of a GUID."),
       title: z.string().optional().describe("The new title for the pull request."),
-      description: z.string().max(4000).optional().describe("The new description for the pull request. Must not be longer than 4000 characters."),
+      description: z
+        .string()
+        .max(4000)
+        .optional()
+        .describe(
+          "The new description for the pull request. Must not be longer than 4000 characters. Supports markdown formatting. Use actual newline characters (not literal backslash-n sequences) for line breaks."
+        ),
       isDraft: z.boolean().optional().describe("Whether the pull request should be a draft."),
       targetRefName: z.string().optional().describe("The new target branch name (e.g., 'refs/heads/main')."),
       status: z.enum(["Active", "Abandoned"]).optional().describe("The new status of the pull request. Can be 'Active' or 'Abandoned'."),
@@ -395,7 +410,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const updateRequest: Record<string, unknown> = {};
 
         if (title !== undefined) updateRequest.title = title;
-        if (description !== undefined) updateRequest.description = description;
+        if (description !== undefined) {
+          // Normalize literal \n sequences that AI agents may produce via JSON-RPC serialization
+          updateRequest.description = description.replace(/\\n/g, "\n");
+        }
         if (isDraft !== undefined) updateRequest.isDraft = isDraft;
         if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
         if (status !== undefined) {

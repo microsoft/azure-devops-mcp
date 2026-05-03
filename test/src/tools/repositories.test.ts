@@ -961,6 +961,45 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
+    it("should normalize literal backslash-n sequences in description", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      if (!call) throw new Error("repo_create_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const mockCreatedPR = {
+        pullRequestId: 789,
+        codeReviewId: 789,
+        repository: { name: "test-repo" },
+        status: 1,
+        createdBy: { displayName: "Test User", uniqueName: "testuser@example.com" },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "Test PR",
+        isDraft: false,
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+      };
+      mockGitApi.createPullRequest.mockResolvedValue(mockCreatedPR);
+
+      await handler({
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/feature",
+        targetRefName: "refs/heads/main",
+        title: "Test PR",
+        description: "Line 1\\nLine 2\\nLine 3",
+        project: "test-project",
+      });
+
+      expect(mockGitApi.createPullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: "Line 1\nLine 2\nLine 3",
+        }),
+        "repo123",
+        "test-project"
+      );
+    });
+
     it("should create pull request with all optional fields including labels", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
