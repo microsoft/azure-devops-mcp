@@ -54,6 +54,28 @@ const REPO_TOOLS = {
   get_file_content: "repo_get_file_content",
 };
 
+const DEFAULT_AI_ATTRIBUTION_MARKER = "\n\n---\n🤖 *This content was generated with AI assistance.*";
+
+const aiAttributionSchema = {
+  aiGenerated: z.boolean().optional().default(false).describe("When true, appends an AI attribution marker to the content indicating it was generated with AI assistance."),
+  aiAuthor: z.string().optional().describe("Optional author name to include in the AI attribution marker (e.g. '@username'). Only used when aiGenerated is true."),
+};
+
+/**
+ * Appends the AI attribution marker to content if aiGenerated is true.
+ * @param content The original content string
+ * @param aiGenerated Whether to append the AI attribution marker
+ * @param aiAuthor Optional author name to include in the attribution (e.g. "@username")
+ * @returns The content with the marker appended, or the original content
+ */
+function applyAiAttribution(content: string, aiGenerated?: boolean, aiAuthor?: string): string {
+  if (!aiGenerated) return content;
+  if (aiAuthor && aiAuthor.trim()) {
+    return content + `\n\n---\n🤖 *This content was generated with AI assistance on behalf of ${aiAuthor.trim()}.*`;
+  }
+  return content + DEFAULT_AI_ATTRIBUTION_MARKER;
+}
+
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
   return branches
     ?.flatMap((branch) => (branch.name ? [branch.name] : []))
@@ -178,8 +200,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       workItems: z.string().optional().describe("Work item IDs to associate with the pull request, space-separated."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository that the pull request originates from. Optional, used when creating a pull request from a fork."),
       labels: z.array(z.string()).optional().describe("Array of label names to add to the pull request after creation."),
+      ...aiAttributionSchema,
     },
-    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, project, workItems, forkSourceRepositoryId, labels }) => {
+    async ({ repositoryId, sourceRefName, targetRefName, title, description, isDraft, project, workItems, forkSourceRepositoryId, labels, aiGenerated, aiAuthor }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -200,7 +223,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             sourceRefName,
             targetRefName,
             title,
-            description,
+            description: description ? applyAiAttribution(description, aiGenerated, aiAuthor) : description,
             isDraft,
             workItemRefs: workItemRefs,
             forkSource,
@@ -370,6 +393,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
       labels: z.array(z.string()).optional().describe("Array of label names to replace existing labels on the pull request. This will remove all current labels and add the specified ones."),
+      ...aiAttributionSchema,
     },
     async ({
       repositoryId,
@@ -386,6 +410,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       transitionWorkItems,
       bypassReason,
       labels,
+      aiGenerated,
+      aiAuthor,
     }) => {
       try {
         const connection = await connectionProvider();
@@ -395,7 +421,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const updateRequest: Record<string, unknown> = {};
 
         if (title !== undefined) updateRequest.title = title;
-        if (description !== undefined) updateRequest.description = description;
+        if (description !== undefined) updateRequest.description = description ? applyAiAttribution(description, aiGenerated, aiAuthor) : description;
         if (isDraft !== undefined) updateRequest.isDraft = isDraft;
         if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
         if (status !== undefined) {
@@ -1464,12 +1490,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       content: z.string().describe("The content of the comment to be added."),
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a repository name instead of a GUID."),
       fullResponse: z.boolean().optional().default(false).describe("Return full comment JSON response instead of a simple confirmation message."),
+      ...aiAttributionSchema,
     },
-    async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse }) => {
+    async ({ repositoryId, pullRequestId, threadId, content, project, fullResponse, aiGenerated, aiAuthor }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
-        const comment = await gitApi.createComment({ content }, repositoryId, pullRequestId, threadId, project);
+        const comment = await gitApi.createComment({ content: applyAiAttribution(content, aiGenerated, aiAuthor) }, repositoryId, pullRequestId, threadId, project);
 
         // Check if the comment was successfully created
         if (!comment) {
@@ -1538,8 +1565,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe(
           "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must be set if rightFileEndLine is also specified. (optional)"
         ),
+      ...aiAttributionSchema,
     },
-    async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
+    async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset, aiGenerated, aiAuthor }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -1631,7 +1659,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         const thread = await gitApi.createThread(
-          { comments: [{ content: content }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
+          { comments: [{ content: applyAiAttribution(content, aiGenerated, aiAuthor) }], threadContext: threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
           repositoryId,
           pullRequestId,
           project

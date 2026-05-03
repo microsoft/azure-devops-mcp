@@ -165,11 +165,60 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
+    it("should append AI attribution marker to description when aiGenerated is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      const [, , , handler] = call!;
+      mockGitApi.updatePullRequest.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { name: "r" },
+        status: 1,
+        createdBy: { displayName: "U", uniqueName: "u@e.com" },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "T",
+        isDraft: false,
+        sourceRefName: "refs/heads/f",
+        targetRefName: "refs/heads/main",
+      });
+
+      await handler({ repositoryId: "repo123", pullRequestId: 123, project: "p", description: "My description", aiGenerated: true });
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ description: "My description\n\n---\n🤖 *This content was generated with AI assistance.*" }),
+        "repo123",
+        123,
+        "p"
+      );
+    });
+
+    it("should include aiAuthor in AI attribution marker when provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
+      const [, , , handler] = call!;
+      mockGitApi.updatePullRequest.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { name: "r" },
+        status: 1,
+        createdBy: { displayName: "U", uniqueName: "u@e.com" },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "T",
+        isDraft: false,
+        sourceRefName: "refs/heads/f",
+        targetRefName: "refs/heads/main",
+      });
+
+      await handler({ repositoryId: "repo123", pullRequestId: 123, project: "p", description: "My description", aiGenerated: true, aiAuthor: "@test-user" });
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ description: "My description\n\n---\n🤖 *This content was generated with AI assistance on behalf of @test-user.*" }),
+        "repo123",
+        123,
+        "p"
+      );
+    });
+
     it("should update pull request with only title", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.update_pull_request);
-
       if (!call) throw new Error("repo_update_pull_request tool not registered");
       const [, , , handler] = call;
 
@@ -959,6 +1008,79 @@ describe("repos tools", () => {
         targetRefName: "refs/heads/main",
       };
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
+    });
+
+    it("should append AI attribution marker to description when aiGenerated is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      const [, , , handler] = call!;
+      mockGitApi.createPullRequest.mockResolvedValue({
+        pullRequestId: 789,
+        repository: { name: "r" },
+        status: 1,
+        createdBy: { displayName: "U", uniqueName: "u@e.com" },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "T",
+        isDraft: false,
+        sourceRefName: "refs/heads/f",
+        targetRefName: "refs/heads/main",
+      });
+
+      await handler({ repositoryId: "repo123", sourceRefName: "refs/heads/f", targetRefName: "refs/heads/main", title: "T", description: "Generated", project: "p", aiGenerated: true });
+      expect(mockGitApi.createPullRequest).toHaveBeenCalledWith(expect.objectContaining({ description: "Generated\n\n---\n🤖 *This content was generated with AI assistance.*" }), "repo123", "p");
+    });
+
+    it("should not append AI attribution marker when aiGenerated is omitted", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      const [, , , handler] = call!;
+      mockGitApi.createPullRequest.mockResolvedValue({
+        pullRequestId: 789,
+        repository: { name: "r" },
+        status: 1,
+        createdBy: { displayName: "U", uniqueName: "u@e.com" },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "T",
+        isDraft: false,
+        sourceRefName: "refs/heads/f",
+        targetRefName: "refs/heads/main",
+      });
+
+      await handler({ repositoryId: "repo123", sourceRefName: "refs/heads/f", targetRefName: "refs/heads/main", title: "T", description: "Plain", project: "p" });
+      expect(mockGitApi.createPullRequest).toHaveBeenCalledWith(expect.objectContaining({ description: "Plain" }), "repo123", "p");
+    });
+
+    it("should include aiAuthor in AI attribution marker when provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
+      const [, , , handler] = call!;
+      mockGitApi.createPullRequest.mockResolvedValue({
+        pullRequestId: 789,
+        repository: { name: "r" },
+        status: 1,
+        createdBy: { displayName: "U", uniqueName: "u@e.com" },
+        creationDate: "2023-01-01T00:00:00Z",
+        title: "T",
+        isDraft: false,
+        sourceRefName: "refs/heads/f",
+        targetRefName: "refs/heads/main",
+      });
+
+      await handler({
+        repositoryId: "repo123",
+        sourceRefName: "refs/heads/f",
+        targetRefName: "refs/heads/main",
+        title: "T",
+        description: "Generated",
+        project: "p",
+        aiGenerated: true,
+        aiAuthor: "@copilot-user",
+      });
+      expect(mockGitApi.createPullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ description: "Generated\n\n---\n🤖 *This content was generated with AI assistance on behalf of @copilot-user.*" }),
+        "repo123",
+        "p"
+      );
     });
 
     it("should create pull request with all optional fields including labels", async () => {
@@ -4872,6 +4994,26 @@ describe("repos tools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error: Failed to add comment to thread 789");
     });
+
+    it("should append AI attribution marker to reply when aiGenerated is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.reply_to_comment);
+      const [, , , handler] = call!;
+      mockGitApi.createComment.mockResolvedValue({ id: 789, content: "Reply" });
+
+      await handler({ repositoryId: "repo123", pullRequestId: 456, threadId: 789, content: "Reply", aiGenerated: true });
+      expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Reply\n\n---\n🤖 *This content was generated with AI assistance.*" }, "repo123", 456, 789, undefined);
+    });
+
+    it("should include aiAuthor in AI attribution marker for reply when provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.reply_to_comment);
+      const [, , , handler] = call!;
+      mockGitApi.createComment.mockResolvedValue({ id: 789, content: "Reply" });
+
+      await handler({ repositoryId: "repo123", pullRequestId: 456, threadId: 789, content: "Reply", aiGenerated: true, aiAuthor: "@test-user" });
+      expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Reply\n\n---\n🤖 *This content was generated with AI assistance on behalf of @test-user.*" }, "repo123", 456, 789, undefined);
+    });
   });
 
   describe("repo_create_pull_request_thread", () => {
@@ -5037,6 +5179,36 @@ describe("repos tools", () => {
         content: [{ type: "text", text: "rightFileStartLine must be greater than or equal to 1." }],
         isError: true,
       });
+    });
+
+    it("should append AI attribution marker to thread content when aiGenerated is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request_thread);
+      const [, , , handler] = call!;
+      mockGitApi.createThread.mockResolvedValue({ id: 123, status: 1 });
+
+      await handler({ repositoryId: "repo123", pullRequestId: 456, content: "AI review comment", aiGenerated: true });
+      expect(mockGitApi.createThread).toHaveBeenCalledWith(
+        expect.objectContaining({ comments: [{ content: "AI review comment\n\n---\n🤖 *This content was generated with AI assistance.*" }] }),
+        "repo123",
+        456,
+        undefined
+      );
+    });
+
+    it("should include aiAuthor in AI attribution marker for thread when provided", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request_thread);
+      const [, , , handler] = call!;
+      mockGitApi.createThread.mockResolvedValue({ id: 123, status: 1 });
+
+      await handler({ repositoryId: "repo123", pullRequestId: 456, content: "AI review comment", aiGenerated: true, aiAuthor: "@copilot" });
+      expect(mockGitApi.createThread).toHaveBeenCalledWith(
+        expect.objectContaining({ comments: [{ content: "AI review comment\n\n---\n🤖 *This content was generated with AI assistance on behalf of @copilot.*" }] }),
+        "repo123",
+        456,
+        undefined
+      );
     });
   });
 
