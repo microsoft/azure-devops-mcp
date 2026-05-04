@@ -34,7 +34,7 @@ Optional keys:
 - `AzureDevOps:DefaultProject`
 - `AzureDevOps:DefaultRepository`
 
-Example: 
+Example:
 
 ```json
 {
@@ -49,12 +49,20 @@ Example:
 
 Notes:
 
-- `appsettings.json` is ignored by git in this repo, so secrets stay local.
+- Both `appsettings.json` and `appsettings.Development.json` work.
+- For local development, `appsettings.Development.json` is the safer option because it is ignored by git in this repo.
+- `appsettings.json` is not ignored by git, so it should not be used for secrets unless you explicitly manage that risk.
 - Environment variables are also supported:
 	- `AZURE_DEVOPS_ORG_URL`
 	- `AZURE_DEVOPS_PAT`
 	- `AZURE_DEVOPS_PROJECT`
 	- `AZURE_DEVOPS_REPOSITORY`
+
+## Validation
+
+- The currently implemented workflows were validated with fixture-backed integration tests in the .NET solution.
+- The main end-to-end scenarios were also smoke-tested manually against a real Azure DevOps Server/instance using MCP calls.
+- This includes work item retrieval, branch creation, work item comments, branch linking, and pull request creation.
 
 ## PAT Permissions
 

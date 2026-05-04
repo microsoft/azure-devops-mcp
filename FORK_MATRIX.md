@@ -26,3 +26,5 @@ This matrix compares capabilities from the original Azure DevOps MCP Server with
 
 - This fork currently focuses on a limited, pragmatic subset in the [dotnet](dotnet) implementation.
 - The current scope mainly covers repository + work item collaboration workflows for feature delivery.
+- `CreatePullRequestForWorkItem` also supports an optional Markdown description for the pull request body.
+- The implemented fork capabilities were validated with fixture-backed integration tests and manual smoke tests.
