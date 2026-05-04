@@ -183,7 +183,7 @@ We recommend that you always enable `core` tools so that you can fetch project l
       "args": ["-y", "@azure-devops/mcp", "myorg", "--authentication", "azcli"],
       "env": {
         "project": "Contoso",
-        "team": "fabrikam team"
+        "team": "Fabrikam Team"
       }
     }
   }
