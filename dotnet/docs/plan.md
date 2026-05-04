@@ -26,9 +26,19 @@
 - Build: ✅ Alle 8 projecten compileren
 - Live smoke tests: GetWorkItemContext ✅, CreateFeatureBranch ✅
 
+- **AddWorkItemComment use case**: complete (end-to-end + tests + live validatie)
+  - `AddCommentResult` DTO + `AddCommentAsync` op `IWorkItemContextService`
+  - Implementatie via `WorkItemTrackingHttpClient.AddCommentAsync`
+  - MCP tool `AddWorkItemComment(project, workItemId, comment)`
+  - 2 fixture-backed integration tests ✅
+  - Live smoke test ✅
+
+### 📊 Test status
+- Integration tests: **6/6 slaagd** (WorkItemTools × 4 + RepositoryTools × 2)
+- Build: ✅ Clean
+
 ### ⏳ Volgende capabilities
-- LinkBranchToWorkItem (artifact links)
-- AddWorkItemComment
+- LinkBranchToWorkItem (artifact links koppelen aan work item)
 - CreatePullRequestForWorkItem
 
 ---

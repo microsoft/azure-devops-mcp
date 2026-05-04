@@ -59,4 +59,31 @@ public class WorkItemTools
             return JsonSerializer.Serialize(new { error = ex.Message, type = ex.GetType().Name });
         }
     }
+
+    /// <summary>
+    /// Adds a comment to an existing work item.
+    /// </summary>
+    /// <param name="project">The Azure DevOps project name or ID</param>
+    /// <param name="workItemId">The numeric work item ID</param>
+    /// <param name="comment">The comment text to add (HTML or plain text)</param>
+    /// <returns>JSON object with the created comment ID and URL</returns>
+    [McpServerTool(Name = "AddWorkItemComment")]
+    public async Task<string> AddWorkItemComment(string project, int workItemId, string comment)
+    {
+        try
+        {
+            var result = await _workItemContextService.AddCommentAsync(project, workItemId, comment);
+
+            return JsonSerializer.Serialize(new
+            {
+                commentId = result.CommentId,
+                url = result.Url,
+                success = true
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message, type = ex.GetType().Name });
+        }
+    }
 }

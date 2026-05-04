@@ -27,9 +27,19 @@ public class WorkItemCommentResult
 }
 
 /// <summary>
-/// Service for retrieving work item context from Azure DevOps.
+/// Result of adding a comment to a work item.
+/// </summary>
+public class AddCommentResult
+{
+    public int CommentId { get; set; }
+    public string Url { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Service for retrieving and updating work item context from Azure DevOps.
 /// </summary>
 public interface IWorkItemContextService
 {
     Task<WorkItemContextResult> GetWorkItemContextAsync(string project, int workItemId, CancellationToken cancellationToken = default);
+    Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default);
 }

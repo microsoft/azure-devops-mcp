@@ -65,6 +65,9 @@ public class WorkItemToolsFixtureTests
 
             return result;
         }
+
+        public Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AddCommentResult { CommentId = 1, Url = string.Empty });
     }
 
     private sealed class ThrowingWorkItemContextService : IWorkItemContextService
@@ -78,5 +81,45 @@ public class WorkItemToolsFixtureTests
 
         public Task<WorkItemContextResult> GetWorkItemContextAsync(string project, int workItemId, CancellationToken cancellationToken = default)
             => Task.FromException<WorkItemContextResult>(_exception);
+
+        public Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default)
+            => Task.FromException<AddCommentResult>(_exception);
+    }
+
+    [Fact]
+    public async Task AddWorkItemComment_ReturnsSerializedCommentId()
+    {
+        var sut = new WorkItemTools(new FakeAddCommentWorkItemContextService());
+
+        var json = await sut.AddWorkItemComment("UZG.IZ.PrestIZ", 1, "Test comment via MCP");
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal(42, root.GetProperty("commentId").GetInt32());
+        Assert.True(root.GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task AddWorkItemComment_WhenServiceThrows_ReturnsSerializedError()
+    {
+        var sut = new WorkItemTools(new ThrowingWorkItemContextService(new InvalidOperationException("comment failed")));
+
+        var json = await sut.AddWorkItemComment("UZG.IZ.PrestIZ", 1, "Test comment");
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal("comment failed", root.GetProperty("error").GetString());
+        Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
+    }
+
+    private sealed class FakeAddCommentWorkItemContextService : IWorkItemContextService
+    {
+        public Task<WorkItemContextResult> GetWorkItemContextAsync(string project, int workItemId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new WorkItemContextResult());
+
+        public Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AddCommentResult { CommentId = 42, Url = "https://example.invalid/comment/42" });
     }
 }
