@@ -182,8 +182,8 @@ We recommend that you always enable `core` tools so that you can fetch project l
       "command": "npx",
       "args": ["-y", "@azure-devops/mcp", "myorg", "--authentication", "azcli"],
       "env": {
-        "project": "Contoso",
-        "team": "Fabrikam Team"
+        "ado_mcp_project": "Contoso",
+        "ado_mcp_team": "Fabrikam Team"
       }
     }
   }
