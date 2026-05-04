@@ -61,6 +61,19 @@ public class RepositoryToolsFixtureTests
 
             return Task.FromResult(result);
         }
+
+        public Task<LinkBranchResult> LinkBranchToWorkItemAsync(
+            string project,
+            string repository,
+            string branchName,
+            int workItemId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new LinkBranchResult
+            {
+                WorkItemId = workItemId,
+                BranchName = branchName,
+                Repository = repository
+            });
     }
 
     private sealed class ThrowingRepositoryService : IRepositoryService
@@ -79,5 +92,43 @@ public class RepositoryToolsFixtureTests
             string fromBranch,
             CancellationToken cancellationToken = default)
             => Task.FromException<CreateBranchResult>(_exception);
+
+        public Task<LinkBranchResult> LinkBranchToWorkItemAsync(
+            string project,
+            string repository,
+            string branchName,
+            int workItemId,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<LinkBranchResult>(_exception);
+    }
+
+    [Fact]
+    public async Task LinkBranchToWorkItem_ReturnsSerializedResult()
+    {
+        var sut = new RepositoryTools(new FakeRepositoryService());
+
+        var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal(42, root.GetProperty("workItemId").GetInt32());
+        Assert.Equal("feature/TEST-123", root.GetProperty("branchName").GetString());
+        Assert.Equal("TestRepo", root.GetProperty("repository").GetString());
+        Assert.True(root.GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task LinkBranchToWorkItem_WhenServiceThrows_ReturnsSerializedError()
+    {
+        var sut = new RepositoryTools(new ThrowingRepositoryService(new InvalidOperationException("repository not found")));
+
+        var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal("repository not found", root.GetProperty("error").GetString());
+        Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
     }
 }

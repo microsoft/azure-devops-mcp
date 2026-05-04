@@ -11,6 +11,16 @@ public class CreateBranchResult
 }
 
 /// <summary>
+/// Result of linking a branch to a work item.
+/// </summary>
+public class LinkBranchResult
+{
+    public int WorkItemId { get; set; }
+    public string BranchName { get; set; } = string.Empty;
+    public string Repository { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Service for repository operations on Azure DevOps.
 /// </summary>
 public interface IRepositoryService
@@ -29,5 +39,20 @@ public interface IRepositoryService
         string repository,
         string branchName,
         string fromBranch,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Links a branch to a work item as an artifact link.
+    /// </summary>
+    /// <param name="project">The Azure DevOps project name</param>
+    /// <param name="repository">The repository name</param>
+    /// <param name="branchName">The branch name (e.g., "feature/my-feature")</param>
+    /// <param name="workItemId">The work item ID to link to</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task<LinkBranchResult> LinkBranchToWorkItemAsync(
+        string project,
+        string repository,
+        string branchName,
+        int workItemId,
         CancellationToken cancellationToken = default);
 }
