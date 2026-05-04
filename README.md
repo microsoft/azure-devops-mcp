@@ -170,7 +170,7 @@ We recommend that you always enable `core` tools so that you can fetch project l
 
 > By default all domains are loaded
 
-> New: You can now configure default Azure DevOps project and team values from `.vscode/mcp.json` using `DEFAULT_PROJECT` and `DEFAULT_TEAM`, so tools can skip selection prompts.
+> New: You can now configure default Azure DevOps project and team values from `.vscode/mcp.json` using `project` and `team`, so tools can skip selection prompts.
 
 ### Example `.vscode/mcp.json`
 
@@ -182,8 +182,8 @@ We recommend that you always enable `core` tools so that you can fetch project l
       "command": "npx",
       "args": ["-y", "@azure-devops/mcp", "myorg", "--authentication", "azcli"],
       "env": {
-        "DEFAULT_PROJECT": "MyProject",
-        "DEFAULT_TEAM": "MyTeam"
+        "project": "Contoso",
+        "team": "fabrikam team"
       }
     }
   }
