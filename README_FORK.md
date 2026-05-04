@@ -19,3 +19,48 @@ According to the FAQ of the original project, on-prem is not supported as a targ
 ## Capability Overview
 
 A matrix that maps upstream capabilities to what is implemented in this fork is available in [FORK_MATRIX.md](FORK_MATRIX.md).
+
+## Configuration (appsettings.json)
+
+The .NET server reads Azure DevOps settings from configuration keys under `AzureDevOps`.
+
+Required keys:
+
+- `AzureDevOps:OrganizationUrl`
+- `AzureDevOps:PersonalAccessToken`
+
+Optional keys:
+
+- `AzureDevOps:DefaultProject`
+- `AzureDevOps:DefaultRepository`
+
+Example: 
+
+```json
+{
+	"AzureDevOps": {
+		"OrganizationUrl": "https://your-server/YourCollection",
+		"PersonalAccessToken": "YOUR_PAT",
+		"DefaultProject": "YourProject",
+		"DefaultRepository": "YourRepository"
+	}
+}
+```
+
+Notes:
+
+- `appsettings.json` is ignored by git in this repo, so secrets stay local.
+- Environment variables are also supported:
+	- `AZURE_DEVOPS_ORG_URL`
+	- `AZURE_DEVOPS_PAT`
+	- `AZURE_DEVOPS_PROJECT`
+	- `AZURE_DEVOPS_REPOSITORY`
+
+## PAT Permissions
+
+For the capabilities currently implemented in this fork, the PAT should have at least:
+
+- **Code: Read & Write**
+	- Needed for creating branches and pull requests.
+- **Work Items: Read & Write**
+	- Needed for reading work item context, adding comments, and linking branch/PR artifacts.
