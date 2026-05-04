@@ -46,7 +46,7 @@ describe("elicitations", () => {
     });
 
     it("should return project from environment variable without prompting", async () => {
-      process.env.project = "DefaultProject";
+      process.env.ado_mcp_project = "DefaultProject";
 
       const result = await elicitProject(server, mockConnection as unknown as WebApi);
 
@@ -60,7 +60,7 @@ describe("elicitations", () => {
     });
 
     it("should ignore project if empty string", async () => {
-      process.env.project = "";
+      process.env.ado_mcp_project = "";
       (mockCoreApi.getProjects as jest.Mock).mockResolvedValue([{ id: "proj-1", name: "ProjectAlpha" }]);
 
       const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
@@ -107,7 +107,7 @@ describe("elicitations", () => {
     });
 
     it("should return team from environment variable without prompting", async () => {
-      process.env.team = "DefaultTeam";
+      process.env.ado_mcp_team = "DefaultTeam";
 
       const result = await elicitTeam(server, mockConnection as unknown as WebApi, "ProjectAlpha");
 
@@ -121,7 +121,7 @@ describe("elicitations", () => {
     });
 
     it("should ignore team if empty string", async () => {
-      process.env.team = "";
+      process.env.ado_mcp_team = "";
       (mockCoreApi.getTeams as jest.Mock).mockResolvedValue([{ id: "team-1", name: "Team One" }]);
 
       const elicitMock = (server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock;
