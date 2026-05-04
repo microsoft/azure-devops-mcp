@@ -8,6 +8,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\AzureDevOps.Mcp.Application\AzureDevOps.Mcp.Application.csproj" />
+    <ProjectReference Include="..\..\src\AzureDevOps.Mcp.Infrastructure.AzureDevOps\AzureDevOps.Mcp.Infrastructure.AzureDevOps.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 
