@@ -68,9 +68,9 @@
 
 ### 1. Fixture-backed integration tests ✅
 **Status**: 2 tests, beide slaagd
-**Locatie**: `tests/AzureDevOps.Mcp.IntegrationTests/WorkItemToolsFixtureTests.cs`
+**Locatie**: `tests/AzureDevOpsServerMCP.IntegrationTests/WorkItemToolsFixtureTests.cs`
 **Doel**: valideer tool wiring, JSON-RPC response shape, error serialisatie
-**Fixture**: `tests/AzureDevOps.Mcp.IntegrationTests/Fixtures/work-item-context-result.json`
+**Fixture**: `tests/AzureDevOpsServerMCP.IntegrationTests/Fixtures/work-item-context-result.json`
 
 Deze tests zijn stabiel, snel, en niet afhankelijk van echte DevOps instances. Voldoende dekking voor tool level.
 
@@ -92,18 +92,18 @@ Deze tests zijn stabiel, snel, en niet afhankelijk van echte DevOps instances. V
 ```
 dotnet/
 ├── src/
-│   ├── AzureDevOps.Mcp.Application/
+│   ├── AzureDevOpsServerMCP.Application/
 │   │   └── Services/ (IWorkItemContextService, DTO's)
-│   ├── AzureDevOps.Mcp.Infrastructure.AzureDevOps/
+│   ├── AzureDevOpsServerMCP.Infrastructure.AzureDevOps/
 │   │   └── Services/ (AzureDevOpsWorkItemContextService)
-│   ├── AzureDevOps.Mcp.Tools/
+│   ├── AzureDevOpsServerMCP.Tools/
 │   │   └── WorkItemTools.cs (MCP tool def)
-│   └── AzureDevOps.Mcp.Server/
+│   └── AzureDevOpsServerMCP.Server/
 │       ├── Program.cs (DI + MCP registration)
 │       └── appsettings.Development.json (✅ in .gitignore)
 ├── tests/
-│   ├── AzureDevOps.Mcp.UnitTests/ (TODO: add service tests)
-│   └── AzureDevOps.Mcp.IntegrationTests/
+│   ├── AzureDevOpsServerMCP.UnitTests/ (TODO: add service tests)
+│   └── AzureDevOpsServerMCP.IntegrationTests/
 │       ├── WorkItemToolsFixtureTests.cs ✅
 │       └── Fixtures/work-item-context-result.json ✅
 └── docs/

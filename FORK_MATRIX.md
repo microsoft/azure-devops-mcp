@@ -1,5 +1,7 @@
 # Fork Capability Matrix
 
+Project: AzureDevOpsServerMCP
+
 This matrix compares capabilities from the original Azure DevOps MCP Server with the current .NET fork.
 
 - Upstream source: [docs/TOOLSET.md](docs/TOOLSET.md)

@@ -1,6 +1,6 @@
-# README Fork
+# AzureDevOpsServerMCP Fork Notes
 
-This fork is an attempt to make part of the Azure DevOps MCP Server functionality available as a .NET/NuGet-based application, with a focus on scenarios relevant to Azure DevOps Server (on-prem).
+AzureDevOpsServerMCP is an attempt to make part of the Azure DevOps MCP Server functionality available as a .NET/NuGet-based application, with a focus on scenarios relevant to Azure DevOps Server (on-prem).
 
 According to the FAQ of the original project, on-prem is not supported as a target platform. This fork explores how similar workflows can still be made usable in a C# implementation.
 

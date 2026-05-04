@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AzureDevOpsServerMCP.Application\AzureDevOpsServerMCP.Application.csproj" />
+    <ProjectReference Include="..\AzureDevOpsServerMCP.Tools\AzureDevOpsServerMCP.Tools.csproj" />
+    <ProjectReference Include="..\AzureDevOpsServerMCP.Infrastructure.Configuration\AzureDevOpsServerMCP.Infrastructure.Configuration.csproj" />
+    <ProjectReference Include="..\AzureDevOpsServerMCP.Infrastructure.AzureDevOps\AzureDevOpsServerMCP.Infrastructure.AzureDevOps.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AzureDevOpsServerMCP.Application\AzureDevOpsServerMCP.Application.csproj" />
+    <ProjectReference Include="..\..\src\AzureDevOpsServerMCP.Tools\AzureDevOpsServerMCP.Tools.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Fixtures\work-item-context-result.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
