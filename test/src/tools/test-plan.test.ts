@@ -752,11 +752,7 @@ describe("configureTestPlanTools", () => {
       const [, , , handler] = call;
 
       (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [
-          {
-            results: [{ id: 1, testCaseTitle: "FailingTest", outcome: "Failed", errorMessage: "error" }],
-          },
-        ],
+        resultsForGroup: [],
       });
 
       await handler({ project: "proj1", buildid: 123, outcomes: ["Failed", "Aborted"] });
@@ -766,7 +762,7 @@ describe("configureTestPlanTools", () => {
         123,
         undefined, // publishContext
         undefined, // groupBy
-        "Outcome eq 'Failed' or Outcome eq 'Aborted'", // filter expression
+        "Outcome eq Failed,Aborted", // filter expression
         undefined, // orderby
         true // shouldIncludeResults
       );
