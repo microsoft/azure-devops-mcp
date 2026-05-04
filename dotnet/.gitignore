@@ -58,3 +58,5 @@ nunit-*.xml
 
 # dev appsettings files
 appsettings.Development.json
+
+.vs/
