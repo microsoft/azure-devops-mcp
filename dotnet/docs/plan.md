@@ -33,12 +33,18 @@
   - 2 fixture-backed integration tests ✅
   - Live smoke test ✅
 
+- **LinkBranchToWorkItem use case**: complete (end-to-end + tests + live validatie)
+  - `LinkBranchResult` DTO + `LinkBranchToWorkItemAsync` op `IRepositoryService`
+  - Implementatie via vstfs artifact URL + `WorkItemTrackingHttpClient.UpdateWorkItemAsync`
+  - MCP tool `LinkBranchToWorkItem(project, repository, branchName, workItemId)`
+  - 2 fixture-backed integration tests ✅
+  - Live smoke test ✅
+
 ### 📊 Test status
-- Integration tests: **6/6 slaagd** (WorkItemTools × 4 + RepositoryTools × 2)
+- Integration tests: **8/8 slaagd** (WorkItemTools × 4 + RepositoryTools × 4)
 - Build: ✅ Clean
 
 ### ⏳ Volgende capabilities
-- LinkBranchToWorkItem (artifact links koppelen aan work item)
 - CreatePullRequestForWorkItem
 
 ---
