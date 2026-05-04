@@ -76,4 +76,37 @@ public class RepositoryTools
             return JsonSerializer.Serialize(new { error = ex.Message, type = ex.GetType().Name });
         }
     }
+
+    /// <summary>
+    /// Creates a pull request and links it to a work item.
+    /// </summary>
+    /// <param name="project">The Azure DevOps project name</param>
+    /// <param name="repository">The repository name</param>
+    /// <param name="sourceBranch">The source branch (e.g., "feature/TASK-123")</param>
+    /// <param name="targetBranch">The target branch (e.g., "main" or "develop")</param>
+    /// <param name="title">The pull request title</param>
+    /// <param name="description">Optional pull request description in Markdown format</param>
+    /// <param name="workItemId">The work item ID to link to</param>
+    /// <returns>JSON object with pull request details</returns>
+    [McpServerTool(Name = "CreatePullRequestForWorkItem")]
+    public async Task<string> CreatePullRequestForWorkItem(string project, string repository, string sourceBranch, string targetBranch, string title, int workItemId, string? description = null)
+    {
+        try
+        {
+            var result = await _repositoryService.CreatePullRequestAsync(project, repository, sourceBranch, targetBranch, title, description, workItemId);
+
+            return JsonSerializer.Serialize(new
+            {
+                pullRequestId = result.PullRequestId,
+                title = result.Title,
+                url = result.Url,
+                status = result.Status,
+                success = true
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message, type = ex.GetType().Name });
+        }
+    }
 }

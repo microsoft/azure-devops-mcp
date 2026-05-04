@@ -21,6 +21,17 @@ public class LinkBranchResult
 }
 
 /// <summary>
+/// Result of creating a pull request.
+/// </summary>
+public class CreatePullRequestResult
+{
+    public int PullRequestId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Service for repository operations on Azure DevOps.
 /// </summary>
 public interface IRepositoryService
@@ -53,6 +64,27 @@ public interface IRepositoryService
         string project,
         string repository,
         string branchName,
+        int workItemId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a pull request and links it to a work item.
+    /// </summary>
+    /// <param name="project">The Azure DevOps project name</param>
+    /// <param name="repository">The repository name</param>
+    /// <param name="sourceBranch">The source branch (e.g., "feature/my-feature")</param>
+    /// <param name="targetBranch">The target branch (e.g., "main" or "develop")</param>
+    /// <param name="title">The pull request title</param>
+    /// <param name="description">Optional pull request description (Markdown supported)</param>
+    /// <param name="workItemId">The work item ID to link to</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task<CreatePullRequestResult> CreatePullRequestAsync(
+        string project,
+        string repository,
+        string sourceBranch,
+        string targetBranch,
+        string title,
+        string? description,
         int workItemId,
         CancellationToken cancellationToken = default);
 }

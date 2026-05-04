@@ -45,7 +45,22 @@
 - Build: ✅ Clean
 
 ### ⏳ Volgende capabilities
-- CreatePullRequestForWorkItem
+- **CreatePullRequestForWorkItem use case**: complete (end-to-end + tests)
+  - `CreatePullRequestResult` DTO + `CreatePullRequestAsync` op `IRepositoryService`
+  - Implementatie via `GitHttpClient.CreatePullRequestAsync` met `WorkItemRefs` koppeling
+  - MCP tool `CreatePullRequestForWorkItem(project, repository, sourceBranch, targetBranch, title, workItemId)`
+  - 2 fixture-backed integration tests ✅
+
+### 📊 Test status
+- Integration tests: **10/10 slaagd** (WorkItemTools × 4 + RepositoryTools × 6)
+- Build: ✅ Clean
+
+### ✅ Alle geplande capabilities zijn geïmplementeerd
+1. GetWorkItemContext ✅
+2. CreateFeatureBranch ✅
+3. AddWorkItemComment ✅
+4. LinkBranchToWorkItem ✅
+5. CreatePullRequestForWorkItem ✅
 
 ---
 

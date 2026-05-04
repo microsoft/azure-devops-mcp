@@ -1,5 +1,6 @@
 using AzureDevOps.Mcp.Application.Services;
 using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.VisualStudio.Services.WebApi.Patch;
@@ -131,6 +132,56 @@ public class AzureDevOpsRepositoryService : IRepositoryService
             WorkItemId = workItemId,
             BranchName = branchName,
             Repository = repository
+        };
+    }
+
+    public async Task<CreatePullRequestResult> CreatePullRequestAsync(
+        string project,
+        string repository,
+        string sourceBranch,
+        string targetBranch,
+        string title,
+        string? description,
+        int workItemId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(project))
+            throw new ArgumentException("Project cannot be empty", nameof(project));
+        if (string.IsNullOrWhiteSpace(repository))
+            throw new ArgumentException("Repository cannot be empty", nameof(repository));
+        if (string.IsNullOrWhiteSpace(sourceBranch))
+            throw new ArgumentException("Source branch cannot be empty", nameof(sourceBranch));
+        if (string.IsNullOrWhiteSpace(targetBranch))
+            throw new ArgumentException("Target branch cannot be empty", nameof(targetBranch));
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Title cannot be empty", nameof(title));
+        if (workItemId <= 0)
+            throw new ArgumentException("Work item ID must be positive", nameof(workItemId));
+
+        using var connection = _connectionFactory.CreateConnection();
+        var gitClient = connection.GetClient<GitHttpClient>();
+
+        var pullRequest = new GitPullRequest
+        {
+            Title = title,
+            Description = description,
+            SourceRefName = $"refs/heads/{sourceBranch}",
+            TargetRefName = $"refs/heads/{targetBranch}",
+            WorkItemRefs = [new ResourceRef { Id = workItemId.ToString() }]
+        };
+
+        var createdPr = await gitClient.CreatePullRequestAsync(
+            pullRequest,
+            repositoryId: repository,
+            project: project,
+            cancellationToken: cancellationToken);
+
+        return new CreatePullRequestResult
+        {
+            PullRequestId = createdPr.PullRequestId,
+            Title = createdPr.Title,
+            Url = createdPr.Url ?? string.Empty,
+            Status = createdPr.Status.ToString()
         };
     }
 }

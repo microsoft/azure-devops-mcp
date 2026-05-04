@@ -42,8 +42,81 @@ public class RepositoryToolsFixtureTests
         Assert.Equal("Branch already exists", root.GetProperty("error").GetString());
         Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
     }
+    [Fact]
+    public async Task CreatePullRequestForWorkItem_ReturnsSerializedResult()
+    {
+        var sut = new RepositoryTools(new FakeRepositoryService());
 
-    private sealed class FakeRepositoryService : IRepositoryService
+        var json = await sut.CreatePullRequestForWorkItem(
+            "TestProject",
+            "TestRepo",
+            "feature/TEST-123",
+            "main",
+            "Implement TEST-123",
+            42,
+            "## Summary\n- Implemented TEST-123");
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal(99, root.GetProperty("pullRequestId").GetInt32());
+        Assert.Equal("Implement TEST-123", root.GetProperty("title").GetString());
+        Assert.Equal("active", root.GetProperty("status").GetString());
+        Assert.True(root.GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task CreatePullRequestForWorkItem_WhenServiceThrows_ReturnsSerializedError()
+    {
+        var sut = new RepositoryTools(new ThrowingRepositoryService(new InvalidOperationException("source branch not found")));
+
+        var json = await sut.CreatePullRequestForWorkItem(
+            "TestProject",
+            "TestRepo",
+            "feature/TEST-123",
+            "main",
+            "Implement TEST-123",
+            42,
+            "## Summary\n- Failing case");
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal("source branch not found", root.GetProperty("error").GetString());
+        Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
+    }
+
+        [Fact]
+        public async Task LinkBranchToWorkItem_ReturnsSerializedResult()
+        {
+            var sut = new RepositoryTools(new FakeRepositoryService());
+
+            var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
+
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+
+            Assert.Equal(42, root.GetProperty("workItemId").GetInt32());
+            Assert.Equal("feature/TEST-123", root.GetProperty("branchName").GetString());
+            Assert.Equal("TestRepo", root.GetProperty("repository").GetString());
+            Assert.True(root.GetProperty("success").GetBoolean());
+        }
+
+        [Fact]
+        public async Task LinkBranchToWorkItem_WhenServiceThrows_ReturnsSerializedError()
+        {
+            var sut = new RepositoryTools(new ThrowingRepositoryService(new InvalidOperationException("repository not found")));
+
+            var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
+
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+
+            Assert.Equal("repository not found", root.GetProperty("error").GetString());
+            Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
+        }
+
+        private sealed class FakeRepositoryService : IRepositoryService
     {
         public Task<CreateBranchResult> CreateBranchAsync(
             string project,
@@ -74,6 +147,23 @@ public class RepositoryToolsFixtureTests
                 BranchName = branchName,
                 Repository = repository
             });
+
+        public Task<CreatePullRequestResult> CreatePullRequestAsync(
+            string project,
+            string repository,
+            string sourceBranch,
+            string targetBranch,
+            string title,
+            string? description,
+            int workItemId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new CreatePullRequestResult
+            {
+                PullRequestId = 99,
+                Title = title,
+                Url = $"https://example.invalid/{project}/_git/{repository}/pullrequest/99",
+                Status = "active"
+            });
     }
 
     private sealed class ThrowingRepositoryService : IRepositoryService
@@ -100,35 +190,16 @@ public class RepositoryToolsFixtureTests
             int workItemId,
             CancellationToken cancellationToken = default)
             => Task.FromException<LinkBranchResult>(_exception);
-    }
 
-    [Fact]
-    public async Task LinkBranchToWorkItem_ReturnsSerializedResult()
-    {
-        var sut = new RepositoryTools(new FakeRepositoryService());
-
-        var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
-
-        using var document = JsonDocument.Parse(json);
-        var root = document.RootElement;
-
-        Assert.Equal(42, root.GetProperty("workItemId").GetInt32());
-        Assert.Equal("feature/TEST-123", root.GetProperty("branchName").GetString());
-        Assert.Equal("TestRepo", root.GetProperty("repository").GetString());
-        Assert.True(root.GetProperty("success").GetBoolean());
-    }
-
-    [Fact]
-    public async Task LinkBranchToWorkItem_WhenServiceThrows_ReturnsSerializedError()
-    {
-        var sut = new RepositoryTools(new ThrowingRepositoryService(new InvalidOperationException("repository not found")));
-
-        var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
-
-        using var document = JsonDocument.Parse(json);
-        var root = document.RootElement;
-
-        Assert.Equal("repository not found", root.GetProperty("error").GetString());
-        Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
+        public Task<CreatePullRequestResult> CreatePullRequestAsync(
+            string project,
+            string repository,
+            string sourceBranch,
+            string targetBranch,
+            string title,
+            string? description,
+            int workItemId,
+            CancellationToken cancellationToken = default)
+            => Task.FromException<CreatePullRequestResult>(_exception);
     }
 }
