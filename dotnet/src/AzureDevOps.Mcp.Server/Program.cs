@@ -28,9 +28,11 @@ builder.Services.AddSingleton(azureDevOpsOptions);
 builder.Services.AddSingleton<IAzureDevOpsConnectionFactory>(
 	sp => new AzureDevOpsConnectionFactory(azureDevOpsOptions));
 builder.Services.AddScoped<IWorkItemContextService, AzureDevOpsWorkItemContextService>();
+builder.Services.AddScoped<IRepositoryService, AzureDevOpsRepositoryService>();
 
 // Register tools that need DI
 builder.Services.AddScoped<WorkItemTools>();
+builder.Services.AddScoped<RepositoryTools>();
 
 builder.Services
 	.AddMcpServer()

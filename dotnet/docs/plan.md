@@ -1,27 +1,32 @@
 # Azure DevOps MCP — Ontwikkel- en testplan
 
-## Huidige status (2026-05-04)
+## Huidige status (2026-05-04, sessie 2)
 
 ### ✅ Afgerond
 - AzureDevOpsOptions configuratiemodel
 - AzureDevOpsConnectionFactory (PAT auth via VssConnection)
-- IWorkItemContextService interface (Application laag)
-- AzureDevOpsWorkItemContextService implementatie (Infrastructure laag)
-- WorkItemTools MCP tool met GetWorkItemContext
-- Program.cs service registration en MCP HTTP transport
-- **End-to-end validatie**: live test tegen echte Azure DevOps, work item 1 succesvol opgehaald met comments
-- **FixtureTests**: deterministische integration tests met fake service en JSON fixture (2 tests, beide slaagd)
-- appsettings.Development.json uit git verwijderd, in .gitignore gezet
-- Moq + Azure DevOps SDK packages toegevoegd aan UnitTests project
+- **GetWorkItemContext use case**: complete (end-to-end + tests)
+  - IWorkItemContextService interface (Application laag)
+  - AzureDevOpsWorkItemContextService implementatie (Infrastructure laag)
+  - WorkItemTools MCP tool
+  - 2 fixture-backed integration tests ✅
+- **CreateFeatureBranch use case**: complete (end-to-end + tests + live validatie)
+  - IRepositoryService interface (Application laag)
+  - AzureDevOpsRepositoryService implementatie (Infrastructure laag, GitHttpClient)
+  - RepositoryTools MCP tool
+  - 2 fixture-backed integration tests ✅
+  - Live smoke test ✅ (DependabotTest/VulnerableDotNet, master → feature/mcp-smoke-test)
+  - Bugfix: `GetRefsAsync` filter moet `heads/{branchName}` zijn (niet alleen `{branchName}`)
+  - Branches met slash in naam werken ook (bv. `feature/mcp-smoke-test` als source) ✅
+- Program.cs service registration (DI + MCP transport)
+- appsettings.Development.json in .gitignore gezet
 
-### 🚧 Volgende fase
-- **Unit tests uitgesteld**: SDK method signatures zijn complex; fixture-backed integration tests geven voldoende dekking voor nu
-- **Formatering**: HTML → platte tekst in descriptions/comments (later)
-- **Volgende capability**: CreateFeatureBranch
-- Formaat cleanup (HTML → platte tekst in descriptions/comments)
+### 📊 Test status
+- Integration tests: **4/4 slaagd** (WorkItemTools × 2 + RepositoryTools × 2)
+- Build: ✅ Alle 8 projecten compileren
+- Live smoke tests: GetWorkItemContext ✅, CreateFeatureBranch ✅
 
 ### ⏳ Volgende capabilities
-- CreateFeatureBranch (Git branch management)
 - LinkBranchToWorkItem (artifact links)
 - AddWorkItemComment
 - CreatePullRequestForWorkItem
@@ -78,24 +83,24 @@ dotnet/
 
 ## Volgende stap(pen)
 
-**Prioriteit 1**: CreateFeatureBranch capability
-- Nieuwe interface: `IRepositoryService` in Application laag
-- DTO's: `CreateBranchResult`, `CreateBranchRequest`
-- Implementation: `AzureDevOpsRepositoryService` met `GitHttpClient`
-- MCP tool: `RepositoryTools.CreateFeatureBranch(project, repository, branchName, fromBranch)`
-- Fixture test analoog aan WorkItemTools
+**Prioriteit 1**: LinkBranchToWorkItem
+- Voorwaarde: CreateFeatureBranch is klaar ✅
+- Functie: artifact link toevoegen aan work item
+- MCP tool: `WorkItemTools.LinkBranchToWorkItem(project, workItemId, branchName, repository)`
+- Implementatie: WorkItemTrackingHttpClient.UpdateWorkItemAsync met add-link patch operation
 
-**Prioriteit 2**: HTML stripping in responses
+**Prioriteit 2**: AddWorkItemComment
+- Functie: comment toevoegen aan bestaand work item
+- MCP tool: `WorkItemTools.AddWorkItemComment(project, workItemId, comment)`
+- Implementatie: WorkItemTrackingHttpClient.AddCommentAsync
+
+**Prioriteit 3**: HTML stripping in responses
 - Tool retourneert momenteel raw HTML uit Azure DevOps
 - Optie: HTML → platte tekst converter in Application laag
-- Of: optioneel via response formatting flag
+- Kan uniform toepassen op GetWorkItemContext + toekomstige capabilities
 
-**Prioriteit 3**: LinkBranchToWorkItem
-- Artifact link toevoegen aan work item
-- Vereist: work item link update operation
+**Prioriteit 4**: CreatePullRequestForWorkItem
+- Vereist: GitHttpClient.CreatePullRequestAsync
+- Koppeling: link PR aan work item via LinkBranchToWorkItem
 
-**Prioriteit 4**: AddWorkItemComment
-- Simpel: `IWorkItemContextService.AddCommentAsync(...)`
-- MCP tool: `WorkItemTools.AddWorkItemComment(project, workItemId, comment)`
-
-Laatst bijgewerkt: 2026-05-04
+Laatst bijgewerkt: 2026-05-04 (sessie 2)
