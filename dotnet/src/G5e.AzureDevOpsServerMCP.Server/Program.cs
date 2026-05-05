@@ -36,7 +36,6 @@ builder.Services.AddScoped<RepositoryTools>();
 
 builder.Services
 	.AddMcpServer()
-	.WithToolsFromAssembly(typeof(HealthTools).Assembly)
 	.WithToolsFromAssembly(typeof(WorkItemTools).Assembly)
 	.WithHttpTransport(options =>
 	{
