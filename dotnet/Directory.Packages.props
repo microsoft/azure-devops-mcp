@@ -1,11 +1,12 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- MCP SDK -->
-    <PackageVersion Include="ModelContextProtocol" Version="1.1.0" />
+    <PackageVersion Include="ModelContextProtocol" Version="1.2.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.2.0" />
     <PackageVersion Include="MinVer" Version="6.0.0" />
 
@@ -16,8 +17,12 @@
 
     <!-- Microsoft Extensions -->
     <PackageVersion Include="Microsoft.AspNetCore.Http" Version="2.3.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.5" />
+
+    <!-- Fix CVE warnings -->
+    <PackageVersion Include="System.Drawing.Common" Version="10.0.7" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.7" />
   </ItemGroup>
 </Project>
