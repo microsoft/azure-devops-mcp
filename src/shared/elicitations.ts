@@ -15,6 +15,13 @@ interface ElicitResponse {
 export type ElicitResult = ElicitResolved | ElicitResponse;
 
 export async function elicitProject(server: McpServer, connection: WebApi, message?: string): Promise<ElicitResult> {
+  // Check for default project from environment variable
+  const defaultProject = process.env.ado_mcp_project;
+
+  if (defaultProject) {
+    return { resolved: defaultProject };
+  }
+
   const coreApi = await connection.getCoreApi();
   const projects = await coreApi.getProjects("wellFormed", 100, 0, undefined, false);
 
@@ -50,6 +57,13 @@ export async function elicitProject(server: McpServer, connection: WebApi, messa
 }
 
 export async function elicitTeam(server: McpServer, connection: WebApi, project: string, message?: string): Promise<ElicitResult> {
+  // Check for default team from environment variable
+  const defaultTeam = process.env.ado_mcp_team;
+
+  if (defaultTeam) {
+    return { resolved: defaultTeam };
+  }
+
   const coreApi = await connection.getCoreApi();
   const teams = await coreApi.getTeams(project, undefined, undefined, undefined, false);
 

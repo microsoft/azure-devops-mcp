@@ -15,10 +15,11 @@ This TypeScript project provides a **local** MCP server for Azure DevOps, enabli
 4. [⚙️ Supported Tools](#️-supported-tools)
 5. [🔌 Installation & Getting Started](#-installation--getting-started)
 6. [🌏 Using Domains](#-using-domains)
-7. [📝 Troubleshooting](#-troubleshooting)
-8. [🎩 Examples & Best Practices](#-examples--best-practices)
-9. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-10. [📌 Contributing](#-contributing)
+7. [🐥 Project and Team Defaults](#-project-and-team-defaults)
+8. [📝 Troubleshooting](#-troubleshooting)
+9. [🎩 Examples & Best Practices](#-examples--best-practices)
+10. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+11. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -169,6 +170,28 @@ Domains that are available are: `core`, `work`, `work-items`, `search`, `test-pl
 We recommend that you always enable `core` tools so that you can fetch project level information.
 
 > By default all domains are loaded
+
+## 🐥 Project and Team Defaults
+
+You can also configure default Azure DevOps project and team values from `.vscode/mcp.json` using `project` and `team`, so tools can skip selection prompts.
+
+### Example `.vscode/mcp.json`
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "myorg", "--authentication", "azcli"],
+      "env": {
+        "ado_mcp_project": "Contoso",
+        "ado_mcp_team": "Fabrikam Team"
+      }
+    }
+  }
+}
+```
 
 ## 📝 Troubleshooting
 
