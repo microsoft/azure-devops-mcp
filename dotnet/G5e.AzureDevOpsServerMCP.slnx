@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/G5e.AzureDevOpsServerMCP.AspNetCore/G5e.AzureDevOpsServerMCP.AspNetCore.csproj" />
     <Project Path="src/G5e.AzureDevOpsServerMCP.Application/G5e.AzureDevOpsServerMCP.Application.csproj" />
     <Project Path="src/G5e.AzureDevOpsServerMCP.Domain/G5e.AzureDevOpsServerMCP.Domain.csproj" />
     <Project Path="src/G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps/G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.csproj" />

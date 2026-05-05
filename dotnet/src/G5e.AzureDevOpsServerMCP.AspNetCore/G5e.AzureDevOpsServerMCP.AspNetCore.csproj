@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Application\G5e.AzureDevOpsServerMCP.Application.csproj" />
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps\G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.csproj" />
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration.csproj" />
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Tools\G5e.AzureDevOpsServerMCP.Tools.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

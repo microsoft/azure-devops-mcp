@@ -10,6 +10,43 @@ According to the FAQ of the original project, on-prem is not supported as a targ
 - The implementation uses `ModelContextProtocol.AspNetCore` as the MCP transport/runtime for .NET.
 - Reference: https://csharp.sdk.modelcontextprotocol.io/
 
+## Reusable Integration Package
+
+Besides the standalone server app, this fork now also provides a reusable integration project at:
+
+- [dotnet/src/G5e.AzureDevOpsServerMCP.AspNetCore](dotnet/src/G5e.AzureDevOpsServerMCP.AspNetCore)
+
+This project is intended to be packaged as a NuGet package so existing MCP servers (already using `ModelContextProtocol.AspNetCore`) can add the Azure DevOps tools with minimal setup.
+
+It exposes two extension methods:
+
+- `AddDevOpsServerMcpServices(this IServiceCollection services, IConfiguration configuration)`
+- `AddDevOpsServerMCP(this IMcpServerBuilder builder)`
+
+Example usage in an existing MCP host:
+
+```csharp
+using G5e.AzureDevOpsServerMCP.AspNetCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDevOpsServerMcpServices(builder.Configuration);
+
+builder.Services
+	.AddMcpServer()
+	.AddDevOpsServerMCP()
+	.WithHttpTransport(options =>
+	{
+		options.Stateless = true;
+	});
+```
+
+What this adds automatically:
+
+- Azure DevOps options loading from appsettings/environment
+- Connection factory and Azure DevOps service registrations
+- MCP tool registrations for work items and repository workflows
+
 ## Goal of This Fork
 
 - Make Azure DevOps MCP capabilities available in a .NET stack

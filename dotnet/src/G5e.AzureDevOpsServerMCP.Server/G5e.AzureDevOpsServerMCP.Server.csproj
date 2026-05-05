@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.AspNetCore\G5e.AzureDevOpsServerMCP.AspNetCore.csproj" />
     <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Application\G5e.AzureDevOpsServerMCP.Application.csproj" />
     <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Tools\G5e.AzureDevOpsServerMCP.Tools.csproj" />
     <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration.csproj" />

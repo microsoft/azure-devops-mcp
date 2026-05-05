@@ -1,51 +1,13 @@
-using G5e.AzureDevOpsServerMCP.Infrastructure.Configuration;
-using G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps;
-using G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.Services;
-using G5e.AzureDevOpsServerMCP.Application.Services;
-using G5e.AzureDevOpsServerMCP.Tools;
+using G5e.AzureDevOpsServerMCP.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Get Azure DevOps configuration from environment or appsettings
-var azureDevOpsOptions = new AzureDevOpsOptions
-{
-	OrganizationUrl = builder.Configuration["AzureDevOps:OrganizationUrl"]
-		?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_ORG_URL")
-		?? throw new InvalidOperationException("AzureDevOps:OrganizationUrl is required"),
-	PersonalAccessToken = builder.Configuration["AzureDevOps:PersonalAccessToken"]
-		?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_PAT")
-		?? throw new InvalidOperationException("AzureDevOps:PersonalAccessToken is required"),
-	DefaultProject = builder.Configuration["AzureDevOps:DefaultProject"]
-		?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_PROJECT"),
-	DefaultRepository = builder.Configuration["AzureDevOps:DefaultRepository"]
-		?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_REPOSITORY")
-};
-
 builder.Services.AddHealthChecks();
-builder.Services.AddHttpContextAccessor();
-
-// Register Azure DevOps services
-builder.Services.AddSingleton(azureDevOpsOptions);
-builder.Services.AddSingleton<IAzureDevOpsConnectionFactory>(
-	sp => new AzureDevOpsConnectionFactory(azureDevOpsOptions, sp.GetRequiredService<IHttpContextAccessor>()));
-builder.Services.AddScoped<IWorkItemContextService>(
-	sp => new AzureDevOpsWorkItemContextService(
-		sp.GetRequiredService<IAzureDevOpsConnectionFactory>(),
-		sp.GetRequiredService<AzureDevOpsOptions>(),
-		sp.GetRequiredService<IHttpContextAccessor>()));
-builder.Services.AddScoped<IRepositoryService>(
-	sp => new AzureDevOpsRepositoryService(
-		sp.GetRequiredService<IAzureDevOpsConnectionFactory>(),
-		sp.GetRequiredService<AzureDevOpsOptions>(),
-		sp.GetRequiredService<IHttpContextAccessor>()));
-
-// Register tools that need DI
-builder.Services.AddScoped<WorkItemTools>();
-builder.Services.AddScoped<RepositoryTools>();
+builder.Services.AddDevOpsServerMcpServices(builder.Configuration);
 
 builder.Services
 	.AddMcpServer()
-	.WithToolsFromAssembly(typeof(WorkItemTools).Assembly)
+	.AddDevOpsServerMCP()
 	.WithHttpTransport(options =>
 	{
 		options.Stateless = true;
