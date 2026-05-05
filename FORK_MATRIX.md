@@ -1,6 +1,6 @@
 # Fork Capability Matrix
 
-Project: AzureDevOpsServerMCP
+Project: G5e.AzureDevOpsServerMCP
 
 This matrix compares capabilities from the original Azure DevOps MCP Server with the current .NET fork.
 

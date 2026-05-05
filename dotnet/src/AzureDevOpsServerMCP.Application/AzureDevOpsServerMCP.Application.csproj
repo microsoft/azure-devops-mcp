@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <ProjectReference Include="..\AzureDevOpsServerMCP.Domain\AzureDevOpsServerMCP.Domain.csproj" />
-  </ItemGroup>
-
-</Project>
