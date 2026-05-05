@@ -5,8 +5,6 @@ permissions:
   id-token: write # Required for OIDC
 
 on:
-  schedule:
-    - cron: "0 22 * * *" # Runs every day at 22:00 UTC (midnight CEST during daylight saving time)
   workflow_dispatch:
 
 jobs:

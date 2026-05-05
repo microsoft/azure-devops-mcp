@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\G5e.AzureDevOpsServerMCP.Application\G5e.AzureDevOpsServerMCP.Application.csproj" />
+    <ProjectReference Include="..\..\src\G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps\G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

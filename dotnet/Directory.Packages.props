@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MCP SDK -->
+    <PackageVersion Include="ModelContextProtocol" Version="1.1.0" />
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.2.0" />
+    <PackageVersion Include="MinVer" Version="6.0.0" />
+
+    <!-- Azure DevOps Client -->
+    <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="20.256.2" />
+    <PackageVersion Include="Microsoft.VisualStudio.Services.Client" Version="20.256.2" />
+    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+
+    <!-- Microsoft Extensions -->
+    <PackageVersion Include="Microsoft.AspNetCore.Http" Version="2.3.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
+  </ItemGroup>
+</Project>

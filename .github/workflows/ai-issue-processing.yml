@@ -1,8 +1,7 @@
 name: AI Issue Processing
 
 on:
-  issues:
-    types: [labeled]
+  workflow_dispatch:
 
 jobs:
   issue-processing:

@@ -6,12 +6,7 @@ permissions:
   packages: write
 
 on:
-  pull_request:
-    types:
-      - opened
-      - edited
-      - labeled
-      - unlabeled
+  workflow_dispatch:
 
 jobs:
   update-version:

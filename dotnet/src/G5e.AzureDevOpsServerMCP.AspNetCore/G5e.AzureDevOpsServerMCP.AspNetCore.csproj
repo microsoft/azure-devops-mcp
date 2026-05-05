@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>G5e.AzureDevOpsServerMCP.AspNetCore</PackageId>
+    <Description>Reusable ASP.NET Core integration package to add G5e Azure DevOps MCP tools and services to an existing ModelContextProtocol.AspNetCore server.</Description>
+    <Authors>G5e</Authors>
+    <RepositoryUrl>https://github.com/gadeynebram/AzureDevOpsServerMCP</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README_FORK.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- MinVer derives package and assembly versions from Git tags like release/v1.2.3 -->
+    <MinVerTagPrefix>release/v</MinVerTagPrefix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Application\G5e.AzureDevOpsServerMCP.Application.csproj" />
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps\G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.csproj" />
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration.csproj" />
+    <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Tools\G5e.AzureDevOpsServerMCP.Tools.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\README_FORK.md" Pack="true" PackagePath="\" Link="README_FORK.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="All" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>
