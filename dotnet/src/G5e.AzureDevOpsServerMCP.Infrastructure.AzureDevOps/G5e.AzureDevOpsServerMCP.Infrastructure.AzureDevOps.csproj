@@ -1,11 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <PackageId>G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps</PackageId>
+    <Description>Azure DevOps client implementations for the G5e Azure DevOps Server MCP packages.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Application\G5e.AzureDevOpsServerMCP.Application.csproj" />
     <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration\G5e.AzureDevOpsServerMCP.Infrastructure.Configuration.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="All" />
     <PackageReference Include="Microsoft.AspNetCore.Http" />
     <PackageReference Include="Microsoft.TeamFoundationServer.Client" />
     <PackageReference Include="Microsoft.VisualStudio.Services.Client" />

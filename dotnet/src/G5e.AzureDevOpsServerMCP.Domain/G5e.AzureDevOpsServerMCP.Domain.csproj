@@ -1,2 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<PackageId>G5e.AzureDevOpsServerMCP.Domain</PackageId>
+		<Description>Domain abstractions for the G5e Azure DevOps Server MCP packages.</Description>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="MinVer" PrivateAssets="All" />
+	</ItemGroup>
+
 </Project>

@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   publish-dotnet-package:
-    name: Pack and Publish G5e.AzureDevOpsServerMCP.AspNetCore
+    name: Pack and Publish dotnet packages
     runs-on: ubuntu-latest
 
     steps:
@@ -32,14 +32,25 @@ jobs:
       - name: Build
         run: dotnet build dotnet/G5e.AzureDevOpsServerMCP.slnx -c Release --no-restore
 
-      - name: Pack AspNetCore package
+      - name: Pack all reusable packages
         run: |
           mkdir -p artifacts/nuget
-          dotnet pack dotnet/src/G5e.AzureDevOpsServerMCP.AspNetCore/G5e.AzureDevOpsServerMCP.AspNetCore.csproj \
-            -c Release \
-            --no-build \
-            -p:ContinuousIntegrationBuild=true \
-            -o artifacts/nuget
+          projects=(
+            "dotnet/src/G5e.AzureDevOpsServerMCP.Domain/G5e.AzureDevOpsServerMCP.Domain.csproj"
+            "dotnet/src/G5e.AzureDevOpsServerMCP.Application/G5e.AzureDevOpsServerMCP.Application.csproj"
+            "dotnet/src/G5e.AzureDevOpsServerMCP.Infrastructure.Configuration/G5e.AzureDevOpsServerMCP.Infrastructure.Configuration.csproj"
+            "dotnet/src/G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps/G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.csproj"
+            "dotnet/src/G5e.AzureDevOpsServerMCP.Tools/G5e.AzureDevOpsServerMCP.Tools.csproj"
+            "dotnet/src/G5e.AzureDevOpsServerMCP.AspNetCore/G5e.AzureDevOpsServerMCP.AspNetCore.csproj"
+          )
+
+          for project in "${projects[@]}"; do
+            dotnet pack "$project" \
+              -c Release \
+              --no-build \
+              -p:ContinuousIntegrationBuild=true \
+              -o artifacts/nuget
+          done
 
       - name: Publish package to GitHub Packages
         run: |

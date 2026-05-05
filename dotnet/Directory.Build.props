@@ -5,5 +5,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Authors>G5e</Authors>
+    <RepositoryUrl>https://github.com/gadeynebram/AzureDevOpsServerMCP</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <MinVerTagPrefix>release/v</MinVerTagPrefix>
   </PropertyGroup>
 </Project>

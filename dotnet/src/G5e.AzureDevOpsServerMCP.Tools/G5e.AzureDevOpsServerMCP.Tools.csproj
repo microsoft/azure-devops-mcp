@@ -1,10 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <PackageId>G5e.AzureDevOpsServerMCP.Tools</PackageId>
+    <Description>MCP tool implementations for the G5e Azure DevOps Server MCP packages.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\G5e.AzureDevOpsServerMCP.Application\G5e.AzureDevOpsServerMCP.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="All" />
     <PackageReference Include="ModelContextProtocol" />
   </ItemGroup>
 
