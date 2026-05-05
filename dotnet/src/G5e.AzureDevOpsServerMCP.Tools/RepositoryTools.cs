@@ -26,7 +26,7 @@ public class RepositoryTools
     /// <param name="branchName">The name of the new branch (e.g., "feature/TASK-123")</param>
     /// <param name="fromBranch">The source branch to create from (e.g., "develop")</param>
     /// <returns>JSON object with branch creation details</returns>
-    [McpServerTool(Name = "CreateFeatureBranch")]
+    [McpServerTool(Name = "repo_create_branch")]
     [Description("Creates a new feature branch in a Git repository from an existing branch.")]
     public async Task<string> CreateFeatureBranch(string? project, string? repository, string branchName, string fromBranch)
     {
@@ -58,7 +58,7 @@ public class RepositoryTools
     /// <param name="branchName">The branch name to link (e.g., "feature/TASK-123")</param>
     /// <param name="workItemId">The work item ID to link to</param>
     /// <returns>JSON object confirming the link was created</returns>
-    [McpServerTool(Name = "LinkBranchToWorkItem")]
+    [McpServerTool(Name = "wit_add_artifact_link")]
     [Description("Links a Git branch to a work item as an artifact relationship.")]
     public async Task<string> LinkBranchToWorkItem(string? project, string? repository, string branchName, int workItemId)
     {
@@ -91,7 +91,7 @@ public class RepositoryTools
     /// <param name="description">Optional pull request description in Markdown format</param>
     /// <param name="workItemId">The work item ID to link to</param>
     /// <returns>JSON object with pull request details</returns>
-    [McpServerTool(Name = "CreatePullRequestForWorkItem")]
+    [McpServerTool(Name = "repo_create_pull_request")]
     [Description("Creates a pull request in a Git repository and links it to a work item.")]
     public async Task<string> CreatePullRequestForWorkItem(string? project, string? repository, string sourceBranch, string targetBranch, string title, int workItemId, string? description = null)
     {
