@@ -8,6 +8,7 @@ According to the FAQ of the original project, on-prem is not supported as a targ
 
 - New fork-specific functionality is located under [dotnet](dotnet).
 - The implementation uses `ModelContextProtocol.AspNetCore` as the MCP transport/runtime for .NET.
+- Azure DevOps connectivity is implemented with `Microsoft.TeamFoundationServer.Client` and `Microsoft.VisualStudio.Services.Client`.
 - Reference: https://csharp.sdk.modelcontextprotocol.io/
 
 ## Reusable Integration Package
