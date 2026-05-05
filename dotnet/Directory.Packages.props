@@ -7,6 +7,7 @@
     <!-- MCP SDK -->
     <PackageVersion Include="ModelContextProtocol" Version="1.1.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.2.0" />
+    <PackageVersion Include="MinVer" Version="6.0.0" />
 
     <!-- Azure DevOps Client -->
     <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="20.256.2" />

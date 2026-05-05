@@ -28,3 +28,29 @@ This matrix compares capabilities from the original Azure DevOps MCP Server with
 - The current scope mainly covers repository + work item collaboration workflows for feature delivery.
 - `repo_create_pull_request` in this fork also links the pull request to a work item and supports an optional Markdown description for the pull request body.
 - The implemented fork capabilities were validated with fixture-backed integration tests and manual smoke tests.
+
+## NuGet Feed Example (GitHub Packages)
+
+If you publish this fork's packages to GitHub Packages, consumers can configure a `NuGet.config` like this:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+	<packageSources>
+		<add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+		<add key="github-g5e" value="https://nuget.pkg.github.com/gadeynebram/index.json" />
+	</packageSources>
+	<packageSourceCredentials>
+		<github-g5e>
+			<add key="Username" value="GITHUB_USERNAME" />
+			<add key="ClearTextPassword" value="GITHUB_PAT" />
+		</github-g5e>
+	</packageSourceCredentials>
+</configuration>
+```
+
+Notes:
+
+- Replace `OWNER` with your GitHub organization or user name.
+- The PAT must at least include `read:packages` for restore (and `write:packages` when publishing).
+- Prefer CI/CD secrets or environment-based credential injection over committing plaintext tokens.

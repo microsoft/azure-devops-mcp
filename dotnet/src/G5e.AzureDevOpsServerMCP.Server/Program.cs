@@ -17,7 +17,7 @@ var app = builder.Build();
 
 app.MapGet("/", () => Results.Ok(new
 {
-	service = "azure-devops-mcp-dotnet",
+	service = "G5e.AzureDevOpsServerMCP",
 	status = "running",
 }));
 
