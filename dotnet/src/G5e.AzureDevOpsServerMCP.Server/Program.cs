@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Get Azure DevOps configuration from environment or appsettings
 var azureDevOpsOptions = new AzureDevOpsOptions
 {
-	OrganizationUrl = builder.Configuration["AzureDevOps:OrganizationUrl"] 
+	OrganizationUrl = builder.Configuration["AzureDevOps:OrganizationUrl"]
 		?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_ORG_URL")
 		?? throw new InvalidOperationException("AzureDevOps:OrganizationUrl is required"),
 	PersonalAccessToken = builder.Configuration["AzureDevOps:PersonalAccessToken"]
@@ -22,13 +22,22 @@ var azureDevOpsOptions = new AzureDevOpsOptions
 };
 
 builder.Services.AddHealthChecks();
+builder.Services.AddHttpContextAccessor();
 
 // Register Azure DevOps services
 builder.Services.AddSingleton(azureDevOpsOptions);
 builder.Services.AddSingleton<IAzureDevOpsConnectionFactory>(
-	sp => new AzureDevOpsConnectionFactory(azureDevOpsOptions));
-builder.Services.AddScoped<IWorkItemContextService, AzureDevOpsWorkItemContextService>();
-builder.Services.AddScoped<IRepositoryService, AzureDevOpsRepositoryService>();
+	sp => new AzureDevOpsConnectionFactory(azureDevOpsOptions, sp.GetRequiredService<IHttpContextAccessor>()));
+builder.Services.AddScoped<IWorkItemContextService>(
+	sp => new AzureDevOpsWorkItemContextService(
+		sp.GetRequiredService<IAzureDevOpsConnectionFactory>(),
+		sp.GetRequiredService<AzureDevOpsOptions>(),
+		sp.GetRequiredService<IHttpContextAccessor>()));
+builder.Services.AddScoped<IRepositoryService>(
+	sp => new AzureDevOpsRepositoryService(
+		sp.GetRequiredService<IAzureDevOpsConnectionFactory>(),
+		sp.GetRequiredService<AzureDevOpsOptions>(),
+		sp.GetRequiredService<IHttpContextAccessor>()));
 
 // Register tools that need DI
 builder.Services.AddScoped<WorkItemTools>();

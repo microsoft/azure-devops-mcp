@@ -40,6 +40,6 @@ public class AddCommentResult
 /// </summary>
 public interface IWorkItemContextService
 {
-    Task<WorkItemContextResult> GetWorkItemContextAsync(string project, int workItemId, CancellationToken cancellationToken = default);
-    Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default);
+    Task<WorkItemContextResult> GetWorkItemContextAsync(string? project, int workItemId, CancellationToken cancellationToken = default);
+    Task<AddCommentResult> AddCommentAsync(string? project, int workItemId, string comment, CancellationToken cancellationToken = default);
 }

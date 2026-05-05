@@ -1,8 +1,10 @@
 using G5e.AzureDevOpsServerMCP.Application.Services;
-using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.WebApi;
+using G5e.AzureDevOpsServerMCP.Infrastructure.Configuration;
+using Microsoft.AspNetCore.Http;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
+using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.WebApi;
 using Microsoft.VisualStudio.Services.WebApi.Patch;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 
@@ -11,22 +13,31 @@ namespace G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.Services;
 public class AzureDevOpsRepositoryService : IRepositoryService
 {
     private readonly IAzureDevOpsConnectionFactory _connectionFactory;
+    private readonly AzureDevOpsOptions _options;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public AzureDevOpsRepositoryService(IAzureDevOpsConnectionFactory connectionFactory)
+    public AzureDevOpsRepositoryService(
+        IAzureDevOpsConnectionFactory connectionFactory,
+        AzureDevOpsOptions options,
+        IHttpContextAccessor httpContextAccessor)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
     }
 
     public async Task<CreateBranchResult> CreateBranchAsync(
-        string project,
-        string repository,
+        string? project,
+        string? repository,
         string branchName,
         string fromBranch,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(project))
+        var resolvedProject = ResolveProject(project);
+        var resolvedRepository = ResolveRepository(repository);
+        if (string.IsNullOrWhiteSpace(resolvedProject))
             throw new ArgumentException("Project cannot be empty", nameof(project));
-        if (string.IsNullOrWhiteSpace(repository))
+        if (string.IsNullOrWhiteSpace(resolvedRepository))
             throw new ArgumentException("Repository cannot be empty", nameof(repository));
         if (string.IsNullOrWhiteSpace(branchName))
             throw new ArgumentException("Branch name cannot be empty", nameof(branchName));
@@ -47,7 +58,7 @@ public class AzureDevOpsRepositoryService : IRepositoryService
         var sourceRef = refs?.FirstOrDefault();
         if (sourceRef is null)
         {
-            throw new InvalidOperationException($"Source branch '{fromBranch}' not found in repository {repository}");
+            throw new InvalidOperationException($"Source branch '{fromBranch}' not found in repository {resolvedRepository}");
         }
 
         // Create new branch pointing to the same commit
@@ -82,15 +93,17 @@ public class AzureDevOpsRepositoryService : IRepositoryService
     }
 
     public async Task<LinkBranchResult> LinkBranchToWorkItemAsync(
-        string project,
-        string repository,
+        string? project,
+        string? repository,
         string branchName,
         int workItemId,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(project))
+        var resolvedProject = ResolveProject(project);
+        var resolvedRepository = ResolveRepository(repository);
+        if (string.IsNullOrWhiteSpace(resolvedProject))
             throw new ArgumentException("Project cannot be empty", nameof(project));
-        if (string.IsNullOrWhiteSpace(repository))
+        if (string.IsNullOrWhiteSpace(resolvedRepository))
             throw new ArgumentException("Repository cannot be empty", nameof(repository));
         if (string.IsNullOrWhiteSpace(branchName))
             throw new ArgumentException("Branch name cannot be empty", nameof(branchName));
@@ -102,7 +115,7 @@ public class AzureDevOpsRepositoryService : IRepositoryService
         var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
 
         // Get repo to obtain project ID and repository ID (GUIDs required for vstfs URL)
-        var repo = await gitClient.GetRepositoryAsync(project, repository, cancellationToken: cancellationToken);
+        var repo = await gitClient.GetRepositoryAsync(resolvedProject, resolvedRepository, cancellationToken: cancellationToken);
 
         // Build the vstfs artifact URL for the branch
         // Format: vstfs:///Git/Ref/{projectId}/{repoId}/{encodedRef}
@@ -131,13 +144,13 @@ public class AzureDevOpsRepositoryService : IRepositoryService
         {
             WorkItemId = workItemId,
             BranchName = branchName,
-            Repository = repository
+            Repository = resolvedRepository
         };
     }
 
     public async Task<CreatePullRequestResult> CreatePullRequestAsync(
-        string project,
-        string repository,
+        string? project,
+        string? repository,
         string sourceBranch,
         string targetBranch,
         string title,
@@ -145,9 +158,11 @@ public class AzureDevOpsRepositoryService : IRepositoryService
         int workItemId,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(project))
+        var resolvedProject = ResolveProject(project);
+        var resolvedRepository = ResolveRepository(repository);
+        if (string.IsNullOrWhiteSpace(resolvedProject))
             throw new ArgumentException("Project cannot be empty", nameof(project));
-        if (string.IsNullOrWhiteSpace(repository))
+        if (string.IsNullOrWhiteSpace(resolvedRepository))
             throw new ArgumentException("Repository cannot be empty", nameof(repository));
         if (string.IsNullOrWhiteSpace(sourceBranch))
             throw new ArgumentException("Source branch cannot be empty", nameof(sourceBranch));
@@ -183,5 +198,50 @@ public class AzureDevOpsRepositoryService : IRepositoryService
             Url = createdPr.Url ?? string.Empty,
             Status = createdPr.Status.ToString()
         };
+    }
+
+    private string ResolveProject(string? project)
+    {
+        if (!string.IsNullOrWhiteSpace(project))
+            return project;
+
+        var headerProject = GetHeaderValue(AzureDevOpsHeaderNames.DefaultProject);
+        if (!string.IsNullOrWhiteSpace(headerProject))
+            return headerProject;
+
+        if (!string.IsNullOrWhiteSpace(_options.DefaultProject))
+            return _options.DefaultProject;
+
+        throw new ArgumentException(
+            "Project cannot be empty. Provide project argument, X-AzureDevOps-Default-Project header, or AzureDevOps:DefaultProject.",
+            nameof(project));
+    }
+
+    private string ResolveRepository(string? repository)
+    {
+        if (!string.IsNullOrWhiteSpace(repository))
+            return repository;
+
+        var headerRepository = GetHeaderValue(AzureDevOpsHeaderNames.DefaultRepository);
+        if (!string.IsNullOrWhiteSpace(headerRepository))
+            return headerRepository;
+
+        if (!string.IsNullOrWhiteSpace(_options.DefaultRepository))
+            return _options.DefaultRepository;
+
+        throw new ArgumentException(
+            "Repository cannot be empty. Provide repository argument, X-AzureDevOps-Default-Repository header, or AzureDevOps:DefaultRepository.",
+            nameof(repository));
+    }
+
+    private string? GetHeaderValue(string headerName)
+    {
+        var headers = _httpContextAccessor.HttpContext?.Request?.Headers;
+        if (headers is null)
+            return null;
+
+        return headers.TryGetValue(headerName, out var value)
+            ? value.ToString()
+            : null;
     }
 }

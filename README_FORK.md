@@ -58,6 +58,38 @@ Notes:
 	- `AZURE_DEVOPS_PROJECT`
 	- `AZURE_DEVOPS_REPOSITORY`
 
+## Per-Request Header Overrides
+
+The server also supports per-request header-based overrides for authentication and default parameters. This is useful when multiple users or contexts access the same server instance with different credentials or project/repository defaults.
+
+Supported headers (must be sent with each MCP request):
+
+- `X-AzureDevOps-Pat`: Personal Access Token (overrides system PAT from config)
+- `X-AzureDevOps-Default-Project`: Default project name/ID (overrides configured default project)
+- `X-AzureDevOps-Default-Repository`: Default repository name/ID (overrides configured default repository)
+
+Header precedence:
+
+1. Header value (if provided)
+2. Function argument (if provided as a tool parameter)
+3. Configured default (from appsettings/environment)
+
+Example request with headers (via curl):
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "X-AzureDevOps-Pat: YOUR_HEADER_PAT" \
+  -H "X-AzureDevOps-Default-Project: MyProject" \
+  -H "X-AzureDevOps-Default-Repository: MyRepo" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {...}}'
+```
+
+Notes:
+
+- The `AzureDevOps:OrganizationUrl` is intentionally **not overridable via headers** to prevent runtime endpoint switching security risks. It must be configured via `appsettings.json` or `AZURE_DEVOPS_ORG_URL` environment variable at server startup.
+- Headers should always be sent over HTTPS to prevent credential exposure in transit.
+
 ## Validation
 
 - The currently implemented workflows were validated with fixture-backed integration tests in the .NET solution.

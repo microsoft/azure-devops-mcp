@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.ComponentModel;
 using G5e.AzureDevOpsServerMCP.Application.Services;
 using ModelContextProtocol.Server;
 
@@ -24,7 +25,8 @@ public class WorkItemTools
     /// <param name="workItemId">The numeric work item ID</param>
     /// <returns>JSON object with work item details and comments</returns>
     [McpServerTool(Name = "GetWorkItemContext")]
-    public async Task<string> GetWorkItemContext(string project, int workItemId)
+    [Description("Retrieves a work item's context including title, state, description, assigned user, and all comments.")]
+    public async Task<string> GetWorkItemContext(string? project, int workItemId)
     {
         try
         {
@@ -68,7 +70,8 @@ public class WorkItemTools
     /// <param name="comment">The comment text to add (HTML or plain text)</param>
     /// <returns>JSON object with the created comment ID and URL</returns>
     [McpServerTool(Name = "AddWorkItemComment")]
-    public async Task<string> AddWorkItemComment(string project, int workItemId, string comment)
+    [Description("Adds a comment to a work item in Azure DevOps.")]
+    public async Task<string> AddWorkItemComment(string? project, int workItemId, string comment)
     {
         try
         {

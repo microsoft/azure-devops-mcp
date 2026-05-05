@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.ComponentModel;
 using G5e.AzureDevOpsServerMCP.Application.Services;
 using ModelContextProtocol.Server;
 
@@ -26,7 +27,8 @@ public class RepositoryTools
     /// <param name="fromBranch">The source branch to create from (e.g., "develop")</param>
     /// <returns>JSON object with branch creation details</returns>
     [McpServerTool(Name = "CreateFeatureBranch")]
-    public async Task<string> CreateFeatureBranch(string project, string repository, string branchName, string fromBranch)
+    [Description("Creates a new feature branch in a Git repository from an existing branch.")]
+    public async Task<string> CreateFeatureBranch(string? project, string? repository, string branchName, string fromBranch)
     {
         try
         {
@@ -57,7 +59,8 @@ public class RepositoryTools
     /// <param name="workItemId">The work item ID to link to</param>
     /// <returns>JSON object confirming the link was created</returns>
     [McpServerTool(Name = "LinkBranchToWorkItem")]
-    public async Task<string> LinkBranchToWorkItem(string project, string repository, string branchName, int workItemId)
+    [Description("Links a Git branch to a work item as an artifact relationship.")]
+    public async Task<string> LinkBranchToWorkItem(string? project, string? repository, string branchName, int workItemId)
     {
         try
         {
@@ -89,7 +92,8 @@ public class RepositoryTools
     /// <param name="workItemId">The work item ID to link to</param>
     /// <returns>JSON object with pull request details</returns>
     [McpServerTool(Name = "CreatePullRequestForWorkItem")]
-    public async Task<string> CreatePullRequestForWorkItem(string project, string repository, string sourceBranch, string targetBranch, string title, int workItemId, string? description = null)
+    [Description("Creates a pull request in a Git repository and links it to a work item.")]
+    public async Task<string> CreatePullRequestForWorkItem(string? project, string? repository, string sourceBranch, string targetBranch, string title, int workItemId, string? description = null)
     {
         try
         {

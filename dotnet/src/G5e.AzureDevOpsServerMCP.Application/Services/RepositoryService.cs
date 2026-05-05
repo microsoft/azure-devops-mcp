@@ -46,8 +46,8 @@ public interface IRepositoryService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>CreateBranchResult with branch details</returns>
     Task<CreateBranchResult> CreateBranchAsync(
-        string project,
-        string repository,
+        string? project,
+        string? repository,
         string branchName,
         string fromBranch,
         CancellationToken cancellationToken = default);
@@ -61,8 +61,8 @@ public interface IRepositoryService
     /// <param name="workItemId">The work item ID to link to</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task<LinkBranchResult> LinkBranchToWorkItemAsync(
-        string project,
-        string repository,
+        string? project,
+        string? repository,
         string branchName,
         int workItemId,
         CancellationToken cancellationToken = default);
@@ -79,8 +79,8 @@ public interface IRepositoryService
     /// <param name="workItemId">The work item ID to link to</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task<CreatePullRequestResult> CreatePullRequestAsync(
-        string project,
-        string repository,
+        string? project,
+        string? repository,
         string sourceBranch,
         string targetBranch,
         string title,
