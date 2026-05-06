@@ -40,6 +40,22 @@ public class AddCommentResult
 /// </summary>
 public interface IWorkItemContextService
 {
-    Task<WorkItemContextResult> GetWorkItemContextAsync(string? project, int workItemId, CancellationToken cancellationToken = default);
-    Task<AddCommentResult> AddCommentAsync(string? project, int workItemId, string comment, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Gets work item context (details and comments).
+    /// </summary>
+    /// <param name="collection">The collection name</param>
+    /// <param name="project">The project name or ID</param>
+    /// <param name="workItemId">The work item ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task<WorkItemContextResult> GetWorkItemContextAsync(string collection, string project, int workItemId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a comment to a work item.
+    /// </summary>
+    /// <param name="collection">The collection name</param>
+    /// <param name="project">The project name or ID</param>
+    /// <param name="workItemId">The work item ID</param>
+    /// <param name="comment">The comment text</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task<AddCommentResult> AddCommentAsync(string collection, string project, int workItemId, string comment, CancellationToken cancellationToken = default);
 }

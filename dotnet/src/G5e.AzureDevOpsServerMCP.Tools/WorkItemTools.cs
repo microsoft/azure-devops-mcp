@@ -21,16 +21,17 @@ public class WorkItemTools
     /// <summary>
     /// Gets the context of a work item including its details and comments.
     /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="workItemId">The numeric work item ID</param>
     /// <returns>JSON object with work item details and comments</returns>
     [McpServerTool(Name = "wit_get_work_item")]
     [Description("Retrieves a work item's context including title, state, description, assigned user, and all comments.")]
-    public async Task<string> GetWorkItemContext(string? project, int workItemId)
+    public async Task<string> GetWorkItemContext(string collection, string project, int workItemId)
     {
         try
         {
-            var ctx = await _workItemContextService.GetWorkItemContextAsync(project, workItemId);
+            var ctx = await _workItemContextService.GetWorkItemContextAsync(collection, project, workItemId);
 
             var result = new
             {
@@ -65,17 +66,18 @@ public class WorkItemTools
     /// <summary>
     /// Adds a comment to an existing work item.
     /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="workItemId">The numeric work item ID</param>
     /// <param name="comment">The comment text to add (HTML or plain text)</param>
     /// <returns>JSON object with the created comment ID and URL</returns>
     [McpServerTool(Name = "wit_add_work_item_comment")]
     [Description("Adds a comment to a work item in Azure DevOps.")]
-    public async Task<string> AddWorkItemComment(string? project, int workItemId, string comment)
+    public async Task<string> AddWorkItemComment(string collection, string project, int workItemId, string comment)
     {
         try
         {
-            var result = await _workItemContextService.AddCommentAsync(project, workItemId, comment);
+            var result = await _workItemContextService.AddCommentAsync(collection, project, workItemId, comment);
 
             return JsonSerializer.Serialize(new
             {

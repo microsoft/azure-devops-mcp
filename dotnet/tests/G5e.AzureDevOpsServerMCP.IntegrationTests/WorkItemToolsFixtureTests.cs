@@ -13,7 +13,7 @@ public class WorkItemToolsFixtureTests
         var service = new FixtureBackedWorkItemContextService(fixturePath);
         var sut = new WorkItemTools(service);
 
-        var json = await sut.GetWorkItemContext("UZG.IZ.PrestIZ", 1);
+        var json = await sut.GetWorkItemContext("DefaultCollection", "UZG.IZ.PrestIZ", 1);
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
@@ -35,7 +35,7 @@ public class WorkItemToolsFixtureTests
     {
         var sut = new WorkItemTools(new ThrowingWorkItemContextService(new InvalidOperationException("fixture failure")));
 
-        var json = await sut.GetWorkItemContext("UZG.IZ.PrestIZ", 1);
+        var json = await sut.GetWorkItemContext("DefaultCollection", "UZG.IZ.PrestIZ", 1);
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
@@ -53,7 +53,7 @@ public class WorkItemToolsFixtureTests
             _fixturePath = fixturePath;
         }
 
-        public async Task<WorkItemContextResult> GetWorkItemContextAsync(string project, int workItemId, CancellationToken cancellationToken = default)
+        public async Task<WorkItemContextResult> GetWorkItemContextAsync(string collection, string project, int workItemId, CancellationToken cancellationToken = default)
         {
             var json = await File.ReadAllTextAsync(_fixturePath, cancellationToken);
             var result = JsonSerializer.Deserialize<WorkItemContextResult>(json);
@@ -66,7 +66,7 @@ public class WorkItemToolsFixtureTests
             return result;
         }
 
-        public Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default)
+        public Task<AddCommentResult> AddCommentAsync(string collection, string project, int workItemId, string comment, CancellationToken cancellationToken = default)
             => Task.FromResult(new AddCommentResult { CommentId = 1, Url = string.Empty });
     }
 
@@ -79,10 +79,10 @@ public class WorkItemToolsFixtureTests
             _exception = exception;
         }
 
-        public Task<WorkItemContextResult> GetWorkItemContextAsync(string project, int workItemId, CancellationToken cancellationToken = default)
+        public Task<WorkItemContextResult> GetWorkItemContextAsync(string collection, string project, int workItemId, CancellationToken cancellationToken = default)
             => Task.FromException<WorkItemContextResult>(_exception);
 
-        public Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default)
+        public Task<AddCommentResult> AddCommentAsync(string collection, string project, int workItemId, string comment, CancellationToken cancellationToken = default)
             => Task.FromException<AddCommentResult>(_exception);
     }
 
@@ -91,7 +91,7 @@ public class WorkItemToolsFixtureTests
     {
         var sut = new WorkItemTools(new FakeAddCommentWorkItemContextService());
 
-        var json = await sut.AddWorkItemComment("UZG.IZ.PrestIZ", 1, "Test comment via MCP");
+        var json = await sut.AddWorkItemComment("DefaultCollection", "UZG.IZ.PrestIZ", 1, "Test comment via MCP");
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
@@ -105,7 +105,7 @@ public class WorkItemToolsFixtureTests
     {
         var sut = new WorkItemTools(new ThrowingWorkItemContextService(new InvalidOperationException("comment failed")));
 
-        var json = await sut.AddWorkItemComment("UZG.IZ.PrestIZ", 1, "Test comment");
+        var json = await sut.AddWorkItemComment("DefaultCollection", "UZG.IZ.PrestIZ", 1, "Test comment");
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
@@ -116,10 +116,10 @@ public class WorkItemToolsFixtureTests
 
     private sealed class FakeAddCommentWorkItemContextService : IWorkItemContextService
     {
-        public Task<WorkItemContextResult> GetWorkItemContextAsync(string project, int workItemId, CancellationToken cancellationToken = default)
+        public Task<WorkItemContextResult> GetWorkItemContextAsync(string collection, string project, int workItemId, CancellationToken cancellationToken = default)
             => Task.FromResult(new WorkItemContextResult());
 
-        public Task<AddCommentResult> AddCommentAsync(string project, int workItemId, string comment, CancellationToken cancellationToken = default)
+        public Task<AddCommentResult> AddCommentAsync(string collection, string project, int workItemId, string comment, CancellationToken cancellationToken = default)
             => Task.FromResult(new AddCommentResult { CommentId = 42, Url = "https://example.invalid/comment/42" });
     }
 }
