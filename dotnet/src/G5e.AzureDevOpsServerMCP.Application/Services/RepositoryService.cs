@@ -39,6 +39,7 @@ public interface IRepositoryService
     /// <summary>
     /// Creates a feature branch from a source branch.
     /// </summary>
+    /// <param name="collection">The collection name</param>
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="repository">The repository name or ID</param>
     /// <param name="branchName">The name of the new branch (e.g., "feature/my-feature")</param>
@@ -46,8 +47,9 @@ public interface IRepositoryService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>CreateBranchResult with branch details</returns>
     Task<CreateBranchResult> CreateBranchAsync(
-        string? project,
-        string? repository,
+        string collection,
+        string project,
+        string repository,
         string branchName,
         string fromBranch,
         CancellationToken cancellationToken = default);
@@ -55,14 +57,16 @@ public interface IRepositoryService
     /// <summary>
     /// Links a branch to a work item as an artifact link.
     /// </summary>
+    /// <param name="collection">The collection name</param>
     /// <param name="project">The Azure DevOps project name</param>
     /// <param name="repository">The repository name</param>
     /// <param name="branchName">The branch name (e.g., "feature/my-feature")</param>
     /// <param name="workItemId">The work item ID to link to</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task<LinkBranchResult> LinkBranchToWorkItemAsync(
-        string? project,
-        string? repository,
+        string collection,
+        string project,
+        string repository,
         string branchName,
         int workItemId,
         CancellationToken cancellationToken = default);
@@ -70,6 +74,7 @@ public interface IRepositoryService
     /// <summary>
     /// Creates a pull request and links it to a work item.
     /// </summary>
+    /// <param name="collection">The collection name</param>
     /// <param name="project">The Azure DevOps project name</param>
     /// <param name="repository">The repository name</param>
     /// <param name="sourceBranch">The source branch (e.g., "feature/my-feature")</param>
@@ -79,8 +84,9 @@ public interface IRepositoryService
     /// <param name="workItemId">The work item ID to link to</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task<CreatePullRequestResult> CreatePullRequestAsync(
-        string? project,
-        string? repository,
+        string collection,
+        string project,
+        string repository,
         string sourceBranch,
         string targetBranch,
         string title,

@@ -14,7 +14,7 @@ public class RepositoryToolsFixtureTests
         var sut = new RepositoryTools(service);
 
         // Act
-        var json = await sut.CreateFeatureBranch("TestProject", "TestRepo", "feature/TEST-123", "main");
+        var json = await sut.CreateFeatureBranch("DefaultCollection", "TestProject", "TestRepo", "feature/TEST-123", "main");
 
         // Assert
         using var document = JsonDocument.Parse(json);
@@ -33,7 +33,7 @@ public class RepositoryToolsFixtureTests
         var sut = new RepositoryTools(service);
 
         // Act
-        var json = await sut.CreateFeatureBranch("TestProject", "TestRepo", "feature/TEST-123", "main");
+        var json = await sut.CreateFeatureBranch("DefaultCollection", "TestProject", "TestRepo", "feature/TEST-123", "main");
 
         // Assert
         using var document = JsonDocument.Parse(json);
@@ -48,6 +48,7 @@ public class RepositoryToolsFixtureTests
         var sut = new RepositoryTools(new FakeRepositoryService());
 
         var json = await sut.CreatePullRequestForWorkItem(
+            "DefaultCollection",
             "TestProject",
             "TestRepo",
             "feature/TEST-123",
@@ -71,6 +72,7 @@ public class RepositoryToolsFixtureTests
         var sut = new RepositoryTools(new ThrowingRepositoryService(new InvalidOperationException("source branch not found")));
 
         var json = await sut.CreatePullRequestForWorkItem(
+            "DefaultCollection",
             "TestProject",
             "TestRepo",
             "feature/TEST-123",
@@ -91,7 +93,7 @@ public class RepositoryToolsFixtureTests
         {
             var sut = new RepositoryTools(new FakeRepositoryService());
 
-            var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
+            var json = await sut.LinkBranchToWorkItem("DefaultCollection", "TestProject", "TestRepo", "feature/TEST-123", 42);
 
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
@@ -107,7 +109,7 @@ public class RepositoryToolsFixtureTests
         {
             var sut = new RepositoryTools(new ThrowingRepositoryService(new InvalidOperationException("repository not found")));
 
-            var json = await sut.LinkBranchToWorkItem("TestProject", "TestRepo", "feature/TEST-123", 42);
+            var json = await sut.LinkBranchToWorkItem("DefaultCollection", "TestProject", "TestRepo", "feature/TEST-123", 42);
 
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
@@ -119,6 +121,7 @@ public class RepositoryToolsFixtureTests
         private sealed class FakeRepositoryService : IRepositoryService
     {
         public Task<CreateBranchResult> CreateBranchAsync(
+            string collection,
             string project,
             string repository,
             string branchName,
@@ -136,6 +139,7 @@ public class RepositoryToolsFixtureTests
         }
 
         public Task<LinkBranchResult> LinkBranchToWorkItemAsync(
+            string collection,
             string project,
             string repository,
             string branchName,
@@ -149,6 +153,7 @@ public class RepositoryToolsFixtureTests
             });
 
         public Task<CreatePullRequestResult> CreatePullRequestAsync(
+            string collection,
             string project,
             string repository,
             string sourceBranch,
@@ -176,6 +181,7 @@ public class RepositoryToolsFixtureTests
         }
 
         public Task<CreateBranchResult> CreateBranchAsync(
+            string collection,
             string project,
             string repository,
             string branchName,
@@ -184,6 +190,7 @@ public class RepositoryToolsFixtureTests
             => Task.FromException<CreateBranchResult>(_exception);
 
         public Task<LinkBranchResult> LinkBranchToWorkItemAsync(
+            string collection,
             string project,
             string repository,
             string branchName,
@@ -192,6 +199,7 @@ public class RepositoryToolsFixtureTests
             => Task.FromException<LinkBranchResult>(_exception);
 
         public Task<CreatePullRequestResult> CreatePullRequestAsync(
+            string collection,
             string project,
             string repository,
             string sourceBranch,

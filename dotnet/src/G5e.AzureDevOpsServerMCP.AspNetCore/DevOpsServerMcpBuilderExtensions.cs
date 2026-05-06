@@ -23,14 +23,7 @@ public static class DevOpsServerMcpBuilderExtensions
         {
             OrganizationUrl = configuration["AzureDevOps:OrganizationUrl"]
                 ?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_ORG_URL")
-                ?? throw new InvalidOperationException("AzureDevOps:OrganizationUrl is required"),
-            PersonalAccessToken = configuration["AzureDevOps:PersonalAccessToken"]
-                ?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_PAT")
-                ?? throw new InvalidOperationException("AzureDevOps:PersonalAccessToken is required"),
-            DefaultProject = configuration["AzureDevOps:DefaultProject"]
-                ?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_PROJECT"),
-            DefaultRepository = configuration["AzureDevOps:DefaultRepository"]
-                ?? Environment.GetEnvironmentVariable("AZURE_DEVOPS_REPOSITORY")
+                ?? throw new InvalidOperationException("AzureDevOps:OrganizationUrl is required")
         };
 
         services.AddHttpContextAccessor();

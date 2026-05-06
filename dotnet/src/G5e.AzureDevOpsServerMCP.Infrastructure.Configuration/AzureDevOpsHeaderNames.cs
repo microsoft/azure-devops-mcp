@@ -5,7 +5,9 @@ namespace G5e.AzureDevOpsServerMCP.Infrastructure.Configuration;
 /// </summary>
 public static class AzureDevOpsHeaderNames
 {
-    public const string PersonalAccessToken = "X-AzureDevOps-Pat";
-    public const string DefaultProject = "X-AzureDevOps-Default-Project";
-    public const string DefaultRepository = "X-AzureDevOps-Default-Repository";
+    /// <summary>
+    /// Collection-specific PAT header pattern: X-AzureDevOps-Pat-{CollectionName}
+    /// Example: X-AzureDevOps-Pat-DefaultCollection
+    /// </summary>
+    public const string PersonalAccessTokenPattern = "X-AzureDevOps-Pat-{0}";
 }
