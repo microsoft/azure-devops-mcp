@@ -36,6 +36,18 @@ public class AddCommentResult
 }
 
 /// <summary>
+/// Result of updating a comment on a work item.
+/// </summary>
+public class UpdateCommentResult
+{
+    public int CommentId { get; set; }
+    public int WorkItemId { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public int? Version { get; set; }
+    public string? Url { get; set; }
+}
+
+/// <summary>
 /// Service for retrieving and updating work item context from Azure DevOps.
 /// </summary>
 public interface IWorkItemContextService
@@ -55,7 +67,18 @@ public interface IWorkItemContextService
     /// <param name="collection">The collection name</param>
     /// <param name="project">The project name or ID</param>
     /// <param name="workItemId">The work item ID</param>
-    /// <param name="comment">The comment text</param>
+    /// <param name="comment">The comment text (supports plain text and HTML formatting)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task<AddCommentResult> AddCommentAsync(string collection, string project, int workItemId, string comment, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing comment on a work item.
+    /// </summary>
+    /// <param name="collection">The collection name</param>
+    /// <param name="project">The project name or ID</param>
+    /// <param name="workItemId">The work item ID</param>
+    /// <param name="commentId">The comment ID to update</param>
+    /// <param name="text">The updated comment text (supports plain text and HTML formatting)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task<UpdateCommentResult> UpdateCommentAsync(string collection, string project, int workItemId, int commentId, string text, CancellationToken cancellationToken = default);
 }

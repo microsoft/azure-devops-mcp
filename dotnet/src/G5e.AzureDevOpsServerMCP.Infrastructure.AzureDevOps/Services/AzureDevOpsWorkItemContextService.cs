@@ -110,6 +110,41 @@ public class AzureDevOpsWorkItemContextService : IWorkItemContextService
         };
     }
 
+    public async Task<UpdateCommentResult> UpdateCommentAsync(
+        string collection,
+        string project,
+        int workItemId,
+        int commentId,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(collection))
+            throw new ArgumentException("Collection cannot be empty", nameof(collection));
+        if (string.IsNullOrWhiteSpace(project))
+            throw new ArgumentException("Project cannot be empty", nameof(project));
+        if (workItemId <= 0)
+            throw new ArgumentException("Work item ID must be positive", nameof(workItemId));
+        if (commentId <= 0)
+            throw new ArgumentException("Comment ID must be positive", nameof(commentId));
+        if (string.IsNullOrWhiteSpace(text))
+            throw new ArgumentException("Comment text cannot be empty", nameof(text));
+
+        using var connection = _connectionFactory.CreateConnection(collection);
+        var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
+
+        var request = new CommentUpdate { Text = text };
+        var result = await witClient.UpdateCommentAsync(request, project, workItemId, commentId, cancellationToken: cancellationToken);
+
+        return new UpdateCommentResult
+        {
+            CommentId = result.Id,
+            WorkItemId = result.WorkItemId,
+            Text = result.Text ?? string.Empty,
+            Version = result.Version,
+            Url = result.Url
+        };
+    }
+
     private static string GetField(WorkItem wit, string fieldName) =>
         wit.Fields.TryGetValue(fieldName, out var val) ? val?.ToString() ?? string.Empty : string.Empty;
 

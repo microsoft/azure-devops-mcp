@@ -11,6 +11,7 @@ This matrix compares capabilities from the original Azure DevOps MCP Server with
 | --- | --- | --- | --- |
 | Get work item context (details + comments) | `mcp_ado_wit_get_work_item`, `mcp_ado_wit_list_work_item_comments` | `wit_get_work_item` | Implemented |
 | Add comment to work item | `mcp_ado_wit_add_work_item_comment` | `wit_add_work_item_comment` | Implemented |
+| Update comment on work item | `mcp_ado_wit_update_work_item_comment` | `wit_update_work_item_comment` | Implemented |
 | Create feature branch | `mcp_ado_repo_create_branch` | `repo_create_branch` | Implemented |
 | Link branch to work item (artifact link) | `mcp_ado_wit_add_artifact_link` | `wit_add_artifact_link` | Implemented |
 | Create pull request and link to work item | `mcp_ado_repo_create_pull_request`, `mcp_ado_wit_link_work_item_to_pull_request` | `repo_create_pull_request` | Implemented |
