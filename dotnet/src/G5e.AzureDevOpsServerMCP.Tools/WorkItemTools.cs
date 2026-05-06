@@ -21,16 +21,17 @@ public class WorkItemTools
     /// <summary>
     /// Gets the context of a work item including its details and comments.
     /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="workItemId">The numeric work item ID</param>
     /// <returns>JSON object with work item details and comments</returns>
     [McpServerTool(Name = "wit_get_work_item")]
     [Description("Retrieves a work item's context including title, state, description, assigned user, and all comments.")]
-    public async Task<string> GetWorkItemContext(string? project, int workItemId)
+    public async Task<string> GetWorkItemContext(string collection, string project, int workItemId)
     {
         try
         {
-            var ctx = await _workItemContextService.GetWorkItemContextAsync(project, workItemId);
+            var ctx = await _workItemContextService.GetWorkItemContextAsync(collection, project, workItemId);
 
             var result = new
             {
@@ -65,21 +66,55 @@ public class WorkItemTools
     /// <summary>
     /// Adds a comment to an existing work item.
     /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="workItemId">The numeric work item ID</param>
-    /// <param name="comment">The comment text to add (HTML or plain text)</param>
+    /// <param name="comment">The comment text to add (plain text or HTML formatting supported, e.g., "&lt;b&gt;text&lt;/b&gt;")</param>
     /// <returns>JSON object with the created comment ID and URL</returns>
     [McpServerTool(Name = "wit_add_work_item_comment")]
-    [Description("Adds a comment to a work item in Azure DevOps.")]
-    public async Task<string> AddWorkItemComment(string? project, int workItemId, string comment)
+    [Description("Adds a comment to a work item in Azure DevOps. Supports plain text and HTML formatting (e.g., <b>bold</b>, <i>italic</i>).")]
+    public async Task<string> AddWorkItemComment(string collection, string project, int workItemId, string comment)
     {
         try
         {
-            var result = await _workItemContextService.AddCommentAsync(project, workItemId, comment);
+            var result = await _workItemContextService.AddCommentAsync(collection, project, workItemId, comment);
 
             return JsonSerializer.Serialize(new
             {
                 commentId = result.CommentId,
+                url = result.Url,
+                success = true
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message, type = ex.GetType().Name });
+        }
+    }
+
+    /// <summary>
+    /// Updates an existing comment on a work item.
+    /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
+    /// <param name="project">The Azure DevOps project name or ID</param>
+    /// <param name="workItemId">The numeric work item ID</param>
+    /// <param name="commentId">The ID of the comment to update</param>
+    /// <param name="text">The updated comment text (plain text or HTML formatting supported, e.g., "&lt;b&gt;text&lt;/b&gt;")</param>
+    /// <returns>JSON object with the updated comment details</returns>
+    [McpServerTool(Name = "wit_update_work_item_comment")]
+    [Description("Updates an existing comment on a work item in Azure DevOps. Supports plain text and HTML formatting (e.g., <b>bold</b>, <i>italic</i>).")]
+    public async Task<string> UpdateWorkItemComment(string collection, string project, int workItemId, int commentId, string text)
+    {
+        try
+        {
+            var result = await _workItemContextService.UpdateCommentAsync(collection, project, workItemId, commentId, text);
+
+            return JsonSerializer.Serialize(new
+            {
+                commentId = result.CommentId,
+                workItemId = result.WorkItemId,
+                text = result.Text,
+                version = result.Version,
                 url = result.Url,
                 success = true
             }, new JsonSerializerOptions { WriteIndented = true });

@@ -62,25 +62,18 @@ A matrix that maps upstream capabilities to what is implemented in this fork is 
 
 The .NET server reads Azure DevOps settings from configuration keys under `AzureDevOps`.
 
-Required keys:
+**Required keys:**
 
-- `AzureDevOps:OrganizationUrl`
-- `AzureDevOps:PersonalAccessToken`
+- `AzureDevOps:OrganizationUrl`: Base URL of the Azure DevOps Server (e.g., `https://dev.azure.local/myorg` or `https://myserver.com/tfs`). Collection name is **not** part of the URL; it is specified per request.
 
-Optional keys:
-
-- `AzureDevOps:DefaultProject`
-- `AzureDevOps:DefaultRepository`
+**Optional keys:** None (all other parameters are provided per request).
 
 Example:
 
 ```json
 {
 	"AzureDevOps": {
-		"OrganizationUrl": "https://your-server/YourCollection",
-		"PersonalAccessToken": "YOUR_PAT",
-		"DefaultProject": "YourProject",
-		"DefaultRepository": "YourRepository"
+		"OrganizationUrl": "https://dev.azure.local"
 	}
 }
 ```
@@ -91,42 +84,59 @@ Notes:
 - For local development, `appsettings.Development.json` is the safer option because it is ignored by git in this repo.
 - `appsettings.json` is not ignored by git, so it should not be used for secrets unless you explicitly manage that risk.
 - Environment variables are also supported:
-	- `AZURE_DEVOPS_ORG_URL`
-	- `AZURE_DEVOPS_PAT`
-	- `AZURE_DEVOPS_PROJECT`
-	- `AZURE_DEVOPS_REPOSITORY`
+	- `AZURE_DEVOPS_ORG_URL`: Base URL of Azure DevOps Server (no collection in URL)
 
-## Per-Request Header Overrides
+## Per-Request Parameters and PAT Headers
 
-The server also supports per-request header-based overrides for authentication and default parameters. This is useful when multiple users or contexts access the same server instance with different credentials or project/repository defaults.
+Each MCP tool call **must include**:
 
-Supported headers (must be sent with each MCP request):
+1. **Collection name** as a tool parameter (required)
+2. **Project name** as a tool parameter (required)
+3. **Repository name** as a tool parameter (required for repository operations)
+4. **Personal Access Token** via a collection-specific header (required)
 
-- `X-AzureDevOps-Pat`: Personal Access Token (overrides system PAT from config)
-- `X-AzureDevOps-Default-Project`: Default project name/ID (overrides configured default project)
-- `X-AzureDevOps-Default-Repository`: Default repository name/ID (overrides configured default repository)
+The server supports per-request authentication via collection-specific PAT headers. This allows multiple collections and PATs to be used with the same server instance.
 
-Header precedence:
+**Supported PAT header pattern:**
 
-1. Header value (if provided)
-2. Function argument (if provided as a tool parameter)
-3. Configured default (from appsettings/environment)
+- `X-AzureDevOps-Pat-{CollectionName}`: Personal Access Token for the specified collection
+  - Example: `X-AzureDevOps-Pat-DefaultCollection`
+  - Example: `X-AzureDevOps-Pat-MyTeamCollection`
+
+**PAT Resolution:**
+
+When a tool call is made with a collection name, the server looks for a PAT in this order:
+
+1. Collection-specific header (e.g., `X-AzureDevOps-Pat-MyCollection`)
+2. If not found, the request fails with HTTP 401 Unauthorized
 
 Example request with headers (via curl):
 
 ```bash
 curl -X POST http://localhost:3000/mcp \
-  -H "X-AzureDevOps-Pat: YOUR_HEADER_PAT" \
-  -H "X-AzureDevOps-Default-Project: MyProject" \
-  -H "X-AzureDevOps-Default-Repository: MyRepo" \
+  -H "X-AzureDevOps-Pat-DefaultCollection: YOUR_COLLECTION_PAT" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {...}}'
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "wit_get_work_item",
+      "arguments": {
+        "collection": "DefaultCollection",
+        "project": "MyProject",
+        "workItemId": 123
+      }
+    }
+  }'
 ```
 
 Notes:
 
 - The `AzureDevOps:OrganizationUrl` is intentionally **not overridable via headers** to prevent runtime endpoint switching security risks. It must be configured via `appsettings.json` or `AZURE_DEVOPS_ORG_URL` environment variable at server startup.
+- Each collection requires its own PAT header with the collection name embedded in the header name (e.g., `X-AzureDevOps-Pat-CollectionA`, `X-AzureDevOps-Pat-CollectionB`).
 - Headers should always be sent over HTTPS to prevent credential exposure in transit.
+- The base URL in `OrganizationUrl` must **not** include the collection name (e.g., use `https://myserver.com/tfs`, not `https://myserver.com/tfs/DefaultCollection`).
 
 ## Validation
 

@@ -21,6 +21,7 @@ public class RepositoryTools
     /// <summary>
     /// Creates a new feature branch from a source branch.
     /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="repository">The repository name or ID</param>
     /// <param name="branchName">The name of the new branch (e.g., "feature/TASK-123")</param>
@@ -28,11 +29,11 @@ public class RepositoryTools
     /// <returns>JSON object with branch creation details</returns>
     [McpServerTool(Name = "repo_create_branch")]
     [Description("Creates a new feature branch in a Git repository from an existing branch.")]
-    public async Task<string> CreateFeatureBranch(string? project, string? repository, string branchName, string fromBranch)
+    public async Task<string> CreateFeatureBranch(string collection, string project, string repository, string branchName, string fromBranch)
     {
         try
         {
-            var result = await _repositoryService.CreateBranchAsync(project, repository, branchName, fromBranch);
+            var result = await _repositoryService.CreateBranchAsync(collection, project, repository, branchName, fromBranch);
 
             var response = new
             {
@@ -53,6 +54,7 @@ public class RepositoryTools
     /// <summary>
     /// Links a branch to a work item as an artifact link.
     /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name</param>
     /// <param name="repository">The repository name</param>
     /// <param name="branchName">The branch name to link (e.g., "feature/TASK-123")</param>
@@ -60,11 +62,11 @@ public class RepositoryTools
     /// <returns>JSON object confirming the link was created</returns>
     [McpServerTool(Name = "wit_add_artifact_link")]
     [Description("Links a Git branch to a work item as an artifact relationship.")]
-    public async Task<string> LinkBranchToWorkItem(string? project, string? repository, string branchName, int workItemId)
+    public async Task<string> LinkBranchToWorkItem(string collection, string project, string repository, string branchName, int workItemId)
     {
         try
         {
-            var result = await _repositoryService.LinkBranchToWorkItemAsync(project, repository, branchName, workItemId);
+            var result = await _repositoryService.LinkBranchToWorkItemAsync(collection, project, repository, branchName, workItemId);
 
             return JsonSerializer.Serialize(new
             {
@@ -83,21 +85,22 @@ public class RepositoryTools
     /// <summary>
     /// Creates a pull request and links it to a work item.
     /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name</param>
     /// <param name="repository">The repository name</param>
     /// <param name="sourceBranch">The source branch (e.g., "feature/TASK-123")</param>
     /// <param name="targetBranch">The target branch (e.g., "main" or "develop")</param>
     /// <param name="title">The pull request title</param>
-    /// <param name="description">Optional pull request description in Markdown format</param>
     /// <param name="workItemId">The work item ID to link to</param>
+    /// <param name="description">Optional pull request description in Markdown format</param>
     /// <returns>JSON object with pull request details</returns>
     [McpServerTool(Name = "repo_create_pull_request")]
     [Description("Creates a pull request in a Git repository and links it to a work item.")]
-    public async Task<string> CreatePullRequestForWorkItem(string? project, string? repository, string sourceBranch, string targetBranch, string title, int workItemId, string? description = null)
+    public async Task<string> CreatePullRequestForWorkItem(string collection, string project, string repository, string sourceBranch, string targetBranch, string title, int workItemId, string? description = null)
     {
         try
         {
-            var result = await _repositoryService.CreatePullRequestAsync(project, repository, sourceBranch, targetBranch, title, description, workItemId);
+            var result = await _repositoryService.CreatePullRequestAsync(collection, project, repository, sourceBranch, targetBranch, title, description, workItemId);
 
             return JsonSerializer.Serialize(new
             {

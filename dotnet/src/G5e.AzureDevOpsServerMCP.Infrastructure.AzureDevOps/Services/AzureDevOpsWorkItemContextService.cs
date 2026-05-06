@@ -25,27 +25,31 @@ public class AzureDevOpsWorkItemContextService : IWorkItemContextService
     }
 
     public async Task<WorkItemContextResult> GetWorkItemContextAsync(
-        string? project,
+        string collection,
+        string project,
         int workItemId,
         CancellationToken cancellationToken = default)
     {
-        var resolvedProject = ResolveProject(project);
+        if (string.IsNullOrWhiteSpace(collection))
+            throw new ArgumentException("Collection cannot be empty", nameof(collection));
+        if (string.IsNullOrWhiteSpace(project))
+            throw new ArgumentException("Project cannot be empty", nameof(project));
         if (workItemId <= 0)
             throw new ArgumentException("Work item ID must be positive", nameof(workItemId));
 
-        using var connection = _connectionFactory.CreateConnection();
+        using var connection = _connectionFactory.CreateConnection(collection);
         var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
 
         var workItem = await witClient.GetWorkItemAsync(
-            resolvedProject, workItemId, expand: WorkItemExpand.All, cancellationToken: cancellationToken);
+            project, workItemId, expand: WorkItemExpand.All, cancellationToken: cancellationToken);
 
         if (workItem == null)
-            throw new InvalidOperationException($"Work item {workItemId} not found in project {resolvedProject}");
+            throw new InvalidOperationException($"Work item {workItemId} not found in project {project}");
 
         var comments = new List<WorkItemCommentResult>();
         try
         {
-            var commentsResult = await witClient.GetCommentsAsync(resolvedProject, workItemId, cancellationToken: cancellationToken);
+            var commentsResult = await witClient.GetCommentsAsync(project, workItemId, cancellationToken: cancellationToken);
             if (commentsResult?.Comments != null)
             {
                 comments = commentsResult.Comments.Select(c => new WorkItemCommentResult
@@ -78,22 +82,26 @@ public class AzureDevOpsWorkItemContextService : IWorkItemContextService
     }
 
     public async Task<AddCommentResult> AddCommentAsync(
-        string? project,
+        string collection,
+        string project,
         int workItemId,
         string comment,
         CancellationToken cancellationToken = default)
     {
-        var resolvedProject = ResolveProject(project);
+        if (string.IsNullOrWhiteSpace(collection))
+            throw new ArgumentException("Collection cannot be empty", nameof(collection));
+        if (string.IsNullOrWhiteSpace(project))
+            throw new ArgumentException("Project cannot be empty", nameof(project));
         if (workItemId <= 0)
             throw new ArgumentException("Work item ID must be positive", nameof(workItemId));
         if (string.IsNullOrWhiteSpace(comment))
             throw new ArgumentException("Comment cannot be empty", nameof(comment));
 
-        using var connection = _connectionFactory.CreateConnection();
+        using var connection = _connectionFactory.CreateConnection(collection);
         var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
 
         var request = new CommentCreate { Text = comment };
-        var result = await witClient.AddCommentAsync(request, resolvedProject, workItemId, cancellationToken: cancellationToken);
+        var result = await witClient.AddCommentAsync(request, project, workItemId, cancellationToken: cancellationToken);
 
         return new AddCommentResult
         {
@@ -102,25 +110,43 @@ public class AzureDevOpsWorkItemContextService : IWorkItemContextService
         };
     }
 
+    public async Task<UpdateCommentResult> UpdateCommentAsync(
+        string collection,
+        string project,
+        int workItemId,
+        int commentId,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(collection))
+            throw new ArgumentException("Collection cannot be empty", nameof(collection));
+        if (string.IsNullOrWhiteSpace(project))
+            throw new ArgumentException("Project cannot be empty", nameof(project));
+        if (workItemId <= 0)
+            throw new ArgumentException("Work item ID must be positive", nameof(workItemId));
+        if (commentId <= 0)
+            throw new ArgumentException("Comment ID must be positive", nameof(commentId));
+        if (string.IsNullOrWhiteSpace(text))
+            throw new ArgumentException("Comment text cannot be empty", nameof(text));
+
+        using var connection = _connectionFactory.CreateConnection(collection);
+        var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
+
+        var request = new CommentUpdate { Text = text };
+        var result = await witClient.UpdateCommentAsync(request, project, workItemId, commentId, cancellationToken: cancellationToken);
+
+        return new UpdateCommentResult
+        {
+            CommentId = result.Id,
+            WorkItemId = result.WorkItemId,
+            Text = result.Text ?? string.Empty,
+            Version = result.Version,
+            Url = result.Url
+        };
+    }
+
     private static string GetField(WorkItem wit, string fieldName) =>
         wit.Fields.TryGetValue(fieldName, out var val) ? val?.ToString() ?? string.Empty : string.Empty;
-
-    private string ResolveProject(string? project)
-    {
-        if (!string.IsNullOrWhiteSpace(project))
-            return project;
-
-        var headerProject = GetHeaderValue(AzureDevOpsHeaderNames.DefaultProject);
-        if (!string.IsNullOrWhiteSpace(headerProject))
-            return headerProject;
-
-        if (!string.IsNullOrWhiteSpace(_options.DefaultProject))
-            return _options.DefaultProject;
-
-        throw new ArgumentException(
-            "Project cannot be empty. Provide project argument, X-AzureDevOps-Default-Project header, or AzureDevOps:DefaultProject.",
-            nameof(project));
-    }
 
     private string? GetHeaderValue(string headerName)
     {
