@@ -3,9 +3,10 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { TestPlanCreateParams, TestSuiteType } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
 import { apiVersion } from "../utils.js";
+import { elicitProject } from "../shared/elicitations.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
@@ -20,11 +21,13 @@ const Test_Plan_Tools = {
 };
 
 function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider?: () => string) {
+  const projectDescription = "The unique identifier (ID or name) of the Azure DevOps project. If not provided, a project selection prompt will be shown.";
+
   server.tool(
     Test_Plan_Tools.list_test_plans,
     "Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: z.string().optional().describe(projectDescription),
       filterActivePlans: z.boolean().default(true).describe("Filter to include only active test plans. Defaults to true."),
       includePlanDetails: z.boolean().default(false).describe("Include detailed information about each test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
@@ -32,12 +35,18 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, filterActivePlans, includePlanDetails, continuationToken }) => {
       try {
         const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection);
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
         const accessToken = await tokenProvider();
         const params = new URLSearchParams({ "api-version": apiVersion });
         if (filterActivePlans) params.append("filterActivePlans", "true");
         if (includePlanDetails) params.append("includePlanDetails", "true");
         if (continuationToken) params.append("continuationToken", continuationToken);
-        const url = `${connection.serverUrl}/${encodeURIComponent(project)}/_apis/testplan/Plans?${params.toString()}`;
+        const url = `${connection.serverUrl}/${encodeURIComponent(resolvedProject)}/_apis/testplan/Plans?${params.toString()}`;
         const headers: Record<string, string> = {
           Authorization: `Bearer ${accessToken}`,
         };
@@ -85,7 +94,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.create_test_plan,
     "Creates a new test plan in the project.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project where the test plan will be created."),
+      project: z.string().optional().describe(projectDescription),
       name: z.string().describe("The name of the test plan to be created."),
       iteration: z.string().describe("The iteration path for the test plan"),
       description: z.string().optional().describe("The description of the test plan"),
@@ -96,6 +105,12 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, name, iteration, description, startDate, endDate, areaPath }) => {
       try {
         const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection);
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
         const testPlanApi = await connection.getTestPlanApi();
 
         const testPlanToCreate: TestPlanCreateParams = {
@@ -107,7 +122,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           areaPath,
         };
 
-        const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, project);
+        const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, resolvedProject);
 
         return {
           content: [{ type: "text", text: JSON.stringify(createdTestPlan, null, 2) }],
@@ -124,20 +139,32 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     Test_Plan_Tools.create_test_suite,
-    "Creates a new test suite in a test plan.",
+    "Creates a new test suite in a test plan. Supports static suites and requirement-based suites linked to a specific work item.",
     {
-      project: z.string().describe("Project ID or project name"),
+      project: z.string().optional().describe(projectDescription),
       planId: z.coerce.number().min(1).describe("ID of the test plan that contains the suites"),
       parentSuiteId: z.coerce.number().min(1).describe("ID of the parent suite under which the new suite will be created, if not given by user this can be id of a root suite of the test plan"),
       name: z.string().describe("Name of the child test suite"),
+      requirementId: z.coerce
+        .number()
+        .min(1)
+        .optional()
+        .describe("Work item ID of the requirement to link this suite to. When provided, creates a requirement-based test suite instead of a static one."),
     },
-    async ({ project, planId, parentSuiteId, name }) => {
+    async ({ project, planId, parentSuiteId, name, requirementId }) => {
       const maxRetries = 5;
       const baseDelay = 500; // milliseconds
 
+      const connection = await connectionProvider();
+      let resolvedProject = project;
+      if (!resolvedProject) {
+        const result = await elicitProject(server, connection);
+        if ("response" in result) return result.response;
+        resolvedProject = result.resolved;
+      }
+
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          const connection = await connectionProvider();
           const testPlanApi = await connection.getTestPlanApi();
 
           const testSuiteToCreate = {
@@ -146,10 +173,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
               id: parentSuiteId,
               name: "",
             },
-            suiteType: 2,
+            suiteType: requirementId ? TestSuiteType.RequirementTestSuite : TestSuiteType.StaticTestSuite,
+            ...(requirementId && { requirementId }),
           };
 
-          const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, project, planId);
+          const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, resolvedProject, planId);
 
           return {
             content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }],
@@ -187,7 +215,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.add_test_cases_to_suite,
     "Adds existing test cases to a test suite.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: z.string().optional().describe(projectDescription),
       planId: z.coerce.number().min(1).describe("The ID of the test plan."),
       suiteId: z.coerce.number().min(1).describe("The ID of the test suite."),
       testCaseIds: z.string().or(z.array(z.string())).describe("The ID(s) of the test case(s) to add. "),
@@ -195,12 +223,18 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, planId, suiteId, testCaseIds }) => {
       try {
         const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection);
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
         const testApi = await connection.getTestApi();
 
         // If testCaseIds is an array, convert it to comma-separated string
         const testCaseIdsString = Array.isArray(testCaseIds) ? testCaseIds.join(",") : testCaseIds;
 
-        const addedTestCases = await testApi.addTestCasesToSuite(project, planId, suiteId, testCaseIdsString);
+        const addedTestCases = await testApi.addTestCasesToSuite(resolvedProject, planId, suiteId, testCaseIdsString);
 
         return {
           content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }],
@@ -219,7 +253,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.create_test_case,
     "Creates a new test case work item.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: z.string().optional().describe(projectDescription),
       title: z.string().describe("The title of the test case."),
       steps: z
         .string()
@@ -235,6 +269,12 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, title, steps, priority, areaPath, iterationPath, testsWorkItemId }) => {
       try {
         const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection);
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
         const witClient = await connection.getWorkItemTrackingApi();
 
         let stepsXml;
@@ -257,7 +297,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
             path: "/relations/-",
             value: {
               rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
-              url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${testsWorkItemId}`,
+              url: `${connection.serverUrl}/${resolvedProject}/_apis/wit/workItems/${testsWorkItemId}`,
             },
           });
         }
@@ -294,7 +334,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           });
         }
 
-        const workItem = await witClient.createWorkItem({}, patchDocument, project, "Test Case");
+        const workItem = await witClient.createWorkItem({}, patchDocument, resolvedProject, "Test Case");
 
         return {
           content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
@@ -360,7 +400,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.list_test_cases,
     "Gets a list of test cases in the test plan.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: z.string().optional().describe(projectDescription),
       planid: z.coerce.number().min(1).describe("The ID of the test plan."),
       suiteid: z.coerce.number().min(1).describe("The ID of the test suite."),
       continuationToken: z.string().optional().describe("Token to continue fetching test cases from a previous request."),
@@ -368,10 +408,16 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     async ({ project, planid, suiteid, continuationToken }) => {
       try {
         const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection);
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
         const accessToken = await tokenProvider();
         const params = new URLSearchParams({ "api-version": "7.2-preview.3" });
         if (continuationToken) params.append("continuationToken", continuationToken);
-        const url = `${connection.serverUrl}/${encodeURIComponent(project)}/_apis/testplan/Plans/${planid}/Suites/${suiteid}/TestCase?${params.toString()}`;
+        const url = `${connection.serverUrl}/${encodeURIComponent(resolvedProject)}/_apis/testplan/Plans/${planid}/Suites/${suiteid}/TestCase?${params.toString()}`;
         const headers: Record<string, string> = {
           Authorization: `Bearer ${accessToken}`,
         };
@@ -419,13 +465,19 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.test_results_from_build_id,
     "Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes. Efficiently handles builds with large numbers of test runs.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: z.string().optional().describe(projectDescription),
       buildid: z.coerce.number().min(1).describe("The ID of the build."),
       outcomes: z.array(z.string()).optional().describe("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
     },
     async ({ project, buildid, outcomes }) => {
       try {
         const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection);
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
         const testResultsApi = await connection.getTestResultsApi();
 
         // Build filter expression for outcomes if specified.
@@ -436,7 +488,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
         // This is more efficient than getTestRuns + getTestResults per run,
         // especially for builds with many test runs (e.g., cloud testing with one run per test case)
         const testResultDetails = await testResultsApi.getTestResultDetailsForBuild(
-          project,
+          resolvedProject,
           buildid,
           undefined, // publishContext
           undefined, // groupBy
@@ -487,17 +539,23 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.list_test_suites,
     "Retrieve a paginated list of test suites from an Azure DevOps project and Test Plan Id.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: z.string().optional().describe(projectDescription),
       planId: z.coerce.number().min(1).describe("The ID of the test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
     async ({ project, planId, continuationToken }) => {
       try {
         const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection);
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
         const accessToken = await tokenProvider();
         const params = new URLSearchParams({ "api-version": apiVersion, "expand": "children" });
         if (continuationToken) params.append("continuationToken", continuationToken);
-        const url = `${connection.serverUrl}/${encodeURIComponent(project)}/_apis/testplan/Plans/${planId}/Suites?${params.toString()}`;
+        const url = `${connection.serverUrl}/${encodeURIComponent(resolvedProject)}/_apis/testplan/Plans/${planId}/Suites?${params.toString()}`;
         const headers: Record<string, string> = {
           Authorization: `Bearer ${accessToken}`,
         };
