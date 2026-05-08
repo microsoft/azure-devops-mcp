@@ -9,6 +9,7 @@ import { ITestPlanApi } from "azure-devops-node-api/TestPlanApi";
 import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { ITestApi } from "azure-devops-node-api/TestApi";
+import { TestSuiteType } from "azure-devops-node-api/interfaces/TestPlanInterfaces";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -24,6 +25,7 @@ describe("configureTestPlanTools", () => {
     getTestResultsApi: () => Promise<ITestResultsApi>;
     getWorkItemTrackingApi: () => Promise<IWorkItemTrackingApi>;
     getTestApi: () => Promise<ITestApi>;
+    getCoreApi: (...args: unknown[]) => Promise<unknown>;
     serverUrl: string;
   };
   let mockTestPlanApi: ITestPlanApi;
@@ -32,7 +34,7 @@ describe("configureTestPlanTools", () => {
   let mockTestApi: ITestApi;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
     tokenProvider = jest.fn().mockResolvedValue("test-token");
     userAgentProvider = jest.fn().mockReturnValue("test-agent");
     mockTestPlanApi = {
@@ -59,6 +61,7 @@ describe("configureTestPlanTools", () => {
       getTestResultsApi: jest.fn().mockResolvedValue(mockTestResultsApi),
       getWorkItemTrackingApi: jest.fn().mockResolvedValue(mockWitApi),
       getTestApi: jest.fn().mockResolvedValue(mockTestApi),
+      getCoreApi: jest.fn().mockResolvedValue({ getProjects: jest.fn() }),
       serverUrl: "https://dev.azure.com/testorg",
     };
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
@@ -604,6 +607,118 @@ describe("configureTestPlanTools", () => {
       const result = await handler(params);
 
       expect(result.content[0].text).toBe(JSON.stringify(null, null, 2));
+    });
+
+    it("creates a RequirementTestSuite when requirementId is provided", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({ id: 20, name: "Req Suite", requirementId: 42 });
+
+      const result = await handler({ project: "proj1", planId: 1, parentSuiteId: 5, name: "Req Suite", requirementId: 42 });
+
+      expect(mockTestPlanApi.createTestSuite).toHaveBeenCalledWith(
+        {
+          name: "Req Suite",
+          parentSuite: { id: 5, name: "" },
+          suiteType: TestSuiteType.RequirementTestSuite,
+          requirementId: 42,
+        },
+        "proj1",
+        1
+      );
+      expect(result.content[0].text).toContain('"id": 20');
+    });
+
+    it("creates a StaticTestSuite when no requirementId is provided", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({ id: 21, name: "Static Suite" });
+
+      await handler({ project: "proj1", planId: 1, parentSuiteId: 5, name: "Static Suite" });
+
+      expect(mockTestPlanApi.createTestSuite).toHaveBeenCalledWith(
+        {
+          name: "Static Suite",
+          parentSuite: { id: 5, name: "" },
+          suiteType: TestSuiteType.StaticTestSuite,
+        },
+        "proj1",
+        1
+      );
+    });
+
+    it("uses elicitProject when project is not provided", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockConnection.getCoreApi as jest.Mock).mockResolvedValue({
+        getProjects: jest.fn().mockResolvedValue([{ id: "proj-1", name: "Contoso" }]),
+      });
+      ((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock).mockResolvedValue({
+        action: "accept",
+        content: { project: "Contoso" },
+      });
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({ id: 22, name: "Elicited Suite" });
+
+      await handler({ planId: 1, parentSuiteId: 5, name: "Elicited Suite" });
+
+      expect(mockTestPlanApi.createTestSuite).toHaveBeenCalledWith(expect.objectContaining({ name: "Elicited Suite" }), "Contoso", 1);
+    });
+
+    it("returns cancellation message when project elicitation is declined", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockConnection.getCoreApi as jest.Mock).mockResolvedValue({
+        getProjects: jest.fn().mockResolvedValue([{ id: "proj-1", name: "Contoso" }]),
+      });
+      ((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock).mockResolvedValue({
+        action: "decline",
+      });
+
+      const result = await handler({ planId: 1, parentSuiteId: 5, name: "Cancelled Suite" });
+
+      expect(result.content[0].text).toContain("cancelled");
+      expect(mockTestPlanApi.createTestSuite).not.toHaveBeenCalled();
+    });
+
+    it("creates a RequirementTestSuite via elicited project when both requirementId and no project are provided", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_create_test_suite");
+      if (!call) throw new Error("testplan_create_test_suite tool not registered");
+      const [, , , handler] = call;
+
+      (mockConnection.getCoreApi as jest.Mock).mockResolvedValue({
+        getProjects: jest.fn().mockResolvedValue([{ id: "proj-1", name: "Fabrikam" }]),
+      });
+      ((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput as jest.Mock).mockResolvedValue({
+        action: "accept",
+        content: { project: "Fabrikam" },
+      });
+      (mockTestPlanApi.createTestSuite as jest.Mock).mockResolvedValue({ id: 23, name: "Req Suite via Elicit", requirementId: 99 });
+
+      await handler({ planId: 2, parentSuiteId: 7, name: "Req Suite via Elicit", requirementId: 99 });
+
+      expect(mockTestPlanApi.createTestSuite).toHaveBeenCalledWith(
+        {
+          name: "Req Suite via Elicit",
+          parentSuite: { id: 7, name: "" },
+          suiteType: TestSuiteType.RequirementTestSuite,
+          requirementId: 99,
+        },
+        "Fabrikam",
+        2
+      );
     });
   });
 
