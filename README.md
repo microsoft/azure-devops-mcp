@@ -14,8 +14,8 @@ This project provides Azure DevOps MCP tooling for AI agents, with a **remote-fi
 3. [🚀 Remote MCP Server (Recommended)](#-remote-mcp-server-recommended)
 4. [⚙️ Supported Tools](#️-supported-tools)
 5. [🔌 Local MCP Server Installation (Optional)](#-local-mcp-server-installation-optional)
-6. [🌏 Using Domains](#-using-domains)
-7. [🐥 Project and Team Defaults](#-project-and-team-defaults)
+6. [🌏 Using Domains (local)](#-using-domains-local)
+7. [🐥 Project and Team Defaults (local)](#-project-and-team-defaults-local)
 8. [📝 Troubleshooting](#-troubleshooting)
 9. [🎩 Examples & Best Practices](#-examples--best-practices)
 10. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
@@ -167,7 +167,7 @@ Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first ti
 
 See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
 
-## 🌏 Using Domains
+## 🌏 Using Domains (local)
 
 Azure DevOps exposes a large surface area. As a result, our Azure DevOps MCP Server includes many tools. To keep the toolset manageable, avoid confusing the model, and respect client limits on loaded tools, use Domains to load only the areas you need. Domains are named groups of related tools (for example: core, work, work-items, repositories, wiki). Add the `-d` argument and the domain names to the server args in your `mcp.json` to list the domains to enable.
 
@@ -198,7 +198,7 @@ We recommend that you always enable `core` tools so that you can fetch project l
 
 > By default all domains are loaded
 
-## 🐥 Project and Team Defaults
+## 🐥 Project and Team Defaults (local)
 
 You can also configure default Azure DevOps project and team values from `.vscode/mcp.json` using `project` and `team`, so tools can skip selection prompts.
 
