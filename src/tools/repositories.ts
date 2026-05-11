@@ -184,6 +184,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
         const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
+        const noDataErrorMessage =
+          `Pull request creation returned no data and no matching PR was found. This often means repositoryId=\"${repositoryId}\" was not resolvable. ` +
+          "Try the repository GUID from repo_list_repos_by_project instead of the Project/RepoName slash format.";
 
         const forkSource: GitForkRef | undefined = forkSourceRepositoryId
           ? {
@@ -217,7 +220,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             pullRequest = prs[0];
           } else {
             return {
-              content: [{ type: "text", text: "Pull request created but API returned no data." }],
+              content: [{ type: "text", text: noDataErrorMessage }],
+              isError: true,
             };
           }
         }
@@ -226,7 +230,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (!trimmedPullRequest) {
           return {
-            content: [{ type: "text", text: "Pull request created but API returned no data." }],
+            content: [{ type: "text", text: noDataErrorMessage }],
+            isError: true,
           };
         }
 
