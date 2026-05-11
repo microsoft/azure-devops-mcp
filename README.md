@@ -3,17 +3,17 @@
 > [!IMPORTANT]
 > The Azure DevOps Remote MCP Server is now available in public preview for all organizations. We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
 >
-> [Learn more](#-remote-mcp-server)
+> [Learn more](#-remote-mcp-server-recommended)
 
-This TypeScript project provides a **local** MCP server for Azure DevOps, enabling you to perform a wide range of Azure DevOps tasks directly from your code editor.
+This project provides Azure DevOps MCP tooling for AI agents, with a **remote-first** onboarding experience and a local server option when you need it.
 
 ## 📄 Table of Contents
 
 1. [📺 Overview](#-overview)
 2. [🏆 Expectations](#-expectations)
-3. [🚀 Remote MCP Server](#-remote-mcp-server)
+3. [🚀 Remote MCP Server (Recommended)](#-remote-mcp-server-recommended)
 4. [⚙️ Supported Tools](#️-supported-tools)
-5. [🔌 Installation & Getting Started](#-installation--getting-started)
+5. [🔌 Local MCP Server Installation (Optional)](#-local-mcp-server-installation-optional)
 6. [🌏 Using Domains](#-using-domains)
 7. [🐥 Project and Team Defaults](#-project-and-team-defaults)
 8. [📝 Troubleshooting](#-troubleshooting)
@@ -40,9 +40,9 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 
 ## 🏆 Expectations
 
-The Azure DevOps MCP Server is built from tools that are concise, simple, focused, and easy to use—each designed for a specific scenario. We intentionally avoid complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs, making data access straightforward and letting the language model handle complex reasoning.
+The Azure DevOps MCP Server is built around tools that are concise, simple, focused, and easy to use, with each one designed for a specific scenario. We intentionally avoid creating complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs that makes data access straightforward while allowing the language model to handle the more complex reasoning.
 
-## 🚀 Remote MCP Server
+## 🚀 Remote MCP Server (Recommended)
 
 The Azure DevOps **Remote MCP Server** is now available in [public preview](https://devblogs.microsoft.com/devops/azure-devops-remote-mcp-server-public-preview).
 
@@ -55,13 +55,40 @@ If you encounter issues with tools, need support, or have a feature request, you
 > [!WARNING]
 > Internal Microsoft users of the Remote MCP Server should **not** create issues in this repository. Please use the dedicated Teams channel instead.
 
-For instructions on how to get started with the Remote MCP Server, see the [onboarding documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server).
+For complete instructions, see the [Remote MCP Server onboarding documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops).
+
+### Quick start with `.vscode/mcp.json`
+
+Use this configuration to connect directly to the Azure DevOps-hosted endpoint using streamable HTTP transport:
+
+```json
+{
+  "servers": {
+    "ado-remote-mcp": {
+      "url": "https://mcp.dev.azure.com/{organization}",
+      "type": "http"
+    }
+  },
+  "inputs": []
+}
+```
+
+See [documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#mcpjson-configuration) for additional configuration options.
+
+After saving `.vscode/mcp.json`, start the server from the MCP view in VS Code, then run a prompt like `List ADO projects`.
 
 ## ⚙️ Supported Tools
 
-See [TOOLSET.md](./docs/TOOLSET.md) for a comprehensive list.
+See the [Available Tools](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#available-tools) documentation for the complete list of available remote tools.
 
-## 🔌 Installation & Getting Started
+For a comprehensive list of local tools, see [TOOLSET.md](./docs/TOOLSET.md).
+
+## 🔌 Local MCP Server Installation (Optional)
+
+> [!IMPORTANT]
+> Start with the Remote MCP Server first. Use the local MCP Server only if your scenario specifically requires a local `stdio` setup.
+
+Use this section if you specifically need the local `stdio` server experience. For most users, start with the [Remote MCP Server](#-remote-mcp-server-recommended) section above.
 
 For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, Cursor, Opencode, and Kilocode.
 
@@ -73,7 +100,7 @@ For the best experience, use Visual Studio Code and GitHub Copilot. See the [get
 
 ### Installation
 
-#### 🧨 Install from Public Feed (Recommended)
+#### 🧨 Install from Public Feed
 
 This installation method is the easiest for all users of Visual Studio Code.
 
