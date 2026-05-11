@@ -1184,7 +1184,7 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
-    it("should return no-data message when createPullRequest returns null and fallback finds no PRs", async () => {
+    it("should return error when createPullRequest returns null and fallback finds no PRs", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.create_pull_request);
@@ -1203,8 +1203,9 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(result.content[0].text).toBe("Pull request created but API returned no data.");
-      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toContain('repositoryId="repo123"');
+      expect(result.content[0].text).toContain("repo_list_repos_by_project");
+      expect(result.isError).toBe(true);
     });
   });
 
