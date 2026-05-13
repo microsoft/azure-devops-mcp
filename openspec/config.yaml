@@ -1,20 +1,24 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+	Repository: G5e.AzureDevOpsServerMCP
+	This repository is a fork of microsoft/azure-devops-mcp.
+	The effective implementation for this fork lives under dotnet/ and is described in README_FORK.md.
+	The root TypeScript files are primarily retained for upstream tracking, reference behavior, documentation parity, and upstream sync work.
+	New fork-specific behavior should normally be proposed and implemented against the .NET projects under dotnet/src/.
+	Primary runtime target: Azure DevOps Server and other on-premises scenarios.
+	Current fork scope is intentionally limited to a pragmatic subset of work item and repository workflows.
+	FORK_MATRIX.md is the reference snapshot of upstream-to-fork capability coverage.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+	proposal:
+		- State whether the change affects the .NET fork surface under dotnet/, the upstream-tracking TypeScript surface, or both.
+		- If a change affects supported capabilities, name the impacted capability area explicitly.
+		- Call out compatibility expectations with existing MCP tool contracts.
+	design:
+		- Treat dotnet/ as the default implementation surface for fork-specific runtime behavior.
+		- Explain any deviation from the documented runtime and authentication constraints in README_FORK.md.
+		- Identify whether FORK_MATRIX.md or README_FORK.md should be updated alongside the change.
+	tasks:
+		- Group tasks by implementation surface when both dotnet/ and root TypeScript files are affected.
+		- Include validation tasks for the touched test surface.
