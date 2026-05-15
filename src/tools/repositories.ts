@@ -184,6 +184,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
         const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
+        const noDataErrorMessage =
+          `Pull request creation returned no data and no matching PR was found. This often means repositoryId=\"${repositoryId}\" was not resolvable. ` +
+          "Try the repository GUID from repo_list_repos_by_project instead of the Project/RepoName slash format.";
 
         const forkSource: GitForkRef | undefined = forkSourceRepositoryId
           ? {
@@ -217,7 +220,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             pullRequest = prs[0];
           } else {
             return {
-              content: [{ type: "text", text: "Pull request created but API returned no data." }],
+              content: [{ type: "text", text: noDataErrorMessage }],
+              isError: true,
             };
           }
         }
@@ -226,7 +230,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (!trimmedPullRequest) {
           return {
-            content: [{ type: "text", text: "Pull request created but API returned no data." }],
+            content: [{ type: "text", text: noDataErrorMessage }],
+            isError: true,
           };
         }
 
@@ -366,6 +371,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
         .optional()
         .describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
+      mergeCommitMessage: z.string().optional().describe("Commit message to use when the pull request is completed."),
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
@@ -382,6 +388,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       status,
       autoComplete,
       mergeStrategy,
+      mergeCommitMessage,
       deleteSourceBranch,
       transitionWorkItems,
       bypassReason,
@@ -416,6 +423,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
             if (mergeStrategy) {
               completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
+            }
+
+            if (mergeCommitMessage) {
+              completionOptions.mergeCommitMessage = mergeCommitMessage;
             }
 
             if (bypassReason) {

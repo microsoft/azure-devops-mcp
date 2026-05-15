@@ -258,10 +258,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           if (!resolvedPath) {
             resolvedPath = "/";
           }
-          if (!resolvedProject || !resolvedWiki) {
-            return { content: [{ type: "text", text: "Project and wikiIdentifier must be defined to fetch wiki page content." }], isError: true };
-          }
-          const stream = await wikiApi.getPageText(resolvedProject, resolvedWiki, resolvedPath, undefined, undefined, true);
+          // resolvedProject and resolvedWiki are guaranteed to be defined here:
+          // - the url branch errors out in parseWikiUrl when project/wikiIdentifier are missing
+          // - the pair branch enforces both via the hasPair check above
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          const stream = await wikiApi.getPageText(resolvedProject!, resolvedWiki!, resolvedPath, undefined, undefined, true);
           if (!stream) {
             return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
           }
