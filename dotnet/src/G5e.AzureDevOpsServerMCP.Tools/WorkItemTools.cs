@@ -124,4 +124,36 @@ public class WorkItemTools
             return JsonSerializer.Serialize(new { error = ex.Message, type = ex.GetType().Name });
         }
     }
+
+    /// <summary>
+    /// Creates a new work item in a project.
+    /// </summary>
+    /// <param name="collection">The Azure DevOps collection name</param>
+    /// <param name="project">The Azure DevOps project name or ID</param>
+    /// <param name="workItemType">The work item type (e.g., "Task", "Bug", "User Story")</param>
+    /// <param name="title">The work item title</param>
+    /// <param name="description">The work item description (optional)</param>
+    /// <returns>JSON object with the created work item ID, title, type, and URL</returns>
+    [McpServerTool(Name = "wit_work_item_write_create")]
+    [Description("Creates a new work item in an Azure DevOps project with a specified type, title, and optional description. Returns the work item ID, URL, and confirmation details.")]
+    public async Task<string> CreateWorkItem(string collection, string project, string workItemType, string title, string? description = null)
+    {
+        try
+        {
+            var result = await _workItemContextService.CreateWorkItemAsync(collection, project, workItemType, title, description);
+
+            return JsonSerializer.Serialize(new
+            {
+                workItemId = result.WorkItemId,
+                title = result.Title,
+                type = result.Type,
+                url = result.Url,
+                success = true
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = ex.Message, type = ex.GetType().Name });
+        }
+    }
 }
