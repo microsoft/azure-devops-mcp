@@ -69,10 +69,10 @@ public class WorkItemTools
     /// <param name="collection">The Azure DevOps collection name</param>
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="workItemId">The numeric work item ID</param>
-    /// <param name="comment">The comment text to add (plain text or HTML formatting supported, e.g., "&lt;b&gt;text&lt;/b&gt;")</param>
+    /// <param name="comment">The comment content to add. Azure DevOps stores comments as rich text (typically HTML), so formatting markup such as &lt;div&gt;, &lt;br&gt;, &amp;nbsp;, &lt;span&gt;, lists, and related HTML elements may be present.</param>
     /// <returns>JSON object with the created comment ID and URL</returns>
     [McpServerTool(Name = "wit_add_work_item_comment")]
-    [Description("Adds a comment to a work item in Azure DevOps. Supports plain text and HTML formatting (e.g., <b>bold</b>, <i>italic</i>).")]
+    [Description("Adds a comment to a work item in Azure DevOps. Comments are stored as rich text (typically HTML), and may include markup such as div, br, nbsp, spans, lists, and other formatting elements.")]
     public async Task<string> AddWorkItemComment(string collection, string project, int workItemId, string comment)
     {
         try
@@ -99,10 +99,10 @@ public class WorkItemTools
     /// <param name="project">The Azure DevOps project name or ID</param>
     /// <param name="workItemId">The numeric work item ID</param>
     /// <param name="commentId">The ID of the comment to update</param>
-    /// <param name="text">The updated comment text (plain text or HTML formatting supported, e.g., "&lt;b&gt;text&lt;/b&gt;")</param>
+    /// <param name="text">The updated comment content. Azure DevOps stores comments as rich text (typically HTML), so formatting markup such as &lt;div&gt;, &lt;br&gt;, &amp;nbsp;, &lt;span&gt;, lists, and related HTML elements may be present.</param>
     /// <returns>JSON object with the updated comment details</returns>
     [McpServerTool(Name = "wit_update_work_item_comment")]
-    [Description("Updates an existing comment on a work item in Azure DevOps. Supports plain text and HTML formatting (e.g., <b>bold</b>, <i>italic</i>).")]
+    [Description("Updates an existing comment on a work item in Azure DevOps. Comments are stored as rich text (typically HTML), and may include markup such as div, br, nbsp, spans, lists, and other formatting elements.")]
     public async Task<string> UpdateWorkItemComment(string collection, string project, int workItemId, int commentId, string text)
     {
         try
