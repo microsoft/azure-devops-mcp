@@ -29,5 +29,4 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Update tool documentation or EXAMPLES.md with `wit_work_item_write_create` usage example
-- [ ] 5.2 Document accepted workItemType values (reference Azure DevOps project settings)
+- [x] 5.1 Add `wit_work_item_write_create` entry to `FORK_MATRIX.md` capability matrix
