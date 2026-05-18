@@ -4999,6 +4999,251 @@ describe("repos tools", () => {
       expect(parsedResult.changeEntries[1].diff.originalPath).toBe("src/gone.ts");
       expect(parsedResult.changeEntries[1].diff.lineDiffBlocks[0].originalLines).toEqual(["export const gone = true;"]);
     });
+
+    it("should return error when non-GUID repositoryId is used without a project", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        repositoryId: "my-repository-name", // not a GUID
+        pullRequestId: 456,
+        iterationId: 1,
+        // project intentionally omitted
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("When using a repository name instead of a GUID");
+      expect(mockGitApi.getPullRequestIterationChanges).not.toHaveBeenCalled();
+    });
+
+    it("should return entry unchanged when getItemText rejects for added file (catch null path)", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [{ item: { path: "/new-file.ts" }, originalPath: null, changeType: 1 }], // Add
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      // getItemText rejects → .catch(() => null) fires → targetStream = null → return entry
+      mockGitApi.getItemText.mockRejectedValueOnce(new Error("Network error"));
+
+      const params = {
+        repositoryId: "12345678-1234-1234-1234-123456789012",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeDiffs: true,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.changeEntries[0].diff).toBeNull();
+      expect(parsedResult.changeEntries[0]._contentFetchError).toBeUndefined();
+    });
+
+    it("should return _contentFetchError when streamToString throws for added file", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [{ item: { path: "/new-file.ts" }, originalPath: null, changeType: 1 }], // Add
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const { Readable } = await import("stream");
+      const errorStream = new Readable({
+        read() {
+          this.emit("error", new Error("Stream read error"));
+        },
+      });
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getItemText.mockResolvedValueOnce(errorStream);
+
+      const params = {
+        repositoryId: "12345678-1234-1234-1234-123456789012",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeDiffs: true,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("Failed to fetch added file content");
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("Stream read error");
+    });
+
+    it("should return entry unchanged when getItemText rejects for deleted file (catch null path)", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [{ originalPath: "/deleted-file.ts", item: { path: null }, changeType: 16 }], // Delete
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      // getItemText rejects → .catch(() => null) fires → baseStream = null → return entry
+      mockGitApi.getItemText.mockRejectedValueOnce(new Error("Network error"));
+
+      const params = {
+        repositoryId: "12345678-1234-1234-1234-123456789012",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeDiffs: true,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.changeEntries[0].diff).toBeNull();
+      expect(parsedResult.changeEntries[0]._contentFetchError).toBeUndefined();
+    });
+
+    it("should return _contentFetchError when streamToString throws for deleted file", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [{ originalPath: "/deleted-file.ts", item: { path: null }, changeType: 16 }], // Delete
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const { Readable } = await import("stream");
+      const errorStream = new Readable({
+        read() {
+          this.emit("error", new Error("Stream read error"));
+        },
+      });
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getItemText.mockResolvedValueOnce(errorStream);
+
+      const params = {
+        repositoryId: "12345678-1234-1234-1234-123456789012",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeDiffs: true,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("Failed to fetch deleted file content");
+      expect(parsedResult.changeEntries[0]._contentFetchError).toContain("Stream read error");
+    });
+
+    it("should handle getItemText rejection for modified file via catch null (empty lines result)", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
+      if (!call) throw new Error("repo_get_pull_request_changes tool not registered");
+      const [, , , handler] = call;
+
+      const mockIteration = {
+        id: 1,
+        sourceRefCommit: { commitId: "abc123" },
+        commonRefCommit: { commitId: "def456" },
+      };
+
+      const mockChanges = {
+        changeEntries: [{ item: { path: "/src/file.ts" }, changeType: 2 }], // Edit
+        nextSkip: 0,
+        nextTop: 0,
+      };
+
+      const mockFileDiffs = [
+        {
+          path: "src/file.ts",
+          lineDiffBlocks: [
+            {
+              changeType: 3,
+              modifiedLineNumberStart: 10,
+              modifiedLinesCount: 1,
+              originalLineNumberStart: 10,
+              originalLinesCount: 1,
+            },
+          ],
+        },
+      ];
+
+      mockGitApi.getPullRequestIteration.mockResolvedValue(mockIteration);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue(mockChanges);
+      mockGitApi.getFileDiffs.mockResolvedValue(mockFileDiffs);
+      // Both getItemText calls reject → .catch(() => null) fires → null content → empty lines
+      mockGitApi.getItemText.mockRejectedValueOnce(new Error("Network error")).mockRejectedValueOnce(new Error("Network error"));
+
+      const params = {
+        repositoryId: "12345678-1234-1234-1234-123456789012",
+        pullRequestId: 456,
+        iterationId: 1,
+        includeDiffs: true,
+        includeLineContent: true,
+      };
+
+      const result = await handler(params);
+
+      const parsedResult = JSON.parse(result.content[0].text);
+      const diffBlock = parsedResult.changeEntries[0].diff.lineDiffBlocks[0];
+      expect(diffBlock.originalLines).toEqual([]);
+      expect(diffBlock.modifiedLines).toEqual([]);
+    });
   });
 
   describe("repo_reply_to_comment", () => {
