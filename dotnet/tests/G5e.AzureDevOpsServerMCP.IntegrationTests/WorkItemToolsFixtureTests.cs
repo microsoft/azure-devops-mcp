@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using G5e.AzureDevOpsServerMCP.Application.Services;
 using G5e.AzureDevOpsServerMCP.Tools;
 
@@ -71,6 +71,9 @@ public class WorkItemToolsFixtureTests
 
         public Task<UpdateCommentResult> UpdateCommentAsync(string collection, string project, int workItemId, int commentId, string text, CancellationToken cancellationToken = default)
             => Task.FromResult(new UpdateCommentResult { CommentId = commentId, WorkItemId = workItemId, Text = text, Version = 2, Url = string.Empty });
+
+        public Task<CreateWorkItemResult> CreateWorkItemAsync(string collection, string project, string workItemType, string title, string? description = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(new CreateWorkItemResult { WorkItemId = 2, Title = title, Type = workItemType, Url = string.Empty });
     }
 
     private sealed class ThrowingWorkItemContextService : IWorkItemContextService
@@ -90,6 +93,9 @@ public class WorkItemToolsFixtureTests
 
         public Task<UpdateCommentResult> UpdateCommentAsync(string collection, string project, int workItemId, int commentId, string text, CancellationToken cancellationToken = default)
             => Task.FromException<UpdateCommentResult>(_exception);
+
+        public Task<CreateWorkItemResult> CreateWorkItemAsync(string collection, string project, string workItemType, string title, string? description = null, CancellationToken cancellationToken = default)
+            => Task.FromException<CreateWorkItemResult>(_exception);
     }
 
     [Fact]
@@ -130,6 +136,9 @@ public class WorkItemToolsFixtureTests
 
         public Task<UpdateCommentResult> UpdateCommentAsync(string collection, string project, int workItemId, int commentId, string text, CancellationToken cancellationToken = default)
             => Task.FromResult(new UpdateCommentResult { CommentId = commentId, WorkItemId = workItemId, Text = text, Version = 2, Url = "https://example.invalid/comment/" + commentId });
+
+        public Task<CreateWorkItemResult> CreateWorkItemAsync(string collection, string project, string workItemType, string title, string? description = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(new CreateWorkItemResult { WorkItemId = 3, Title = title, Type = workItemType, Url = string.Empty });
     }
 
     [Fact]
@@ -161,5 +170,54 @@ public class WorkItemToolsFixtureTests
 
         Assert.Equal("update failed", root.GetProperty("error").GetString());
         Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public async Task CreateWorkItem_ReturnsSerializedWorkItemDetails()
+    {
+        var sut = new WorkItemTools(new FakeCreateWorkItemService());
+        var json = await sut.CreateWorkItem("DefaultCollection", "UZG.IZ.PrestIZ", "Task", "New task via MCP");
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.Equal(99, root.GetProperty("workItemId").GetInt32());
+        Assert.Equal("New task via MCP", root.GetProperty("title").GetString());
+        Assert.Equal("Task", root.GetProperty("type").GetString());
+        Assert.True(root.GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task CreateWorkItem_WithDescription_ReturnsSerializedWorkItem()
+    {
+        var sut = new WorkItemTools(new FakeCreateWorkItemService());
+        var json = await sut.CreateWorkItem("DefaultCollection", "UZG.IZ.PrestIZ", "Bug", "Critical bug", "This is a critical issue that needs fixing");
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.Equal(99, root.GetProperty("workItemId").GetInt32());
+        Assert.Equal("Critical bug", root.GetProperty("title").GetString());
+        Assert.Equal("Bug", root.GetProperty("type").GetString());
+        Assert.True(root.GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task CreateWorkItem_WhenServiceThrows_ReturnsSerializedError()
+    {
+        var sut = new WorkItemTools(new ThrowingWorkItemContextService(new InvalidOperationException("Invalid work item type")));
+        var json = await sut.CreateWorkItem("DefaultCollection", "UZG.IZ.PrestIZ", "InvalidType", "Test");
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.Equal("Invalid work item type", root.GetProperty("error").GetString());
+        Assert.Equal("InvalidOperationException", root.GetProperty("type").GetString());
+    }
+
+    private sealed class FakeCreateWorkItemService : IWorkItemContextService
+    {
+        public Task<WorkItemContextResult> GetWorkItemContextAsync(string collection, string project, int workItemId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new WorkItemContextResult());
+        public Task<AddCommentResult> AddCommentAsync(string collection, string project, int workItemId, string comment, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AddCommentResult { CommentId = 42, Url = "https://example.invalid/comment/42" });
+        public Task<UpdateCommentResult> UpdateCommentAsync(string collection, string project, int workItemId, int commentId, string text, CancellationToken cancellationToken = default)
+            => Task.FromResult(new UpdateCommentResult { CommentId = commentId, WorkItemId = workItemId, Text = text, Version = 2, Url = "https://example.invalid/comment/" + commentId });
+        public Task<CreateWorkItemResult> CreateWorkItemAsync(string collection, string project, string workItemType, string title, string? description = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(new CreateWorkItemResult { WorkItemId = 99, Title = title, Type = workItemType, Url = "https://example.invalid/work-item/99" });
     }
 }

@@ -48,6 +48,17 @@ public class UpdateCommentResult
 }
 
 /// <summary>
+/// Result of creating a new work item.
+/// </summary>
+public class CreateWorkItemResult
+{
+    public int WorkItemId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public string? Url { get; set; }
+}
+
+/// <summary>
 /// Service for retrieving and updating work item context from Azure DevOps.
 /// </summary>
 public interface IWorkItemContextService
@@ -81,4 +92,15 @@ public interface IWorkItemContextService
     /// <param name="text">The updated comment text (supports plain text and HTML formatting)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task<UpdateCommentResult> UpdateCommentAsync(string collection, string project, int workItemId, int commentId, string text, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new work item in a project.
+    /// </summary>
+    /// <param name="collection">The collection name</param>
+    /// <param name="project">The project name or ID</param>
+    /// <param name="workItemType">The work item type (e.g., "Task", "Bug")</param>
+    /// <param name="title">The work item title</param>
+    /// <param name="description">The work item description (optional)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task<CreateWorkItemResult> CreateWorkItemAsync(string collection, string project, string workItemType, string title, string? description = null, CancellationToken cancellationToken = default);
 }

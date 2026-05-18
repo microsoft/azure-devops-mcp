@@ -5,6 +5,8 @@ using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
+using Microsoft.VisualStudio.Services.WebApi.Patch;
+using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 
 namespace G5e.AzureDevOpsServerMCP.Infrastructure.AzureDevOps.Services;
 
@@ -158,5 +160,65 @@ public class AzureDevOpsWorkItemContextService : IWorkItemContextService
             ? value.ToString()
             : null;
     }
-}
 
+    public async Task<CreateWorkItemResult> CreateWorkItemAsync(
+        string collection,
+        string project,
+        string workItemType,
+        string title,
+        string? description = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(collection))
+            throw new ArgumentException("Collection cannot be empty", nameof(collection));
+        if (string.IsNullOrWhiteSpace(project))
+            throw new ArgumentException("Project cannot be empty", nameof(project));
+        if (string.IsNullOrWhiteSpace(workItemType))
+            throw new ArgumentException("Work item type cannot be empty", nameof(workItemType));
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Title cannot be empty", nameof(title));
+
+        using var connection = _connectionFactory.CreateConnection(collection);
+        var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
+
+        var patchDocument = new JsonPatchDocument
+        {
+            new JsonPatchOperation
+            {
+                Operation = Operation.Add,
+                Path = "/fields/System.Title",
+                Value = title
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            patchDocument.Add(new JsonPatchOperation
+            {
+                Operation = Operation.Add,
+                Path = "/fields/System.Description",
+                Value = description
+            });
+        }
+
+        try
+        {
+            var workItem = await witClient.CreateWorkItemAsync(patchDocument, project, workItemType, cancellationToken: cancellationToken);
+
+            if (workItem == null)
+                throw new InvalidOperationException("Failed to create work item");
+
+            return new CreateWorkItemResult
+            {
+                WorkItemId = workItem.Id ?? 0,
+                Title = GetField(workItem, "System.Title"),
+                Type = GetField(workItem, "System.WorkItemType"),
+                Url = workItem.Url
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create work item in project {project}: {ex.Message}", ex);
+        }
+    }
+}
