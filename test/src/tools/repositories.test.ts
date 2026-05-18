@@ -4879,9 +4879,9 @@ describe("repos tools", () => {
 
       const mockChanges = {
         changeEntries: [
-          { item: { path: "/Testfolder.md" }, changeType: 1 }, // Add
-          { item: { path: "/New Folder/Addition 1" }, changeType: 1 }, // Add
-          { item: { path: "/New Folder/Addition 2" }, changeType: 1 }, // Add
+          { item: { path: "/Testfolder.md" }, originalPath: null, changeType: 1 }, // Add
+          { item: { path: "/New Folder/Addition 1" }, originalPath: null, changeType: 1 }, // Add
+          { item: { path: "/New Folder/Addition 2" }, originalPath: null, changeType: 1 }, // Add
         ],
         nextSkip: 0,
         nextTop: 0,
@@ -4915,7 +4915,10 @@ describe("repos tools", () => {
       expect(mockGitApi.getItemText).toHaveBeenCalledTimes(3);
 
       const parsedResult = JSON.parse(result.content[0].text);
-      // Each added entry should have a synthetic diff with the full file content
+      // Each added entry should have a synthetic diff with the full file content,
+      // path set to the new file path, and originalPath null (file didn't exist before).
+      expect(parsedResult.changeEntries[0].diff.path).toBe("Testfolder.md");
+      expect(parsedResult.changeEntries[0].diff.originalPath).toBeNull();
       expect(parsedResult.changeEntries[0].diff.lineDiffBlocks[0].modifiedLines).toEqual(["# Testfolder", "Hello"]);
       expect(parsedResult.changeEntries[1].diff.lineDiffBlocks[0].modifiedLines).toEqual(["Addition 1 content"]);
       expect(parsedResult.changeEntries[2].diff.lineDiffBlocks[0].modifiedLines).toEqual(["Addition 2 content"]);
@@ -4924,6 +4927,7 @@ describe("repos tools", () => {
     it("should return file content for PRs with only deleted files (no modified files)", async () => {
       // Regression test: mirror of the addition case for deletions — when all changes are Delete,
       // fileDiffParams is empty so the enrichment block was previously skipped entirely.
+      // Also covers the ADO behaviour where item.path is null for deletions (path lives in originalPath).
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.get_pull_request_changes);
@@ -4936,10 +4940,11 @@ describe("repos tools", () => {
         commonRefCommit: { commitId: "def456" },
       };
 
+      // ADO real shape: item.path is null for deletions; path is in originalPath only
       const mockChanges = {
         changeEntries: [
-          { item: { path: "/src/removed.ts" }, changeType: 16 }, // Delete (VersionControlChangeType.Delete = 16)
-          { item: { path: "/src/gone.ts" }, changeType: 16 }, // Delete
+          { originalPath: "/src/removed.ts", item: { path: null }, changeType: 16 }, // Delete
+          { originalPath: "/src/gone.ts", item: { path: null }, changeType: 16 }, // Delete
         ],
         nextSkip: 0,
         nextTop: 0,
@@ -4969,13 +4974,29 @@ describe("repos tools", () => {
 
       // getFileDiffs must NOT have been called (no modified files)
       expect(mockGitApi.getFileDiffs).not.toHaveBeenCalled();
-      // getItemText must have been called once per deleted file
+      // getItemText must have been called once per deleted file, using the normalised originalPath
       expect(mockGitApi.getItemText).toHaveBeenCalledTimes(2);
+      expect(mockGitApi.getItemText).toHaveBeenCalledWith(
+        "12345678-1234-1234-1234-123456789012",
+        "src/removed.ts", // leading slash stripped
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { version: "def456", versionType: expect.anything() }
+      );
 
       const parsedResult = JSON.parse(result.content[0].text);
-      // Each deleted entry should have a synthetic diff with the removed file content
+      // Each deleted entry should have a synthetic diff with the removed file content,
+      // path null (file no longer exists) and originalPath set to the pre-deletion path.
+      expect(parsedResult.changeEntries[0].diff.path).toBeNull();
+      expect(parsedResult.changeEntries[0].diff.originalPath).toBe("src/removed.ts");
       expect(parsedResult.changeEntries[0].diff.lineDiffBlocks[0].originalLines).toEqual(["export const removed = true;"]);
       expect(parsedResult.changeEntries[0].diff.lineDiffBlocks[0].changeType).toBe(2); // Delete
+      expect(parsedResult.changeEntries[1].diff.path).toBeNull();
+      expect(parsedResult.changeEntries[1].diff.originalPath).toBe("src/gone.ts");
       expect(parsedResult.changeEntries[1].diff.lineDiffBlocks[0].originalLines).toEqual(["export const gone = true;"]);
     });
   });

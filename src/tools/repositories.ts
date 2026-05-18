@@ -1256,9 +1256,15 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                       const isAdd = !!(ct & VersionControlChangeType.Add);
                       const isDelete = !!(ct & VersionControlChangeType.Delete);
 
-                      const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
+                      const entryPath = entry.item?.path ? (entry.item.path.startsWith("/") ? entry.item.path.substring(1) : entry.item.path) : undefined;
+                      // For deleted files ADO sets item.path to null and puts the path in originalPath only.
+                      // Normalise originalPath once and use it as the fallback throughout.
+                      const normalizedOriginalPath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : undefined;
+                      // effectivePath is what we use as the "current" path for API calls / early-exit guard.
+                      // For additions/modifications it's item.path; for deletions it's originalPath.
+                      const effectivePath = entryPath ?? normalizedOriginalPath;
 
-                      if (!entryPath) {
+                      if (!effectivePath) {
                         return entry;
                       }
 
@@ -1266,7 +1272,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                       if (isAdd && !entry.diff) {
                         try {
                           const targetStream = await gitApi
-                            .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
+                            .getItemText(repositoryId, effectivePath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
                             .catch(() => null);
                           if (targetStream) {
                             const targetText = await streamToString(targetStream);
@@ -1274,8 +1280,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                             return {
                               ...entry,
                               diff: {
-                                path: entryPath,
-                                originalPath: entryPath,
+                                path: effectivePath,
+                                originalPath: null,
                                 lineDiffBlocks: [
                                   {
                                     changeType: 1, // Add
@@ -1298,10 +1304,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                         return entry;
                       }
 
-                      // Handle deleted files: fetch full content at base commit and create synthetic diff
+                      // Handle deleted files: fetch full content at base commit and create synthetic diff.
+                      // basePath prefers originalPath (the pre-deletion path); falls back to effectivePath.
                       if (isDelete && !entry.diff) {
                         try {
-                          const basePath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : entryPath;
+                          const basePath = normalizedOriginalPath ?? effectivePath;
                           const baseStream = await gitApi
                             .getItemText(repositoryId, basePath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
                             .catch(() => null);
@@ -1311,7 +1318,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                             return {
                               ...entry,
                               diff: {
-                                path: entryPath,
+                                path: null,
                                 originalPath: basePath,
                                 lineDiffBlocks: [
                                   {
@@ -1341,7 +1348,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                       }
 
                       // For renamed/moved files, the base version is at the original path
-                      const basePath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : entryPath;
+                      const basePath = normalizedOriginalPath ?? effectivePath;
 
                       try {
                         // Fetch file content at both commits
@@ -1352,7 +1359,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                             .catch(() => null),
                           // Target version (modified)
                           gitApi
-                            .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
+                            .getItemText(repositoryId, effectivePath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
                             .catch(() => null),
                         ]);
 
