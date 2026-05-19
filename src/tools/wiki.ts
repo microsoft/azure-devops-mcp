@@ -122,7 +122,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     WIKI_TOOLS.get_wiki_page,
-    "Retrieve wiki page metadata by path. This tool does not return page content.",
+    "Retrieve wiki page metadata by path. This tool does not return page content. Returns isError: true if the page is not found.",
     {
       wikiIdentifier: z.string().describe("The unique identifier of the wiki."),
       project: z.string().describe("The project name or ID where the wiki is located."),
@@ -184,7 +184,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     WIKI_TOOLS.get_wiki_page_content,
-    "Retrieve wiki page content. Provide either a 'url' parameter OR the combination of 'wikiIdentifier' and 'project' parameters.",
+    "Retrieve wiki page content. Provide either a 'url' parameter OR the combination of 'wikiIdentifier' and 'project' parameters. " + "Returns isError: true if the wiki page is not found.",
     {
       url: z
         .string()
@@ -258,10 +258,11 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           if (!resolvedPath) {
             resolvedPath = "/";
           }
-          if (!resolvedProject || !resolvedWiki) {
-            return { content: [{ type: "text", text: "Project and wikiIdentifier must be defined to fetch wiki page content." }], isError: true };
-          }
-          const stream = await wikiApi.getPageText(resolvedProject, resolvedWiki, resolvedPath, undefined, undefined, true);
+          // resolvedProject and resolvedWiki are guaranteed to be defined here:
+          // - the url branch errors out in parseWikiUrl when project/wikiIdentifier are missing
+          // - the pair branch enforces both via the hasPair check above
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          const stream = await wikiApi.getPageText(resolvedProject!, resolvedWiki!, resolvedPath, undefined, undefined, true);
           if (!stream) {
             return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
           }

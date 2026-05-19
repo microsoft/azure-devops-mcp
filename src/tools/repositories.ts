@@ -184,6 +184,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
         const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
+        const noDataErrorMessage =
+          `Pull request creation returned no data and no matching PR was found. This often means repositoryId=\"${repositoryId}\" was not resolvable. ` +
+          "Try the repository GUID from repo_list_repos_by_project instead of the Project/RepoName slash format.";
 
         const forkSource: GitForkRef | undefined = forkSourceRepositoryId
           ? {
@@ -217,7 +220,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             pullRequest = prs[0];
           } else {
             return {
-              content: [{ type: "text", text: "Pull request created but API returned no data." }],
+              content: [{ type: "text", text: noDataErrorMessage }],
+              isError: true,
             };
           }
         }
@@ -226,7 +230,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (!trimmedPullRequest) {
           return {
-            content: [{ type: "text", text: "Pull request created but API returned no data." }],
+            content: [{ type: "text", text: noDataErrorMessage }],
+            isError: true,
           };
         }
 
@@ -366,6 +371,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
         .optional()
         .describe("The merge strategy to use when the pull request autocompletes. Defaults to 'NoFastForward'."),
+      mergeCommitMessage: z.string().optional().describe("Commit message to use when the pull request is completed."),
       deleteSourceBranch: z.boolean().optional().default(false).describe("Whether to delete the source branch when the pull request autocompletes. Defaults to false."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Whether to transition associated work items to the next state when the pull request autocompletes. Defaults to true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. When provided, branch policies will be automatically bypassed during autocompletion."),
@@ -382,6 +388,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       status,
       autoComplete,
       mergeStrategy,
+      mergeCommitMessage,
       deleteSourceBranch,
       transitionWorkItems,
       bypassReason,
@@ -416,6 +423,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
             if (mergeStrategy) {
               completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
+            }
+
+            if (mergeCommitMessage) {
+              completionOptions.mergeCommitMessage = mergeCommitMessage;
             }
 
             if (bypassReason) {
@@ -860,7 +871,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_branches_by_repo,
-    "Retrieve a list of branches for a given repository.",
+    "Retrieve a list of branch names for a given repository. Returns an array of branch name strings, not full branch objects. Use repo_get_branch_by_name to get full details for a specific branch.",
     {
       repositoryId: z
         .string()
@@ -893,7 +904,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_my_branches_by_repo,
-    "Retrieve a list of my branches for a given repository Id.",
+    "Retrieve a list of my branch names for a given repository Id. Returns an array of branch name strings, not full branch objects. Use repo_get_branch_by_name to get full details for a specific branch.",
     {
       repositoryId: z
         .string()
@@ -962,7 +973,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.get_branch_by_name,
-    "Get a branch by its name.",
+    "Get a branch by its name. Returns isError: true if the branch is not found.",
     {
       repositoryId: z.string().describe("The ID or name of the repository where the branch is located. When using a repository name instead of a GUID, the project parameter must also be provided."),
       branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
@@ -1195,11 +1206,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                 };
               });
 
-            if (fileDiffParams.length > 0) {
-              try {
+            try {
+              // Fetch diffs for modified files. Add/Delete files are excluded from getFileDiffs
+              // because they don't have two versions to compare; their content is fetched
+              // separately below via getItemText when includeLineContent is true.
+              let fileDiffs: any[] = [];
+              if (fileDiffParams.length > 0) {
                 // Azure DevOps getFileDiffs API accepts max 10 files per request
                 const FILE_DIFF_BATCH_SIZE = 10;
-                let fileDiffs: any[] = [];
                 for (let i = 0; i < fileDiffParams.length; i += FILE_DIFF_BATCH_SIZE) {
                   const batch = fileDiffParams.slice(i, i + FILE_DIFF_BATCH_SIZE);
                   const batchDiffs = await gitApi.getFileDiffs(
@@ -1213,226 +1227,234 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                   );
                   fileDiffs = fileDiffs.concat(batchDiffs);
                 }
+              }
 
-                // Merge diff content with change metadata
-                const enrichedChanges = {
-                  ...changes,
-                  changeEntries: changes.changeEntries.map((entry) => {
-                    // Normalize path for comparison (remove leading slash)
-                    const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
-                    const matchingDiff = fileDiffs.find((diff) => diff.path === entryPath);
-                    return {
-                      ...entry,
-                      diff: matchingDiff || null,
-                    };
-                  }),
-                };
+              // Merge diff content with change metadata.
+              // Added/deleted entries get diff: null here and are enriched below.
+              const enrichedChanges = {
+                ...changes,
+                changeEntries: changes.changeEntries.map((entry) => {
+                  // Normalize path for comparison (remove leading slash)
+                  const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
+                  const matchingDiff = fileDiffs.find((diff) => diff.path === entryPath);
+                  return {
+                    ...entry,
+                    diff: matchingDiff || null,
+                  };
+                }),
+              };
 
-                // If includeLineContent is true, fetch actual file content with concurrency limit
-                if (includeLineContent && enrichedChanges.changeEntries) {
-                  const CONCURRENCY_LIMIT = 10;
-                  const entriesWithContent = [...enrichedChanges.changeEntries];
-                  for (let i = 0; i < entriesWithContent.length; i += CONCURRENCY_LIMIT) {
-                    const batch = entriesWithContent.slice(i, i + CONCURRENCY_LIMIT);
-                    const batchResults = await Promise.all(
-                      batch.map(async (entry) => {
-                        const ct = entry.changeType ?? 0;
-                        const isAdd = !!(ct & VersionControlChangeType.Add);
-                        const isDelete = !!(ct & VersionControlChangeType.Delete);
+              // If includeLineContent is true, fetch actual file content with concurrency limit
+              if (includeLineContent && enrichedChanges.changeEntries) {
+                const CONCURRENCY_LIMIT = 10;
+                const entriesWithContent = [...enrichedChanges.changeEntries];
+                for (let i = 0; i < entriesWithContent.length; i += CONCURRENCY_LIMIT) {
+                  const batch = entriesWithContent.slice(i, i + CONCURRENCY_LIMIT);
+                  const batchResults = await Promise.all(
+                    batch.map(async (entry) => {
+                      const ct = entry.changeType ?? 0;
+                      const isAdd = !!(ct & VersionControlChangeType.Add);
+                      const isDelete = !!(ct & VersionControlChangeType.Delete);
 
-                        const entryPath = entry.item?.path?.startsWith("/") ? entry.item.path.substring(1) : entry.item?.path;
+                      const entryPath = entry.item?.path ? (entry.item.path.startsWith("/") ? entry.item.path.substring(1) : entry.item.path) : undefined;
+                      // For deleted files ADO sets item.path to null and puts the path in originalPath only.
+                      // Normalise originalPath once and use it as the fallback throughout.
+                      const normalizedOriginalPath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : undefined;
+                      // effectivePath is what we use as the "current" path for API calls / early-exit guard.
+                      // For additions/modifications it's item.path; for deletions it's originalPath.
+                      const effectivePath = entryPath ?? normalizedOriginalPath;
 
-                        if (!entryPath) {
-                          return entry;
-                        }
+                      if (!effectivePath) {
+                        return entry;
+                      }
 
-                        // Handle added files: fetch full content at target commit and create synthetic diff
-                        if (isAdd && !entry.diff) {
-                          try {
-                            const targetStream = await gitApi
-                              .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
-                              .catch(() => null);
-                            if (targetStream) {
-                              const targetText = await streamToString(targetStream);
-                              const targetLines = targetText.split(/\r?\n/);
-                              return {
-                                ...entry,
-                                diff: {
-                                  path: entryPath,
-                                  originalPath: entryPath,
-                                  lineDiffBlocks: [
-                                    {
-                                      changeType: 1, // Add
-                                      originalLineNumberStart: 0,
-                                      originalLinesCount: 0,
-                                      modifiedLineNumberStart: 1,
-                                      modifiedLinesCount: targetLines.length,
-                                      modifiedLines: targetLines,
-                                    },
-                                  ],
-                                },
-                              };
-                            }
-                          } catch (addError) {
-                            return {
-                              ...entry,
-                              _contentFetchError: `Failed to fetch added file content: ${addError instanceof Error ? addError.message : "Unknown error"}`,
-                            };
-                          }
-                          return entry;
-                        }
-
-                        // Handle deleted files: fetch full content at base commit and create synthetic diff
-                        if (isDelete && !entry.diff) {
-                          try {
-                            const basePath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : entryPath;
-                            const baseStream = await gitApi
-                              .getItemText(repositoryId, basePath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
-                              .catch(() => null);
-                            if (baseStream) {
-                              const baseText = await streamToString(baseStream);
-                              const baseLines = baseText.split(/\r?\n/);
-                              return {
-                                ...entry,
-                                diff: {
-                                  path: entryPath,
-                                  originalPath: basePath,
-                                  lineDiffBlocks: [
-                                    {
-                                      changeType: 2, // Delete
-                                      originalLineNumberStart: 1,
-                                      originalLinesCount: baseLines.length,
-                                      modifiedLineNumberStart: 0,
-                                      modifiedLinesCount: 0,
-                                      originalLines: baseLines,
-                                    },
-                                  ],
-                                },
-                              };
-                            }
-                          } catch (delError) {
-                            return {
-                              ...entry,
-                              _contentFetchError: `Failed to fetch deleted file content: ${delError instanceof Error ? delError.message : "Unknown error"}`,
-                            };
-                          }
-                          return entry;
-                        }
-
-                        // For modified/renamed files, skip if no diff blocks
-                        if (!entry.diff?.lineDiffBlocks || entry.diff.lineDiffBlocks.length === 0) {
-                          return entry;
-                        }
-
-                        // For renamed/moved files, the base version is at the original path
-                        const basePath = entry.originalPath ? (entry.originalPath.startsWith("/") ? entry.originalPath.substring(1) : entry.originalPath) : entryPath;
-
+                      // Handle added files: fetch full content at target commit and create synthetic diff
+                      if (isAdd && !entry.diff) {
                         try {
-                          // Fetch file content at both commits
-                          const [baseContent, targetContent] = await Promise.all([
-                            // Base version (original) - use basePath for renamed files
-                            gitApi
-                              .getItemText(repositoryId, basePath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
-                              .catch(() => null),
-                            // Target version (modified)
-                            gitApi
-                              .getItemText(repositoryId, entryPath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
-                              .catch(() => null),
-                          ]);
-
-                          // Convert streams to text
-                          const baseText = baseContent ? await streamToString(baseContent) : "";
-                          const targetText = targetContent ? await streamToString(targetContent) : "";
-
-                          // Check if response is an Azure DevOps error (returned as JSON in the stream)
-                          const checkForApiError = (text: string, label: string) => {
-                            if (text.startsWith("{")) {
-                              try {
-                                const parsed = JSON.parse(text);
-                                if (parsed.$id && parsed.innerException !== undefined) {
-                                  throw new Error(`Failed to fetch ${label} file content: ${parsed.message || text}`);
-                                }
-                              } catch (e) {
-                                if (e instanceof Error && e.message.startsWith("Failed to fetch")) throw e;
-                                // Not valid JSON or not an error response — treat as legitimate content
-                              }
-                            }
-                          };
-                          checkForApiError(baseText, "base");
-                          checkForApiError(targetText, "target");
-
-                          // Split into lines
-                          const baseLines = baseText.split(/\r?\n/);
-                          const targetLines = targetText.split(/\r?\n/);
-
-                          // Enrich each lineDiffBlock with actual line content
-                          const enrichedDiff = {
-                            ...entry.diff,
-                            lineDiffBlocks: entry.diff.lineDiffBlocks?.map((block: any) => {
-                              const enrichedBlock: any = { ...block };
-
-                              // Add original (base) lines if they exist
-                              if (block.originalLineNumberStart && block.originalLinesCount) {
-                                const startIdx = block.originalLineNumberStart - 1;
-                                const endIdx = startIdx + block.originalLinesCount;
-                                enrichedBlock.originalLines = baseLines.slice(startIdx, endIdx);
-                              }
-
-                              // Add modified (target) lines if they exist
-                              if (block.modifiedLineNumberStart && block.modifiedLinesCount) {
-                                const startIdx = block.modifiedLineNumberStart - 1;
-                                const endIdx = startIdx + block.modifiedLinesCount;
-                                enrichedBlock.modifiedLines = targetLines.slice(startIdx, endIdx);
-                              }
-
-                              return enrichedBlock;
-                            }),
-                          };
-
+                          const targetStream = await gitApi
+                            .getItemText(repositoryId, effectivePath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
+                            .catch(() => null);
+                          if (targetStream) {
+                            const targetText = await streamToString(targetStream);
+                            const targetLines = targetText.split(/\r?\n/);
+                            return {
+                              ...entry,
+                              diff: {
+                                path: effectivePath,
+                                originalPath: null,
+                                lineDiffBlocks: [
+                                  {
+                                    changeType: 1, // Add
+                                    originalLineNumberStart: 0,
+                                    originalLinesCount: 0,
+                                    modifiedLineNumberStart: 1,
+                                    modifiedLinesCount: targetLines.length,
+                                    modifiedLines: targetLines,
+                                  },
+                                ],
+                              },
+                            };
+                          }
+                        } catch (addError) {
                           return {
                             ...entry,
-                            diff: enrichedDiff,
-                          };
-                        } catch (contentError) {
-                          // If content fetch fails, return entry with error
-                          return {
-                            ...entry,
-                            _contentFetchError: `Failed to fetch line content: ${contentError instanceof Error ? contentError.message : "Unknown error"}`,
+                            _contentFetchError: `Failed to fetch added file content: ${addError instanceof Error ? addError.message : "Unknown error"}`,
                           };
                         }
-                      })
-                    );
-                    // Write batch results back into the array
-                    for (let j = 0; j < batchResults.length; j++) {
-                      entriesWithContent[i + j] = batchResults[j];
-                    }
-                  }
+                        return entry;
+                      }
 
-                  enrichedChanges.changeEntries = entriesWithContent;
+                      // Handle deleted files: fetch full content at base commit and create synthetic diff.
+                      // basePath prefers originalPath (the pre-deletion path); falls back to effectivePath.
+                      if (isDelete && !entry.diff) {
+                        try {
+                          const basePath = normalizedOriginalPath ?? effectivePath;
+                          const baseStream = await gitApi
+                            .getItemText(repositoryId, basePath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
+                            .catch(() => null);
+                          if (baseStream) {
+                            const baseText = await streamToString(baseStream);
+                            const baseLines = baseText.split(/\r?\n/);
+                            return {
+                              ...entry,
+                              diff: {
+                                path: null,
+                                originalPath: basePath,
+                                lineDiffBlocks: [
+                                  {
+                                    changeType: 2, // Delete
+                                    originalLineNumberStart: 1,
+                                    originalLinesCount: baseLines.length,
+                                    modifiedLineNumberStart: 0,
+                                    modifiedLinesCount: 0,
+                                    originalLines: baseLines,
+                                  },
+                                ],
+                              },
+                            };
+                          }
+                        } catch (delError) {
+                          return {
+                            ...entry,
+                            _contentFetchError: `Failed to fetch deleted file content: ${delError instanceof Error ? delError.message : "Unknown error"}`,
+                          };
+                        }
+                        return entry;
+                      }
+
+                      // For modified/renamed files, skip if no diff blocks
+                      if (!entry.diff?.lineDiffBlocks || entry.diff.lineDiffBlocks.length === 0) {
+                        return entry;
+                      }
+
+                      // For renamed/moved files, the base version is at the original path
+                      const basePath = normalizedOriginalPath ?? effectivePath;
+
+                      try {
+                        // Fetch file content at both commits
+                        const [baseContent, targetContent] = await Promise.all([
+                          // Base version (original) - use basePath for renamed files
+                          gitApi
+                            .getItemText(repositoryId, basePath, project, undefined, undefined, undefined, undefined, undefined, { version: baseCommitId, versionType: GitVersionType.Commit })
+                            .catch(() => null),
+                          // Target version (modified)
+                          gitApi
+                            .getItemText(repositoryId, effectivePath, project, undefined, undefined, undefined, undefined, undefined, { version: targetCommitId, versionType: GitVersionType.Commit })
+                            .catch(() => null),
+                        ]);
+
+                        // Convert streams to text
+                        const baseText = baseContent ? await streamToString(baseContent) : "";
+                        const targetText = targetContent ? await streamToString(targetContent) : "";
+
+                        // Check if response is an Azure DevOps error (returned as JSON in the stream)
+                        const checkForApiError = (text: string, label: string) => {
+                          if (text.startsWith("{")) {
+                            try {
+                              const parsed = JSON.parse(text);
+                              if (parsed.$id && parsed.innerException !== undefined) {
+                                throw new Error(`Failed to fetch ${label} file content: ${parsed.message || text}`);
+                              }
+                            } catch (e) {
+                              if (e instanceof Error && e.message.startsWith("Failed to fetch")) throw e;
+                              // Not valid JSON or not an error response — treat as legitimate content
+                            }
+                          }
+                        };
+                        checkForApiError(baseText, "base");
+                        checkForApiError(targetText, "target");
+
+                        // Split into lines
+                        const baseLines = baseText.split(/\r?\n/);
+                        const targetLines = targetText.split(/\r?\n/);
+
+                        // Enrich each lineDiffBlock with actual line content
+                        const enrichedDiff = {
+                          ...entry.diff,
+                          lineDiffBlocks: entry.diff.lineDiffBlocks?.map((block: any) => {
+                            const enrichedBlock: any = { ...block };
+
+                            // Add original (base) lines if they exist
+                            if (block.originalLineNumberStart && block.originalLinesCount) {
+                              const startIdx = block.originalLineNumberStart - 1;
+                              const endIdx = startIdx + block.originalLinesCount;
+                              enrichedBlock.originalLines = baseLines.slice(startIdx, endIdx);
+                            }
+
+                            // Add modified (target) lines if they exist
+                            if (block.modifiedLineNumberStart && block.modifiedLinesCount) {
+                              const startIdx = block.modifiedLineNumberStart - 1;
+                              const endIdx = startIdx + block.modifiedLinesCount;
+                              enrichedBlock.modifiedLines = targetLines.slice(startIdx, endIdx);
+                            }
+
+                            return enrichedBlock;
+                          }),
+                        };
+
+                        return {
+                          ...entry,
+                          diff: enrichedDiff,
+                        };
+                      } catch (contentError) {
+                        // If content fetch fails, return entry with error
+                        return {
+                          ...entry,
+                          _contentFetchError: `Failed to fetch line content: ${contentError instanceof Error ? contentError.message : "Unknown error"}`,
+                        };
+                      }
+                    })
+                  );
+                  // Write batch results back into the array
+                  for (let j = 0; j < batchResults.length; j++) {
+                    entriesWithContent[i + j] = batchResults[j];
+                  }
                 }
 
-                return {
-                  content: [{ type: "text", text: JSON.stringify(enrichedChanges, null, 2) }],
-                };
-              } catch (diffError) {
-                // If diff fetching fails, return metadata with error info
-                return {
-                  content: [
-                    {
-                      type: "text",
-                      text: JSON.stringify(
-                        {
-                          ...changes,
-                          _diffError: `Failed to fetch diff content: ${diffError instanceof Error ? diffError.message : "Unknown error"}`,
-                          _note: "Returned metadata only",
-                        },
-                        null,
-                        2
-                      ),
-                    },
-                  ],
-                };
+                enrichedChanges.changeEntries = entriesWithContent;
               }
+
+              return {
+                content: [{ type: "text", text: JSON.stringify(enrichedChanges, null, 2) }],
+              };
+            } catch (diffError) {
+              // If diff fetching fails, return metadata with error info
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify(
+                      {
+                        ...changes,
+                        _diffError: `Failed to fetch diff content: ${diffError instanceof Error ? diffError.message : "Unknown error"}`,
+                        _note: "Returned metadata only",
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+              };
             }
           }
         }
@@ -1976,7 +1998,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.list_directory,
-    "List files and folders in a directory within a repository. Useful for exploring the structure of a codebase or finding related files.",
+    "List files and folders in a directory within a repository. Useful for exploring the structure of a codebase or finding related files. Returns isError: true if the path is not found.",
     {
       repositoryId: z.string().describe("The ID or name of the repository."),
       path: z.string().optional().default("/").describe("The directory path to list (e.g., '/src' or '/src/components'). Defaults to repository root."),
@@ -2004,7 +2026,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         if (!items || items.length === 0) {
           return {
-            content: [{ type: "text", text: `No items found at path: ${path}` }],
+            content: [{ type: "text", text: `No items found at path: ${path}. The path may not exist in the repository.` }],
+            isError: true,
           };
         }
 
@@ -2062,7 +2085,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   server.tool(
     REPO_TOOLS.get_file_content,
     "Get the content of a file from a Git repository at a specific version (branch, tag, or commit SHA). " +
-      "Useful for reading source files from PR branches, specific commits, or tags without having them checked out locally.",
+      "Useful for reading source files from PR branches, specific commits, or tags without having them checked out locally. " +
+      "Returns isError: true if the file is not found.",
     {
       repositoryId: z.string().describe("The ID (GUID) or name of the repository."),
       path: z.string().describe("The full path to the file in the repository, e.g., '/src/main.ts' or 'src/main.ts'."),

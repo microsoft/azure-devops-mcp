@@ -480,6 +480,28 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("Error fetching wiki page metadata: Network error");
     });
 
+    it("should handle non-Error throwables in metadata catch block", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page");
+      if (!call) throw new Error("wiki_get_page tool not registered");
+      const [, , , handler] = call;
+
+      mockFetch.mockImplementation(() => {
+        throw "string thrown, not an Error";
+      });
+
+      const params = {
+        wikiIdentifier: "wiki1",
+        project: "proj1",
+        path: "/Home",
+      };
+
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Error fetching wiki page metadata: Unknown error occurred");
+    });
+
     it("should encode project and wikiIdentifier in URL to prevent path injection", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page");
@@ -854,6 +876,81 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("UNTRUSTED");
     });
 
+    it("should fall back to getPageText when pageId fetch returns non-404 error status", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValueOnce("abc");
+
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch as typeof fetch;
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("fallback after server error"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/123/Page-Title";
+      const result = await handler({ url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
+      expect(result.content[0].text).toContain("fallback after server error");
+    });
+
+    it("should normalize pagePath query parameter when it lacks a leading slash", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("normalized path content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki?pagePath=Home";
+      const result = await handler({ url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Home", undefined, undefined, true);
+      expect(result.content[0].text).toContain("normalized path content");
+    });
+
+    it("should default to root path when URL has no segments after wikiIdentifier and no pagePath", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("bare-wiki root content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki";
+      const result = await handler({ url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
+      expect(result.content[0].text).toContain("bare-wiki root content");
+    });
+
     it("should use default root path when resolvedPath is undefined", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
@@ -878,7 +975,7 @@ describe("configureWikiTools", () => {
       expect(result.isError).toBeUndefined();
     });
 
-    it("should handle scenario where resolvedProject/Wiki become null after URL processing", async () => {
+    it("should return URL parse error for malformed wiki URL with empty project and wiki segments", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
@@ -898,6 +995,51 @@ describe("configureWikiTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("URL does not match expected wiki pattern");
+    });
+
+    it("should return parse error when wiki URL is missing the wikiIdentifier segment", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const url = "https://dev.azure.com/proj/_wiki/wikis/";
+      const result = await handler({ url });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Could not extract project or wikiIdentifier from URL");
+    });
+
+    it("should fall back to getPageText when REST page-by-id returns null JSON body", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      (tokenProvider as jest.Mock).mockResolvedValueOnce("abc");
+
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch as typeof fetch;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue(null),
+      });
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("fallback root content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/123/Page-Title";
+      const result = await handler({ url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
+      expect(result.content[0].text).toContain("fallback root content");
     });
 
     it("should encode project and wikiIdentifier in REST URL to prevent path injection", async () => {

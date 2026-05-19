@@ -35,7 +35,12 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     "Retrieves a list of build definitions for a given project.",
     {
       project: z.string().describe("Project ID or name to get build definitions for"),
-      repositoryId: z.string().optional().describe("Repository ID to filter build definitions"),
+      repositoryId: z
+        .string()
+        .optional()
+        .describe(
+          "Repository ID to filter build definitions. Can be a GUID or a repository name; when a name is provided, it is auto-resolved to the repository GUID using the project parameter (Azure Repos / TfsGit only)."
+        ),
       repositoryType: z.enum(["TfsGit", "GitHub", "BitbucketCloud"]).optional().describe("Type of repository to filter build definitions"),
       name: z.string().optional().describe("Name of the build definition to filter"),
       path: z.string().optional().describe("Path of the build definition to filter"),
@@ -76,10 +81,29 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     }) => {
       const connection = await connectionProvider();
       const buildApi = await connection.getBuildApi();
+
+      // Auto-resolve repositoryId from name to GUID for Azure Repos
+      let resolvedRepositoryId = repositoryId;
+      if (repositoryId) {
+        const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repositoryId);
+        if (!isGuid && (!repositoryType || repositoryType === "TfsGit")) {
+          const gitApi = await connection.getGitApi();
+          const repositories = await gitApi.getRepositories(project);
+          const repo = repositories?.find((r) => r.name === repositoryId);
+          if (!repo?.id) {
+            return {
+              content: [{ type: "text", text: `Error: Repository '${repositoryId}' not found in project '${project}'.` }],
+              isError: true,
+            };
+          }
+          resolvedRepositoryId = repo.id;
+        }
+      }
+
       const buildDefinitions = await buildApi.getDefinitions(
         project,
         name,
-        repositoryId,
+        resolvedRepositoryId,
         repositoryType,
         safeEnumConvert(DefinitionQueryOrder, queryOrder),
         top,
@@ -532,23 +556,25 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     PIPELINE_TOOLS.pipelines_download_artifact,
-    "Downloads a pipeline artifact.",
+    "Downloads a pipeline artifact. When destinationPath is provided, it must be a relative local path; absolute paths and path traversal are not allowed.",
     {
       project: z.string().describe("The name or ID of the project."),
       buildId: z.coerce.number().min(1).describe("The ID of the build."),
       artifactName: z.string().describe("The name of the artifact to download."),
-      destinationPath: z.string().optional().describe("The local path to download the artifact to. If not provided, returns binary content as base64."),
+      destinationPath: z.string().optional().describe("The relative local path to download the artifact to. If not provided, returns binary content as base64."),
     },
     async ({ project, buildId, artifactName, destinationPath }) => {
-      const isAbsolutePath = (value: string) => posix.isAbsolute(value) || win32.isAbsolute(value);
+      const hasUnsafePathSegment = (value: string) => value.split(/[\\/]+/).some((segment) => segment === "." || segment === "..");
+      const hasPathSeparators = (value: string) => /[\\/]/.test(value);
       const hasDriveLetter = (value: string) => /^[a-zA-Z]:/.test(value);
+      const isAbsolutePath = (value: string) => posix.isAbsolute(value) || win32.isAbsolute(value);
 
-      if (artifactName.includes("..")) {
-        throw new Error("Invalid artifactName: path traversal is not allowed.");
+      if (hasUnsafePathSegment(artifactName) || hasPathSeparators(artifactName) || hasDriveLetter(artifactName) || isAbsolutePath(artifactName)) {
+        throw new Error("Invalid artifactName: artifactName must be a file name, not a path.");
       }
 
-      if (destinationPath && (destinationPath.includes("..") || isAbsolutePath(destinationPath) || hasDriveLetter(destinationPath))) {
-        throw new Error("Invalid destinationPath: absolute paths and path traversals are not allowed.");
+      if (destinationPath && (hasUnsafePathSegment(destinationPath) || isAbsolutePath(destinationPath) || hasDriveLetter(destinationPath))) {
+        throw new Error("Invalid destinationPath: use a relative path without path traversal.");
       }
 
       const connection = await connectionProvider();
