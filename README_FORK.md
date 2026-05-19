@@ -58,6 +58,12 @@ What this adds automatically:
 
 A matrix that maps upstream capabilities to what is implemented in this fork is available in [FORK_MATRIX.md](FORK_MATRIX.md).
 
+## Upstream Synchronization Workflow
+
+This fork uses an audit-first upstream synchronization flow before any merge action. The merge phase targets a sync branch (not `main` by default) and relies on manual validation before promoting changes.
+
+See [docs/UPSTREAM-SYNC.md](docs/UPSTREAM-SYNC.md) for the complete workflow, guardrails, troubleshooting, and examples.
+
 ## Configuration (appsettings.json)
 
 The .NET server reads Azure DevOps settings from configuration keys under `AzureDevOps`.
