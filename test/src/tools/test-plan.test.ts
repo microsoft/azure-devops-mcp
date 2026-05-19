@@ -752,11 +752,7 @@ describe("configureTestPlanTools", () => {
       const [, , , handler] = call;
 
       (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [
-          {
-            results: [{ id: 1, testCaseTitle: "FailingTest", outcome: "Failed", errorMessage: "error" }],
-          },
-        ],
+        resultsForGroup: [],
       });
 
       await handler({ project: "proj1", buildid: 123, outcomes: ["Failed", "Aborted"] });
@@ -766,7 +762,7 @@ describe("configureTestPlanTools", () => {
         123,
         undefined, // publishContext
         undefined, // groupBy
-        "Outcome eq 'Failed' or Outcome eq 'Aborted'", // filter expression
+        "Outcome eq Failed,Aborted", // filter expression
         undefined, // orderby
         true // shouldIncludeResults
       );
@@ -846,6 +842,30 @@ describe("configureTestPlanTools", () => {
         expect(result).toHaveProperty("testCaseTitle");
         expect(result.testCaseTitle).toBeTruthy();
       });
+    });
+
+    it("should handle large result groups without spreading them onto the stack", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
+      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
+      const [, , , handler] = call;
+
+      const largeResults = Array.from({ length: 150_000 }, (_, id) => ({
+        id,
+        testCaseTitle: `Test ${id}`,
+        outcome: "Passed",
+      }));
+
+      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
+        resultsForGroup: [{ results: largeResults }],
+      });
+
+      const result = await handler({ project: "proj1", buildid: 456 });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed).toHaveLength(largeResults.length);
+      expect(parsed[0].testCaseTitle).toBe("Test 0");
+      expect(parsed[largeResults.length - 1].testCaseTitle).toBe("Test 149999");
     });
 
     it("should handle empty results groups without errors", async () => {
