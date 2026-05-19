@@ -126,9 +126,11 @@ The merge summary includes at least:
 
 ## Validation Strategy
 
-- unit-level checks for impact classification logic
-- scenario checks for gate behavior (High finding blocks merge)
-- dry-run and real-run checks for merge orchestration
+Validation for this change is manual.
+
+- run a manual audit against `main..upstream/main` and confirm severity classification output
+- manually verify gate behavior where unresolved High findings block merge execution
+- manually run an end-to-end scenario: audit -> sync branch merge -> PR summary generation
 
 ## Open Questions
 
