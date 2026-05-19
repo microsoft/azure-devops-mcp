@@ -109,6 +109,103 @@ Get detailed information about a specific Advanced Security alert.
 - **Required**: `project`, `repository`, `alertId`
 - **Optional**: `ref`
 
+## Enterprise Live Migration
+
+### mcp_ado_enterprise-live-migration_list
+
+List all Enterprise Live Migration (ELM) migrations for the organization. By default returns only the latest migration per repository.
+
+- **Optional**: `includeAllMigrations`, `project`
+
+### mcp_ado_enterprise-live-migration_status
+
+Get the status of an Enterprise Live Migration for a specific repository.
+
+- **Required**: `repositoryId`
+
+### mcp_ado_enterprise-live-migration_create
+
+Create a new Enterprise Live Migration to migrate an Azure DevOps Git repository to GitHub.
+
+- **Required**: `repositoryId`, `targetRepository`
+- **Optional**: `targetOwnerUserId`, `gitHubUserToken`, `validateOnly`, `scheduledCutoverDate`, `skipValidation`, `agentPool`, `serviceEndpointId`, `pipelineServiceConnectionId`, `configOptions`
+
+### mcp_ado_enterprise-live-migration_pause
+
+Pause an active Enterprise Live Migration. The migration can be resumed later.
+
+- **Required**: `repositoryId`
+
+### mcp_ado_enterprise-live-migration_resume
+
+Resume a paused Enterprise Live Migration.
+
+- **Required**: `repositoryId`
+- **Optional**: `validateOnly`
+
+### mcp_ado_enterprise-live-migration_cutover_set
+
+Schedule the cutover date for an Enterprise Live Migration.
+
+- **Required**: `repositoryId`, `scheduledCutoverDate`
+
+### mcp_ado_enterprise-live-migration_cutover_cancel
+
+Cancel a previously scheduled cutover for an Enterprise Live Migration.
+
+- **Required**: `repositoryId`
+
+### mcp_ado_enterprise-live-migration_abandon
+
+Abandon (delete) an Enterprise Live Migration. This cannot be undone.
+
+- **Required**: `repositoryId`
+- **Optional**: `removeReadOnly`
+
+### mcp_ado_enterprise-live-migration_get_cutover_review
+
+Get the cutover review showing failed, blocked, and pending items that may need approval before cutover.
+
+- **Required**: `repositoryId`
+
+### mcp_ado_enterprise-live-migration_approve_cutover
+
+Approve cutover by accepting the specified number of failures.
+
+- **Required**: `repositoryId`, `cutoverFailureAcceptedCount`
+
+### mcp_ado_enterprise-live-migration_device_flow_config
+
+Get the GitHub App device flow configuration needed to authenticate for a migration.
+
+- **Required**: `targetRepository`
+
+### mcp_ado_enterprise-live-migration_pipelines_list
+
+List pipelines and their rewiring status for an Enterprise Live Migration.
+
+- **Required**: `repositoryId`
+
+### mcp_ado_enterprise-live-migration_pipelines_submit
+
+Submit pipelines for rewiring as part of an Enterprise Live Migration.
+
+- **Required**: `repositoryId`, `pipelineIds`, `serviceConnectionId`
+- **Optional**: `repositoryMappings`
+
+### mcp_ado_enterprise-live-migration_pipelines_update
+
+Update the pipeline rewiring configuration for an Enterprise Live Migration.
+
+- **Required**: `repositoryId`
+- **Optional**: `addPipelineIds`, `removePipelineIds`, `serviceConnectionId`, `repositoryMappings`, `retryFailedPipelineIds`, `acknowledgePipelineIds`
+
+### mcp_ado_enterprise-live-migration_pipelines_delete
+
+Delete all pipeline clone definitions and config. Only allowed for terminal migrations (Failed or Completed).
+
+- **Required**: `repositoryId`, `migrationId`
+
 ## Core
 
 ### mcp_ado_core_list_projects

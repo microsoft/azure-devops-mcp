@@ -15,6 +15,7 @@ This guide offers step-by-step examples for using the Azure DevOps MCP Server to
 - [Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
 - [Adding Artifact Links](#adding-artifact-links)
 - [Reading, Creating, and Updating Wiki Page Content](#reading-creating-and-updating-wiki-page-content)
+- [Enterprise Live Migration](#enterprise-live-migration)
 
 ## 🙋‍♂️ Projects and Teams
 
@@ -217,3 +218,83 @@ Create new wiki page called 'how to bake a cake' and add the following content:
 ```
 
 📽️ [Azure Devops MCP Server: Reading, creating, and updating wiki pages](https://youtu.be/z_WQ_QefpGU)
+
+## 🚀 Enterprise Live Migration
+
+Enterprise Live Migration (ELM) tools help you migrate Azure DevOps Git repositories to GitHub. Enable the `enterprise-live-migration` domain in your `mcp.json` to use these tools.
+
+### List Migrations
+
+See all active and recent migrations in your organization:
+
+```text
+List all ELM migrations
+```
+
+Filter to a specific project:
+
+```text
+List ELM migrations for project Contoso
+```
+
+### Check Migration Status
+
+Get detailed status for a specific repository's migration:
+
+```text
+What is the ELM migration status for repo d8ad85a3-1b56-4ca5-aac2-64f63e847b9e?
+```
+
+### Create a Validate-Only Migration
+
+Run pre-migration validation checks without starting a full sync:
+
+```text
+Create a validate-only ELM migration for repo 5a139f93-d787-4de4-ab94-cba75ca89d29 to https://example.ghe.com/org/my-repo with owner ghuser
+```
+
+### Create a Full Migration
+
+Start a full migration with synchronization:
+
+```text
+Create an ELM migration for repo 5a139f93-d787-4de4-ab94-cba75ca89d29 to https://example.ghe.com/org/my-repo with owner ghuser and schedule cutover for 2026-07-01
+```
+
+### Pause and Resume
+
+```text
+Pause the ELM migration for repo 5a139f93-d787-4de4-ab94-cba75ca89d29
+```
+
+```text
+Resume the ELM migration for repo 5a139f93-d787-4de4-ab94-cba75ca89d29
+```
+
+### Schedule and Cancel Cutover
+
+```text
+Schedule cutover for repo 5a139f93-d787-4de4-ab94-cba75ca89d29 on July 1st 2026 at midnight UTC
+```
+
+```text
+Cancel the scheduled cutover for repo 5a139f93-d787-4de4-ab94-cba75ca89d29
+```
+
+### Review and Approve Cutover
+
+When a migration reaches the ReviewForCutover stage, review pending issues and approve:
+
+```text
+Show the cutover review for repo d8ad85a3-1b56-4ca5-aac2-64f63e847b9e
+```
+
+```text
+Approve cutover for repo d8ad85a3-1b56-4ca5-aac2-64f63e847b9e with 2 accepted failures
+```
+
+### Abandon a Migration
+
+```text
+Abandon the ELM migration for repo 5a139f93-d787-4de4-ab94-cba75ca89d29
+```
