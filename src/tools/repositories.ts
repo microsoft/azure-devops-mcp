@@ -1546,7 +1546,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .number()
         .optional()
         .describe(
-          "Position of first character of the thread's span in right file. The line number of a thread's position. The character offset of a thread's position inside of a line. Starts at 1. Must be set if rightFileStartLine is also specified. (optional)"
+          "Start character offset of the thread's span within the line in the right file. The character offset of a thread's position inside of a line. Starts at 1. Must be set if rightFileStartLine is also specified. (optional)"
         ),
       rightFileEndLine: z
         .number()
@@ -1558,7 +1558,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .number()
         .optional()
         .describe(
-          "Position of last character of the thread's span in right file. The character offset of a thread's position inside of a line. Must be set if rightFileEndLine is also specified. (optional)"
+          "Exclusive end character offset of the thread's span within the line in the right file. This value is exclusive: to cover the entire line, set it to (length of the original line text) + 1. When posting a suggestion, always calculate this from the existing file content being replaced, not from the suggestion or replacement text. Must be set if rightFileEndLine is also specified. (optional)"
         ),
     },
     async ({ repositoryId, pullRequestId, content, project, filePath, status, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
