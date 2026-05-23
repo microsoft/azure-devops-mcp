@@ -28,6 +28,6 @@ Unfortunately, personal accounts are not supported. To maintain a higher level o
 
 ![image of login error for personal accounts](./media/personal-accounts-error.png)
 
-## When will a remote Azure DevOps MCP Server be availble?
+## When will a remote Azure DevOps MCP Server be available?
 
 We receive this question frequently. The good news is that work is currently underway. Development began in early January 2026. Once we can provide a reliable timeline, we will publish it on the public [Azure DevOps roadmap](https://learn.microsoft.com/en-us/azure/devops/release-notes/features-timeline).
