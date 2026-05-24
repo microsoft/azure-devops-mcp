@@ -112,6 +112,31 @@ function pullRequestStatusStringToInt(status: string): number {
   }
 }
 
+const pullRequestStatusNames: Record<number, string> = {
+  0: "NotSet",
+  1: "Active",
+  2: "Abandoned",
+  3: "Completed",
+  4: "All",
+};
+
+const pullRequestMergeStatusNames: Record<number, string> = {
+  0: "NotSet",
+  1: "Queued",
+  2: "Conflicts",
+  3: "Succeeded",
+  4: "RejectedByPolicy",
+  5: "Failure",
+};
+
+function addPullRequestStatusNames<T extends Record<string, unknown>>(pr: T): T & { statusName?: string; mergeStatusName?: string } {
+  return {
+    ...pr,
+    ...(typeof pr.status === "number" ? { statusName: pullRequestStatusNames[pr.status] ?? `Unknown(${pr.status})` } : {}),
+    ...(typeof pr.mergeStatus === "number" ? { mergeStatusName: pullRequestMergeStatusNames[pr.mergeStatus] ?? `Unknown(${pr.mergeStatus})` } : {}),
+  };
+}
+
 function filterReposByName(repositories: GitRepository[], repoNameFilter: string): GitRepository[] {
   const lowerCaseFilter = repoNameFilter.toLowerCase();
   const filteredByName = repositories?.filter((repo) => repo.name?.toLowerCase().includes(lowerCaseFilter));
@@ -1029,7 +1054,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const gitApi = await connection.getGitApi();
         const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project, undefined, undefined, undefined, undefined, includeWorkItemRefs);
 
-        let enhancedResponse: Record<string, unknown> = { ...pullRequest };
+        let enhancedResponse: Record<string, unknown> = addPullRequestStatusNames({ ...pullRequest });
 
         if (includeLabels) {
           try {

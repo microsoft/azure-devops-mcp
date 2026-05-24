@@ -3566,6 +3566,7 @@ describe("repos tools", () => {
         pullRequestId: 123,
         title: "Test PR",
         status: 1,
+        mergeStatus: 3,
       };
       mockGitApi.getPullRequest.mockResolvedValue(mockPR);
 
@@ -3578,7 +3579,11 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
-      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+      expect(JSON.parse(result.content[0].text)).toEqual({
+        ...mockPR,
+        statusName: "Active",
+        mergeStatusName: "Succeeded",
+      });
     });
 
     it("should pass project parameter when provided", async () => {
@@ -3605,7 +3610,7 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("my-repo-name", 456, "my-project", undefined, undefined, undefined, undefined, false);
-      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+      expect(JSON.parse(result.content[0].text)).toEqual({ ...mockPR, statusName: "Active" });
     });
 
     it("should include work item refs when requested", async () => {
@@ -3668,6 +3673,7 @@ describe("repos tools", () => {
 
       const expectedResponse = {
         ...mockPR,
+        statusName: "Active",
         labelSummary: {
           labels: ["bug", "enhancement"],
           labelCount: 2,
@@ -3703,7 +3709,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, undefined);
       expect(mockGitApi.getPullRequestLabels).not.toHaveBeenCalled();
-      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+      expect(result.content[0].text).toBe(JSON.stringify({ ...mockPR, statusName: "Active" }, null, 2));
     });
 
     it("should include labels by default when includeLabels is explicitly set to default value true", async () => {
@@ -3743,6 +3749,7 @@ describe("repos tools", () => {
 
       const expectedResponse = {
         ...mockPR,
+        statusName: "Active",
         labelSummary: {
           labels: ["documentation"],
           labelCount: 1,
@@ -3778,7 +3785,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
       expect(mockGitApi.getPullRequestLabels).not.toHaveBeenCalled();
-      expect(result.content[0].text).toBe(JSON.stringify(mockPR, null, 2));
+      expect(result.content[0].text).toBe(JSON.stringify({ ...mockPR, statusName: "Active" }, null, 2));
     });
 
     it("should handle empty labels array", async () => {
@@ -3816,6 +3823,7 @@ describe("repos tools", () => {
 
       const expectedResponse = {
         ...mockPR,
+        statusName: "Active",
         labelSummary: {
           labels: [],
           labelCount: 0,
@@ -3862,6 +3870,7 @@ describe("repos tools", () => {
 
       const expectedResponse = {
         ...mockPR,
+        statusName: "Active",
         labelSummary: {
           labels: ["bug", "feature"], // undefined name filtered out
           labelCount: 2,
@@ -3910,6 +3919,7 @@ describe("repos tools", () => {
       // Should fall back to empty labelSummary
       const expectedResponse = {
         ...mockPR,
+        statusName: "Active",
         labelSummary: {},
       };
 
@@ -3955,6 +3965,7 @@ describe("repos tools", () => {
 
       const expectedResponse = {
         ...mockPR,
+        statusName: "Active",
         labelSummary: {
           labels: ["urgent"],
           labelCount: 1,
