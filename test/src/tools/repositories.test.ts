@@ -109,6 +109,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -151,6 +152,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: "test-repo",
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -178,6 +180,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -213,6 +216,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: "test-repo",
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -240,6 +244,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -275,6 +280,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: "test-repo",
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -302,6 +308,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: PullRequestStatus.Abandoned,
+        statusName: "Abandoned",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -337,6 +344,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: "test-repo",
         status: PullRequestStatus.Abandoned,
+        statusName: "Abandoned",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -364,6 +372,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -401,6 +410,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: "test-repo",
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -598,6 +608,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -645,6 +656,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -735,6 +747,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -793,6 +806,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -859,6 +873,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -913,6 +928,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -961,6 +977,7 @@ describe("repos tools", () => {
         codeReviewId: 456,
         repository: { name: "test-repo" },
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -1004,6 +1021,7 @@ describe("repos tools", () => {
         codeReviewId: 456,
         repository: "test-repo",
         status: 1,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -1030,6 +1048,7 @@ describe("repos tools", () => {
         codeReviewId: 456,
         repository: { name: "test-repo" },
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -1083,6 +1102,7 @@ describe("repos tools", () => {
         codeReviewId: 456,
         repository: "test-repo",
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -1131,6 +1151,7 @@ describe("repos tools", () => {
         codeReviewId: 789,
         repository: { name: "test-repo" },
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -1170,6 +1191,7 @@ describe("repos tools", () => {
         codeReviewId: 789,
         repository: "test-repo",
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -1674,6 +1696,7 @@ describe("repos tools", () => {
           pullRequestId: 123,
           codeReviewId: 456,
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
@@ -2043,6 +2066,7 @@ describe("repos tools", () => {
           codeReviewId: 456,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
@@ -2070,6 +2094,7 @@ describe("repos tools", () => {
           codeReviewId: 456,
           repository: "test-repo",
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
           creationDate: "2023-01-01T00:00:00Z",
           title: "Feature PR",
@@ -2095,6 +2120,7 @@ describe("repos tools", () => {
           codeReviewId: 456,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Test User", uniqueName: "testuser@example.com" },
           creationDate: "2023-01-01T00:00:00Z",
           title: "My Feature PR",
@@ -2124,6 +2150,7 @@ describe("repos tools", () => {
           codeReviewId: 456,
           repository: "test-repo",
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Test User", uniqueName: "testuser@example.com" },
           creationDate: "2023-01-01T00:00:00Z",
           title: "My Feature PR",
@@ -2149,6 +2176,7 @@ describe("repos tools", () => {
           codeReviewId: 789,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Other User", uniqueName: "other@example.com" },
           creationDate: "2023-01-02T00:00:00Z",
           title: "Review Me PR",
@@ -2178,6 +2206,7 @@ describe("repos tools", () => {
           codeReviewId: 789,
           repository: "test-repo",
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Other User", uniqueName: "other@example.com" },
           creationDate: "2023-01-02T00:00:00Z",
           title: "Review Me PR",
@@ -2203,6 +2232,7 @@ describe("repos tools", () => {
           codeReviewId: 101112,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Test User", uniqueName: "testuser@example.com" },
           creationDate: "2023-01-03T00:00:00Z",
           title: "Both Creator and Reviewer PR",
@@ -2233,6 +2263,7 @@ describe("repos tools", () => {
           codeReviewId: 101112,
           repository: "test-repo",
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Test User", uniqueName: "testuser@example.com" },
           creationDate: "2023-01-03T00:00:00Z",
           title: "Both Creator and Reviewer PR",
@@ -2261,6 +2292,7 @@ describe("repos tools", () => {
           codeReviewId: 888,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Specific User", uniqueName: "specific@example.com" },
           creationDate: "2023-01-04T00:00:00Z",
           title: "Specific User PR",
@@ -2292,6 +2324,7 @@ describe("repos tools", () => {
           codeReviewId: 888,
           repository: "test-repo",
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Specific User", uniqueName: "specific@example.com" },
           creationDate: "2023-01-04T00:00:00Z",
           title: "Specific User PR",
@@ -2450,6 +2483,7 @@ describe("repos tools", () => {
           codeReviewId: 666,
           repository: { name: "test-repo" },
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Another User", uniqueName: "another@example.com" },
           creationDate: "2023-01-05T00:00:00Z",
           title: "PR Reviewed by Specific User",
@@ -2479,6 +2513,7 @@ describe("repos tools", () => {
           codeReviewId: 666,
           repository: "test-repo",
           status: PullRequestStatus.Active,
+          statusName: "Active",
           createdBy: { displayName: "Another User", uniqueName: "another@example.com" },
           creationDate: "2023-01-05T00:00:00Z",
           title: "PR Reviewed by Specific User",
@@ -6481,6 +6516,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: { name: "test-repo" },
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",
@@ -6527,6 +6563,7 @@ describe("repos tools", () => {
         codeReviewId: 123,
         repository: "test-repo",
         status: PullRequestStatus.Active,
+        statusName: "Active",
         createdBy: {
           displayName: "Test User",
           uniqueName: "testuser@example.com",

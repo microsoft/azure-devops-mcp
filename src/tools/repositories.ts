@@ -123,11 +123,20 @@ function trimPullRequest(pr: GitPullRequest | null | undefined, includeDescripti
   if (!pr) {
     return null;
   }
+
+  const statusMap: Record<number, string> = {
+    1: "Active",
+    2: "Abandoned",
+    3: "Completed",
+    4: "NotSet", // Add other statuses as needed
+  };
+
   return {
     pullRequestId: pr.pullRequestId,
     codeReviewId: pr.codeReviewId,
     repository: pr.repository?.name,
     status: pr.status,
+    statusName: statusMap[pr.status as number] || "Unknown",
     createdBy: {
       displayName: pr.createdBy?.displayName,
       uniqueName: pr.createdBy?.uniqueName,
