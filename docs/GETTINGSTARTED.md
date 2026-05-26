@@ -361,9 +361,9 @@ For more information, see the [Copilot CLI documentation](https://docs.github.co
 
 Codex can run the Azure DevOps MCP Server as a local stdio MCP server from either the Codex CLI or IDE extension. The configuration is shared through `~/.codex/config.toml`.
 
-#### Interactive authentication without a PAT
+#### Interactive authentication
 
-For local development, start with the default interactive authentication flow. It does not require a PAT:
+For local development, start with the default interactive authentication flow:
 
 ```bash
 codex mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
@@ -388,26 +388,6 @@ az login
 codex mcp add azure-devops -- npx -y @azure-devops/mcp Contoso --authentication azcli
 ```
 
-#### PAT authentication
-
-Use PAT authentication for non-interactive environments or enterprise setups where browser sign-in is not available. `PERSONAL_ACCESS_TOKEN` must contain the base64 encoding of `<email>:<pat>`.
-
-macOS / Linux:
-
-```bash
-printf '%s' 'user@contoso.com:your_pat_here' | base64 | tr -d '\n'
-codex mcp add --env PERSONAL_ACCESS_TOKEN='<base64encoded email:pat>' azure-devops -- npx -y @azure-devops/mcp Contoso --authentication pat
-```
-
-PowerShell:
-
-```powershell
-[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("user@contoso.com:your_pat_here"))
-codex mcp add --env PERSONAL_ACCESS_TOKEN="<base64encoded email:pat>" azure-devops -- npx -y @azure-devops/mcp Contoso --authentication pat
-```
-
-Avoid storing PAT values in source-controlled files. Prefer `codex mcp add --env`, shell environment variables, or your team's secret-management tooling.
-
 #### Manual `config.toml` configuration
 
 You can also edit `~/.codex/config.toml` directly:
@@ -416,17 +396,6 @@ You can also edit `~/.codex/config.toml` directly:
 [mcp_servers.azure-devops]
 command = "npx"
 args = ["-y", "@azure-devops/mcp", "Contoso"]
-```
-
-For PAT authentication:
-
-```toml
-[mcp_servers.azure-devops]
-command = "npx"
-args = ["-y", "@azure-devops/mcp", "Contoso", "--authentication", "pat"]
-
-[mcp_servers.azure-devops.env]
-PERSONAL_ACCESS_TOKEN = "<base64encoded email:pat>"
 ```
 
 Restart Codex after editing the config manually, then ask for a simple read-only operation such as `List ADO projects`.
