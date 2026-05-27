@@ -34,6 +34,7 @@ describe("repos tools", () => {
     getComments: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getPullRequestReviewer: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestLabels: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createPullRequestLabel: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     deletePullRequestLabels: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
@@ -67,6 +68,7 @@ describe("repos tools", () => {
       getComments: jest.fn(),
       getRefs: jest.fn(),
       getPullRequest: jest.fn(),
+      getPullRequestReviewer: jest.fn(),
       getPullRequestLabels: jest.fn(),
       createPullRequestLabel: jest.fn(),
       deletePullRequestLabels: jest.fn(),
@@ -6120,6 +6122,7 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_vote_pull_request tool not registered");
       const [, , , handler] = call;
 
+      mockGitApi.getPullRequestReviewer.mockResolvedValue({ id: "user123", isRequired: true });
       mockGitApi.createPullRequestReviewer.mockResolvedValue({});
 
       const params = {
@@ -6132,7 +6135,8 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGetCurrentUserDetails).toHaveBeenCalledWith(tokenProvider, connectionProvider, userAgentProvider);
-      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123" }, "repo123", 427, "user123", "test-project");
+      expect(mockGitApi.getPullRequestReviewer).toHaveBeenCalledWith("repo123", 427, "user123", "test-project");
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123", isRequired: true }, "repo123", 427, "user123", "test-project");
       expect(result.content[0].text).toBe("Successfully cast vote 'Approved' on PR #427.");
     });
 
@@ -6143,6 +6147,7 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_vote_pull_request tool not registered");
       const [, , , handler] = call;
 
+      mockGitApi.getPullRequestReviewer.mockResolvedValue({ id: "user123", isRequired: false });
       mockGitApi.createPullRequestReviewer.mockResolvedValue({});
 
       const params = {
@@ -6154,7 +6159,29 @@ describe("repos tools", () => {
 
       await handler(params);
 
-      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: -10, id: "user123" }, "repo123", 427, "user123", "test-project");
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: -10, id: "user123", isRequired: false }, "repo123", 427, "user123", "test-project");
+    });
+
+    it("should cast a vote when reviewer does not exist yet", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.vote_pull_request);
+      if (!call) throw new Error("repo_vote_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestReviewer.mockRejectedValue(new Error("Reviewer not found"));
+      mockGitApi.createPullRequestReviewer.mockResolvedValue({});
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 427,
+        project: "test-project",
+        vote: "NoVote" as const,
+      };
+
+      await handler(params);
+
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 0, id: "user123" }, "repo123", 427, "user123", "test-project");
     });
 
     it("should throw when authenticated user ID is missing", async () => {
@@ -6184,6 +6211,7 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_vote_pull_request tool not registered");
       const [, , , handler] = call;
 
+      mockGitApi.getPullRequestReviewer.mockResolvedValue({ id: "user123" });
       mockGitApi.createPullRequestReviewer.mockRejectedValue(new Error("Reviewer update failed"));
 
       const params = {
@@ -6194,6 +6222,26 @@ describe("repos tools", () => {
       };
 
       await expect(handler(params)).rejects.toThrow("Reviewer update failed");
+    });
+
+    it("should propagate API errors from getPullRequestReviewer", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.vote_pull_request);
+      if (!call) throw new Error("repo_vote_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequestReviewer.mockRejectedValue(new Error("Reviewer lookup failed"));
+
+      const params = {
+        repositoryId: "repo123",
+        pullRequestId: 427,
+        project: "test-project",
+        vote: "WaitingForAuthor" as const,
+      };
+
+      await expect(handler(params)).rejects.toThrow("Reviewer lookup failed");
+      expect(mockGitApi.createPullRequestReviewer).not.toHaveBeenCalled();
     });
   });
 
