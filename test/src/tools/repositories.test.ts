@@ -1633,6 +1633,7 @@ describe("repos tools", () => {
 
       const params = {
         project: "test-project",
+        status: "Active",
         top: 100,
         skip: 0,
       };
@@ -2100,6 +2101,133 @@ describe("repos tools", () => {
           title: "Feature PR",
           isDraft: false,
           sourceRefName: "refs/heads/feature-branch",
+          targetRefName: "refs/heads/main",
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should map statusName from PullRequestStatus enum values", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_repo_or_project);
+      if (!call) throw new Error("repo_list_pull_requests_by_repo_or_project tool not registered");
+      const [, , , handler] = call;
+
+      const mockPRs = [
+        {
+          pullRequestId: 123,
+          codeReviewId: 456,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.NotSet,
+          createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
+          creationDate: "2023-01-01T00:00:00Z",
+          title: "NotSet PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/notset-branch",
+          targetRefName: "refs/heads/main",
+        },
+        {
+          pullRequestId: 124,
+          codeReviewId: 457,
+          repository: { name: "test-repo" },
+          status: PullRequestStatus.All,
+          createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
+          creationDate: "2023-01-01T00:00:00Z",
+          title: "All PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/all-branch",
+          targetRefName: "refs/heads/main",
+        },
+      ];
+      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs);
+
+      const params = {
+        project: "test-project",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      const expectedResult = [
+        {
+          pullRequestId: 123,
+          codeReviewId: 456,
+          repository: "test-repo",
+          status: PullRequestStatus.NotSet,
+          statusName: "NotSet",
+          createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
+          creationDate: "2023-01-01T00:00:00Z",
+          title: "NotSet PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/notset-branch",
+          targetRefName: "refs/heads/main",
+        },
+        {
+          pullRequestId: 124,
+          codeReviewId: 457,
+          repository: "test-repo",
+          status: PullRequestStatus.All,
+          statusName: "All",
+          createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
+          creationDate: "2023-01-01T00:00:00Z",
+          title: "All PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/all-branch",
+          targetRefName: "refs/heads/main",
+        },
+      ];
+
+      expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
+    });
+
+    it("should return Unknown statusName for unrecognized pull request status", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.list_pull_requests_by_repo_or_project);
+      if (!call) throw new Error("repo_list_pull_requests_by_repo_or_project tool not registered");
+      const [, , , handler] = call;
+
+      const mockPRs = [
+        {
+          pullRequestId: 123,
+          codeReviewId: 456,
+          repository: { name: "test-repo" },
+          status: 999,
+          createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
+          creationDate: "2023-01-01T00:00:00Z",
+          title: "Unknown Status PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/unknown-status",
+          targetRefName: "refs/heads/main",
+        },
+      ];
+      mockGitApi.getPullRequestsByProject.mockResolvedValue(mockPRs as any);
+
+      const params = {
+        project: "test-project",
+        status: "Active",
+        top: 100,
+        skip: 0,
+      };
+
+      const result = await handler(params);
+
+      const expectedResult = [
+        {
+          pullRequestId: 123,
+          codeReviewId: 456,
+          repository: "test-repo",
+          status: 999,
+          statusName: "Unknown",
+          createdBy: { displayName: "John Doe", uniqueName: "john@example.com" },
+          creationDate: "2023-01-01T00:00:00Z",
+          title: "Unknown Status PR",
+          isDraft: false,
+          sourceRefName: "refs/heads/unknown-status",
           targetRefName: "refs/heads/main",
         },
       ];
