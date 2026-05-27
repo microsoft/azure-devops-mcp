@@ -123,11 +123,15 @@ function trimPullRequest(pr: GitPullRequest | null | undefined, includeDescripti
   if (!pr) {
     return null;
   }
+
+  const statusName = typeof pr.status === "number" ? (PullRequestStatus[pr.status] ?? "Unknown") : "Unknown";
+
   return {
     pullRequestId: pr.pullRequestId,
     codeReviewId: pr.codeReviewId,
     repository: pr.repository?.name,
     status: pr.status,
+    statusName,
     createdBy: {
       displayName: pr.createdBy?.displayName,
       uniqueName: pr.createdBy?.uniqueName,
