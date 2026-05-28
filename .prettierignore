@@ -4,3 +4,6 @@ dist/
 coverage/
 
 *.log*
+
+# Symlink — not parseable as JSON
+.vscode/mcp.json

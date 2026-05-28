@@ -59,7 +59,8 @@ const argv = yargs(hideBin(process.argv))
   .parseSync();
 
 export const orgName = argv.organization as string;
-const orgUrl = "https://dev.azure.com/" + orgName;
+// Suporta tanto dev.azure.com quanto visualstudio.com
+const orgUrl = orgName.includes(".") ? `https://${orgName}` : `https://${orgName}.visualstudio.com`;
 
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();

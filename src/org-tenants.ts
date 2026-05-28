@@ -35,7 +35,8 @@ async function trySavingCache(cache: OrgTenantCache): Promise<void> {
 }
 
 async function fetchTenantFromApi(orgName: string): Promise<string> {
-  const url = `https://vssps.dev.azure.com/${orgName}`;
+  const baseUrl = orgName.includes(".visualstudio.com") ? orgName.replace(".visualstudio.com", "") : orgName;
+  const url = `https://vssps.${orgName.includes(".visualstudio.com") ? "visualstudio.com" : "dev.azure.com"}/${baseUrl}`;
 
   try {
     const response = await fetch(url, { method: "HEAD" });
