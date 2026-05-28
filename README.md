@@ -1,277 +1,194 @@
-# ⭐ Azure DevOps MCP Server
+# Azure DevOps MCP Server — Gallagher Fork
 
-> [!IMPORTANT]
-> The Azure DevOps Remote MCP Server is now available in public preview for all organizations. We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
->
-> [Learn more](#-remote-mcp-server-recommended)
+This is a fork of [microsoft/azure-devops-mcp](https://github.com/microsoft/azure-devops-mcp) with changes to make the local MCP server work against **Azure DevOps Server (on-premises / TFS)** using **Personal Access Token (PAT)** authentication.
 
-This project provides Azure DevOps MCP tooling for AI agents, with a **remote-first** onboarding experience and a local server option when you need it.
+For the original project documentation, see the [upstream README](https://github.com/microsoft/azure-devops-mcp/blob/main/README.md).
 
-## 📄 Table of Contents
+## Table of Contents
 
-1. [📺 Overview](#-overview)
-2. [🏆 Expectations](#-expectations)
-3. [🚀 Remote MCP Server (Recommended)](#-remote-mcp-server-recommended)
-4. [⚙️ Supported Tools](#️-supported-tools)
-5. [🔌 Local MCP Server Installation (Optional)](#-local-mcp-server-installation-optional)
-6. [🌏 Using Domains (local)](#-using-domains-local)
-7. [🐥 Project and Team Defaults (local)](#-project-and-team-defaults-local)
-8. [📝 Troubleshooting](#-troubleshooting)
-9. [🎩 Examples & Best Practices](#-examples--best-practices)
-10. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-11. [📌 Contributing](#-contributing)
+- [Security Disclaimer](#security-disclaimer)
+- [What This Fork Adds](#what-this-fork-adds)
+- [Using With Claude Code](#using-with-claude-code)
+- [Using With Claude Desktop](#using-with-claude-desktop)
+- [Getting Latest Updates From Upstream](#getting-latest-updates-from-upstream)
+- [Further Reading](#further-reading)
 
-## 📺 Overview
-
-The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prompts like:
-
-- "List my ADO projects"
-- "List ADO Builds for 'Contoso'"
-- "List ADO Repos for 'Contoso'"
-- "List test plans for 'Contoso'"
-- "List teams for project 'Contoso'"
-- "List iterations for project 'Contoso'"
-- "List my work items for project 'Contoso'"
-- "List work items in current iteration for 'Contoso' project and 'Contoso Team'"
-- "List all wikis in the 'Contoso' project"
-- "Create a wiki page '/Architecture/Overview' with content about system design"
-- "Update the wiki page '/Getting Started' with new onboarding instructions"
-- "Get the content of the wiki page '/API/Authentication' from the Documentation wiki"
-
-## 🏆 Expectations
-
-The Azure DevOps MCP Server is built around tools that are concise, simple, focused, and easy to use, with each one designed for a specific scenario. We intentionally avoid creating complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs that makes data access straightforward while allowing the language model to handle the more complex reasoning.
-
-## 🚀 Remote MCP Server (Recommended)
-
-The Azure DevOps **Remote MCP Server** is now available in [public preview](https://devblogs.microsoft.com/devops/azure-devops-remote-mcp-server-public-preview).
-
-Over time, the Remote MCP Server will replace this local MCP Server. We will continue to support the local server for now, but future investments will primarily focus on the remote experience.
-
-We encourage all users of the local MCP Server to begin migrating to the Remote MCP Server.
-
-If you encounter issues with tools, need support, or have a feature request, you can report an issue using the [Remote MCP Server issue template](https://github.com/microsoft/azure-devops-mcp/issues/new?template=remote-mcp-server-issue.md). During the preview period, we will track Remote MCP Server issues through this repository.
+## Security Disclaimer
 
 > [!WARNING]
-> Internal Microsoft users of the Remote MCP Server should **not** create issues in this repository. Please use the dedicated Teams channel instead.
+> **This MCP server acts as you.** Every TFS / Azure DevOps action it performs — reading work items, posting comments, creating pull requests, updating fields, voting, creating branches, linking artifacts — is authenticated with **your PAT (or your Entra identity)** and will appear in audit logs as **performed by you**. The LLM driving the server decides which tools to call, in what order, with what arguments. You are accountable for those actions.
+>
+> Before using this server:
+>
+> - **Scope your PAT to the minimum required.** Don't issue a full-access PAT if read-only work-item access is enough. PAT scope is your blast radius.
+> - **Treat the PAT like a password.** Don't commit it, don't paste it into chat, don't share configs that contain it. Prefer environment variables (`ADO_PAT`) over inline JSON when possible.
+> - **Review tool calls before approving them.** In Claude Code, default permission prompts surface each MCP tool call — read them. Don't blanket-allow state-changing tools (anything that writes, updates, deletes, posts, creates) unless you genuinely want autonomous operation.
+> - **Be especially cautious in agent / auto modes.** Loops and auto-approve modes will execute many tools without per-call confirmation. Combined with a wide-scoped PAT, the LLM can make many changes very quickly.
+> - **Rotate the PAT if it leaks** — into a log, a commit, a screenshot, a shared config — and revoke the old one immediately in Azure DevOps.
+>
+> The fork authors and Microsoft (upstream) take no responsibility for actions the LLM performs through this server using your credentials.
 
-For complete instructions, see the [Remote MCP Server onboarding documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops).
+## What This Fork Adds
 
-### Quick start with `.vscode/mcp.json`
+These are the deltas vs `microsoft/azure-devops-mcp` (`main`). For the full rationale behind each change, see [docs/FORK-ONPREM-PAT.md](./docs/FORK-ONPREM-PAT.md).
 
-Use this configuration to connect directly to the Azure DevOps-hosted endpoint using streamable HTTP transport:
+| Area                   | Change                                                                                                                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Org input              | First positional arg now accepts either an org name (`contoso`) **or** a full on-prem collection URL (`https://ado.company.local/tfs/DefaultCollection`).              |
+| Tenant discovery       | Skipped for PAT auth and on-prem URLs — only runs for hosted Entra-based flows (`interactive`, `azcli`, `env`).                                                        |
+| PAT auth               | Now accepts a raw PAT via `ADO_PAT` (preferred) or `PERSONAL_ACCESS_TOKEN`. Legacy base64 `email:pat` in `PERSONAL_ACCESS_TOKEN` is still supported for compatibility. |
+| PAT Basic-auth rewrite | The `Authorization` header rewriting for direct `fetch` calls now uses `Basic base64(:<pat>)`, the standard PAT form.                                                  |
+| Identity API           | `src/tools/auth.ts` now picks the right identities endpoint per deployment — hosted keeps `vssps.dev.azure.com`, on-prem uses `<serverUrl>/_apis/identities`.          |
+| Search tools           | Search tools detect on-prem and return a clear "unsupported on this deployment" message instead of calling hosted-only `almsearch.dev.azure.com` endpoints.            |
+| New helper module      | `src/deployment.ts` — normalizes deployment context (hosted vs on-prem), derives endpoint base URLs.                                                                   |
+| New fork docs          | [docs/FORK-ONPREM-PAT.md](./docs/FORK-ONPREM-PAT.md), this README.                                                                                                     |
+| New tests              | `test/src/deployment.test.ts`, additions in `test/src/pat-auth.test.ts`, `test/src/tools/auth.test.ts`, `test/src/tools/search.test.ts`.                               |
 
-```json
-{
-  "servers": {
-    "ado-remote-mcp": {
-      "url": "https://mcp.dev.azure.com/{organization}",
-      "type": "http"
-    }
-  },
-  "inputs": []
-}
+### Known limitations of the fork
+
+- `search_*` tools remain hosted-only.
+- API versions are still pinned to upstream defaults (`7.2-preview.*`). Older on-prem releases may need version-compatibility work.
+
+## Using With Claude Code
+
+### Hosted Azure DevOps (Entra / az CLI auth)
+
+```bash
+claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
 ```
 
-See [documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#mcpjson-configuration) for additional configuration options.
+Replace `Contoso` with your org name. On first use, a browser window opens for Microsoft sign-in.
 
-After saving `.vscode/mcp.json`, start the server from the MCP view in VS Code, then run a prompt like `List ADO projects`.
+### On-prem Azure DevOps Server with PAT (fork-specific)
 
-## ⚙️ Supported Tools
+This fork is not published to npm, so you point Claude Code at your local build.
 
-See the [Available Tools](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#available-tools) documentation for the complete list of available remote tools.
+1. Build the fork:
+   ```bash
+   npm install
+   npm run build
+   ```
+2. Generate a PAT in your on-prem ADO instance (User settings → Personal access tokens) with the scopes you need.
+3. Register the server with Claude Code:
+   ```bash
+   claude mcp add azure-devops-onprem \
+     --env ADO_PAT=<your-pat> \
+     -- node /absolute/path/to/azure-devops-mcp/dist/index.js \
+        https://ado.company.local/tfs/DefaultCollection \
+        --authentication pat \
+        -d core work work-items repositories wiki pipelines test-plans
+   ```
 
-For a comprehensive list of local tools, see [TOOLSET.md](./docs/TOOLSET.md).
+The `-d` flags load only the listed domains. Omitting them loads everything — including `search`, which will return "unsupported" messages on on-prem at call time. Excluding the `search` domain via `-d` keeps the tool surface cleaner for on-prem use.
 
-## 🔌 Local MCP Server Installation (Optional)
+To verify, run `claude mcp list` — `azure-devops-onprem` should show as connected. Then try a prompt like `list ADO projects on the on-prem server`.
 
-> [!IMPORTANT]
-> Start with the Remote MCP Server first. Use the local MCP Server only if your scenario specifically requires a local `stdio` setup.
+## Using With Claude Desktop
 
-Use this section if you specifically need the local `stdio` server experience. For most users, start with the [Remote MCP Server](#-remote-mcp-server-recommended) section above.
+Open **File → Settings → Developer → Edit Config** and edit `claude_desktop_config.json`.
 
-For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Codex, Claude Code, Cursor, Opencode, and Kilocode.
-
-If you are using this fork for Azure DevOps Server (on-prem) with PAT auth, see [docs/FORK-ONPREM-PAT.md](./docs/FORK-ONPREM-PAT.md).
-
-### Prerequisites
-
-1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
-2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Open VS Code in an empty folder
-
-### Installation
-
-#### 🧨 Install from Public Feed
-
-This installation method is the easiest for all users of Visual Studio Code.
-
-🎥 [Watch this quick start video to get up and running in under two minutes!](https://youtu.be/EUmFM6qXoYk)
-
-##### Steps
-
-In your project, add a `.vscode\mcp.json` file with the following content:
+### Hosted Azure DevOps
 
 ```json
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
+  "mcpServers": {
     "ado": {
-      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+      "args": ["-y", "@azure-devops/mcp", "Contoso"]
     }
   }
 }
 ```
 
-🔥 To stay up to date with the latest features, you can use our nightly builds. Simply update your `mcp.json` configuration to use `@azure-devops/mcp@next`. Here is an updated example:
+Replace `Contoso` with your org name. Save and fully restart Claude Desktop.
+
+### On-prem Azure DevOps Server with PAT (fork-specific)
 
 ```json
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@azure-devops/mcp@next", "${input:ado_org}"]
-    }
-  }
-}
-```
-
-Save the file, then click 'Start'.
-
-![start mcp server](./docs/media/start-mcp-server.gif)
-
-In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
-
-Click "Select Tools" and choose the available tools.
-
-![configure mcp server tools](./docs/media/configure-mcp-server-tools.gif)
-
-Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first time an ADO tool is executed browser will open prompting to login with your Microsoft account. Please ensure you are using credentials matching selected Azure DevOps organization.
-
-> 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
-> To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
-
-See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Codex, Claude Code, and Cursor.
-
-## 🌏 Using Domains (local)
-
-Azure DevOps exposes a large surface area. As a result, our Azure DevOps MCP Server includes many tools. To keep the toolset manageable, avoid confusing the model, and respect client limits on loaded tools, use Domains to load only the areas you need. Domains are named groups of related tools (for example: core, work, work-items, repositories, wiki). Add the `-d` argument and the domain names to the server args in your `mcp.json` to list the domains to enable.
-
-For example, use `"-d", "core", "work", "work-items"` to load only Work Item related tools (see the example below).
-
-```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado_with_filtered_domains": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "-d", "core", "work", "work-items"]
-    }
-  }
-}
-```
-
-Domains that are available are: `core`, `work`, `work-items`, `search`, `test-plans`, `repositories`, `wiki`, `pipelines`, `advanced-security`
-
-We recommend that you always enable `core` tools so that you can fetch project level information.
-
-> By default all domains are loaded
-
-## 🐥 Project and Team Defaults (local)
-
-You can also configure default Azure DevOps project and team values from `.vscode/mcp.json` using `project` and `team`, so tools can skip selection prompts.
-
-### Example `.vscode/mcp.json`
-
-```json
-{
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "myorg", "--authentication", "azcli"],
+  "mcpServers": {
+    "azure-devops-onprem": {
+      "command": "node",
+      "args": [
+        "C:\\absolute\\path\\to\\azure-devops-mcp\\dist\\index.js",
+        "https://ado.company.local/tfs/DefaultCollection",
+        "--authentication",
+        "pat",
+        "-d",
+        "core",
+        "work",
+        "work-items",
+        "repositories",
+        "wiki",
+        "pipelines",
+        "test-plans"
+      ],
       "env": {
-        "ado_mcp_project": "Contoso",
-        "ado_mcp_team": "Fabrikam Team"
+        "ADO_PAT": "<your-pat>"
       }
     }
   }
 }
 ```
 
-## 📝 Troubleshooting
+Notes:
 
-See the [Troubleshooting guide](./docs/TROUBLESHOOTING.md) for help with common issues and logging.
+- On Windows, escape backslashes in JSON paths (`C:\\path\\to\\...`).
+- Run `npm run build` after pulling fork updates so `dist/` is current.
+- After editing the config, perform a **hard restart** of Claude Desktop (quit from the tray icon, not just close the window).
 
-## 🎩 Examples & Best Practices
+Then start a new chat, open **Search and Tools**, and the `azure-devops-onprem` toolset should appear. Try `list my ADO projects`.
 
-Explore example prompts in our [Examples documentation](./docs/EXAMPLES.md).
+## Getting Latest Updates From Upstream
 
-For best practices and tips to enhance your experience with the MCP Server, refer to the [How-To guide](./docs/HOWTO.md).
+The fork tracks `microsoft/azure-devops-mcp`. To pull in new upstream commits while keeping fork-specific changes:
 
-## 🙋‍♀️ Frequently Asked Questions
+### One-time setup
 
-For answers to common questions about the Azure DevOps MCP Server, see the [Frequently Asked Questions](./docs/FAQ.md).
+Add the upstream remote (only needed once per clone):
 
-## 📌 Contributing
+```bash
+git remote add upstream https://github.com/microsoft/azure-devops-mcp.git
+```
 
-We welcome contributions! During preview, please file issues for bugs, enhancements, or documentation improvements.
+Confirm with `git remote -v` — you should see both `origin` (your fork) and `upstream` (Microsoft).
 
-See our [Contributions Guide](./CONTRIBUTING.md) for:
+### Pulling updates
 
-- 🛠️ Development setup
-- ✨ Adding new tools
-- 📝 Code style & testing
-- 🔄 Pull request process
+```bash
+git checkout main
+git fetch upstream
+git merge upstream/main
+```
 
-> ⚠️ Please read the [Contributions Guide](./CONTRIBUTING.md) before creating a pull request.
+If the merge is clean, you're done. If there are conflicts:
 
-## 🤝 Code of Conduct
+1. `git status` shows the conflicted files.
+2. For fork-specific files (anything in [What This Fork Adds](#what-this-fork-adds) — `src/auth.ts`, `src/deployment.ts`, `src/tools/auth.ts`, `src/tools/search.ts`, `src/index.ts`, fork docs), resolve in favour of the fork's behaviour, then layer upstream's changes on top if compatible.
+3. For everything else, take upstream unless there's a clear reason not to.
+4. After resolving: `git add <files>` then `git commit` to complete the merge.
 
-This project follows the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For questions, see the [FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [open@microsoft.com](mailto:open@microsoft.com).
+### Validate before pushing
 
-## 📈 Project Stats
+```bash
+npm install
+npm run build
+npm test
+```
 
-[![Star History Chart](https://api.star-history.com/svg?repos=microsoft/azure-devops-mcp&type=Date)](https://star-history.com/#microsoft/azure-devops-mcp)
+If build and tests pass, push to your fork:
 
-## 🏆 Hall of Fame
+```bash
+git push origin main
+```
 
-Thanks to all contributors who make this project awesome! ❤️
+> **Note:** This fork uses **merge** (not rebase) so the on-prem/PAT commit stays as a single linear history entry. Don't `git rebase upstream/main` — it would rewrite the fork's commit hashes and cause friction for anyone tracking this fork.
 
-[![Contributors](https://contrib.rocks/image?repo=microsoft/azure-devops-mcp)](https://github.com/microsoft/azure-devops-mcp/graphs/contributors)
+## Further Reading
 
-> Generated with [contrib.rocks](https://contrib.rocks)
-
-## License
-
-Licensed under the [MIT License](./LICENSE.md).
-
----
-
-_Trademarks: This project may include trademarks or logos for Microsoft or third parties. Use of Microsoft trademarks or logos must follow [Microsoft’s Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general). Third-party trademarks are subject to their respective policies._
-
-<!-- version: 2023-04-07 [Do not delete this line, it is used for analytics that drive template improvements] -->
+- [Upstream README on GitHub](https://github.com/microsoft/azure-devops-mcp/blob/main/README.md) — Microsoft's project README (always reflects upstream `main`).
+- [docs/FORK-ONPREM-PAT.md](./docs/FORK-ONPREM-PAT.md) — full rationale for each fork change, plus OpenCode setup and troubleshooting.
+- [docs/GETTINGSTARTED.md](./docs/GETTINGSTARTED.md) — upstream's setup guide covering VS Code, Visual Studio 2022, Cursor, Codex, Kilocode (also includes a section for this fork's on-prem PAT mode under OpenCode).
+- [docs/TOOLSET.md](./docs/TOOLSET.md) — full list of MCP tools exposed by the server.
+- [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) — common issues and logging.
+- [docs/FAQ.md](./docs/FAQ.md) — FAQ (includes a fork-specific PAT entry).
