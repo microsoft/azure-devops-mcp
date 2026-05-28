@@ -74,6 +74,29 @@ export function encodeFormattedValue(value: string, format?: "Markdown" | "Html"
 }
 
 /**
+ * Detects whether a string returned from an ADO API stream is actually an error
+ * response serialized as JSON (e.g. a 404 GitItemNotFoundException or
+ * WikiPageNotFoundException) rather than real content.
+ *
+ * The ADO Node API client swallows non-2xx HTTP responses and delivers the
+ * error body as a stream, so callers must check explicitly after reading.
+ *
+ * @returns The human-readable error message extracted from the JSON, or null if
+ *          the content is not an ADO error response.
+ */
+export function extractAdoStreamError(content: string): string | null {
+  try {
+    const json = JSON.parse(content.trim());
+    if (json && typeof json.typeName === "string" && typeof json.message === "string") {
+      return json.message;
+    }
+  } catch {
+    // Not JSON — not an ADO error response.
+  }
+  return null;
+}
+
+/**
  * Convert a Node.js ReadableStream to a string.
  * Shared utility for consistent stream handling across tools.
  */

@@ -6,7 +6,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
 import { Readable } from "stream";
+import * as fs from "fs";
+import * as path from "path";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+
+jest.mock("fs");
 import {
   _mockBacklogs,
   _mockQuery,
@@ -2406,6 +2410,48 @@ describe("configureWorkItemTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error unlinking work item: Unknown error occurred");
     });
+
+    describe("type + url matching", () => {
+      const artifactUrl = "vstfs:///Git/Ref/project%2Frepo%2FGBmain";
+      const relatedUrl = "https://dev.azure.com/contoso/_apis/wit/workItems/2";
+      const relations = [
+        { rel: "ArtifactLink", url: artifactUrl, attributes: { name: "Branch" } },
+        { rel: "System.LinkTypes.Related", url: relatedUrl, attributes: { isLocked: false, name: "Related" } },
+      ];
+
+      const getUnlinkHandler = () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_unlink");
+        if (!call) throw new Error("wit_work_item_unlink tool not registered");
+        return call[3];
+      };
+
+      it.each([
+        { name: "type=related + ArtifactLink url (type bypass)", type: "related", url: artifactUrl },
+        { name: "type=child + ArtifactLink url (type bypass)", type: "child", url: artifactUrl },
+      ])("should NOT remove a relation when url matches but type does not ($name)", async ({ type, url }) => {
+        const handler = getUnlinkHandler();
+        (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue({ id: 1, relations });
+
+        const result = await handler({ project: "TestProject", id: 1, type, url });
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).not.toHaveBeenCalled();
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("No matching relations found");
+      });
+
+      it("should remove a relation when both url and type match", async () => {
+        const handler = getUnlinkHandler();
+        (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue({ id: 1, relations });
+        (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 1, rev: 10 });
+
+        const result = await handler({ project: "TestProject", id: 1, type: "related", url: relatedUrl });
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/1" }], 1, "TestProject");
+        expect(result.isError).toBe(false);
+        expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
+      });
+    });
   });
 
   // Add error handling tests for existing tools
@@ -3845,6 +3891,220 @@ describe("configureWorkItemTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error retrieving work item attachment: Not found");
+    });
+
+    it("should save file to disk and return path text when savePath is provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeData = Buffer.from("fake-png-bytes");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "downloads/attachments",
+      };
+
+      const result = await handler(params);
+
+      const expectedPath = path.join("downloads/attachments", "screenshot.png");
+      expect(writeFileSyncMock).toHaveBeenCalledWith(expectedPath, fakeData);
+      expect(result.content[0].type).toBe("text");
+      expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
+
+      writeFileSyncMock.mockRestore();
+    });
+
+    it("should use attachmentId as filename when savePath is provided but fileName is omitted", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeData = Buffer.from("binary-data");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+
+      const attachmentId = "12341234-1234-1234-1234-123412341234";
+      const params = {
+        project: "TestProject",
+        attachmentId,
+        savePath: "downloads/attachments",
+      };
+
+      const result = await handler(params);
+
+      const expectedPath = path.join("downloads/attachments", attachmentId);
+      expect(writeFileSyncMock).toHaveBeenCalledWith(expectedPath, fakeData);
+      expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
+
+      writeFileSyncMock.mockRestore();
+    });
+
+    it("should throw an error if the file already exists at the savePath", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fakeData = Buffer.from("fake-png-bytes");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+      jest.spyOn(fs, "existsSync").mockReturnValue(true);
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "downloads/attachments",
+      };
+
+      const expectedPath = path.join("downloads/attachments", "screenshot.png");
+      const result = await handler(params);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(`Error retrieving work item attachment: File already exists: ${expectedPath}`);
+
+      jest.restoreAllMocks();
+    });
+
+    it("should return text content for markdown files when savePath is not provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const markdownContent = "# Hello\n\nThis is a markdown file.";
+      const fakeData = Buffer.from(markdownContent, "utf-8");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "notes.md",
+      });
+
+      expect(result.content[0].type).toBe("text");
+      expect(result.content[0].text).toBe(markdownContent);
+    });
+
+    it("should return text content for plain text files when savePath is not provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const textContent = "Hello, world!";
+      const fakeData = Buffer.from(textContent, "utf-8");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "readme.txt",
+      });
+
+      expect(result.content[0].type).toBe("text");
+      expect(result.content[0].text).toBe(textContent);
+    });
+
+    it("should reject savePath with a Unix absolute path", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "/tmp/attachments",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid savePath: absolute paths and path traversals are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should reject savePath with a Windows absolute path", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "C:\\temp\\attachments",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid savePath: absolute paths and path traversals are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should reject savePath with path traversal segments", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "../../etc",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid savePath: absolute paths and path traversals are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should reject savePath with a Windows drive-relative path", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "D:attachments",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid savePath: absolute paths and path traversals are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should reject fileName with path traversal segments", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_get_work_item_attachment");
+      if (!call) throw new Error("wit_get_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "../../etc/passwd",
+        savePath: "downloads",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Invalid fileName: path traversal is not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import * as fs from "fs";
+import * as path from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
@@ -500,8 +502,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         if (revisions && Array.isArray(revisions)) {
           revisions.forEach((revision) => {
             if (revision.fields) {
-              Object.keys(revision.fields).forEach((fieldName) => {
-                const fieldValue = revision.fields ? revision.fields[fieldName] : undefined;
+              const fields = revision.fields;
+              Object.keys(fields).forEach((fieldName) => {
+                const fieldValue = fields[fieldName];
                 // Check if this is an identity object by looking for common identity properties
                 if (
                   fieldValue &&
@@ -877,7 +880,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           z.object({
             name: z.string().describe("The name of the field, e.g., 'System.Title'."),
             value: z.string().describe("The value of the field."),
-            format: z.enum(["Html", "Markdown"]).optional().default("Markdown").describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
+            format: z.enum(["Html", "Markdown"]).optional().describe("the format of the field value, e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
         .describe("A record of field names and values to set on the new work item. Each fild is the field name and each value is the corresponding value to set for that field."),
@@ -903,9 +906,9 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
         // this should only happen for large text fields, but since we dont't know by field name, lets assume if the users
-        // passes a value longer than 50 characters, then we can set the format to Markdown
+        // passes a value longer than 100 characters, then we can set the format to Markdown
         fields.forEach(({ name, value, format }) => {
-          if (value.length > 50 && format === "Markdown") {
+          if (value.length > 100 && format === "Markdown") {
             document.push({
               op: "add",
               path: `/multilineFieldsFormat/${name}`,
@@ -1030,7 +1033,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             format: z
               .enum(["Html", "Markdown"])
               .optional()
-              .default("Markdown")
               .describe("The format of the field value. Only to be used for large text fields. e.g., 'Html', 'Markdown'. Optional, defaults to 'Markdown'."),
           })
         )
@@ -1055,7 +1057,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
           // Add format operations for Markdown fields
           workItemUpdates.forEach(({ path, value, format }) => {
-            if (format === "Markdown" && value && value.length > 50) {
+            if (format === "Markdown" && value && value.length > 100) {
               operations.push({
                 op: "Add",
                 path: `/multilineFieldsFormat${path.replace("/fields", "")}`,
@@ -1225,7 +1227,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (url && url.trim().length > 0) {
           // If url is provided, find relations matching both rel type and url
-          relationIndexes = relations.map((relation, idx) => (relation.url === url ? idx : -1)).filter((idx) => idx !== -1);
+          relationIndexes = relations.map((relation, idx) => (relation.rel === linkType && relation.url === url ? idx : -1)).filter((idx) => idx !== -1);
         } else {
           // If url is not provided, find all relations matching rel type
           relationIndexes = relations.map((relation, idx) => (relation.rel === linkType ? idx : -1)).filter((idx) => idx !== -1);
@@ -1479,13 +1481,30 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.get_work_item_attachment,
-    "Download a work item attachment by its ID and return the content as a base64-encoded resource. Useful for viewing images (e.g. screenshots) attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
+    "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If savePath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
-      fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type for the returned resource."),
+      fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type or the saved file's name."),
+      savePath: z
+        .string()
+        .optional()
+        .describe(
+          "Optional local directory path where the file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
+        ),
     },
-    async ({ project, attachmentId, fileName }) => {
+    async ({ project, attachmentId, fileName, savePath }) => {
+      const isAbsolutePath = (value: string) => path.posix.isAbsolute(value) || path.win32.isAbsolute(value);
+      const hasDriveLetter = (value: string) => /^[a-zA-Z]:/.test(value);
+
+      if (savePath !== undefined && (savePath.includes("..") || isAbsolutePath(savePath) || hasDriveLetter(savePath))) {
+        throw new Error("Invalid savePath: absolute paths and path traversals are not allowed.");
+      }
+
+      if (fileName !== undefined && fileName.includes("..")) {
+        throw new Error("Invalid fileName: path traversal is not allowed.");
+      }
+
       try {
         const connection = await connectionProvider();
 
@@ -1507,9 +1526,31 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         });
 
         const buffer = Buffer.concat(chunks);
-        const base64Data = buffer.toString("base64");
+
+        if (savePath) {
+          const resolvedFileName = fileName ?? attachmentId;
+          const localFilePath = path.join(savePath, resolvedFileName);
+
+          if (fs.existsSync(localFilePath)) {
+            throw new Error(`File already exists: ${localFilePath}`);
+          }
+
+          fs.writeFileSync(localFilePath, buffer);
+
+          return {
+            content: [{ type: "text", text: `Attachment saved to: ${localFilePath}` }],
+          };
+        }
+
         const mimeType = getMimeType(fileName);
 
+        if (mimeType.startsWith("text/")) {
+          return {
+            content: [{ type: "text", text: buffer.toString("utf-8") }],
+          };
+        }
+
+        const base64Data = buffer.toString("base64");
         return {
           content: [
             {
@@ -1545,6 +1586,15 @@ function getMimeType(fileName: string | undefined): string {
     webp: "image/webp",
     pdf: "application/pdf",
     txt: "text/plain",
+    md: "text/markdown",
+    markdown: "text/markdown",
+    csv: "text/csv",
+    html: "text/html",
+    htm: "text/html",
+    xml: "text/xml",
+    json: "application/json",
+    yaml: "text/yaml",
+    yml: "text/yaml",
     zip: "application/zip",
   };
   return (ext && mimeTypes[ext]) ?? "application/octet-stream";

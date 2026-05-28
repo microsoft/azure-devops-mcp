@@ -3,27 +3,23 @@
 > [!IMPORTANT]
 > The Azure DevOps Remote MCP Server is now available in public preview for all organizations. We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
 >
-> [Learn more](#-remote-mcp-server)
+> [Learn more](#-remote-mcp-server-recommended)
 
-Easily install the Azure DevOps MCP Server for VS Code or VS Code Insiders:
-
-[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install_AzureDevops_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
-[![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_AzureDevops_MCP_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&quality=insiders&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
-
-This TypeScript project provides a **local** MCP server for Azure DevOps, enabling you to perform a wide range of Azure DevOps tasks directly from your code editor.
+This project provides Azure DevOps MCP tooling for AI agents, with a **remote-first** onboarding experience and a local server option when you need it.
 
 ## 📄 Table of Contents
 
 1. [📺 Overview](#-overview)
 2. [🏆 Expectations](#-expectations)
-3. [🚀 Remote MCP Server](#-remote-mcp-server)
+3. [🚀 Remote MCP Server (Recommended)](#-remote-mcp-server-recommended)
 4. [⚙️ Supported Tools](#️-supported-tools)
-5. [🔌 Installation & Getting Started](#-installation--getting-started)
-6. [🌏 Using Domains](#-using-domains)
-7. [📝 Troubleshooting](#-troubleshooting)
-8. [🎩 Examples & Best Practices](#-examples--best-practices)
-9. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
-10. [📌 Contributing](#-contributing)
+5. [🔌 Local MCP Server Installation (Optional)](#-local-mcp-server-installation-optional)
+6. [🌏 Using Domains (local)](#-using-domains-local)
+7. [🐥 Project and Team Defaults (local)](#-project-and-team-defaults-local)
+8. [📝 Troubleshooting](#-troubleshooting)
+9. [🎩 Examples & Best Practices](#-examples--best-practices)
+10. [🙋‍♀️ Frequently Asked Questions](#️-frequently-asked-questions)
+11. [📌 Contributing](#-contributing)
 
 ## 📺 Overview
 
@@ -44,9 +40,9 @@ The Azure DevOps MCP Server brings Azure DevOps context to your agents. Try prom
 
 ## 🏆 Expectations
 
-The Azure DevOps MCP Server is built from tools that are concise, simple, focused, and easy to use—each designed for a specific scenario. We intentionally avoid complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs, making data access straightforward and letting the language model handle complex reasoning.
+The Azure DevOps MCP Server is built around tools that are concise, simple, focused, and easy to use, with each one designed for a specific scenario. We intentionally avoid creating complex tools that try to do too much. The goal is to provide a thin abstraction layer over the REST APIs that makes data access straightforward while allowing the language model to handle the more complex reasoning.
 
-## 🚀 Remote MCP Server
+## 🚀 Remote MCP Server (Recommended)
 
 The Azure DevOps **Remote MCP Server** is now available in [public preview](https://devblogs.microsoft.com/devops/azure-devops-remote-mcp-server-public-preview).
 
@@ -59,15 +55,42 @@ If you encounter issues with tools, need support, or have a feature request, you
 > [!WARNING]
 > Internal Microsoft users of the Remote MCP Server should **not** create issues in this repository. Please use the dedicated Teams channel instead.
 
-For instructions on how to get started with the Remote MCP Server, see the [onboarding documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server).
+For complete instructions, see the [Remote MCP Server onboarding documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops).
+
+### Quick start with `.vscode/mcp.json`
+
+Use this configuration to connect directly to the Azure DevOps-hosted endpoint using streamable HTTP transport:
+
+```json
+{
+  "servers": {
+    "ado-remote-mcp": {
+      "url": "https://mcp.dev.azure.com/{organization}",
+      "type": "http"
+    }
+  },
+  "inputs": []
+}
+```
+
+See [documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#mcpjson-configuration) for additional configuration options.
+
+After saving `.vscode/mcp.json`, start the server from the MCP view in VS Code, then run a prompt like `List ADO projects`.
 
 ## ⚙️ Supported Tools
 
-See [TOOLSET.md](./docs/TOOLSET.md) for a comprehensive list.
+See the [Available Tools](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#available-tools) documentation for the complete list of available remote tools.
 
-## 🔌 Installation & Getting Started
+For a comprehensive list of local tools, see [TOOLSET.md](./docs/TOOLSET.md).
 
-For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, Cursor, Opencode, and Kilocode.
+## 🔌 Local MCP Server Installation (Optional)
+
+> [!IMPORTANT]
+> Start with the Remote MCP Server first. Use the local MCP Server only if your scenario specifically requires a local `stdio` setup.
+
+Use this section if you specifically need the local `stdio` server experience. For most users, start with the [Remote MCP Server](#-remote-mcp-server-recommended) section above.
+
+For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Codex, Claude Code, Cursor, Opencode, and Kilocode.
 
 If you are using this fork for Azure DevOps Server (on-prem) with PAT auth, see [docs/FORK-ONPREM-PAT.md](./docs/FORK-ONPREM-PAT.md).
 
@@ -79,14 +102,7 @@ If you are using this fork for Azure DevOps Server (on-prem) with PAT auth, see 
 
 ### Installation
 
-#### ✨ One-Click Install
-
-[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-Install_AzureDevops_MCP_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
-[![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_AzureDevops_MCP_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=ado&quality=insiders&config=%7B%20%22type%22%3A%20%22stdio%22%2C%20%22command%22%3A%20%22npx%22%2C%20%22args%22%3A%20%5B%22-y%22%2C%20%22%40azure-devops%2Fmcp%22%2C%20%22%24%7Binput%3Aado_org%7D%22%5D%7D&inputs=%5B%7B%22id%22%3A%20%22ado_org%22%2C%20%22type%22%3A%20%22promptString%22%2C%20%22description%22%3A%20%22Azure%20DevOps%20organization%20name%20%20%28e.g.%20%27contoso%27%29%22%7D%5D)
-
-After installation, select GitHub Copilot Agent Mode and refresh the tools list. Learn more about Agent Mode in the [VS Code Documentation](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode).
-
-#### 🧨 Install from Public Feed (Recommended)
+#### 🧨 Install from Public Feed
 
 This installation method is the easiest for all users of Visual Studio Code.
 
@@ -151,9 +167,9 @@ Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first ti
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
 
-See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
+See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Codex, Claude Code, and Cursor.
 
-## 🌏 Using Domains
+## 🌏 Using Domains (local)
 
 Azure DevOps exposes a large surface area. As a result, our Azure DevOps MCP Server includes many tools. To keep the toolset manageable, avoid confusing the model, and respect client limits on loaded tools, use Domains to load only the areas you need. Domains are named groups of related tools (for example: core, work, work-items, repositories, wiki). Add the `-d` argument and the domain names to the server args in your `mcp.json` to list the domains to enable.
 
@@ -183,6 +199,28 @@ Domains that are available are: `core`, `work`, `work-items`, `search`, `test-pl
 We recommend that you always enable `core` tools so that you can fetch project level information.
 
 > By default all domains are loaded
+
+## 🐥 Project and Team Defaults (local)
+
+You can also configure default Azure DevOps project and team values from `.vscode/mcp.json` using `project` and `team`, so tools can skip selection prompts.
+
+### Example `.vscode/mcp.json`
+
+```json
+{
+  "servers": {
+    "ado": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "myorg", "--authentication", "azcli"],
+      "env": {
+        "ado_mcp_project": "Contoso",
+        "ado_mcp_team": "Fabrikam Team"
+      }
+    }
+  }
+}
+```
 
 ## 📝 Troubleshooting
 

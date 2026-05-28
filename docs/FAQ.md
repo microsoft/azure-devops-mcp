@@ -24,7 +24,7 @@ Yes. This fork supports PAT authentication with:
 - `PERSONAL_ACCESS_TOKEN` (raw PAT value)
 - legacy compatibility for base64 `email:pat` in `PERSONAL_ACCESS_TOKEN`
 
-For setup examples and caveats, see [FORK-ONPREM-PAT.md](./FORK-ONPREM-PAT.md).
+For setup examples and caveats, see [FORK-ONPREM-PAT.md](./FORK-ONPREM-PAT.md). Upstream now also supports PATs via the `pat` authentication type — see the [Authentication Methods](./GETTINGSTARTED.md#-authentication-methods) section in the Getting Started guide.
 
 ## Is there a remote supported version of the MCP Server?
 
