@@ -84,6 +84,7 @@
 | Work Items        | [mcp_ado_wit_get_query_results_by_id](#mcp_ado_wit_get_query_results_by_id)                               | Execute a query and get results                                   |
 | Work Items        | [mcp_ado_wit_query_by_wiql](#mcp_ado_wit_query_by_wiql)                                                   | Execute a WIQL query and return matching work items               |
 | Work Items        | [mcp_ado_wit_get_work_item_attachment](#mcp_ado_wit_get_work_item_attachment)                             | Download a work item attachment; save locally or return as base64 |
+| Work Items        | [mcp_ado_wit_create_work_item_attachment](#mcp_ado_wit_create_work_item_attachment)                       | Upload a file as a work item attachment; returns ID and URL       |
 | Work              | [mcp_ado_work_list_iterations](#mcp_ado_work_list_iterations)                                             | List all iterations in a project                                  |
 | Work              | [mcp_ado_work_create_iterations](#mcp_ado_work_create_iterations)                                         | Create new iterations in a project                                |
 | Work              | [mcp_ado_work_list_team_iterations](#mcp_ado_work_list_team_iterations)                                   | List iterations assigned to a team                                |
@@ -692,6 +693,13 @@ Download a work item attachment by its ID. If `savePath` is provided, saves the 
 
 - **Required**: `attachmentId`
 - **Optional**: `project`, `fileName`, `savePath`
+
+### mcp_ado_wit_create_work_item_attachment
+
+Upload a file as a work item attachment and return its ID and URL. Supply the bytes either inline as `base64Content` (best for small images) or as `filePath` (path to a file on the MCP server's filesystem — preferred for anything over ~1 MB, since base64 over JSON-RPC inflates by ~33% and hits tool-input size limits quickly). The returned URL can be embedded inline in HTML rich-text fields (e.g. `System.Description`, `Microsoft.VSTS.TCM.ReproSteps`) using `<img src="<url>">`; pair this with `wit_create_work_item` or `wit_update_work_item` using `format: "Html"` on the matching `fields[]` entry to render the image inline. The upload itself does not add an `AttachedFile` relation, so for inline-only display do not also add one — the image will render in the body but not appear in the Attachments tab. If the image does not render after a successful update, check the work item type's form layout: some templates (e.g. Bug vs Task on CMMI) render Description differently.
+
+- **Required**: `fileName`, and exactly one of `base64Content` / `filePath`
+- **Optional**: `project`
 
 ## Work
 

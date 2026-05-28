@@ -10,6 +10,7 @@ For the original project documentation, see the [upstream README](https://github
 - [What This Fork Adds](#what-this-fork-adds)
 - [Using With Claude Code](#using-with-claude-code)
 - [Using With Claude Desktop](#using-with-claude-desktop)
+- [Refreshing After A Fork Update](#refreshing-after-a-fork-update)
 - [Getting Latest Updates From Upstream](#getting-latest-updates-from-upstream)
 - [Further Reading](#further-reading)
 
@@ -43,6 +44,7 @@ These are the deltas vs `microsoft/azure-devops-mcp` (`main`). For the full rati
 | New helper module      | `src/deployment.ts` — normalizes deployment context (hosted vs on-prem), derives endpoint base URLs.                                                                   |
 | New fork docs          | [docs/FORK-ONPREM-PAT.md](./docs/FORK-ONPREM-PAT.md), this README.                                                                                                     |
 | New tests              | `test/src/deployment.test.ts`, additions in `test/src/pat-auth.test.ts`, `test/src/tools/auth.test.ts`, `test/src/tools/search.test.ts`.                               |
+| Inline image uploads   | New `wit_create_work_item_attachment` tool — upload an image as a work item attachment (base64 in) and get back the URL to embed in HTML body fields via `<img src>`.  |
 
 ### Known limitations of the fork
 
@@ -138,6 +140,23 @@ Notes:
 - After editing the config, perform a **hard restart** of Claude Desktop (quit from the tray icon, not just close the window).
 
 Then start a new chat, open **Search and Tools**, and the `azure-devops-onprem` toolset should appear. Try `list my ADO projects`.
+
+## Refreshing After A Fork Update
+
+When this fork ships a new tool or fix, your clients keep running the old compiled `dist/` until you rebuild. The MCP server itself is launched by `node dist/index.js`, not by `npm`, so a `git pull` alone is not enough.
+
+```bash
+git pull
+npm install
+npm run build
+```
+
+Then **restart any MCP client process** that has the server connected so it re-spawns with the new `dist/`:
+
+- **Claude Code**: in any active session, run `/mcp` and disconnect/reconnect the `azure-devops-onprem` entry, or just close and reopen the session. (`claude mcp list` should still show it connected; new tools only appear after the re-spawn.)
+- **Claude Desktop**: hard-restart (quit from the system-tray icon, not just close the window — closing the window leaves the background process running with the old `dist/`).
+
+To confirm a newly added tool is loaded, ask the client to list the available `azure-devops-onprem` tools, or invoke the tool by name (e.g. `wit_create_work_item_attachment`). The full inventory is in [docs/TOOLSET.md](./docs/TOOLSET.md).
 
 ## Getting Latest Updates From Upstream
 

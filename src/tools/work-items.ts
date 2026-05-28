@@ -3,6 +3,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
@@ -35,6 +36,7 @@ const WORKITEM_TOOLS = {
   work_item_unlink: "wit_work_item_unlink",
   add_artifact_link: "wit_add_artifact_link",
   get_work_item_attachment: "wit_get_work_item_attachment",
+  create_work_item_attachment: "wit_create_work_item_attachment",
   query_by_wiql: "wit_query_by_wiql",
 };
 
@@ -1567,6 +1569,93 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [{ type: "text", text: `Error retrieving work item attachment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.create_work_item_attachment,
+    'Upload a file as a work item attachment and return its ID and URL. Supply the bytes either inline as `base64Content` (best for small images) OR as `filePath` (a path to a file on the MCP server\'s filesystem — preferred for anything over ~1 MB, since base64 over JSON-RPC inflates by ~33% and hits tool-input size limits quickly). To attach an image inline in a work item body, embed the returned URL in an HTML rich-text field (e.g. System.Description, Microsoft.VSTS.TCM.ReproSteps) using `<img src="<url>">`, then call `wit_create_work_item` or `wit_update_work_item` with that HTML as the field value and `format: "Html"` on the matching `fields[]` entry. Example patch op for an update: `{ op: "add", path: "/fields/System.Description", value: "<div><img src=\\"<url>\\"></div>" }`. Important: for INLINE-ONLY display do NOT also add an `AttachedFile` relation to the work item — the `<img>` reference alone is sufficient, and skipping the relation keeps the file out of the Attachments tab (the file still exists in storage either way). If the image does not render after a successful update, check the work item type\'s form layout: some templates (e.g. Bug vs Task on CMMI) render Description differently. If a project is not specified, you will be prompted to select one.',
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      fileName: z.string().describe("The file name including extension, e.g. 'screenshot.png'. The extension drives how Azure DevOps renders the attachment (inline image vs download)."),
+      base64Content: z
+        .string()
+        .optional()
+        .describe(
+          "The file contents encoded as base64. A leading 'data:<mime>;base64,' prefix is accepted and stripped. Provide either this OR filePath, not both. Use filePath for files over ~1 MB."
+        ),
+      filePath: z
+        .string()
+        .optional()
+        .describe(
+          "Absolute or relative path to a file on the MCP server's filesystem. The server reads the bytes directly, avoiding JSON-RPC size limits. Provide either this OR base64Content, not both. The path is read as-is — make sure you trust it; reads run with the MCP server process's filesystem permissions."
+        ),
+    },
+    async ({ project, fileName, base64Content, filePath }) => {
+      if (fileName.includes("..") || fileName.includes("/") || fileName.includes("\\")) {
+        throw new Error("Invalid fileName: must be a plain file name with no path separators.");
+      }
+
+      const hasBase64 = base64Content !== undefined && base64Content !== "";
+      const hasFilePath = filePath !== undefined && filePath !== "";
+      if (hasBase64 === hasFilePath) {
+        throw new Error("Provide exactly one of base64Content or filePath.");
+      }
+
+      try {
+        const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to upload the work item attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        let buffer: Buffer;
+        if (hasFilePath) {
+          buffer = fs.readFileSync(filePath as string);
+        } else {
+          // Tolerate a full data-URI if the caller pastes one verbatim.
+          const rawBase64 = (base64Content as string).replace(/^data:[^;]+;base64,/, "");
+          buffer = Buffer.from(rawBase64, "base64");
+        }
+
+        if (buffer.length === 0) {
+          throw new Error("Attachment content is empty. Provide a non-empty file or base64 string.");
+        }
+
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const attachment = await workItemApi.createAttachment(null, Readable.from(buffer), fileName, "Simple", resolvedProject);
+
+        if (!attachment?.url) {
+          throw new Error("Attachment upload returned no URL. Check that the PAT has the 'vso.work_write' scope.");
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  id: attachment.id,
+                  url: attachment.url,
+                  fileName,
+                  hint: "Embed in an HTML field with <img src=\"<url>\"> and set the field format to 'Html' when calling wit_create_work_item or wit_update_work_item. Do not also add an AttachedFile relation if you want the image to appear inline only.",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error creating work item attachment: ${errorMessage}` }],
           isError: true,
         };
       }

@@ -49,6 +49,7 @@ interface WorkItemTrackingApiMock {
   queryById: jest.Mock;
   queryByWiql: jest.Mock;
   getAttachmentContent: jest.Mock;
+  createAttachment: jest.Mock;
 }
 
 interface MockConnection {
@@ -92,6 +93,7 @@ describe("configureWorkItemTools", () => {
       queryById: jest.fn(),
       queryByWiql: jest.fn(),
       getAttachmentContent: jest.fn(),
+      createAttachment: jest.fn(),
     };
 
     mockConnection = {
@@ -4105,6 +4107,235 @@ describe("configureWorkItemTools", () => {
 
       await expect(handler(params)).rejects.toThrow("Invalid fileName: path traversal is not allowed.");
       expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("wit_create_work_item_attachment tool", () => {
+    it("should upload the decoded bytes via createAttachment and return id, url and fileName", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({
+        id: "abcd1234-abcd-1234-abcd-123412341234",
+        url: "https://dev.azure.com/contoso/_apis/wit/attachments/abcd1234-abcd-1234-abcd-123412341234?fileName=screenshot.png",
+      });
+
+      const originalBytes = Buffer.from("fake-png-bytes");
+      const params = {
+        project: "TestProject",
+        fileName: "screenshot.png",
+        base64Content: originalBytes.toString("base64"),
+      };
+
+      const result = await handler(params);
+
+      expect(mockWorkItemTrackingApi.createAttachment).toHaveBeenCalledTimes(1);
+      const [customHeaders, contentStream, fileNameArg, uploadType, projectArg] = mockWorkItemTrackingApi.createAttachment.mock.calls[0];
+      expect(customHeaders).toBeNull();
+      expect(fileNameArg).toBe("screenshot.png");
+      expect(uploadType).toBe("Simple");
+      expect(projectArg).toBe("TestProject");
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of contentStream as Readable) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      expect(Buffer.concat(chunks).equals(originalBytes)).toBe(true);
+
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.id).toBe("abcd1234-abcd-1234-abcd-123412341234");
+      expect(payload.url).toContain("/_apis/wit/attachments/abcd1234-abcd-1234-abcd-123412341234");
+      expect(payload.fileName).toBe("screenshot.png");
+      expect(typeof payload.hint).toBe("string");
+    });
+
+    it("should strip a leading data URI prefix from base64Content before decoding", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({ id: "id-1", url: "https://example/_apis/wit/attachments/id-1" });
+
+      const originalBytes = Buffer.from("png-bytes-here");
+      const base64 = originalBytes.toString("base64");
+
+      await handler({
+        project: "TestProject",
+        fileName: "image.png",
+        base64Content: `data:image/png;base64,${base64}`,
+      });
+
+      const contentStream = mockWorkItemTrackingApi.createAttachment.mock.calls[0][1];
+      const chunks: Buffer[] = [];
+      for await (const chunk of contentStream as Readable) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      expect(Buffer.concat(chunks).equals(originalBytes)).toBe(true);
+    });
+
+    it.each([["../etc/passwd"], ["subdir/image.png"], ["dir\\image.png"]])("should reject fileName with path separators (%s)", async (badName) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      await expect(
+        handler({
+          project: "TestProject",
+          fileName: badName,
+          base64Content: Buffer.from("anything").toString("base64"),
+        })
+      ).rejects.toThrow("Invalid fileName: must be a plain file name with no path separators.");
+
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should return an error when createAttachment resolves without a URL", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({ id: "id-1" });
+
+      const result = await handler({
+        project: "TestProject",
+        fileName: "screenshot.png",
+        base64Content: Buffer.from("bytes").toString("base64"),
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Attachment upload returned no URL");
+    });
+
+    it("should treat empty base64Content as 'no input provided' and reject the call", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      await expect(
+        handler({
+          project: "TestProject",
+          fileName: "image.png",
+          base64Content: "",
+        })
+      ).rejects.toThrow("Provide exactly one of base64Content or filePath.");
+
+      expect(mockWorkItemTrackingApi.createAttachment).not.toHaveBeenCalled();
+    });
+
+    it("should upload bytes read from disk when filePath is provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const diskBytes = Buffer.from("large-file-bytes-from-disk");
+      const readFileSyncMock = jest.spyOn(fs, "readFileSync").mockReturnValue(diskBytes);
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({
+        id: "abcd1234-abcd-1234-abcd-123412341234",
+        url: "https://dev.azure.com/contoso/_apis/wit/attachments/abcd1234-abcd-1234-abcd-123412341234?fileName=big.png",
+      });
+
+      const params = {
+        project: "TestProject",
+        fileName: "big.png",
+        filePath: "C:/temp/big.png",
+      };
+
+      const result = await handler(params);
+
+      expect(readFileSyncMock).toHaveBeenCalledWith("C:/temp/big.png");
+
+      const [, contentStream, fileNameArg, uploadType, projectArg] = mockWorkItemTrackingApi.createAttachment.mock.calls[0];
+      expect(fileNameArg).toBe("big.png");
+      expect(uploadType).toBe("Simple");
+      expect(projectArg).toBe("TestProject");
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of contentStream as Readable) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      expect(Buffer.concat(chunks).equals(diskBytes)).toBe(true);
+
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.fileName).toBe("big.png");
+
+      readFileSyncMock.mockRestore();
+    });
+
+    it.each([
+      [{ base64Content: "Zm9v", filePath: "C:/temp/x.png" }, "both"],
+      [{}, "neither"],
+    ])("should reject when %s of base64Content / filePath is provided ($1)", async (inputs) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      await expect(
+        handler({
+          project: "TestProject",
+          fileName: "image.png",
+          ...inputs,
+        })
+      ).rejects.toThrow("Provide exactly one of base64Content or filePath.");
+
+      expect(mockWorkItemTrackingApi.createAttachment).not.toHaveBeenCalled();
+    });
+
+    it("should return an error when the file on disk is empty", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const readFileSyncMock = jest.spyOn(fs, "readFileSync").mockReturnValue(Buffer.alloc(0));
+
+      const result = await handler({
+        project: "TestProject",
+        fileName: "image.png",
+        filePath: "C:/temp/empty.png",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Attachment content is empty");
+      expect(mockWorkItemTrackingApi.createAttachment).not.toHaveBeenCalled();
+
+      readFileSyncMock.mockRestore();
+    });
+
+    it("should return an error when createAttachment rejects", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_work_item_attachment");
+      if (!call) throw new Error("wit_create_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.createAttachment.mockRejectedValue(new Error("Upload failed"));
+
+      const result = await handler({
+        project: "TestProject",
+        fileName: "screenshot.png",
+        base64Content: Buffer.from("bytes").toString("base64"),
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating work item attachment: Upload failed");
     });
   });
 
