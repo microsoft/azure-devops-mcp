@@ -125,7 +125,7 @@ async function main() {
     logger.debug("PAT mode: global fetch interceptor installed to rewrite Bearer -> Basic auth headers");
   }
 
-  // removing prompts untill further notice
+  // removing prompts until further notice
   // configurePrompts(server);
 
   configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer, argv.authentication), () => userAgentComposer.userAgent, enabledDomains);

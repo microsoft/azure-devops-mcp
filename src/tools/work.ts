@@ -133,7 +133,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       depth: z.coerce.number().default(2).describe("Depth of children to fetch."),
-      excludedIds: z.array(z.coerce.number().min(1)).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
+      excludedIds: z.array(z.coerce.number().min(1)).optional().describe("An optional array of iteration IDs, and their children, that should not be returned."),
     },
     async ({ project, depth, excludedIds: ids }) => {
       try {
