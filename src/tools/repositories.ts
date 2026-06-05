@@ -123,11 +123,15 @@ function trimPullRequest(pr: GitPullRequest | null | undefined, includeDescripti
   if (!pr) {
     return null;
   }
+
+  const statusName = typeof pr.status === "number" ? (PullRequestStatus[pr.status] ?? "Unknown") : "Unknown";
+
   return {
     pullRequestId: pr.pullRequestId,
     codeReviewId: pr.codeReviewId,
     repository: pr.repository?.name,
     status: pr.status,
+    statusName,
     createdBy: {
       displayName: pr.createdBy?.displayName,
       uniqueName: pr.createdBy?.uniqueName,
@@ -1983,7 +1987,21 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         Rejected: -10,
       };
 
-      await gitApi.createPullRequestReviewer({ vote: voteMap[vote], id: userId } as any, repositoryId, pullRequestId, userId, project);
+      const existingReviewer = await gitApi.getPullRequestReviewer(repositoryId, pullRequestId, userId, project).catch((error) => {
+        if (!(error instanceof Error) || !/not found|reviewer does not exist/i.test(error.message)) {
+          throw error;
+        }
+
+        return undefined;
+      });
+
+      const reviewerPayload = {
+        vote: voteMap[vote],
+        id: userId,
+        ...(existingReviewer?.isRequired !== undefined ? { isRequired: existingReviewer.isRequired } : {}),
+      };
+
+      await gitApi.createPullRequestReviewer(reviewerPayload as any, repositoryId, pullRequestId, userId, project);
 
       return {
         content: [

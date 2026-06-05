@@ -90,7 +90,7 @@ For a comprehensive list of local tools, see [TOOLSET.md](./docs/TOOLSET.md).
 
 Use this section if you specifically need the local `stdio` server experience. For most users, start with the [Remote MCP Server](#-remote-mcp-server-recommended) section above.
 
-For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, Cursor, Opencode, and Kilocode.
+For the best experience, use Visual Studio Code and GitHub Copilot. See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Codex, Claude Code, Cursor, Opencode, and Kilocode.
 
 ### Prerequisites
 
@@ -165,7 +165,7 @@ Open GitHub Copilot Chat and try a prompt like `List ADO projects`. The first ti
 > 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
 > To start, just include "`This project uses Azure DevOps. Always check to see if the Azure DevOps MCP server has a tool relevant to the user's request`" in your copilot instructions file.
 
-See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
+See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Codex, Claude Code, and Cursor.
 
 ## 🌏 Using Domains (local)
 

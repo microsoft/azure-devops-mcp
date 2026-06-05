@@ -7,6 +7,7 @@ This guide will help you get started with the Azure DevOps MCP Server in differe
 - [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
 - [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
 - [Getting started with GitHub Copilot CLI](#-using-mcp-server-with-github-copilot-cli)
+- [Getting started with Codex](#-using-mcp-server-with-codex)
 - [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
 - [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
 - [Getting started with Cursor](#-using-mcp-server-with-cursor)
@@ -355,6 +356,49 @@ Alternatively, create or edit the configuration file `~/.copilot/mcp-config.json
 Replace `{Contoso}` with your Azure DevOps organization name.
 
 For more information, see the [Copilot CLI documentation](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli).
+
+### 🤖 Using MCP Server with Codex
+
+Codex can run the Azure DevOps MCP Server as a local stdio MCP server from either the Codex CLI or IDE extension. The configuration is shared through `~/.codex/config.toml`.
+
+#### Interactive authentication
+
+For local development, start with the default interactive authentication flow:
+
+```bash
+codex mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
+```
+
+Replace `Contoso` with your Azure DevOps organization name.
+
+Verify that Codex can see the server:
+
+```bash
+codex mcp list
+```
+
+On first use of an Azure DevOps tool, the MCP server opens a browser window for Microsoft account sign-in. Use an account that has access to the selected Azure DevOps organization.
+
+#### Azure CLI authentication
+
+If your workstation already uses Azure CLI sign-in, authenticate first and configure the MCP server with `azcli`:
+
+```bash
+az login
+codex mcp add azure-devops -- npx -y @azure-devops/mcp Contoso --authentication azcli
+```
+
+#### Manual `config.toml` configuration
+
+You can also edit `~/.codex/config.toml` directly:
+
+```toml
+[mcp_servers.azure-devops]
+command = "npx"
+args = ["-y", "@azure-devops/mcp", "Contoso"]
+```
+
+Restart Codex after editing the config manually, then ask for a simple read-only operation such as `List ADO projects`.
 
 ### 🤖 Using MCP Server with Claude Code
 
