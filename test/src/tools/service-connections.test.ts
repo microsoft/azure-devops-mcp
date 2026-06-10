@@ -388,4 +388,112 @@ describe("configureServiceConnectionTools", () => {
       expect(result.content[0].text).toBe("No OAuth configurations found.");
     });
   });
+
+  describe("empty-result branches", () => {
+    it("service_connections_list_by_type_and_owner reports empty results", async () => {
+      const handler = getHandler("service_connections_list_by_type_and_owner");
+      mockApi.getServiceEndpointsByTypeAndOwner.mockResolvedValue([]);
+      const result = await handler({ type: "azurerm", owner: "Library" });
+      expect(result.content[0].text).toBe("No service connections found.");
+    });
+  });
+
+  describe("error paths", () => {
+    type ErrorCase = {
+      tool: string;
+      method: keyof ServiceEndpointApiMock;
+      prefix: string;
+      args: Record<string, unknown>;
+    };
+
+    const cases: ErrorCase[] = [
+      { tool: "service_connections_get_details", method: "getServiceEndpointDetails", prefix: "Error getting service connection details:", args: { project: "P", endpointId: "ep1" } },
+      {
+        tool: "service_connections_list_by_type_and_owner",
+        method: "getServiceEndpointsByTypeAndOwner",
+        prefix: "Error listing service connections by type and owner:",
+        args: { type: "t", owner: "o" },
+      },
+      {
+        tool: "service_connections_refresh_authentication",
+        method: "getServiceEndpointsWithRefreshedAuthentication",
+        prefix: "Error refreshing service connection authentication:",
+        args: { project: "P", endpointIds: ["ep1"], refreshAuthenticationParameters: [] },
+      },
+      { tool: "service_connections_create", method: "createServiceEndpoint", prefix: "Error creating service connection:", args: { endpoint: {} } },
+      { tool: "service_connections_update", method: "updateServiceEndpoint", prefix: "Error updating service connection:", args: { endpointId: "ep1", endpoint: {} } },
+      { tool: "service_connections_update_many", method: "updateServiceEndpoints", prefix: "Error updating service connections:", args: { endpoints: [] } },
+      { tool: "service_connections_delete", method: "deleteServiceEndpoint", prefix: "Error deleting service connection:", args: { endpointId: "ep1", projectIds: ["p1"] } },
+      { tool: "service_connections_share", method: "shareServiceEndpoint", prefix: "Error sharing service connection:", args: { endpointId: "ep1", endpointProjectReferences: [] } },
+      {
+        tool: "service_connections_share_with_project",
+        method: "shareEndpointWithProject",
+        prefix: "Error sharing service connection with project:",
+        args: { endpointId: "ep1", fromProject: "P1", withProject: "P2" },
+      },
+      { tool: "service_connections_query_shared_projects", method: "querySharedProjects", prefix: "Error querying shared projects:", args: { endpointId: "ep1", project: "P" } },
+      {
+        tool: "service_connections_list_execution_records",
+        method: "getServiceEndpointExecutionRecords",
+        prefix: "Error listing service connection execution records:",
+        args: { project: "P", endpointId: "ep1" },
+      },
+      {
+        tool: "service_connections_add_execution_records",
+        method: "addServiceEndpointExecutionRecords",
+        prefix: "Error adding service connection execution records:",
+        args: { project: "P", input: {} },
+      },
+      {
+        tool: "service_connections_execute_request",
+        method: "executeServiceEndpointRequest",
+        prefix: "Error executing service connection request:",
+        args: { project: "P", endpointId: "ep1", serviceEndpointRequest: {} },
+      },
+      { tool: "service_connections_query", method: "queryServiceEndpoint", prefix: "Error querying service connection:", args: { project: "P", binding: {} } },
+      { tool: "service_connections_list_types", method: "getServiceEndpointTypes", prefix: "Error listing service connection types:", args: {} },
+      { tool: "service_connections_list_filtered_types", method: "getFilteredServiceEndpointTypes", prefix: "Error listing filtered service connection types:", args: { typesFilter: ["t"] } },
+      { tool: "service_connections_list_azure_subscriptions", method: "getAzureSubscriptions", prefix: "Error listing Azure subscriptions:", args: {} },
+      { tool: "service_connections_list_azure_management_groups", method: "getAzureManagementGroups", prefix: "Error listing Azure management groups:", args: {} },
+      { tool: "service_connections_get_aad_tenant_id", method: "getVstsAadTenantId", prefix: "Error getting AAD tenant ID:", args: {} },
+      {
+        tool: "service_connections_create_aad_oauth_request",
+        method: "createAadOAuthRequest",
+        prefix: "Error creating AAD OAuth request:",
+        args: { tenantId: "t", redirectUri: "r" },
+      },
+      {
+        tool: "service_connections_oauth_create",
+        method: "createOAuthConfiguration",
+        prefix: "Error creating OAuth configuration:",
+        args: { configurationParams: { clientId: "c", clientSecret: "s", endpointType: "github", name: "n" } },
+      },
+      {
+        tool: "service_connections_oauth_update",
+        method: "updateOAuthConfiguration",
+        prefix: "Error updating OAuth configuration:",
+        args: { configurationId: "oc1", configurationParams: { clientId: "c", clientSecret: "s", endpointType: "github", name: "n" } },
+      },
+      { tool: "service_connections_oauth_delete", method: "deleteOAuthConfiguration", prefix: "Error deleting OAuth configuration:", args: { configurationId: "oc1" } },
+      { tool: "service_connections_oauth_get", method: "getOAuthConfiguration", prefix: "Error getting OAuth configuration:", args: { configurationId: "oc1" } },
+      { tool: "service_connections_oauth_list", method: "getOAuthConfigurations", prefix: "Error listing OAuth configurations:", args: {} },
+    ];
+
+    it.each(cases)("$tool surfaces upstream errors", async ({ tool, method, prefix, args }) => {
+      const handler = getHandler(tool);
+      mockApi[method].mockRejectedValue(new Error("boom"));
+      const result = await handler(args);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(prefix);
+      expect(result.content[0].text).toContain("boom");
+    });
+
+    it("falls back to 'Unknown error occurred' when a non-Error value is thrown", async () => {
+      const handler = getHandler("service_connections_list");
+      mockApi.getServiceEndpoints.mockRejectedValue("not-an-error");
+      const result = await handler({ project: "P" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown error occurred");
+    });
+  });
 });
