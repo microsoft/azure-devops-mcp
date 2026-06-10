@@ -40,6 +40,13 @@ interface ServiceEndpointApiMock {
   getOAuthConfigurations: jest.Mock;
 }
 
+interface ErrorCase {
+  tool: string;
+  method: keyof ServiceEndpointApiMock;
+  prefix: string;
+  args: Record<string, unknown>;
+}
+
 describe("configureServiceConnectionTools", () => {
   let server: McpServer;
   let tokenProvider: TokenProviderMock;
@@ -399,13 +406,6 @@ describe("configureServiceConnectionTools", () => {
   });
 
   describe("error paths", () => {
-    type ErrorCase = {
-      tool: string;
-      method: keyof ServiceEndpointApiMock;
-      prefix: string;
-      args: Record<string, unknown>;
-    };
-
     const cases: ErrorCase[] = [
       { tool: "service_connections_get_details", method: "getServiceEndpointDetails", prefix: "Error getting service connection details:", args: { project: "P", endpointId: "ep1" } },
       {
@@ -488,7 +488,16 @@ describe("configureServiceConnectionTools", () => {
       expect(result.content[0].text).toContain("boom");
     });
 
-    it("falls back to 'Unknown error occurred' when a non-Error value is thrown", async () => {
+    it.each(cases)("$tool falls back to 'Unknown error occurred' when a non-Error value is thrown", async ({ tool, method, prefix, args }) => {
+      const handler = getHandler(tool);
+      mockApi[method].mockRejectedValue("not-an-error");
+      const result = await handler(args);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(prefix);
+      expect(result.content[0].text).toContain("Unknown error occurred");
+    });
+
+    it("service_connections_list falls back to 'Unknown error occurred' when a non-Error value is thrown", async () => {
       const handler = getHandler("service_connections_list");
       mockApi.getServiceEndpoints.mockRejectedValue("not-an-error");
       const result = await handler({ project: "P" });
