@@ -2,96 +2,122 @@
 
 ## Overview
 
-| Functional Area   | Tool                                                                                                      | Description                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Advanced Security | [mcp_ado_advsec_get_alerts](#mcp_ado_advsec_get_alerts)                                                   | Retrieve Advanced Security alerts for a repository                |
-| Advanced Security | [mcp_ado_advsec_get_alert_details](#mcp_ado_advsec_get_alert_details)                                     | Get detailed information about a specific security alert          |
-| Core              | [mcp_ado_core_list_projects](#mcp_ado_core_list_projects)                                                 | List all projects in the organization                             |
-| Core              | [mcp_ado_core_list_project_teams](#mcp_ado_core_list_project_teams)                                       | List teams within a project                                       |
-| Core              | [mcp_ado_core_get_identity_ids](#mcp_ado_core_get_identity_ids)                                           | Retrieve identity IDs by search filter                            |
-| Pipelines         | [mcp_ado_pipelines_create_pipeline](#mcp_ado_pipelines_create_pipeline)                                   | Create a new pipeline with YAML configuration                     |
-| Pipelines         | [mcp_ado_pipelines_get_builds](#mcp_ado_pipelines_get_builds)                                             | Retrieve a list of builds with optional filters                   |
-| Pipelines         | [mcp_ado_pipelines_get_build_status](#mcp_ado_pipelines_get_build_status)                                 | Get the status of a specific build                                |
-| Pipelines         | [mcp_ado_pipelines_get_build_log](#mcp_ado_pipelines_get_build_log)                                       | Retrieve complete logs for a build                                |
-| Pipelines         | [mcp_ado_pipelines_get_build_log_by_id](#mcp_ado_pipelines_get_build_log_by_id)                           | Get a specific build log by log ID                                |
-| Pipelines         | [mcp_ado_pipelines_get_build_changes](#mcp_ado_pipelines_get_build_changes)                               | Get changes (commits) associated with a build                     |
-| Pipelines         | [mcp_ado_pipelines_get_build_definitions](#mcp_ado_pipelines_get_build_definitions)                       | List build/pipeline definitions in a project                      |
-| Pipelines         | [mcp_ado_pipelines_get_build_definition_revisions](#mcp_ado_pipelines_get_build_definition_revisions)     | Get revision history of a build definition                        |
-| Pipelines         | [mcp_ado_pipelines_run_pipeline](#mcp_ado_pipelines_run_pipeline)                                         | Start a new pipeline run with optional parameters                 |
-| Pipelines         | [mcp_ado_pipelines_get_run](#mcp_ado_pipelines_get_run)                                                   | Get details of a specific pipeline run                            |
-| Pipelines         | [mcp_ado_pipelines_list_runs](#mcp_ado_pipelines_list_runs)                                               | List recent runs for a pipeline                                   |
-| Pipelines         | [mcp_ado_pipelines_update_build_stage](#mcp_ado_pipelines_update_build_stage)                             | Update a build stage (cancel, retry, or run)                      |
-| Repositories      | [mcp_ado_repo_list_repos_by_project](#mcp_ado_repo_list_repos_by_project)                                 | List all repositories in a project                                |
-| Repositories      | [mcp_ado_repo_get_repo_by_name_or_id](#mcp_ado_repo_get_repo_by_name_or_id)                               | Get repository details by name or ID                              |
-| Repositories      | [mcp_ado_repo_list_branches_by_repo](#mcp_ado_repo_list_branches_by_repo)                                 | List all branches in a repository                                 |
-| Repositories      | [mcp_ado_repo_list_my_branches_by_repo](#mcp_ado_repo_list_my_branches_by_repo)                           | List branches created by current user                             |
-| Repositories      | [mcp_ado_repo_get_branch_by_name](#mcp_ado_repo_get_branch_by_name)                                       | Get details of a specific branch                                  |
-| Repositories      | [mcp_ado_repo_create_branch](#mcp_ado_repo_create_branch)                                                 | Create a new branch from a source branch                          |
-| Repositories      | [mcp_ado_repo_search_commits](#mcp_ado_repo_search_commits)                                               | Search for commits with comprehensive filters                     |
-| Repositories      | [mcp_ado_repo_list_pull_requests_by_repo_or_project](#mcp_ado_repo_list_pull_requests_by_repo_or_project) | List pull requests with optional filters                          |
-| Repositories      | [mcp_ado_repo_list_pull_requests_by_commits](#mcp_ado_repo_list_pull_requests_by_commits)                 | Find pull requests containing specific commits                    |
-| Repositories      | [mcp_ado_repo_get_pull_request_by_id](#mcp_ado_repo_get_pull_request_by_id)                               | Get details of a specific pull request                            |
-| Repositories      | [mcp_ado_repo_get_pull_request_changes](#mcp_ado_repo_get_pull_request_changes)                           | Get file changes (diff) for a pull request                        |
-| Repositories      | [mcp_ado_repo_create_pull_request](#mcp_ado_repo_create_pull_request)                                     | Create a new pull request                                         |
-| Repositories      | [mcp_ado_repo_update_pull_request](#mcp_ado_repo_update_pull_request)                                     | Update pull request properties and settings                       |
-| Repositories      | [mcp_ado_repo_update_pull_request_reviewers](#mcp_ado_repo_update_pull_request_reviewers)                 | Add or remove reviewers from a pull request                       |
-| Repositories      | [mcp_ado_repo_vote_pull_request](#mcp_ado_repo_vote_pull_request)                                         | Cast a vote on a pull request                                     |
-| Repositories      | [mcp_ado_repo_list_pull_request_threads](#mcp_ado_repo_list_pull_request_threads)                         | List comment threads on a pull request                            |
-| Repositories      | [mcp_ado_repo_list_pull_request_thread_comments](#mcp_ado_repo_list_pull_request_thread_comments)         | List comments in a specific thread                                |
-| Repositories      | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                       | Create a new comment thread on a pull request                     |
-| Repositories      | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                       | Update an existing pull request comment thread                    |
-| Repositories      | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                           | Reply to a pull request comment                                   |
-| Repositories      | [mcp_ado_repo_list_directory](#mcp_ado_repo_list_directory)                                               | List files and folders in a directory                             |
-| Repositories      | [mcp_ado_repo_get_file_content](#mcp_ado_repo_get_file_content)                                           | Get file content at a specific version                            |
-| Search            | [mcp_ado_search_code](#mcp_ado_search_code)                                                               | Search for code across repositories                               |
-| Search            | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                               | Search wiki pages by keywords                                     |
-| Search            | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                       | Search work items by text and filters                             |
-| Test Plans        | [mcp_ado_testplan_list_test_plans](#mcp_ado_testplan_list_test_plans)                                     | List test plans in a project                                      |
-| Test Plans        | [mcp_ado_testplan_create_test_plan](#mcp_ado_testplan_create_test_plan)                                   | Create a new test plan                                            |
-| Test Plans        | [mcp_ado_testplan_list_test_suites](#mcp_ado_testplan_list_test_suites)                                   | List test suites in a test plan                                   |
-| Test Plans        | [mcp_ado_testplan_create_test_suite](#mcp_ado_testplan_create_test_suite)                                 | Create a test suite within a test plan                            |
-| Test Plans        | [mcp_ado_testplan_add_test_cases_to_suite](#mcp_ado_testplan_add_test_cases_to_suite)                     | Add test cases to a test suite                                    |
-| Test Plans        | [mcp_ado_testplan_list_test_cases](#mcp_ado_testplan_list_test_cases)                                     | List test cases in a test suite                                   |
-| Test Plans        | [mcp_ado_testplan_create_test_case](#mcp_ado_testplan_create_test_case)                                   | Create a new test case work item                                  |
-| Test Plans        | [mcp_ado_testplan_update_test_case_steps](#mcp_ado_testplan_update_test_case_steps)                       | Update steps of an existing test case                             |
-| Test Plans        | [mcp_ado_testplan_show_test_results_from_build_id](#mcp_ado_testplan_show_test_results_from_build_id)     | Get test results for a specific build                             |
-| Wiki              | [mcp_ado_wiki_list_wikis](#mcp_ado_wiki_list_wikis)                                                       | List wikis in organization or project                             |
-| Wiki              | [mcp_ado_wiki_get_wiki](#mcp_ado_wiki_get_wiki)                                                           | Get details of a specific wiki                                    |
-| Wiki              | [mcp_ado_wiki_list_pages](#mcp_ado_wiki_list_pages)                                                       | List pages in a wiki                                              |
-| Wiki              | [mcp_ado_wiki_get_page](#mcp_ado_wiki_get_page)                                                           | Get wiki page metadata (without content)                          |
-| Wiki              | [mcp_ado_wiki_get_page_content](#mcp_ado_wiki_get_page_content)                                           | Retrieve wiki page content                                        |
-| Wiki              | [mcp_ado_wiki_create_or_update_page](#mcp_ado_wiki_create_or_update_page)                                 | Create or update a wiki page                                      |
-| Work Items        | [mcp_ado_wit_get_work_item](#mcp_ado_wit_get_work_item)                                                   | Get a work item by ID                                             |
-| Work Items        | [mcp_ado_wit_get_work_items_batch_by_ids](#mcp_ado_wit_get_work_items_batch_by_ids)                       | Retrieve multiple work items by IDs                               |
-| Work Items        | [mcp_ado_wit_create_work_item](#mcp_ado_wit_create_work_item)                                             | Create a new work item                                            |
-| Work Items        | [mcp_ado_wit_update_work_item](#mcp_ado_wit_update_work_item)                                             | Update fields of a work item                                      |
-| Work Items        | [mcp_ado_wit_update_work_items_batch](#mcp_ado_wit_update_work_items_batch)                               | Update multiple work items in batch                               |
-| Work Items        | [mcp_ado_wit_add_child_work_items](#mcp_ado_wit_add_child_work_items)                                     | Create child work items under a parent                            |
-| Work Items        | [mcp_ado_wit_work_items_link](#mcp_ado_wit_work_items_link)                                               | Link work items together                                          |
-| Work Items        | [mcp_ado_wit_work_item_unlink](#mcp_ado_wit_work_item_unlink)                                             | Remove links from a work item                                     |
-| Work Items        | [mcp_ado_wit_add_artifact_link](#mcp_ado_wit_add_artifact_link)                                           | Link artifacts (commits, builds, PRs) to work items               |
-| Work Items        | [mcp_ado_wit_link_work_item_to_pull_request](#mcp_ado_wit_link_work_item_to_pull_request)                 | Link a work item to a pull request                                |
-| Work Items        | [mcp_ado_wit_list_work_item_comments](#mcp_ado_wit_list_work_item_comments)                               | List comments on a work item                                      |
-| Work Items        | [mcp_ado_wit_add_work_item_comment](#mcp_ado_wit_add_work_item_comment)                                   | Add a comment to a work item                                      |
-| Work Items        | [mcp_ado_wit_update_work_item_comment](#mcp_ado_wit_update_work_item_comment)                             | Update an existing comment on a work item                         |
-| Work Items        | [mcp_ado_wit_list_work_item_revisions](#mcp_ado_wit_list_work_item_revisions)                             | Get revision history of a work item                               |
-| Work Items        | [mcp_ado_wit_get_work_item_type](#mcp_ado_wit_get_work_item_type)                                         | Get details of a work item type                                   |
-| Work Items        | [mcp_ado_wit_my_work_items](#mcp_ado_wit_my_work_items)                                                   | List work items relevant to current user                          |
-| Work Items        | [mcp_ado_wit_get_work_items_for_iteration](#mcp_ado_wit_get_work_items_for_iteration)                     | Get work items in a specific iteration                            |
-| Work Items        | [mcp_ado_wit_list_backlogs](#mcp_ado_wit_list_backlogs)                                                   | List backlogs for a team                                          |
-| Work Items        | [mcp_ado_wit_list_backlog_work_items](#mcp_ado_wit_list_backlog_work_items)                               | Get work items in a backlog                                       |
-| Work Items        | [mcp_ado_wit_get_query](#mcp_ado_wit_get_query)                                                           | Get a work item query by ID or path                               |
-| Work Items        | [mcp_ado_wit_get_query_results_by_id](#mcp_ado_wit_get_query_results_by_id)                               | Execute a query and get results                                   |
-| Work Items        | [mcp_ado_wit_query_by_wiql](#mcp_ado_wit_query_by_wiql)                                                   | Execute a WIQL query and return matching work items               |
-| Work Items        | [mcp_ado_wit_get_work_item_attachment](#mcp_ado_wit_get_work_item_attachment)                             | Download a work item attachment; save locally or return as base64 |
-| Work              | [mcp_ado_work_list_iterations](#mcp_ado_work_list_iterations)                                             | List all iterations in a project                                  |
-| Work              | [mcp_ado_work_create_iterations](#mcp_ado_work_create_iterations)                                         | Create new iterations in a project                                |
-| Work              | [mcp_ado_work_list_team_iterations](#mcp_ado_work_list_team_iterations)                                   | List iterations assigned to a team                                |
-| Work              | [mcp_ado_work_assign_iterations](#mcp_ado_work_assign_iterations)                                         | Assign iterations to a team                                       |
-| Work              | [mcp_ado_work_get_iteration_capacities](#mcp_ado_work_get_iteration_capacities)                           | Get capacity for all teams in an iteration                        |
-| Work              | [mcp_ado_work_get_team_capacity](#mcp_ado_work_get_team_capacity)                                         | Get capacity for a specific team in iteration                     |
-| Work              | [mcp_ado_work_update_team_capacity](#mcp_ado_work_update_team_capacity)                                   | Update team member capacity for iteration                         |
-| Work              | [mcp_ado_work_get_team_settings](#mcp_ado_work_get_team_settings)                                         | Get team settings including default iteration and area            |
+| Functional Area     | Tool                                                                                                                  | Description                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Advanced Security   | [mcp_ado_advsec_get_alerts](#mcp_ado_advsec_get_alerts)                                                               | Retrieve Advanced Security alerts for a repository                |
+| Advanced Security   | [mcp_ado_advsec_get_alert_details](#mcp_ado_advsec_get_alert_details)                                                 | Get detailed information about a specific security alert          |
+| Core                | [mcp_ado_core_list_projects](#mcp_ado_core_list_projects)                                                             | List all projects in the organization                             |
+| Core                | [mcp_ado_core_list_project_teams](#mcp_ado_core_list_project_teams)                                                   | List teams within a project                                       |
+| Core                | [mcp_ado_core_get_identity_ids](#mcp_ado_core_get_identity_ids)                                                       | Retrieve identity IDs by search filter                            |
+| Pipelines           | [mcp_ado_pipelines_create_pipeline](#mcp_ado_pipelines_create_pipeline)                                               | Create a new pipeline with YAML configuration                     |
+| Pipelines           | [mcp_ado_pipelines_get_builds](#mcp_ado_pipelines_get_builds)                                                         | Retrieve a list of builds with optional filters                   |
+| Pipelines           | [mcp_ado_pipelines_get_build_status](#mcp_ado_pipelines_get_build_status)                                             | Get the status of a specific build                                |
+| Pipelines           | [mcp_ado_pipelines_get_build_log](#mcp_ado_pipelines_get_build_log)                                                   | Retrieve complete logs for a build                                |
+| Pipelines           | [mcp_ado_pipelines_get_build_log_by_id](#mcp_ado_pipelines_get_build_log_by_id)                                       | Get a specific build log by log ID                                |
+| Pipelines           | [mcp_ado_pipelines_get_build_changes](#mcp_ado_pipelines_get_build_changes)                                           | Get changes (commits) associated with a build                     |
+| Pipelines           | [mcp_ado_pipelines_get_build_definitions](#mcp_ado_pipelines_get_build_definitions)                                   | List build/pipeline definitions in a project                      |
+| Pipelines           | [mcp_ado_pipelines_get_build_definition_revisions](#mcp_ado_pipelines_get_build_definition_revisions)                 | Get revision history of a build definition                        |
+| Pipelines           | [mcp_ado_pipelines_run_pipeline](#mcp_ado_pipelines_run_pipeline)                                                     | Start a new pipeline run with optional parameters                 |
+| Pipelines           | [mcp_ado_pipelines_get_run](#mcp_ado_pipelines_get_run)                                                               | Get details of a specific pipeline run                            |
+| Pipelines           | [mcp_ado_pipelines_list_runs](#mcp_ado_pipelines_list_runs)                                                           | List recent runs for a pipeline                                   |
+| Pipelines           | [mcp_ado_pipelines_update_build_stage](#mcp_ado_pipelines_update_build_stage)                                         | Update a build stage (cancel, retry, or run)                      |
+| Repositories        | [mcp_ado_repo_list_repos_by_project](#mcp_ado_repo_list_repos_by_project)                                             | List all repositories in a project                                |
+| Repositories        | [mcp_ado_repo_get_repo_by_name_or_id](#mcp_ado_repo_get_repo_by_name_or_id)                                           | Get repository details by name or ID                              |
+| Repositories        | [mcp_ado_repo_list_branches_by_repo](#mcp_ado_repo_list_branches_by_repo)                                             | List all branches in a repository                                 |
+| Repositories        | [mcp_ado_repo_list_my_branches_by_repo](#mcp_ado_repo_list_my_branches_by_repo)                                       | List branches created by current user                             |
+| Repositories        | [mcp_ado_repo_get_branch_by_name](#mcp_ado_repo_get_branch_by_name)                                                   | Get details of a specific branch                                  |
+| Repositories        | [mcp_ado_repo_create_branch](#mcp_ado_repo_create_branch)                                                             | Create a new branch from a source branch                          |
+| Repositories        | [mcp_ado_repo_search_commits](#mcp_ado_repo_search_commits)                                                           | Search for commits with comprehensive filters                     |
+| Repositories        | [mcp_ado_repo_list_pull_requests_by_repo_or_project](#mcp_ado_repo_list_pull_requests_by_repo_or_project)             | List pull requests with optional filters                          |
+| Repositories        | [mcp_ado_repo_list_pull_requests_by_commits](#mcp_ado_repo_list_pull_requests_by_commits)                             | Find pull requests containing specific commits                    |
+| Repositories        | [mcp_ado_repo_get_pull_request_by_id](#mcp_ado_repo_get_pull_request_by_id)                                           | Get details of a specific pull request                            |
+| Repositories        | [mcp_ado_repo_get_pull_request_changes](#mcp_ado_repo_get_pull_request_changes)                                       | Get file changes (diff) for a pull request                        |
+| Repositories        | [mcp_ado_repo_create_pull_request](#mcp_ado_repo_create_pull_request)                                                 | Create a new pull request                                         |
+| Repositories        | [mcp_ado_repo_update_pull_request](#mcp_ado_repo_update_pull_request)                                                 | Update pull request properties and settings                       |
+| Repositories        | [mcp_ado_repo_update_pull_request_reviewers](#mcp_ado_repo_update_pull_request_reviewers)                             | Add or remove reviewers from a pull request                       |
+| Repositories        | [mcp_ado_repo_vote_pull_request](#mcp_ado_repo_vote_pull_request)                                                     | Cast a vote on a pull request                                     |
+| Repositories        | [mcp_ado_repo_list_pull_request_threads](#mcp_ado_repo_list_pull_request_threads)                                     | List comment threads on a pull request                            |
+| Repositories        | [mcp_ado_repo_list_pull_request_thread_comments](#mcp_ado_repo_list_pull_request_thread_comments)                     | List comments in a specific thread                                |
+| Repositories        | [mcp_ado_repo_create_pull_request_thread](#mcp_ado_repo_create_pull_request_thread)                                   | Create a new comment thread on a pull request                     |
+| Repositories        | [mcp_ado_repo_update_pull_request_thread](#mcp_ado_repo_update_pull_request_thread)                                   | Update an existing pull request comment thread                    |
+| Repositories        | [mcp_ado_repo_reply_to_comment](#mcp_ado_repo_reply_to_comment)                                                       | Reply to a pull request comment                                   |
+| Repositories        | [mcp_ado_repo_list_directory](#mcp_ado_repo_list_directory)                                                           | List files and folders in a directory                             |
+| Repositories        | [mcp_ado_repo_get_file_content](#mcp_ado_repo_get_file_content)                                                       | Get file content at a specific version                            |
+| Search              | [mcp_ado_search_code](#mcp_ado_search_code)                                                                           | Search for code across repositories                               |
+| Search              | [mcp_ado_search_wiki](#mcp_ado_search_wiki)                                                                           | Search wiki pages by keywords                                     |
+| Search              | [mcp_ado_search_workitem](#mcp_ado_search_workitem)                                                                   | Search work items by text and filters                             |
+| Service Connections | [mcp_ado_service_connections_list](#mcp_ado_service_connections_list)                                                 | List service connections in a project                             |
+| Service Connections | [mcp_ado_service_connections_get_details](#mcp_ado_service_connections_get_details)                                   | Get details of a specific service connection                      |
+| Service Connections | [mcp_ado_service_connections_list_by_type_and_owner](#mcp_ado_service_connections_list_by_type_and_owner)             | List org-scoped service connections by type and owner             |
+| Service Connections | [mcp_ado_service_connections_refresh_authentication](#mcp_ado_service_connections_refresh_authentication)             | Refresh authentication parameters for service connections         |
+| Service Connections | [mcp_ado_service_connections_create](#mcp_ado_service_connections_create)                                             | Create a new service connection                                   |
+| Service Connections | [mcp_ado_service_connections_update](#mcp_ado_service_connections_update)                                             | Update an existing service connection                             |
+| Service Connections | [mcp_ado_service_connections_update_many](#mcp_ado_service_connections_update_many)                                   | Update multiple service connections in one call                   |
+| Service Connections | [mcp_ado_service_connections_delete](#mcp_ado_service_connections_delete)                                             | Delete a service connection from one or more projects             |
+| Service Connections | [mcp_ado_service_connections_share](#mcp_ado_service_connections_share)                                               | Share a service connection across multiple projects               |
+| Service Connections | [mcp_ado_service_connections_share_with_project](#mcp_ado_service_connections_share_with_project)                     | Share a service connection from one project with another          |
+| Service Connections | [mcp_ado_service_connections_query_shared_projects](#mcp_ado_service_connections_query_shared_projects)               | List projects a service connection is shared with                 |
+| Service Connections | [mcp_ado_service_connections_list_execution_records](#mcp_ado_service_connections_list_execution_records)             | List execution records for a service connection                   |
+| Service Connections | [mcp_ado_service_connections_add_execution_records](#mcp_ado_service_connections_add_execution_records)               | Add execution records for service connections                     |
+| Service Connections | [mcp_ado_service_connections_execute_request](#mcp_ado_service_connections_execute_request)                           | Proxy a GET request through a service connection                  |
+| Service Connections | [mcp_ado_service_connections_query](#mcp_ado_service_connections_query)                                               | Query a service connection via a data source binding              |
+| Service Connections | [mcp_ado_service_connections_list_types](#mcp_ado_service_connections_list_types)                                     | Get available service connection types                            |
+| Service Connections | [mcp_ado_service_connections_list_filtered_types](#mcp_ado_service_connections_list_filtered_types)                   | Get service connection types filtered by name                     |
+| Service Connections | [mcp_ado_service_connections_list_azure_subscriptions](#mcp_ado_service_connections_list_azure_subscriptions)         | List discoverable Azure subscriptions                             |
+| Service Connections | [mcp_ado_service_connections_list_azure_management_groups](#mcp_ado_service_connections_list_azure_management_groups) | List discoverable Azure management groups                         |
+| Service Connections | [mcp_ado_service_connections_get_aad_tenant_id](#mcp_ado_service_connections_get_aad_tenant_id)                       | Get the AAD tenant ID of the organization                         |
+| Service Connections | [mcp_ado_service_connections_create_aad_oauth_request](#mcp_ado_service_connections_create_aad_oauth_request)         | Create an AAD OAuth authorization request URL                     |
+| Service Connections | [mcp_ado_service_connections_oauth_create](#mcp_ado_service_connections_oauth_create)                                 | Create a new OAuth configuration                                  |
+| Service Connections | [mcp_ado_service_connections_oauth_update](#mcp_ado_service_connections_oauth_update)                                 | Update an existing OAuth configuration                            |
+| Service Connections | [mcp_ado_service_connections_oauth_delete](#mcp_ado_service_connections_oauth_delete)                                 | Delete an OAuth configuration                                     |
+| Service Connections | [mcp_ado_service_connections_oauth_get](#mcp_ado_service_connections_oauth_get)                                       | Get an OAuth configuration by ID                                  |
+| Service Connections | [mcp_ado_service_connections_oauth_list](#mcp_ado_service_connections_oauth_list)                                     | List OAuth configurations                                         |
+| Test Plans          | [mcp_ado_testplan_list_test_plans](#mcp_ado_testplan_list_test_plans)                                                 | List test plans in a project                                      |
+| Test Plans          | [mcp_ado_testplan_create_test_plan](#mcp_ado_testplan_create_test_plan)                                               | Create a new test plan                                            |
+| Test Plans          | [mcp_ado_testplan_list_test_suites](#mcp_ado_testplan_list_test_suites)                                               | List test suites in a test plan                                   |
+| Test Plans          | [mcp_ado_testplan_create_test_suite](#mcp_ado_testplan_create_test_suite)                                             | Create a test suite within a test plan                            |
+| Test Plans          | [mcp_ado_testplan_add_test_cases_to_suite](#mcp_ado_testplan_add_test_cases_to_suite)                                 | Add test cases to a test suite                                    |
+| Test Plans          | [mcp_ado_testplan_list_test_cases](#mcp_ado_testplan_list_test_cases)                                                 | List test cases in a test suite                                   |
+| Test Plans          | [mcp_ado_testplan_create_test_case](#mcp_ado_testplan_create_test_case)                                               | Create a new test case work item                                  |
+| Test Plans          | [mcp_ado_testplan_update_test_case_steps](#mcp_ado_testplan_update_test_case_steps)                                   | Update steps of an existing test case                             |
+| Test Plans          | [mcp_ado_testplan_show_test_results_from_build_id](#mcp_ado_testplan_show_test_results_from_build_id)                 | Get test results for a specific build                             |
+| Wiki                | [mcp_ado_wiki_list_wikis](#mcp_ado_wiki_list_wikis)                                                                   | List wikis in organization or project                             |
+| Wiki                | [mcp_ado_wiki_get_wiki](#mcp_ado_wiki_get_wiki)                                                                       | Get details of a specific wiki                                    |
+| Wiki                | [mcp_ado_wiki_list_pages](#mcp_ado_wiki_list_pages)                                                                   | List pages in a wiki                                              |
+| Wiki                | [mcp_ado_wiki_get_page](#mcp_ado_wiki_get_page)                                                                       | Get wiki page metadata (without content)                          |
+| Wiki                | [mcp_ado_wiki_get_page_content](#mcp_ado_wiki_get_page_content)                                                       | Retrieve wiki page content                                        |
+| Wiki                | [mcp_ado_wiki_create_or_update_page](#mcp_ado_wiki_create_or_update_page)                                             | Create or update a wiki page                                      |
+| Work Items          | [mcp_ado_wit_get_work_item](#mcp_ado_wit_get_work_item)                                                               | Get a work item by ID                                             |
+| Work Items          | [mcp_ado_wit_get_work_items_batch_by_ids](#mcp_ado_wit_get_work_items_batch_by_ids)                                   | Retrieve multiple work items by IDs                               |
+| Work Items          | [mcp_ado_wit_create_work_item](#mcp_ado_wit_create_work_item)                                                         | Create a new work item                                            |
+| Work Items          | [mcp_ado_wit_update_work_item](#mcp_ado_wit_update_work_item)                                                         | Update fields of a work item                                      |
+| Work Items          | [mcp_ado_wit_update_work_items_batch](#mcp_ado_wit_update_work_items_batch)                                           | Update multiple work items in batch                               |
+| Work Items          | [mcp_ado_wit_add_child_work_items](#mcp_ado_wit_add_child_work_items)                                                 | Create child work items under a parent                            |
+| Work Items          | [mcp_ado_wit_work_items_link](#mcp_ado_wit_work_items_link)                                                           | Link work items together                                          |
+| Work Items          | [mcp_ado_wit_work_item_unlink](#mcp_ado_wit_work_item_unlink)                                                         | Remove links from a work item                                     |
+| Work Items          | [mcp_ado_wit_add_artifact_link](#mcp_ado_wit_add_artifact_link)                                                       | Link artifacts (commits, builds, PRs) to work items               |
+| Work Items          | [mcp_ado_wit_link_work_item_to_pull_request](#mcp_ado_wit_link_work_item_to_pull_request)                             | Link a work item to a pull request                                |
+| Work Items          | [mcp_ado_wit_list_work_item_comments](#mcp_ado_wit_list_work_item_comments)                                           | List comments on a work item                                      |
+| Work Items          | [mcp_ado_wit_add_work_item_comment](#mcp_ado_wit_add_work_item_comment)                                               | Add a comment to a work item                                      |
+| Work Items          | [mcp_ado_wit_update_work_item_comment](#mcp_ado_wit_update_work_item_comment)                                         | Update an existing comment on a work item                         |
+| Work Items          | [mcp_ado_wit_list_work_item_revisions](#mcp_ado_wit_list_work_item_revisions)                                         | Get revision history of a work item                               |
+| Work Items          | [mcp_ado_wit_get_work_item_type](#mcp_ado_wit_get_work_item_type)                                                     | Get details of a work item type                                   |
+| Work Items          | [mcp_ado_wit_my_work_items](#mcp_ado_wit_my_work_items)                                                               | List work items relevant to current user                          |
+| Work Items          | [mcp_ado_wit_get_work_items_for_iteration](#mcp_ado_wit_get_work_items_for_iteration)                                 | Get work items in a specific iteration                            |
+| Work Items          | [mcp_ado_wit_list_backlogs](#mcp_ado_wit_list_backlogs)                                                               | List backlogs for a team                                          |
+| Work Items          | [mcp_ado_wit_list_backlog_work_items](#mcp_ado_wit_list_backlog_work_items)                                           | Get work items in a backlog                                       |
+| Work Items          | [mcp_ado_wit_get_query](#mcp_ado_wit_get_query)                                                                       | Get a work item query by ID or path                               |
+| Work Items          | [mcp_ado_wit_get_query_results_by_id](#mcp_ado_wit_get_query_results_by_id)                                           | Execute a query and get results                                   |
+| Work Items          | [mcp_ado_wit_query_by_wiql](#mcp_ado_wit_query_by_wiql)                                                               | Execute a WIQL query and return matching work items               |
+| Work Items          | [mcp_ado_wit_get_work_item_attachment](#mcp_ado_wit_get_work_item_attachment)                                         | Download a work item attachment; save locally or return as base64 |
+| Work                | [mcp_ado_work_list_iterations](#mcp_ado_work_list_iterations)                                                         | List all iterations in a project                                  |
+| Work                | [mcp_ado_work_create_iterations](#mcp_ado_work_create_iterations)                                                     | Create new iterations in a project                                |
+| Work                | [mcp_ado_work_list_team_iterations](#mcp_ado_work_list_team_iterations)                                               | List iterations assigned to a team                                |
+| Work                | [mcp_ado_work_assign_iterations](#mcp_ado_work_assign_iterations)                                                     | Assign iterations to a team                                       |
+| Work                | [mcp_ado_work_get_iteration_capacities](#mcp_ado_work_get_iteration_capacities)                                       | Get capacity for all teams in an iteration                        |
+| Work                | [mcp_ado_work_get_team_capacity](#mcp_ado_work_get_team_capacity)                                                     | Get capacity for a specific team in iteration                     |
+| Work                | [mcp_ado_work_update_team_capacity](#mcp_ado_work_update_team_capacity)                                               | Update team member capacity for iteration                         |
+| Work                | [mcp_ado_work_get_team_settings](#mcp_ado_work_get_team_settings)                                                     | Get team settings including default iteration and area            |
 
 ## Advanced Security
 
@@ -420,6 +446,190 @@ Get Azure DevOps Work Item search results for a given search text.
 
 - **Required**: `searchText`
 - **Optional**: `areaPath`, `assignedTo`, `includeFacets`, `project`, `skip`, `state`, `top`, `workItemType`
+
+## Service Connections
+
+### mcp_ado_service_connections_list
+
+List service connections (service endpoints) in an Azure DevOps project. Supports filtering by type, authorization scheme, owner, endpoint IDs, and endpoint names. Secret/credential fields are never returned by the API.
+
+- **Required**: `project`
+- **Optional**: `type`, `authSchemes`, `endpointIds`, `endpointNames`, `owner`, `includeFailed`, `actionFilter`
+
+### mcp_ado_service_connections_get_details
+
+Get details of a specific service connection by its ID within a project. Secret/credential fields are never returned by the API.
+
+- **Required**: `project`, `endpointId`
+- **Optional**: `actionFilter`
+
+### mcp_ado_service_connections_list_by_type_and_owner
+
+Get organization-scoped service connections by type and owner. Returns only id, name, and url (used internally by licensing).
+
+- **Required**: `type`, `owner`
+- **Optional**: None
+
+### mcp_ado_service_connections_refresh_authentication
+
+Get service connections with refreshed authentication parameters (e.g., short-lived OAuth tokens).
+
+- **Required**: `project`, `endpointIds`, `refreshAuthenticationParameters`
+- **Optional**: None
+
+### mcp_ado_service_connections_create
+
+Create a new service connection. The `endpoint` body must match the ServiceEndpoint schema for the target type and include authorization fields.
+
+- **Required**: `endpoint`
+- **Optional**: None
+
+### mcp_ado_service_connections_update
+
+Update an existing service connection.
+
+- **Required**: `endpointId`, `endpoint`
+- **Optional**: `operation`
+
+### mcp_ado_service_connections_update_many
+
+Update multiple service connections in a single call.
+
+- **Required**: `endpoints`
+- **Optional**: None
+
+### mcp_ado_service_connections_delete
+
+Delete a service connection from one or more projects.
+
+- **Required**: `endpointId`, `projectIds`
+- **Optional**: `deep`
+
+### mcp_ado_service_connections_share
+
+Share a service connection across one or more projects using project references.
+
+- **Required**: `endpointId`, `endpointProjectReferences`
+- **Optional**: None
+
+### mcp_ado_service_connections_share_with_project
+
+Share a service connection from one project with another project.
+
+- **Required**: `endpointId`, `fromProject`, `withProject`
+- **Optional**: None
+
+### mcp_ado_service_connections_query_shared_projects
+
+List the projects a service connection is shared with.
+
+- **Required**: `endpointId`, `project`
+- **Optional**: None
+
+### mcp_ado_service_connections_list_execution_records
+
+Get execution records for a service connection (paginated).
+
+- **Required**: `project`, `endpointId`
+- **Optional**: `top`, `continuationToken`
+
+### mcp_ado_service_connections_add_execution_records
+
+Add execution records for one or more service connections.
+
+- **Required**: `project`, `input`
+- **Optional**: None
+
+### mcp_ado_service_connections_execute_request
+
+Proxy a GET request through a service connection. The request is authorized using the connection's credentials.
+
+- **Required**: `project`, `endpointId`, `serviceEndpointRequest`
+- **Optional**: None
+
+### mcp_ado_service_connections_query
+
+Proxy a GET defined by a data source binding on a service connection. The response is filtered via XPath/JSON selector.
+
+- **Required**: `project`, `binding`
+- **Optional**: None
+
+### mcp_ado_service_connections_list_types
+
+Get available service connection (endpoint) types.
+
+- **Required**: None
+- **Optional**: `type`, `scheme`
+
+### mcp_ado_service_connections_list_filtered_types
+
+Get service connection types filtered to a specific list of type names.
+
+- **Required**: `typesFilter`
+- **Optional**: None
+
+### mcp_ado_service_connections_list_azure_subscriptions
+
+List Azure subscriptions discoverable by the organization for use in Azure-based service connections.
+
+- **Required**: None
+- **Optional**: None
+
+### mcp_ado_service_connections_list_azure_management_groups
+
+List Azure management groups discoverable by the organization.
+
+- **Required**: None
+- **Optional**: None
+
+### mcp_ado_service_connections_get_aad_tenant_id
+
+Get the AAD tenant ID associated with the organization.
+
+- **Required**: None
+- **Optional**: None
+
+### mcp_ado_service_connections_create_aad_oauth_request
+
+Create an AAD OAuth authorization request URL for use during service connection setup.
+
+- **Required**: `tenantId`, `redirectUri`
+- **Optional**: `completeCallbackPayload`, `completeCallbackByAuthCode`
+
+### mcp_ado_service_connections_oauth_create
+
+Create a new OAuth configuration (organization-scoped).
+
+- **Required**: `configurationParams`
+- **Optional**: None
+
+### mcp_ado_service_connections_oauth_update
+
+Update an existing OAuth configuration.
+
+- **Required**: `configurationId`, `configurationParams`
+- **Optional**: None
+
+### mcp_ado_service_connections_oauth_delete
+
+Delete an OAuth configuration.
+
+- **Required**: `configurationId`
+- **Optional**: None
+
+### mcp_ado_service_connections_oauth_get
+
+Get an OAuth configuration by ID.
+
+- **Required**: `configurationId`
+- **Optional**: None
+
+### mcp_ado_service_connections_oauth_list
+
+List OAuth configurations, optionally filtered by endpoint type and/or action filter.
+
+- **Required**: None
+- **Optional**: `endpointType`, `actionFilter`
 
 ## Test Plans
 

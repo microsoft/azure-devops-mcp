@@ -16,6 +16,7 @@ export enum Domain {
   WIKI = "wiki",
   WORK = "work",
   WORK_ITEMS = "work-items",
+  SERVICE_CONNECTIONS = "service-connections",
   MCP_APPS = "mcp-apps",
 }
 

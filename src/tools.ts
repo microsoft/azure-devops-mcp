@@ -11,6 +11,7 @@ import { configurePipelineTools } from "./tools/pipelines.js";
 import { configureCoreTools } from "./tools/core.js";
 import { configureRepoTools } from "./tools/repositories.js";
 import { configureSearchTools } from "./tools/search.js";
+import { configureServiceConnectionTools } from "./tools/service-connections.js";
 import { configureTestPlanTools } from "./tools/test-plans.js";
 import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
@@ -33,6 +34,7 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<strin
   configureIfDomainEnabled(Domain.TEST_PLANS, () => configureTestPlanTools(server, tokenProvider, connectionProvider, userAgentProvider));
   configureIfDomainEnabled(Domain.SEARCH, () => configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider));
   configureIfDomainEnabled(Domain.ADVANCED_SECURITY, () => configureAdvSecTools(server, tokenProvider, connectionProvider));
+  configureIfDomainEnabled(Domain.SERVICE_CONNECTIONS, () => configureServiceConnectionTools(server, tokenProvider, connectionProvider));
 }
 
 export { configureAllTools };
