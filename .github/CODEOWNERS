@@ -3,3 +3,21 @@
 
 # Define maintainers as code owners for the entire repository
 * @microsoft/azure-devops-mcp-maintainers
+INSTALLATION_NAME="arc-runner-set"
+NAMESPACE="arc-runners"
+GITHUB_CONFIG_URL="https://github.com/<your_enterprise/org/repo>"
+GITHUB_PAT="<PAT>"
+helm install "${INSTALLATION_NAME}" \
+    --namespace "${NAMESPACE}" \
+    --create-namespace \
+    --set githubConfigUrl="${GITHUB_CONFIG_URL}" \
+    --set githubConfigSecret.github_token="${GITHUB_PAT}" \
+    oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set
+helm list -A
+kubectl get pods -n arc-systemskubectl get pods -n arc-systems
+refs/heads/main
+# Define code owners for the codeowners file
+.github/CODEOWNERS @microsoft/azure-devops-mcp-maintainers
+
+# Define maintainers as code owners for the entire repository
+* @microsoft/azure-devops-mcp-maintainers
