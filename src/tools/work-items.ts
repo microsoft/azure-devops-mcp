@@ -158,7 +158,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
   server.tool(
     WORKITEM_TOOLS.my_work_items,
-    "Retrieve a list of work items relevent to the authenticated user. If a project is not specified, you will be prompted to select one.",
+    "Retrieve a list of work items relevant to the authenticated user. If a project is not specified, you will be prompted to select one.",
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       type: z.enum(["assignedtome", "myactivity"]).default("assignedtome").describe("The type of work items to retrieve. Defaults to 'assignedtome'."),
@@ -905,7 +905,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         }));
 
         // Check if any field has format === "Markdown" and add the multilineFieldsFormat operation
-        // this should only happen for large text fields, but since we dont't know by field name, lets assume if the users
+        // this should only happen for large text fields, but since we don't know by field name, lets assume if the users
         // passes a value longer than 100 characters, then we can set the format to Markdown
         fields.forEach(({ name, value, format }) => {
           if (value.length > 100 && format === "Markdown") {
