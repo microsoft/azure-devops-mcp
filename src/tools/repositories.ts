@@ -1740,7 +1740,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.search_commits,
-    "Search for commits in a repository with comprehensive filtering capabilities. Supports searching by description/comment text, time range, author, committer, specific commit IDs, and more. This is the unified tool for all commit search operations.",
+    "Search for commits in a repository with comprehensive filtering capabilities. Supports searching by description/comment text, time range, author, committer, specific commit IDs, and more. NOTE: searchText, authorEmail, committer, and committerEmail are client-side filters — they run against the commits already fetched from the API (limited by 'skip' and 'top'), not against the full repository history. Use API-level filters (fromDate, toDate, author, version) to narrow results before these filters apply.",
     {
       project: z.string().describe("Project name or ID"),
       repository: z.string().describe("Repository name or ID"),
@@ -1758,11 +1758,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
       includeWorkItems: z.boolean().optional().default(false).describe("Include associated work items"),
       // Enhanced search parameters
-      searchText: z.string().optional().describe("Search text to filter commits by description/comment. Supports partial matching."),
+      searchText: z.string().optional().describe("Search text to filter commits by description/comment. Supports partial matching. Client-side only: filters within the commits already fetched."),
       author: z.string().optional().describe("Filter commits by author email or display name"),
-      authorEmail: z.string().optional().describe("Filter commits by exact author email address"),
-      committer: z.string().optional().describe("Filter commits by committer email or display name"),
-      committerEmail: z.string().optional().describe("Filter commits by exact committer email address"),
+      authorEmail: z.string().optional().describe("Filter commits by exact author email address. Client-side only: filters within the commits already fetched."),
+      committer: z.string().optional().describe("Filter commits by committer email or display name. Client-side only: filters within the commits already fetched."),
+      committerEmail: z.string().optional().describe("Filter commits by exact committer email address. Client-side only: filters within the commits already fetched."),
       fromDate: z.string().optional().describe("Filter commits from this date (ISO 8601 format, e.g., '2024-01-01T00:00:00Z')"),
       toDate: z.string().optional().describe("Filter commits to this date (ISO 8601 format, e.g., '2024-12-31T23:59:59Z')"),
       commitIds: z.array(z.string()).optional().describe("Array of specific commit IDs to retrieve. When provided, other filters are ignored except top/skip."),
