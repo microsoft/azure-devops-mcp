@@ -84,6 +84,8 @@
 | Work Items        | [mcp_ado_wit_get_query_results_by_id](#mcp_ado_wit_get_query_results_by_id)                               | Execute a query and get results                                   |
 | Work Items        | [mcp_ado_wit_query_by_wiql](#mcp_ado_wit_query_by_wiql)                                                   | Execute a WIQL query and return matching work items               |
 | Work Items        | [mcp_ado_wit_get_work_item_attachment](#mcp_ado_wit_get_work_item_attachment)                             | Download a work item attachment; save locally or return as base64 |
+| Work Items        | [mcp_ado_wit_upload_attachment](#mcp_ado_wit_upload_attachment)                                           | Upload a local file to Azure DevOps as an attachment              |
+| Work Items        | [mcp_ado_wit_add_attachment_to_work_item](#mcp_ado_wit_add_attachment_to_work_item)                       | Link an uploaded attachment URL to a work item                    |
 | Work              | [mcp_ado_work_list_iterations](#mcp_ado_work_list_iterations)                                             | List all iterations in a project                                  |
 | Work              | [mcp_ado_work_create_iterations](#mcp_ado_work_create_iterations)                                         | Create new iterations in a project                                |
 | Work              | [mcp_ado_work_list_team_iterations](#mcp_ado_work_list_team_iterations)                                   | List iterations assigned to a team                                |
@@ -692,6 +694,24 @@ Download a work item attachment by its ID. If `savePath` is provided, saves the 
 
 - **Required**: `attachmentId`
 - **Optional**: `project`, `fileName`, `savePath`
+
+### mcp_ado_wit_upload_attachment
+
+Upload a local file to Azure DevOps as an attachment. Returns an attachment reference (ID and URL) that can be passed directly to `mcp_ado_wit_add_attachment_to_work_item`.
+
+The two-step design mirrors the ADO REST API model: upload once, attach to any number of work items without re-uploading.
+
+- **Required**: `filePath`
+- **Optional**: `project`, `fileName`, `comment`, `allowedPaths`, `maxFileSizeBytes`, `allowedMimeTypes`
+
+**Security note**: Use `allowedPaths` to restrict which directories the agent may read from. When provided, `filePath` must resolve to one of those prefixes. Recommended for automated or agent workflows to prevent exfiltration of sensitive files (e.g. `.env`, SSH keys). Supports MIME type allowlists via `allowedMimeTypes` (e.g. `["image/*", "text/plain"]`).
+
+### mcp_ado_wit_add_attachment_to_work_item
+
+Link an already-uploaded attachment URL to an existing work item. Use the `url` returned by `mcp_ado_wit_upload_attachment`, or any valid Azure DevOps attachment URL.
+
+- **Required**: `workItemId`, `attachmentUrl`, `fileName`
+- **Optional**: `project`, `comment`
 
 ## Work
 

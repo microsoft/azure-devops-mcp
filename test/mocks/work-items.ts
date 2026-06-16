@@ -664,6 +664,22 @@ export const _mockWorkItemRevisions = [
   },
 ];
 
+export const _mockAttachmentReference = {
+  id: "abc-123-def-456",
+  url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/abc-123-def-456",
+};
+
+export const _mockWorkItemWithAttachment = {
+  id: 99,
+  relations: [
+    {
+      rel: "AttachedFile",
+      url: "https://dev.azure.com/fabrikam/_apis/wit/attachments/abc-123-def-456",
+      attributes: { name: "screenshot.png", comment: "Bug evidence" },
+    },
+  ],
+};
+
 export const _mockWiqlQueryResults = {
   queryType: 1,
   queryResultType: 1,

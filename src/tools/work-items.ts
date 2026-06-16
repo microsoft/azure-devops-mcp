@@ -35,6 +35,8 @@ const WORKITEM_TOOLS = {
   work_item_unlink: "wit_work_item_unlink",
   add_artifact_link: "wit_add_artifact_link",
   get_work_item_attachment: "wit_get_work_item_attachment",
+  upload_attachment: "wit_upload_attachment",
+  add_attachment_to_work_item: "wit_add_attachment_to_work_item",
   query_by_wiql: "wit_query_by_wiql",
 };
 
@@ -1569,6 +1571,191 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           content: [{ type: "text", text: `Error retrieving work item attachment: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.upload_attachment,
+    `Upload a local file to Azure DevOps as an attachment. Returns an attachment reference (ID and URL) that can be passed to ${WORKITEM_TOOLS.add_attachment_to_work_item}.
+
+SECURITY: Use allowedPaths to restrict which directories the agent may read from. Example: allowedPaths: ["/tmp/test-artifacts"] limits uploads to that folder only. If a project is not specified, you will be prompted to select one.`,
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      filePath: z.string().describe("Absolute local path to the file to upload."),
+      fileName: z.string().optional().describe("Display name for the attachment. Defaults to the file's basename."),
+      comment: z.string().optional().describe("Optional description stored with the attachment."),
+      allowedPaths: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Security allowlist. If provided, filePath must start with one of these directory prefixes. " +
+            "Recommended when using this tool in automated or agent workflows to prevent exfiltration of sensitive files."
+        ),
+      maxFileSizeBytes: z.number().int().positive().max(104_857_600).optional().default(10_485_760).describe("Maximum allowed file size in bytes. Default 10 MB, hard ceiling 100 MB."),
+      allowedMimeTypes: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Optional MIME type allowlist (e.g. ['image/png', 'text/plain']). Supports wildcards (e.g. 'image/*'). " +
+            "When provided, the upload is rejected if the file extension does not map to an allowed type."
+        ),
+    },
+    async ({ project, filePath, fileName, comment, allowedPaths, maxFileSizeBytes, allowedMimeTypes }) => {
+      try {
+        const resolvedPath = path.resolve(filePath);
+
+        if (filePath.includes("..")) {
+          throw new Error(`Security: filePath must not contain '..' sequences. Received: ${filePath}`);
+        }
+
+        if (allowedPaths && allowedPaths.length > 0) {
+          const permitted = allowedPaths.some((allowed) => resolvedPath.startsWith(path.resolve(allowed)));
+          if (!permitted) {
+            throw new Error(`Security: filePath '${resolvedPath}' is not within any allowedPaths. Allowed prefixes: ${allowedPaths.join(", ")}`);
+          }
+        }
+
+        if (!fs.existsSync(resolvedPath)) {
+          throw new Error(`File not found: ${resolvedPath}`);
+        }
+
+        const stat = fs.statSync(resolvedPath);
+        if (!stat.isFile()) {
+          throw new Error(`Path is not a file: ${resolvedPath}`);
+        }
+
+        const effectiveMax = maxFileSizeBytes ?? 10_485_760;
+        if (stat.size > effectiveMax) {
+          throw new Error(`File size ${stat.size} bytes exceeds limit of ${effectiveMax} bytes. Use maxFileSizeBytes to increase the limit (max 100 MB).`);
+        }
+
+        if (allowedMimeTypes && allowedMimeTypes.length > 0) {
+          const ext = path.extname(resolvedPath).toLowerCase();
+          const UPLOAD_MIME_MAP: Record<string, string> = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+            ".svg": "image/svg+xml",
+            ".pdf": "application/pdf",
+            ".txt": "text/plain",
+            ".log": "text/plain",
+            ".json": "application/json",
+            ".xml": "application/xml",
+            ".csv": "text/csv",
+            ".zip": "application/zip",
+            ".mp4": "video/mp4",
+            ".mov": "video/quicktime",
+            ".avi": "video/avi",
+          };
+          const detectedMime = UPLOAD_MIME_MAP[ext] ?? "application/octet-stream";
+          const allowed = allowedMimeTypes.some((m) => detectedMime === m || (m.endsWith("/*") && detectedMime.startsWith(m.slice(0, -1))));
+          if (!allowed) {
+            throw new Error(`File type '${detectedMime}' (extension '${ext}') is not in allowedMimeTypes: ${allowedMimeTypes.join(", ")}`);
+          }
+        }
+
+        const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to upload the attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const effectiveFileName = fileName ?? path.basename(resolvedPath);
+        const uploadStream = fs.createReadStream(resolvedPath);
+
+        const attachmentRef = await workItemApi.createAttachment({}, uploadStream, effectiveFileName, undefined, resolvedProject);
+
+        if (!attachmentRef?.url) {
+          throw new Error("Upload succeeded but no attachment URL was returned.");
+        }
+
+        const result = {
+          id: attachmentRef.id,
+          url: attachmentRef.url,
+          fileName: effectiveFileName,
+          comment: comment ?? null,
+          uploadedAt: new Date().toISOString(),
+          fileSizeBytes: stat.size,
+        };
+
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`wit_upload_attachment failed: ${message}`);
+      }
+    }
+  );
+
+  server.tool(
+    WORKITEM_TOOLS.add_attachment_to_work_item,
+    `Link an already-uploaded attachment URL to an existing work item. Use the URL returned by ${WORKITEM_TOOLS.upload_attachment}, or any valid Azure DevOps attachment URL.
+
+This is intentionally a separate step from uploading so the same file can be attached to multiple work items without re-uploading, and so each operation remains focused. If a project is not specified, you will be prompted to select one.`,
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      workItemId: z.number().int().positive().describe("ID of the work item to attach the file to."),
+      attachmentUrl: z.string().url().describe("Attachment URL — use the 'url' field returned by wit_upload_attachment, or any valid Azure DevOps attachment URL."),
+      fileName: z.string().describe("Display name for the attachment as it will appear on the work item."),
+      comment: z.string().optional().describe("Optional comment shown in work item history alongside the attachment."),
+    },
+    async ({ project, workItemId, attachmentUrl, fileName, comment }) => {
+      try {
+        const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to add the attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const workItemApi = await connection.getWorkItemTrackingApi();
+
+        const patchDocument = [
+          {
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "AttachedFile",
+              url: attachmentUrl,
+              attributes: {
+                comment: comment ?? "",
+                name: fileName,
+              },
+            },
+          },
+        ];
+
+        const updatedWorkItem = await workItemApi.updateWorkItem({} as never, patchDocument, workItemId, resolvedProject, false, false, false, undefined);
+
+        const result = {
+          workItemId: updatedWorkItem.id,
+          attachedFileName: fileName,
+          attachmentUrl,
+          relations: updatedWorkItem.relations?.map((r) => ({
+            rel: r.rel,
+            url: r.url,
+            name: r.attributes?.["name"],
+            comment: r.attributes?.["comment"],
+          })),
+        };
+
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`wit_add_attachment_to_work_item failed: ${message}`);
       }
     }
   );

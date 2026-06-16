@@ -49,6 +49,7 @@ interface WorkItemTrackingApiMock {
   queryById: jest.Mock;
   queryByWiql: jest.Mock;
   getAttachmentContent: jest.Mock;
+  createAttachment: jest.Mock;
 }
 
 interface MockConnection {
@@ -92,6 +93,7 @@ describe("configureWorkItemTools", () => {
       queryById: jest.fn(),
       queryByWiql: jest.fn(),
       getAttachmentContent: jest.fn(),
+      createAttachment: jest.fn(),
     };
 
     mockConnection = {
@@ -5003,6 +5005,177 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.getRevisions as jest.Mock).mockResolvedValue(revisionsWithNoFields);
       const result = await handler({ project: "P", workItemId: 1, top: 10 });
       expect(result.content[0].text).toBe(JSON.stringify(revisionsWithNoFields, null, 2));
+    });
+  });
+
+  describe("wit_upload_attachment tool", () => {
+    const SAFE_DIR = "/tmp/test-artifacts";
+    const SAFE_FILE = `${SAFE_DIR}/screenshot.png`;
+    const FAKE_ATTACHMENT_URL = "https://dev.azure.com/myorg/_apis/wit/attachments/abc-123";
+
+    beforeEach(() => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.statSync as jest.Mock).mockReturnValue({ isFile: () => true, size: 5_120 });
+      (fs.createReadStream as jest.Mock).mockReturnValue("STREAM" as never);
+      (mockWorkItemTrackingApi.createAttachment as jest.Mock).mockResolvedValue({ id: "abc-123", url: FAKE_ATTACHMENT_URL });
+    });
+
+    it("should upload a file and return the attachment reference", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_upload_attachment");
+      if (!call) throw new Error("wit_upload_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ project: "MyProject", filePath: SAFE_FILE });
+
+      expect(mockWorkItemTrackingApi.createAttachment).toHaveBeenCalledWith({}, "STREAM", "screenshot.png", undefined, "MyProject");
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.url).toBe(FAKE_ATTACHMENT_URL);
+      expect(parsed.id).toBe("abc-123");
+      expect(parsed.fileName).toBe("screenshot.png");
+    });
+
+    it("should use a custom fileName when provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await handler({ project: "MyProject", filePath: SAFE_FILE, fileName: "custom-name.png" });
+
+      expect(mockWorkItemTrackingApi.createAttachment).toHaveBeenCalledWith({}, "STREAM", "custom-name.png", undefined, "MyProject");
+    });
+
+    it("should reject paths containing '..'", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: "/tmp/../etc/passwd" })).rejects.toThrow("Security: filePath must not contain '..' sequences");
+    });
+
+    it("should reject paths outside allowedPaths", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: "/etc/passwd", allowedPaths: [SAFE_DIR] })).rejects.toThrow("Security: filePath");
+    });
+
+    it("should accept paths within allowedPaths", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: SAFE_FILE, allowedPaths: [SAFE_DIR] })).resolves.toBeDefined();
+    });
+
+    it("should reject files exceeding maxFileSizeBytes", async () => {
+      (fs.statSync as jest.Mock).mockReturnValue({ isFile: () => true, size: 20_000_000 });
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: SAFE_FILE, maxFileSizeBytes: 10_485_760 })).rejects.toThrow("exceeds limit");
+    });
+
+    it("should reject disallowed MIME types", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: `${SAFE_DIR}/video.mp4`, allowedMimeTypes: ["image/png", "image/jpeg"] })).rejects.toThrow("not in allowedMimeTypes");
+    });
+
+    it("should accept files matching an allowedMimeTypes wildcard", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: `${SAFE_DIR}/photo.jpg`, allowedMimeTypes: ["image/*"] })).resolves.toBeDefined();
+    });
+
+    it("should throw when file does not exist", async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: SAFE_FILE })).rejects.toThrow("File not found");
+    });
+
+    it("should throw when createAttachment returns no URL", async () => {
+      (mockWorkItemTrackingApi.createAttachment as jest.Mock).mockResolvedValue({});
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_upload_attachment")!;
+
+      await expect(handler({ project: "MyProject", filePath: SAFE_FILE })).rejects.toThrow("no attachment URL was returned");
+    });
+  });
+
+  describe("wit_add_attachment_to_work_item tool", () => {
+    const ATTACHMENT_URL = "https://dev.azure.com/myorg/_apis/wit/attachments/abc-123";
+
+    beforeEach(() => {
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue({
+        id: 99,
+        relations: [
+          {
+            rel: "AttachedFile",
+            url: ATTACHMENT_URL,
+            attributes: { name: "screenshot.png", comment: "Bug evidence" },
+          },
+        ],
+      });
+    });
+
+    it("should patch the work item with an AttachedFile relation", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_attachment_to_work_item");
+      if (!call) throw new Error("wit_add_attachment_to_work_item tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        project: "MyProject",
+        workItemId: 99,
+        attachmentUrl: ATTACHMENT_URL,
+        fileName: "screenshot.png",
+        comment: "Bug evidence",
+      });
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.arrayContaining([
+          expect.objectContaining({
+            op: "add",
+            path: "/relations/-",
+            value: expect.objectContaining({ rel: "AttachedFile", url: ATTACHMENT_URL }),
+          }),
+        ]),
+        99,
+        "MyProject",
+        false,
+        false,
+        false,
+        undefined
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.workItemId).toBe(99);
+      expect(parsed.attachedFileName).toBe("screenshot.png");
+      expect(parsed.relations).toHaveLength(1);
+      expect(parsed.relations[0].rel).toBe("AttachedFile");
+    });
+
+    it("should default comment to empty string when not provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_add_attachment_to_work_item")!;
+
+      await handler({ project: "MyProject", workItemId: 99, attachmentUrl: ATTACHMENT_URL, fileName: "log.txt" });
+
+      const patchDoc = (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mock.calls[0][1];
+      expect(patchDoc[0].value.attributes.comment).toBe("");
+    });
+
+    it("should propagate API errors with context", async () => {
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockRejectedValue(new Error("403 Forbidden"));
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const [, , , handler] = (server.tool as jest.Mock).mock.calls.find(([n]) => n === "wit_add_attachment_to_work_item")!;
+
+      await expect(handler({ project: "MyProject", workItemId: 99, attachmentUrl: ATTACHMENT_URL, fileName: "screenshot.png" })).rejects.toThrow(
+        "wit_add_attachment_to_work_item failed: 403 Forbidden"
+      );
     });
   });
 });
