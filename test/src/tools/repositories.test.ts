@@ -5431,7 +5431,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Reply content" }, "repo123", 456, 789, undefined);
+      expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Reply content", commentType: 1 }, "repo123", 456, 789, undefined);
       expect(result.content[0].text).toBe("Comment successfully added to thread 789.");
     });
 
@@ -5502,7 +5502,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.createThread).toHaveBeenCalledWith(
         {
-          comments: [{ content: "New thread content" }],
+          comments: [{ content: "New thread content", commentType: 1 }],
           threadContext: { filePath: undefined },
           status: undefined, // Default status would be handled by CommentThreadStatus enum lookup
         },
@@ -5539,7 +5539,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.createThread).toHaveBeenCalledWith(
         {
-          comments: [{ content: "Thread with position" }],
+          comments: [{ content: "Thread with position", commentType: 1 }],
           threadContext: {
             filePath: "/src/test.ts",
             rightFileStart: { line: 10, offset: 5 },
@@ -5576,7 +5576,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.createThread).toHaveBeenCalledWith(
         {
-          comments: [{ content: "Thread with normalized path" }],
+          comments: [{ content: "Thread with normalized path", commentType: 1 }],
           threadContext: {
             filePath: "/src/file-without-slash.ts", // Should have leading slash added
           },
@@ -5611,7 +5611,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.createThread).toHaveBeenCalledWith(
         {
-          comments: [{ content: "Thread with existing slash" }],
+          comments: [{ content: "Thread with existing slash", commentType: 1 }],
           threadContext: {
             filePath: "/src/file-with-slash.ts", // Should remain unchanged
           },
@@ -7045,7 +7045,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.createThread).toHaveBeenCalledWith(
         {
-          comments: [{ content: "Test comment" }],
+          comments: [{ content: "Test comment", commentType: 1 }],
           threadContext: {
             filePath: "/test/file.js",
             rightFileStart: { line: 5, offset: 10 },
@@ -7086,7 +7086,7 @@ describe("repos tools", () => {
 
       expect(mockGitApi.createThread).toHaveBeenCalledWith(
         {
-          comments: [{ content: "Test comment" }],
+          comments: [{ content: "Test comment", commentType: 1 }],
           threadContext: {
             filePath: "/test/file.js",
             rightFileStart: { line: 5 },
