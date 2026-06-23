@@ -700,7 +700,7 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki?wikiVersion=GBmain&pagePath=%2FDocs%2FIntro";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki?wikiVersion=GBmain&pagePath=%2FDocs%2FIntro";
       const result = await handler({ url });
 
       expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Docs/Intro", undefined, undefined, true);
@@ -733,7 +733,7 @@ describe("configureWikiTools", () => {
         json: jest.fn().mockResolvedValue({ content: "# Page Title\nBody" }),
       });
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/123/Page-Title";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/123/Page-Title";
       const result = await handler({ url });
 
       // Current implementation may fallback to root path stream retrieval
@@ -766,7 +766,7 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/999/Some-Page";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/999/Some-Page";
       const result = await handler({ url });
 
       // Implementation currently falls back to root path if path not resolved prior to fallback
@@ -780,7 +780,7 @@ describe("configureWikiTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
       if (!call) throw new Error("wiki_get_page_content tool not registered");
       const [, , , handler] = call;
-      const result = await handler({ url: "https://dev.azure.com/org/project/_wiki/wikis/wiki1?pagePath=%2FHome", wikiIdentifier: "wiki1", project: "project" });
+      const result = await handler({ url: "https://dev.azure.com/testorg/project/_wiki/wikis/wiki1?pagePath=%2FHome", wikiIdentifier: "wiki1", project: "project" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Provide either 'url' OR 'wikiIdentifier'");
     });
@@ -817,6 +817,59 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("Error fetching wiki page content: Invalid URL format");
     });
 
+    it("should reject a URL pointing to a different organization (dev.azure.com)", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const url = "https://dev.azure.com/otherorg/project/_wiki/wikis/myWiki?pagePath=%2FHome";
+      const result = await handler({ url });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("does not match the configured organization 'testorg'");
+      expect(result.content[0].text).toContain("Cross-organization requests are not allowed");
+      expect(mockWikiApi.getPageText).not.toHaveBeenCalled();
+    });
+
+    it("should reject a legacy visualstudio.com URL pointing to a different organization", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const url = "https://otherorg.visualstudio.com/project/_wiki/wikis/myWiki?pagePath=%2FHome";
+      const result = await handler({ url });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("organization 'otherorg'");
+      expect(mockWikiApi.getPageText).not.toHaveBeenCalled();
+    });
+
+    it("should allow a URL that matches the configured organization regardless of casing", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
+      if (!call) throw new Error("wiki_get_page_content tool not registered");
+      const [, , , handler] = call;
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("same org content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/TestOrg/project/_wiki/wikis/myWiki?pagePath=%2FHome";
+      const result = await handler({ url });
+
+      expect(result.isError).toBeUndefined();
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Home", undefined, undefined, true);
+      expect(result.content[0].text).toContain("same org content");
+    });
+
     it("should handle URL with pageId that returns 404", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki_get_page_content");
@@ -832,7 +885,7 @@ describe("configureWikiTools", () => {
         status: 404,
       });
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/999/NonExistent-Page";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/999/NonExistent-Page";
       const result = await handler({ url });
 
       expect(result.isError).toBe(true);
@@ -868,7 +921,7 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/not-a-number/Some-Page";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/not-a-number/Some-Page";
       const result = await handler({ url });
 
       expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
@@ -898,7 +951,7 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/123/Page-Title";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/123/Page-Title";
       const result = await handler({ url });
 
       expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
@@ -921,7 +974,7 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki?pagePath=Home";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki?pagePath=Home";
       const result = await handler({ url });
 
       expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Home", undefined, undefined, true);
@@ -944,7 +997,7 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki";
       const result = await handler({ url });
 
       expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
@@ -1035,7 +1088,7 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/123/Page-Title";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/123/Page-Title";
       const result = await handler({ url });
 
       expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, undefined, true);
@@ -1771,7 +1824,7 @@ describe("configureWikiTools", () => {
         json: jest.fn().mockResolvedValue({ content: pageContent }),
       });
 
-      const url = "https://dev.azure.com/org/project/_wiki/wikis/myWiki/123/Page-Title";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/123/Page-Title";
       const result = await handler({ url });
 
       const responseText = result.content[0].text;
