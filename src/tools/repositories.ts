@@ -10,6 +10,7 @@ import {
   GitQueryCommitsCriteria,
   GitVersionType,
   GitVersionDescriptor,
+  GitHistoryMode,
   GitPullRequestQuery,
   GitPullRequestQueryInput,
   GitPullRequestQueryType,
@@ -1740,11 +1741,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
   server.tool(
     REPO_TOOLS.search_commits,
-    "Search for commits in a repository with comprehensive filtering capabilities. Supports searching by description/comment text, time range, author, committer, specific commit IDs, and more. NOTE: searchText, authorEmail, committer, and committerEmail are client-side filters — they run against the commits already fetched from the API (limited by 'skip' and 'top'), not against the full repository history. Use API-level filters (fromDate, toDate, author, version) to narrow results before these filters apply.",
+    "Search for commits in a repository. All filters are passed directly to the Azure DevOps API (server-side). Supports filtering by date range, author, branch/tag/commit, commit ID range, and specific commit IDs.",
     {
       project: z.string().describe("Project name or ID"),
       repository: z.string().describe("Repository name or ID"),
-      // Existing parameters
       fromCommit: z.string().optional().describe("Starting commit ID"),
       toCommit: z.string().optional().describe("Ending commit ID"),
       version: z.string().optional().describe("The name of the branch, tag or commit to filter commits by"),
@@ -1757,38 +1757,14 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       top: z.coerce.number().optional().default(10).describe("Maximum number of commits to return"),
       includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
       includeWorkItems: z.boolean().optional().default(false).describe("Include associated work items"),
-      // Enhanced search parameters
-      searchText: z.string().optional().describe("Search text to filter commits by description/comment. Supports partial matching. Client-side only: filters within the commits already fetched."),
-      author: z.string().optional().describe("Filter commits by author email or display name"),
-      authorEmail: z.string().optional().describe("Filter commits by exact author email address. Client-side only: filters within the commits already fetched."),
-      committer: z.string().optional().describe("Filter commits by committer email or display name. Client-side only: filters within the commits already fetched."),
-      committerEmail: z.string().optional().describe("Filter commits by exact committer email address. Client-side only: filters within the commits already fetched."),
+      author: z.string().optional().describe("Filter commits by author alias or display name."),
+      user: z.string().optional().describe("Filter commits by committer alias or display name."),
       fromDate: z.string().optional().describe("Filter commits from this date (ISO 8601 format, e.g., '2024-01-01T00:00:00Z')"),
       toDate: z.string().optional().describe("Filter commits to this date (ISO 8601 format, e.g., '2024-12-31T23:59:59Z')"),
       commitIds: z.array(z.string()).optional().describe("Array of specific commit IDs to retrieve. When provided, other filters are ignored except top/skip."),
-      historySimplificationMode: z.enum(["FirstParent", "SimplifyMerges", "FullHistory", "FullHistorySimplifyMerges"]).optional().describe("How to simplify the commit history"),
+      historyMode: z.enum(["SimplifiedHistory", "FirstParent", "FullHistory", "FullHistorySimplifyMerges"]).optional().describe("Git history traversal mode."),
     },
-    async ({
-      project,
-      repository,
-      fromCommit,
-      toCommit,
-      version,
-      versionType,
-      skip,
-      top,
-      includeLinks,
-      includeWorkItems,
-      searchText,
-      author,
-      authorEmail,
-      committer,
-      committerEmail,
-      fromDate,
-      toDate,
-      commitIds,
-      historySimplificationMode,
-    }) => {
+    async ({ project, repository, fromCommit, toCommit, version, versionType, skip, top, includeLinks, includeWorkItems, author, user, fromDate, toDate, commitIds, historyMode }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -1846,6 +1822,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           searchCriteria.author = author;
         }
 
+        // Add committer filter
+        if (user) {
+          searchCriteria.user = user;
+        }
+
         // Add date range filters (ADO API expects ISO string format)
         if (fromDate) {
           searchCriteria.fromDate = fromDate;
@@ -1854,12 +1835,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           searchCriteria.toDate = toDate;
         }
 
-        // Add history simplification if specified
-        if (historySimplificationMode) {
-          // Note: This parameter might not be directly supported by all ADO API versions
-          // but we'll include it in the criteria for forward compatibility
-          const extendedCriteria = searchCriteria as GitQueryCommitsCriteria & { historySimplificationMode?: string };
-          extendedCriteria.historySimplificationMode = historySimplificationMode;
+        // Add history mode if specified
+        if (historyMode) {
+          searchCriteria.historyMode = GitHistoryMode[historyMode as keyof typeof GitHistoryMode];
         }
 
         if (version) {
@@ -1872,33 +1850,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
         const commits = await gitApi.getCommits(repository, searchCriteria, project, skip, top);
 
-        // Additional client-side filtering for enhanced search capabilities
-        let filteredCommits = commits;
-
-        // Filter by search text in commit message if not handled by API
-        if (searchText && filteredCommits) {
-          filteredCommits = filteredCommits.filter((commit) => commit.comment?.toLowerCase().includes(searchText.toLowerCase()));
-        }
-
-        // Filter by author email if specified
-        if (authorEmail && filteredCommits) {
-          filteredCommits = filteredCommits.filter((commit) => commit.author?.email?.toLowerCase() === authorEmail.toLowerCase());
-        }
-
-        // Filter by committer if specified
-        if (committer && filteredCommits) {
-          filteredCommits = filteredCommits.filter(
-            (commit) => commit.committer?.name?.toLowerCase().includes(committer.toLowerCase()) || commit.committer?.email?.toLowerCase().includes(committer.toLowerCase())
-          );
-        }
-
-        // Filter by committer email if specified
-        if (committerEmail && filteredCommits) {
-          filteredCommits = filteredCommits.filter((commit) => commit.committer?.email?.toLowerCase() === committerEmail.toLowerCase());
-        }
-
         return {
-          content: [{ type: "text", text: JSON.stringify(filteredCommits, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(commits, null, 2) }],
         };
       } catch (error) {
         return {
