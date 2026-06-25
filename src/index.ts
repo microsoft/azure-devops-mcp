@@ -6,13 +6,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getBearerHandler, getPersonalAccessTokenHandler, WebApi } from "azure-devops-node-api";
-import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import { createAuthenticator } from "./auth.js";
 import { logger } from "./logger.js";
 import { getOrgTenant } from "./org-tenants.js";
+import { configureProxyDispatcher } from "./proxy.js";
 //import { configurePrompts } from "./prompts.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
@@ -81,9 +81,7 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
-  const proxy = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? process.env.HTTP_PROXY ?? process.env.http_proxy;
-  if (proxy) {
-    setGlobalDispatcher(new EnvHttpProxyAgent());
+  if (configureProxyDispatcher()) {
     logger.debug("Proxy environment detected: configured undici EnvHttpProxyAgent for all fetch() calls");
   }
 
