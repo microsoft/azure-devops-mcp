@@ -6,6 +6,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getBearerHandler, getPersonalAccessTokenHandler, WebApi } from "azure-devops-node-api";
+import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -80,6 +81,12 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
 }
 
 async function main() {
+  const proxy = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? process.env.HTTP_PROXY ?? process.env.http_proxy;
+  if (proxy) {
+    setGlobalDispatcher(new EnvHttpProxyAgent());
+    logger.debug("Proxy environment detected: configured undici EnvHttpProxyAgent for all fetch() calls");
+  }
+
   logger.info("Starting Azure DevOps MCP Server", {
     organization: orgName,
     organizationUrl: orgUrl,
