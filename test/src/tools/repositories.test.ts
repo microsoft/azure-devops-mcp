@@ -5992,19 +5992,19 @@ describe("repos tools", () => {
       results: [
         {
           commitId: "abc123",
-          commitTitle: "Fix authentication bug",
-          commitDescription: "Fixed null pointer in auth module",
-          authorName: "dpaquette",
-          repositoryName: "MyRepo",
-          projectName: "MyProject",
+          commitTitle: "test commit title one",
+          commitDescription: "test commit description one",
+          authorName: "test-author-1",
+          repositoryName: "test-repo",
+          projectName: "test-project",
         },
         {
           commitId: "def456",
-          commitTitle: "Add feature flag support",
-          commitDescription: "Added feature flag infrastructure",
-          authorName: "krid",
-          repositoryName: "MyRepo",
-          projectName: "MyProject",
+          commitTitle: "test commit title two",
+          commitDescription: "test commit description two",
+          authorName: "test-author-2",
+          repositoryName: "test-repo",
+          projectName: "test-project",
         },
       ],
     };
@@ -6054,20 +6054,20 @@ describe("repos tools", () => {
       const handler = getHandler();
 
       // Zod transform converts string → string[] before handler is called; pass post-transform value
-      await handler({ searchText: "auth", project: ["MyProject"], skip: 0, top: 10, includeFacets: false });
+      await handler({ searchText: "test search", project: ["test-project"], skip: 0, top: 10, includeFacets: false });
 
       const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
-      expect(body.filters.projectName).toEqual(["MyProject"]);
+      expect(body.filters.projectName).toEqual(["test-project"]);
     });
 
     it("should send projectName filter when project is provided as array", async () => {
       const mockFetch = setupFetchMock(true, mockSearchResponse);
       const handler = getHandler();
 
-      await handler({ searchText: "auth", project: ["Project1", "Project2"], skip: 0, top: 10, includeFacets: false });
+      await handler({ searchText: "test search", project: ["test-project-1", "test-project-2"], skip: 0, top: 10, includeFacets: false });
 
       const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
-      expect(body.filters.projectName).toEqual(["Project1", "Project2"]);
+      expect(body.filters.projectName).toEqual(["test-project-1", "test-project-2"]);
     });
 
     it("should send repositoryName filter for multiple repos", async () => {
@@ -6075,16 +6075,16 @@ describe("repos tools", () => {
       const handler = getHandler();
 
       await handler({
-        searchText: "refactor",
-        project: ["AzureDevOps"],
-        repository: ["AzureDevOps", "azure-devops-remote-mcp"],
+        searchText: "test search",
+        project: ["test-project"],
+        repository: ["test-repo-1", "test-repo-2"],
         skip: 0,
         top: 10,
         includeFacets: false,
       });
 
       const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
-      expect(body.filters.repositoryName).toEqual(["AzureDevOps", "azure-devops-remote-mcp"]);
+      expect(body.filters.repositoryName).toEqual(["test-repo-1", "test-repo-2"]);
     });
 
     it("should send authorName filter for multiple authors", async () => {
@@ -6092,15 +6092,15 @@ describe("repos tools", () => {
       const handler = getHandler();
 
       await handler({
-        searchText: "update",
-        author: ["dpaquette", "krid"],
+        searchText: "test search",
+        author: ["test-author-1", "test-author-2"],
         skip: 0,
         top: 10,
         includeFacets: false,
       });
 
       const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
-      expect(body.filters.authorName).toEqual(["dpaquette", "krid"]);
+      expect(body.filters.authorName).toEqual(["test-author-1", "test-author-2"]);
     });
 
     it("should send branchName filter", async () => {
@@ -6193,11 +6193,11 @@ describe("repos tools", () => {
       const handler = getHandler();
 
       await handler({
-        searchText: "api",
-        project: ["AzureDevOps"],
-        repository: ["AzureDevOps", "azure-devops-remote-mcp"],
-        branch: ["main"],
-        author: ["dpaquette", "krid"],
+        searchText: "test search",
+        project: ["test-project"],
+        repository: ["test-repo-1", "test-repo-2"],
+        branch: ["test-branch-1"],
+        author: ["test-author-1", "test-author-2"],
         commitStartDate: "2024-01-01",
         commitEndDate: "2025-12-31T23:59:59",
         orderBy: "DESC",
@@ -6207,11 +6207,11 @@ describe("repos tools", () => {
       });
 
       const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
-      expect(body.searchText).toBe("api");
-      expect(body.filters.projectName).toEqual(["AzureDevOps"]);
-      expect(body.filters.repositoryName).toEqual(["AzureDevOps", "azure-devops-remote-mcp"]);
-      expect(body.filters.branchName).toEqual(["main"]);
-      expect(body.filters.authorName).toEqual(["dpaquette", "krid"]);
+      expect(body.searchText).toBe("test search");
+      expect(body.filters.projectName).toEqual(["test-project"]);
+      expect(body.filters.repositoryName).toEqual(["test-repo-1", "test-repo-2"]);
+      expect(body.filters.branchName).toEqual(["test-branch-1"]);
+      expect(body.filters.authorName).toEqual(["test-author-1", "test-author-2"]);
       expect(body.filters.commitStartDate).toEqual(["2024-01-01"]);
       expect(body.filters.commitEndDate).toEqual(["2025-12-31T23:59:59"]);
       expect(body.$orderBy).toEqual([{ field: "commitDate", sortOrder: "DESC" }]);
@@ -7916,8 +7916,8 @@ describe("repos tools", () => {
         global.fetch = mockFetch;
 
         await handler({
-          searchText: "authentication",
-          author: ["john@example.com"],
+          searchText: "test search",
+          author: ["test-author@example.com"],
           commitStartDate: "2023-01-01",
           commitEndDate: "2023-12-31T23:59:59",
           skip: 0,
@@ -7926,7 +7926,7 @@ describe("repos tools", () => {
         });
 
         const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
-        expect(body.filters.authorName).toEqual(["john@example.com"]);
+        expect(body.filters.authorName).toEqual(["test-author@example.com"]);
         expect(body.filters.commitStartDate).toEqual(["2023-01-01"]);
         expect(body.filters.commitEndDate).toEqual(["2023-12-31T23:59:59"]);
       });
