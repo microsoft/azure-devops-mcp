@@ -1748,10 +1748,10 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z
         .union([z.string().transform((value) => [value]), z.array(z.string())])
         .optional()
-        .describe("Filter by projects"),
-      repository: z.array(z.string()).optional().describe("Filter by repositories"),
-      branch: z.array(z.string()).optional().describe("Filter by branches"),
-      author: z.array(z.string()).optional().describe("Filter by commit authors. Only full display names are supported."),
+        .describe("The names of the projects to search within. If omitted, searches across all projects in the organization."),
+      repository: z.array(z.string()).optional().describe("The names of the repositories to search within. If omitted, searches across all repositories in the specified projects."),
+      branch: z.array(z.string()).optional().describe("The names of the repository branches to search within. If omitted, searches across all branches in the specified repositories."),
+      author: z.array(z.string()).optional().describe("The names of the commit authors to search for. Only full display names are supported."),
       commitStartDate: z.string().optional().describe("Filter commits from this date (format: 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS')"),
       commitEndDate: z.string().optional().describe("Filter commits up to this date (format: 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS', e.g. '2025-06-19T23:59:59' for full day)"),
       orderBy: z.enum(["ASC", "DESC"]).optional().describe("Sort commits by date: 'ASC' for oldest-first, 'DESC' for newest-first. Defaults to relevance if omitted."),
