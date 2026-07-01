@@ -277,10 +277,10 @@ Create a new branch in the repository.
 
 ### mcp_ado_repo_search_commits
 
-Search for commits in a repository with comprehensive filtering capabilities.
+Search for commits across projects and repositories with comprehensive filtering capabilities.
 
-- **Required**: `project`, `repository`
-- **Optional**: `author`, `authorEmail`, `commitIds`, `committer`, `committerEmail`, `fromCommit`, `fromDate`, `historySimplificationMode`, `includeLinks`, `includeWorkItems`, `searchText`, `skip`, `toCommit`, `toDate`, `top`, `version`, `versionType`
+- **Required**: `searchText`
+- **Optional**: `project`, `repository`, `branch`, `author`, `commitStartDate`, `commitEndDate`, `orderBy`, `includeFacets`, `skip`, `top`
 
 ### mcp_ado_repo_list_pull_requests_by_repo_or_project
 
