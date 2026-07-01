@@ -7,10 +7,8 @@ import {
   GitRef,
   GitForkRef,
   PullRequestStatus,
-  GitQueryCommitsCriteria,
   GitVersionType,
   GitVersionDescriptor,
-  GitHistoryMode,
   GitPullRequestQuery,
   GitPullRequestQueryInput,
   GitPullRequestQueryType,
@@ -1737,8 +1735,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       }
     }
   );
-
-  const gitVersionTypeStrings = Object.values(GitVersionType).filter((value): value is string => typeof value === "string");
 
   server.tool(
     REPO_TOOLS.search_commits,
