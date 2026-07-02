@@ -7,7 +7,6 @@ import {
   GitRef,
   GitForkRef,
   PullRequestStatus,
-  GitQueryCommitsCriteria,
   GitVersionType,
   GitVersionDescriptor,
   GitPullRequestQuery,
@@ -27,7 +26,8 @@ import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { extractAdoStreamError, getEnumKeys, streamToString } from "../utils.js";
+import { extractAdoStreamError, getEnumKeys, streamToString, apiVersion } from "../utils.js";
+import { orgName } from "../index.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -1736,181 +1736,68 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     }
   );
 
-  const gitVersionTypeStrings = Object.values(GitVersionType).filter((value): value is string => typeof value === "string");
-
   server.tool(
     REPO_TOOLS.search_commits,
-    "Search for commits in a repository with comprehensive filtering capabilities. Supports searching by description/comment text, time range, author, committer, specific commit IDs, and more. This is the unified tool for all commit search operations.",
+    "Search for commits in a repository with comprehensive filtering capabilities. Supports searching by description/comment text, time range, author and more.",
     {
-      project: z.string().describe("Project name or ID"),
-      repository: z.string().describe("Repository name or ID"),
-      // Existing parameters
-      fromCommit: z.string().optional().describe("Starting commit ID"),
-      toCommit: z.string().optional().describe("Ending commit ID"),
-      version: z.string().optional().describe("The name of the branch, tag or commit to filter commits by"),
-      versionType: z
-        .enum(gitVersionTypeStrings as [string, ...string[]])
+      searchText: z.string().describe("Keywords to search for in commit messages"),
+      project: z
+        .union([z.string().transform((value) => [value]), z.array(z.string())])
         .optional()
-        .default(GitVersionType[GitVersionType.Branch])
-        .describe("The meaning of the version parameter, e.g., branch, tag or commit"),
-      skip: z.coerce.number().optional().default(0).describe("Number of commits to skip"),
-      top: z.coerce.number().optional().default(10).describe("Maximum number of commits to return"),
-      includeLinks: z.boolean().optional().default(false).describe("Include commit links"),
-      includeWorkItems: z.boolean().optional().default(false).describe("Include associated work items"),
-      // Enhanced search parameters
-      searchText: z.string().optional().describe("Search text to filter commits by description/comment. Supports partial matching."),
-      author: z.string().optional().describe("Filter commits by author email or display name"),
-      authorEmail: z.string().optional().describe("Filter commits by exact author email address"),
-      committer: z.string().optional().describe("Filter commits by committer email or display name"),
-      committerEmail: z.string().optional().describe("Filter commits by exact committer email address"),
-      fromDate: z.string().optional().describe("Filter commits from this date (ISO 8601 format, e.g., '2024-01-01T00:00:00Z')"),
-      toDate: z.string().optional().describe("Filter commits to this date (ISO 8601 format, e.g., '2024-12-31T23:59:59Z')"),
-      commitIds: z.array(z.string()).optional().describe("Array of specific commit IDs to retrieve. When provided, other filters are ignored except top/skip."),
-      historySimplificationMode: z.enum(["FirstParent", "SimplifyMerges", "FullHistory", "FullHistorySimplifyMerges"]).optional().describe("How to simplify the commit history"),
+        .describe("The names of the projects to search within. If omitted, searches across all projects in the organization."),
+      repository: z.array(z.string()).optional().describe("The names of the repositories to search within. If omitted, searches across all repositories in the specified projects."),
+      branch: z.array(z.string()).optional().describe("The names of the repository branches to search within. If omitted, searches across all branches in the specified repositories."),
+      author: z.array(z.string()).optional().describe("The names of the commit authors to search for. Only full display names are supported."),
+      commitStartDate: z.string().optional().describe("Filter commits from this date (format: 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS')"),
+      commitEndDate: z.string().optional().describe("Filter commits up to this date (format: 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS', e.g. '2025-06-19T23:59:59' for full day)"),
+      orderBy: z.enum(["ASC", "DESC"]).optional().describe("Sort commits by date: 'ASC' for oldest-first, 'DESC' for newest-first. Defaults to relevance if omitted."),
+      includeFacets: z.boolean().default(false).describe("Include facets in the search results"),
+      skip: z.coerce.number().default(0).describe("Number of results to skip"),
+      top: z.coerce.number().default(10).describe("Maximum number of results to return"),
     },
-    async ({
-      project,
-      repository,
-      fromCommit,
-      toCommit,
-      version,
-      versionType,
-      skip,
-      top,
-      includeLinks,
-      includeWorkItems,
-      searchText,
-      author,
-      authorEmail,
-      committer,
-      committerEmail,
-      fromDate,
-      toDate,
-      commitIds,
-      historySimplificationMode,
-    }) => {
-      try {
-        const connection = await connectionProvider();
-        const gitApi = await connection.getGitApi();
+    async ({ searchText, project, repository, branch, author, commitStartDate, commitEndDate, orderBy, includeFacets, skip, top }) => {
+      const accessToken = await tokenProvider();
+      const url = `https://almsearch.dev.azure.com/${orgName}/_apis/search/commitSearchResults?api-version=${apiVersion}`;
 
-        // If specific commit IDs are provided, use getCommits with commit ID filtering
-        if (commitIds && commitIds.length > 0) {
-          const commits = [];
-          const batchSize = Math.min(top || 10, commitIds.length);
-          const startIndex = skip || 0;
-          const endIndex = Math.min(startIndex + batchSize, commitIds.length);
+      const requestBody: Record<string, unknown> = {
+        searchText,
+        includeFacets,
+        $skip: skip,
+        $top: top,
+      };
 
-          // Process commits in the requested range
-          const requestedCommitIds = commitIds.slice(startIndex, endIndex);
+      const filters: Record<string, string[]> = {};
+      if (project && project.length > 0) filters.projectName = project;
+      if (repository && repository.length > 0) filters.repositoryName = repository;
+      if (branch && branch.length > 0) filters.branchName = branch;
+      if (author && author.length > 0) filters.authorName = author;
+      if (commitStartDate) filters.commitStartDate = [commitStartDate];
+      if (commitEndDate) filters.commitEndDate = [commitEndDate];
 
-          // Use getCommits for each commit ID to maintain consistency
-          for (const commitId of requestedCommitIds) {
-            try {
-              const searchCriteria: GitQueryCommitsCriteria = {
-                includeLinks: includeLinks,
-                includeWorkItems: includeWorkItems,
-                fromCommitId: commitId,
-                toCommitId: commitId,
-              };
+      requestBody.filters = filters;
 
-              const commitResults = await gitApi.getCommits(repository, searchCriteria, project, 0, 1);
-
-              if (commitResults && commitResults.length > 0) {
-                commits.push(commitResults[0]);
-              }
-            } catch (error) {
-              // Log error but continue with other commits
-              console.warn(`Failed to retrieve commit ${commitId}: ${error instanceof Error ? error.message : String(error)}`);
-              // Add error information to result instead of failing completely
-              commits.push({
-                commitId: commitId,
-                error: `Failed to retrieve: ${error instanceof Error ? error.message : String(error)}`,
-              });
-            }
-          }
-
-          return {
-            content: [{ type: "text", text: JSON.stringify(commits, null, 2) }],
-          };
-        }
-
-        const searchCriteria: GitQueryCommitsCriteria = {
-          fromCommitId: fromCommit,
-          toCommitId: toCommit,
-          includeLinks: includeLinks,
-          includeWorkItems: includeWorkItems,
-        };
-
-        // Add author filter
-        if (author) {
-          searchCriteria.author = author;
-        }
-
-        // Add date range filters (ADO API expects ISO string format)
-        if (fromDate) {
-          searchCriteria.fromDate = fromDate;
-        }
-        if (toDate) {
-          searchCriteria.toDate = toDate;
-        }
-
-        // Add history simplification if specified
-        if (historySimplificationMode) {
-          // Note: This parameter might not be directly supported by all ADO API versions
-          // but we'll include it in the criteria for forward compatibility
-          const extendedCriteria = searchCriteria as GitQueryCommitsCriteria & { historySimplificationMode?: string };
-          extendedCriteria.historySimplificationMode = historySimplificationMode;
-        }
-
-        if (version) {
-          const itemVersion: GitVersionDescriptor = {
-            version: version,
-            versionType: GitVersionType[versionType as keyof typeof GitVersionType],
-          };
-          searchCriteria.itemVersion = itemVersion;
-        }
-
-        const commits = await gitApi.getCommits(repository, searchCriteria, project, skip, top);
-
-        // Additional client-side filtering for enhanced search capabilities
-        let filteredCommits = commits;
-
-        // Filter by search text in commit message if not handled by API
-        if (searchText && filteredCommits) {
-          filteredCommits = filteredCommits.filter((commit) => commit.comment?.toLowerCase().includes(searchText.toLowerCase()));
-        }
-
-        // Filter by author email if specified
-        if (authorEmail && filteredCommits) {
-          filteredCommits = filteredCommits.filter((commit) => commit.author?.email?.toLowerCase() === authorEmail.toLowerCase());
-        }
-
-        // Filter by committer if specified
-        if (committer && filteredCommits) {
-          filteredCommits = filteredCommits.filter(
-            (commit) => commit.committer?.name?.toLowerCase().includes(committer.toLowerCase()) || commit.committer?.email?.toLowerCase().includes(committer.toLowerCase())
-          );
-        }
-
-        // Filter by committer email if specified
-        if (committerEmail && filteredCommits) {
-          filteredCommits = filteredCommits.filter((commit) => commit.committer?.email?.toLowerCase() === committerEmail.toLowerCase());
-        }
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(filteredCommits, null, 2) }],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error searching commits: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+      if (orderBy) {
+        requestBody.$orderBy = [{ field: "commitDate", sortOrder: orderBy }];
       }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+          "User-Agent": userAgentProvider(),
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Azure DevOps Commit Search API error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.text();
+      return {
+        content: [{ type: "text", text: result }],
+      };
     }
   );
 

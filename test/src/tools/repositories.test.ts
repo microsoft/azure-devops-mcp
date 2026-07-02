@@ -13,6 +13,9 @@ jest.mock("../../../src/tools/auth", () => ({
   getUserIdFromEmail: jest.fn(),
 }));
 
+// Mock index.js to avoid yargs CLI parsing at import time
+jest.mock("../../../src/index", () => ({ orgName: "test-org" }));
+
 const mockGetCurrentUserDetails = getCurrentUserDetails as jest.MockedFunction<typeof getCurrentUserDetails>;
 const mockGetUserIdFromEmail = getUserIdFromEmail as jest.MockedFunction<typeof getUserIdFromEmail>;
 
@@ -5984,68 +5987,244 @@ describe("repos tools", () => {
   });
 
   describe("repo_search_commits", () => {
-    it("should search commits successfully", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+    const mockSearchResponse = {
+      count: 2,
+      results: [
+        {
+          commitId: "abc123",
+          commitTitle: "test commit title one",
+          commitDescription: "test commit description one",
+          authorName: "test-author-1",
+          repositoryName: "test-repo",
+          projectName: "test-project",
+        },
+        {
+          commitId: "def456",
+          commitTitle: "test commit title two",
+          commitDescription: "test commit description two",
+          authorName: "test-author-2",
+          repositoryName: "test-repo",
+          projectName: "test-project",
+        },
+      ],
+    };
 
+    function setupFetchMock(ok: boolean, body: unknown, status = 200, statusText = "OK") {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok,
+        status,
+        statusText,
+        text: () => Promise.resolve(JSON.stringify(body)),
+      });
+      global.fetch = mockFetch;
+      return mockFetch;
+    }
+
+    function getHandler() {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
       if (!call) throw new Error("repo_search_commits tool not registered");
       const [, , , handler] = call;
+      return handler;
+    }
 
-      const mockCommits = [
-        { commitId: "abc123", comment: "Initial commit" },
-        { commitId: "def456", comment: "Add feature" },
-      ];
-      mockGitApi.getCommits.mockResolvedValue(mockCommits);
-
-      const params = {
-        project: "test-project",
-        repository: "test-repo",
-        version: "main",
-        versionType: "Branch",
-        skip: 0,
-        top: 10,
-      };
-
-      const result = await handler(params);
-
-      expect(mockGitApi.getCommits).toHaveBeenCalledWith(
-        "test-repo",
-        {
-          fromCommitId: undefined,
-          toCommitId: undefined,
-          includeLinks: undefined,
-          includeWorkItems: undefined,
-          itemVersion: {
-            version: "main",
-            versionType: GitVersionType.Branch,
-          },
-        },
-        "test-project",
-        0,
-        10
-      );
-
-      expect(result.content[0].text).toBe(JSON.stringify(mockCommits, null, 2));
+    beforeEach(() => {
+      tokenProvider.mockResolvedValue("fake-token");
     });
 
-    it("should handle commit search errors", async () => {
-      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+    it("should search commits with searchText only and always send filters: {}", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
 
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
-      if (!call) throw new Error("repo_search_commits tool not registered");
-      const [, , , handler] = call;
+      const result = await handler({ searchText: "fix bug", skip: 0, top: 10, includeFacets: false });
 
-      mockGitApi.getCommits.mockRejectedValue(new Error("API Error"));
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("commitSearchResults"),
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({ Authorization: "Bearer fake-token" }),
+          body: expect.stringContaining('"filters":{}'),
+        })
+      );
+      expect(result.content[0].text).toBe(JSON.stringify(mockSearchResponse));
+    });
 
-      const params = {
-        project: "test-project",
-        repository: "test-repo",
-      };
+    it("should send projectName filter when project is provided as string", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
 
-      const result = await handler(params);
+      // Zod transform converts string → string[] before handler is called; pass post-transform value
+      await handler({ searchText: "test search", project: ["test-project"], skip: 0, top: 10, includeFacets: false });
 
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Error searching commits: API Error");
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.projectName).toEqual(["test-project"]);
+    });
+
+    it("should send projectName filter when project is provided as array", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({ searchText: "test search", project: ["test-project-1", "test-project-2"], skip: 0, top: 10, includeFacets: false });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.projectName).toEqual(["test-project-1", "test-project-2"]);
+    });
+
+    it("should send repositoryName filter for multiple repos", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({
+        searchText: "test search",
+        project: ["test-project"],
+        repository: ["test-repo-1", "test-repo-2"],
+        skip: 0,
+        top: 10,
+        includeFacets: false,
+      });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.repositoryName).toEqual(["test-repo-1", "test-repo-2"]);
+    });
+
+    it("should send authorName filter for multiple authors", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({
+        searchText: "test search",
+        author: ["test-author-1", "test-author-2"],
+        skip: 0,
+        top: 10,
+        includeFacets: false,
+      });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.authorName).toEqual(["test-author-1", "test-author-2"]);
+    });
+
+    it("should send branchName filter", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({
+        searchText: "security",
+        branch: ["main", "develop"],
+        skip: 0,
+        top: 10,
+        includeFacets: false,
+      });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.branchName).toEqual(["main", "develop"]);
+    });
+
+    it("should send commitStartDate and commitEndDate filters", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({
+        searchText: "merge",
+        commitStartDate: "2025-01-01",
+        commitEndDate: "2025-06-30T23:59:59",
+        skip: 0,
+        top: 10,
+        includeFacets: false,
+      });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.commitStartDate).toEqual(["2025-01-01"]);
+      expect(body.filters.commitEndDate).toEqual(["2025-06-30T23:59:59"]);
+    });
+
+    it("should send $orderBy with commitDate DESC when orderBy is DESC", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({ searchText: "fix", orderBy: "DESC", skip: 0, top: 10, includeFacets: false });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.$orderBy).toEqual([{ field: "commitDate", sortOrder: "DESC" }]);
+    });
+
+    it("should send $orderBy with commitDate ASC when orderBy is ASC", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({ searchText: "init", orderBy: "ASC", skip: 0, top: 10, includeFacets: false });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.$orderBy).toEqual([{ field: "commitDate", sortOrder: "ASC" }]);
+    });
+
+    it("should not send $orderBy when orderBy is omitted", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({ searchText: "fix", skip: 0, top: 10, includeFacets: false });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.$orderBy).toBeUndefined();
+    });
+
+    it("should send includeFacets: true when requested", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({ searchText: "api", includeFacets: true, skip: 0, top: 25 });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.includeFacets).toBe(true);
+    });
+
+    it("should send $skip and $top for pagination", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({ searchText: "test", skip: 10, top: 5, includeFacets: false });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.$skip).toBe(10);
+      expect(body.$top).toBe(5);
+    });
+
+    it("should send all filters combined (kitchen sink)", async () => {
+      const mockFetch = setupFetchMock(true, mockSearchResponse);
+      const handler = getHandler();
+
+      await handler({
+        searchText: "test search",
+        project: ["test-project"],
+        repository: ["test-repo-1", "test-repo-2"],
+        branch: ["test-branch-1"],
+        author: ["test-author-1", "test-author-2"],
+        commitStartDate: "2024-01-01",
+        commitEndDate: "2025-12-31T23:59:59",
+        orderBy: "DESC",
+        includeFacets: true,
+        skip: 0,
+        top: 25,
+      });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.searchText).toBe("test search");
+      expect(body.filters.projectName).toEqual(["test-project"]);
+      expect(body.filters.repositoryName).toEqual(["test-repo-1", "test-repo-2"]);
+      expect(body.filters.branchName).toEqual(["test-branch-1"]);
+      expect(body.filters.authorName).toEqual(["test-author-1", "test-author-2"]);
+      expect(body.filters.commitStartDate).toEqual(["2024-01-01"]);
+      expect(body.filters.commitEndDate).toEqual(["2025-12-31T23:59:59"]);
+      expect(body.$orderBy).toEqual([{ field: "commitDate", sortOrder: "DESC" }]);
+      expect(body.includeFacets).toBe(true);
+      expect(body.$skip).toBe(0);
+      expect(body.$top).toBe(25);
+    });
+
+    it("should throw an error when the API returns a non-OK response", async () => {
+      setupFetchMock(false, { message: "Bad Request" }, 400, "Bad Request");
+      const handler = getHandler();
+
+      await expect(handler({ searchText: "fix", skip: 0, top: 10, includeFacets: false })).rejects.toThrow("Azure DevOps Commit Search API error: 400 Bad Request");
     });
   });
 
@@ -6410,17 +6589,10 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_search_commits tool not registered");
       const [, , , handler] = call;
 
-      mockGitApi.getCommits.mockRejectedValue(new Error("API Error"));
+      tokenProvider.mockResolvedValue("fake-token");
+      global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, statusText: "Internal Server Error", text: jest.fn() });
 
-      const params = {
-        project: "test-project",
-        repository: "test-repo",
-      };
-
-      const result = await handler(params);
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Error searching commits: API Error");
+      await expect(handler({ searchText: "fix", skip: 0, top: 10, includeFacets: false })).rejects.toThrow("Azure DevOps Commit Search API error: 500 Internal Server Error");
     });
 
     it("should handle thread creation error", async () => {
@@ -7102,86 +7274,44 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
     });
 
-    it("should handle search_commits with version parameter", async () => {
+    it("should handle search_commits with branch filter", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
       if (!call) throw new Error("repo_search_commits tool not registered");
       const [, , , handler] = call;
 
-      const mockCommits = [{ commitId: "abc123", comment: "Test commit" }];
-      mockGitApi.getCommits.mockResolvedValue(mockCommits);
+      tokenProvider.mockResolvedValue("fake-token");
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ count: 1, results: [{ commitId: "abc123" }] })),
+      });
+      global.fetch = mockFetch;
 
-      const params = {
-        project: "test-project",
-        repository: "test-repo",
-        version: "main", // This should trigger the version branch
-        versionType: "Branch",
-        skip: 0, // Provide explicit values
-        top: 10,
-        includeLinks: false,
-        includeWorkItems: false,
-      };
+      await handler({ searchText: "test commit", branch: ["main"], skip: 0, top: 10, includeFacets: false });
 
-      const result = await handler(params);
-
-      expect(mockGitApi.getCommits).toHaveBeenCalledWith(
-        "test-repo",
-        {
-          fromCommitId: undefined,
-          toCommitId: undefined,
-          includeLinks: false,
-          includeWorkItems: false,
-          itemVersion: {
-            version: "main",
-            versionType: GitVersionType.Branch,
-          },
-        },
-        "test-project",
-        0,
-        10
-      );
-
-      expect(result.content[0].text).toBe(JSON.stringify(mockCommits, null, 2));
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.branchName).toEqual(["main"]);
     });
 
-    it("should handle search_commits without version parameter", async () => {
+    it("should handle search_commits without branch filter", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
       if (!call) throw new Error("repo_search_commits tool not registered");
       const [, , , handler] = call;
 
-      const mockCommits = [{ commitId: "abc123", comment: "Test commit" }];
-      mockGitApi.getCommits.mockResolvedValue(mockCommits);
+      tokenProvider.mockResolvedValue("fake-token");
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ count: 1, results: [{ commitId: "abc123" }] })),
+      });
+      global.fetch = mockFetch;
 
-      const params = {
-        project: "test-project",
-        repository: "test-repo",
-        skip: 0, // Provide explicit values
-        top: 10,
-        includeLinks: false,
-        includeWorkItems: false,
-        // version is undefined - should test the branch where itemVersion is not set
-      };
+      await handler({ searchText: "test commit", skip: 0, top: 10, includeFacets: false });
 
-      const result = await handler(params);
-
-      expect(mockGitApi.getCommits).toHaveBeenCalledWith(
-        "test-repo",
-        {
-          fromCommitId: undefined,
-          toCommitId: undefined,
-          includeLinks: false,
-          includeWorkItems: false,
-          // itemVersion should not be set when version is undefined
-        },
-        "test-project",
-        0,
-        10
-      );
-
-      expect(result.content[0].text).toBe(JSON.stringify(mockCommits, null, 2));
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.filters.branchName).toBeUndefined();
     });
 
     it("should handle rightFileEndLine without rightFileStartLine", async () => {
@@ -7717,26 +7847,17 @@ describe("repos tools", () => {
       });
     });
 
-    it("should handle non-Error exceptions in search_commits", async () => {
+    it("should handle network errors in search_commits", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
       if (!call) throw new Error("repo_search_commits tool not registered");
       const [, , , handler] = call;
 
-      mockGitApi.getCommits.mockRejectedValue("String error"); // Non-Error exception
+      tokenProvider.mockResolvedValue("fake-token");
+      global.fetch = jest.fn().mockRejectedValue(new Error("Network failure"));
 
-      const params = {
-        project: "test-project",
-        repository: "test-repo",
-        top: 10,
-        skip: 0,
-      };
-
-      const result = await handler(params);
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Error searching commits: String error");
+      await expect(handler({ searchText: "fix", skip: 0, top: 10, includeFacets: false })).rejects.toThrow("Network failure");
     });
 
     it("should handle valid rightFileEndOffset with rightFileEndLine in create_pull_request_thread", async () => {
@@ -7780,96 +7901,60 @@ describe("repos tools", () => {
 
   describe("enhanced commit search functions", () => {
     describe("repo_search_commits enhanced functionality", () => {
-      it("should search commits with enhanced filters", async () => {
+      it("should search commits with author and date filters via Search API", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
         if (!call) throw new Error("repo_search_commits tool not registered");
         const [, , , handler] = call;
 
-        const mockCommits = [
-          {
-            commitId: "abc123",
-            comment: "Fix bug in authentication",
-            author: { name: "John Doe", email: "john@example.com" },
-            committer: { name: "John Doe", email: "john@example.com" },
-            push: { date: "2023-01-01T00:00:00Z" },
-          },
-        ];
-        mockGitApi.getCommits.mockResolvedValue(mockCommits);
+        tokenProvider.mockResolvedValue("fake-token");
+        const mockFetch = jest.fn().mockResolvedValue({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify({ count: 1, results: [{ commitId: "abc123", commitTitle: "Fix bug in authentication" }] })),
+        });
+        global.fetch = mockFetch;
 
-        const params = {
-          project: "test-project",
-          repository: "test-repo",
-          searchText: "authentication",
-          author: "John Doe",
-          fromDate: "2023-01-01T00:00:00Z",
-          toDate: "2023-12-31T23:59:59Z",
+        await handler({
+          searchText: "test search",
+          author: ["test-author@example.com"],
+          commitStartDate: "2023-01-01",
+          commitEndDate: "2023-12-31T23:59:59",
+          skip: 0,
           top: 10,
-        };
+          includeFacets: false,
+        });
 
-        const result = await handler(params);
-
-        expect(mockGitApi.getCommits).toHaveBeenCalledWith(
-          "test-repo",
-          expect.objectContaining({
-            author: "John Doe",
-            fromDate: "2023-01-01T00:00:00Z",
-            toDate: "2023-12-31T23:59:59Z",
-          }),
-          "test-project",
-          undefined,
-          10
-        );
-
-        expect(result.content[0].text).toBe(JSON.stringify(mockCommits, null, 2));
+        const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+        expect(body.filters.authorName).toEqual(["test-author@example.com"]);
+        expect(body.filters.commitStartDate).toEqual(["2023-01-01"]);
+        expect(body.filters.commitEndDate).toEqual(["2023-12-31T23:59:59"]);
       });
 
-      it("should retrieve specific commits by IDs", async () => {
+      it("should search commits across multiple repos", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
         if (!call) throw new Error("repo_search_commits tool not registered");
         const [, , , handler] = call;
 
-        const mockCommit1 = { commitId: "abc123", comment: "First commit" };
-        const mockCommit2 = { commitId: "def456", comment: "Second commit" };
+        tokenProvider.mockResolvedValue("fake-token");
+        const mockFetch = jest.fn().mockResolvedValue({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify({ count: 2, results: [{ commitId: "abc123" }, { commitId: "def456" }] })),
+        });
+        global.fetch = mockFetch;
 
-        mockGitApi.getCommits.mockResolvedValueOnce([mockCommit1]).mockResolvedValueOnce([mockCommit2]);
-
-        const params = {
-          project: "test-project",
-          repository: "test-repo",
-          commitIds: ["abc123", "def456"],
+        await handler({
+          searchText: "refactor",
+          repository: ["RepoA", "RepoB"],
+          skip: 0,
           top: 10,
-        };
+          includeFacets: false,
+        });
 
-        const result = await handler(params);
-
-        expect(mockGitApi.getCommits).toHaveBeenCalledTimes(2);
-        expect(mockGitApi.getCommits).toHaveBeenCalledWith(
-          "test-repo",
-          expect.objectContaining({
-            fromCommitId: "abc123",
-            toCommitId: "abc123",
-          }),
-          "test-project",
-          0,
-          1
-        );
-        expect(mockGitApi.getCommits).toHaveBeenCalledWith(
-          "test-repo",
-          expect.objectContaining({
-            fromCommitId: "def456",
-            toCommitId: "def456",
-          }),
-          "test-project",
-          0,
-          1
-        );
-
-        const expectedCommits = [mockCommit1, mockCommit2];
-        expect(result.content[0].text).toBe(JSON.stringify(expectedCommits, null, 2));
+        const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+        expect(body.filters.repositoryName).toEqual(["RepoA", "RepoB"]);
       });
     });
   });
@@ -8378,29 +8463,15 @@ describe("repos tools", () => {
     });
 
     describe("repo_search_commits error handling", () => {
-      it("should handle commit search errors", async () => {
+      it("should handle commit search errors (non-ok HTTP response)", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.search_commits);
         const [, , , handler] = call;
 
-        mockGitApi.getCommits.mockRejectedValue(new Error("Repository access denied"));
+        tokenProvider.mockResolvedValue("fake-token");
+        global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 403, statusText: "Forbidden", text: jest.fn() });
 
-        const params = {
-          project: "test-project",
-          repository: "test-repo",
-        };
-
-        const result = await handler(params);
-
-        expect(result).toEqual({
-          content: [
-            {
-              type: "text",
-              text: "Error searching commits: Repository access denied",
-            },
-          ],
-          isError: true,
-        });
+        await expect(handler({ searchText: "fix", skip: 0, top: 10, includeFacets: false })).rejects.toThrow("Azure DevOps Commit Search API error: 403 Forbidden");
       });
     });
 
