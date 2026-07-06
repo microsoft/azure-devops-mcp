@@ -584,6 +584,23 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
 }
 
 /*
+ * Format step content by converting Markdown markers to HTML and wrapping in the ADO rich text
+ * envelope. The entire HTML string is then XML-escaped for storage in the parameterizedString
+ * element, which is the format Azure DevOps expects for rendered step content.
+ */
+function formatStepContent(text: string): string {
+  // Convert Markdown markers to HTML tags (** before * to avoid conflicts)
+  const htmlContent = text
+    .replace(/\*\*(.+?)\*\*/g, "<B>$1</B>")
+    .replace(/\*(.+?)\*/g, "<I>$1</I>")
+    .replace(/`(.+?)`/g, "<CODE>$1</CODE>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<A href="$2">$1</A>');
+
+  // Wrap in ADO rich text envelope and XML-escape the entire HTML string
+  return escapeXml(`<DIV><P>${htmlContent}</P></DIV>`);
+}
+
+/*
  * Helper function to convert steps text to XML format required
  */
 function convertStepsToXml(steps: string): string {
@@ -603,8 +620,8 @@ function convertStepsToXml(steps: string): string {
 
       xmlSteps += `
                 <step id="${i + 1}" type="ActionStep">
-                    <parameterizedString isformatted="true">${escapeXml(stepText)}</parameterizedString>
-                    <parameterizedString isformatted="true">${escapeXml(expectedText)}</parameterizedString>
+                    <parameterizedString isformatted="true">${formatStepContent(stepText)}</parameterizedString>
+                    <parameterizedString isformatted="true">${formatStepContent(expectedText)}</parameterizedString>
                 </step>`;
     }
   }

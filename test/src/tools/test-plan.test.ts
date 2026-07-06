@@ -2193,6 +2193,153 @@ describe("configureTestPlanTools", () => {
       expect(result.content[0].text).toContain("API Error");
     });
 
+    it("should store HTML tags as XML-escaped formatting in step content", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 200001, rev: 2, fields: {} });
+
+      const params = {
+        id: 200001,
+        steps: "1. Click <b>Save</b> button|Button <i>highlights</i> and form submits",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;b&gt;Save&lt;/b&gt;"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;i&gt;highlights&lt;/i&gt;"),
+          }),
+        ]),
+        200001
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should convert Markdown bold and italic to XML-escaped HTML", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 200002, rev: 2, fields: {} });
+
+      const params = {
+        id: 200002,
+        steps: "1. Press **Submit**|Result shows *success* message",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;B&gt;Submit&lt;/B&gt;"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;I&gt;success&lt;/I&gt;"),
+          }),
+        ]),
+        200002
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should convert Markdown inline code to XML-escaped HTML code tags", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 200003, rev: 2, fields: {} });
+
+      const params = {
+        id: 200003,
+        steps: "1. Run `npm install`|Command exits with code `0`",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;CODE&gt;npm install&lt;/CODE&gt;"),
+          }),
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;CODE&gt;0&lt;/CODE&gt;"),
+          }),
+        ]),
+        200003
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should escape non-whitelisted HTML tags", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 200004, rev: 2, fields: {} });
+
+      const params = {
+        id: 200004,
+        steps: "1. Inject <script>alert(1)</script>|Should be escaped",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;script&gt;alert(1)&lt;/script&gt;"),
+          }),
+        ]),
+        200004
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should convert Markdown links to XML-escaped anchor tags", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
+      if (!call) throw new Error("testplan_update_test_case_steps tool not registered");
+      const [, , , handler] = call;
+
+      (mockWitApi.updateWorkItem as jest.Mock).mockResolvedValue({ id: 200005, rev: 2, fields: {} });
+
+      const params = {
+        id: 200005,
+        steps: "1. Open [Azure Portal](https://portal.azure.com)|Portal loads",
+      };
+      const result = await handler(params);
+
+      expect(mockWitApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "/fields/Microsoft.VSTS.TCM.Steps",
+            value: expect.stringContaining("&lt;A href=&quot;https://portal.azure.com&quot;&gt;Azure Portal&lt;/A&gt;"),
+          }),
+        ]),
+        200005
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
     it("should handle mixed numbered and non-numbered steps", async () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_update_test_case_steps");
