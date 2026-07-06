@@ -467,14 +467,14 @@ Gets a list of test cases in the test plan.
 
 ### mcp_ado_testplan_create_test_case
 
-Creates a new test case work item.
+Creates a new test case work item. Step content supports text formatting — use HTML tags (`<b>`, `<i>`, `<u>`, `<code>`) or Markdown markers (`**bold**`, `*italic*`, `` `code` ``, `[label](url)`) directly in step text and expected results.
 
 - **Required**: `project`, `title`
 - **Optional**: `areaPath`, `iterationPath`, `priority`, `steps`, `testsWorkItemId`
 
 ### mcp_ado_testplan_update_test_case_steps
 
-Update an existing test case work item.
+Update the steps of an existing test case work item. Step content supports text formatting — use HTML tags (`<b>`, `<i>`, `<u>`, `<code>`) or Markdown markers (`**bold**`, `*italic*`, `` `code` ``, `[label](url)`) directly in step text and expected results.
 
 - **Required**: `id`, `steps`
 - **Optional**: None
