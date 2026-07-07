@@ -589,15 +589,16 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
  * element, which is the format Azure DevOps expects for rendered step content.
  */
 function formatStepContent(text: string): string {
-  // Convert Markdown markers to HTML tags (** before * to avoid conflicts)
+  // Convert Markdown markers to HTML tags (** before * and __ before _ to avoid conflicts)
   const htmlContent = text
     .replace(/\*\*(.+?)\*\*/g, "<B>$1</B>")
     .replace(/\*(.+?)\*/g, "<I>$1</I>")
+    .replace(/__(.+?)__/g, "<U>$1</U>")
     .replace(/`(.+?)`/g, "<CODE>$1</CODE>")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<A href="$2">$1</A>');
 
   // Wrap in ADO rich text envelope and XML-escape the entire HTML string
-  return escapeXml(`<DIV><P>${htmlContent}</P></DIV>`);
+  return escapeXml(`${htmlContent}`);
 }
 
 /*
