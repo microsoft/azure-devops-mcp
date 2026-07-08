@@ -2243,11 +2243,11 @@ describe("configureTestPlanTools", () => {
         expect.arrayContaining([
           expect.objectContaining({
             path: "/fields/Microsoft.VSTS.TCM.Steps",
-            value: expect.stringContaining("&lt;B&gt;Submit&lt;/B&gt;"),
+            value: expect.stringContaining("&lt;b&gt;Submit&lt;/b&gt;"),
           }),
           expect.objectContaining({
             path: "/fields/Microsoft.VSTS.TCM.Steps",
-            value: expect.stringContaining("&lt;I&gt;success&lt;/I&gt;"),
+            value: expect.stringContaining("&lt;i&gt;success&lt;/i&gt;"),
           }),
         ]),
         200002
@@ -2274,11 +2274,11 @@ describe("configureTestPlanTools", () => {
         expect.arrayContaining([
           expect.objectContaining({
             path: "/fields/Microsoft.VSTS.TCM.Steps",
-            value: expect.stringContaining("&lt;CODE&gt;npm install&lt;/CODE&gt;"),
+            value: expect.stringContaining("&lt;code&gt;npm install&lt;/code&gt;"),
           }),
           expect.objectContaining({
             path: "/fields/Microsoft.VSTS.TCM.Steps",
-            value: expect.stringContaining("&lt;CODE&gt;0&lt;/CODE&gt;"),
+            value: expect.stringContaining("&lt;code&gt;0&lt;/code&gt;"),
           }),
         ]),
         200003
@@ -2332,7 +2332,7 @@ describe("configureTestPlanTools", () => {
         expect.arrayContaining([
           expect.objectContaining({
             path: "/fields/Microsoft.VSTS.TCM.Steps",
-            value: expect.stringContaining("&lt;A href=&quot;https://portal.azure.com&quot;&gt;Azure Portal&lt;/A&gt;"),
+            value: expect.stringContaining("&lt;a href=&quot;https://portal.azure.com&quot;&gt;Azure Portal&lt;/a&gt;"),
           }),
         ]),
         200005
