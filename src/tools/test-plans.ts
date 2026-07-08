@@ -591,11 +591,11 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
 function formatStepContent(text: string): string {
   // Convert Markdown markers to HTML tags (** before * and __ before _ to avoid conflicts)
   const htmlContent = text
-    .replace(/\*\*(.+?)\*\*/g, "<B>$1</B>")
-    .replace(/\*(.+?)\*/g, "<I>$1</I>")
-    .replace(/__(.+?)__/g, "<U>$1</U>")
-    .replace(/`(.+?)`/g, "<CODE>$1</CODE>")
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<A href="$2">$1</A>');
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/\*(.+?)\*/g, "<i>$1</i>")
+    .replace(/__(.+?)__/g, "<u>$1</u>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>');
 
   // Wrap in ADO rich text envelope and XML-escape the entire HTML string
   return escapeXml(`${htmlContent}`);
