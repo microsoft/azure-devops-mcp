@@ -77,7 +77,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
           const workItemTrackingApi = await connection.getWorkItemTrackingApi();
           const effectiveDepth = depth ?? 1;
 
-          let results = await workItemTrackingApi.getClassificationNodes(resolvedProject, [], effectiveDepth);
+          const results = await workItemTrackingApi.getClassificationNodes(resolvedProject, [], effectiveDepth);
 
           if (!results) {
             return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
@@ -163,10 +163,18 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
             resolvedProject = result.resolved;
           }
 
-          const workApi = await connection.getWorkApi();
-          const teamContext = { project: resolvedProject, team: team! };
+          if (!team) {
+            return { content: [{ type: "text", text: "Team is required for get_team_capacity" }], isError: true };
+          }
 
-          const rawResults = await workApi.getCapacitiesWithIdentityRefAndTotals(teamContext, iterationId!);
+          if (!iterationId) {
+            return { content: [{ type: "text", text: "iterationId is required for get_team_capacity" }], isError: true };
+          }
+
+          const workApi = await connection.getWorkApi();
+          const teamContext = { project: resolvedProject, team };
+
+          const rawResults = await workApi.getCapacitiesWithIdentityRefAndTotals(teamContext, iterationId);
 
           if (!rawResults || rawResults.teamMembers?.length === 0) {
             return { content: [{ type: "text", text: "No team capacity assigned to the team" }], isError: true };
@@ -202,8 +210,12 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
             resolvedProject = result.resolved;
           }
 
+          if (!iterationId) {
+            return { content: [{ type: "text", text: "iterationId is required for get_iteration_capacities" }], isError: true };
+          }
+
           const workApi = await connection.getWorkApi();
-          const rawResults = await workApi.getTotalIterationCapacities(resolvedProject, iterationId!);
+          const rawResults = await workApi.getTotalIterationCapacities(resolvedProject, iterationId);
 
           if (!rawResults || !rawResults.teams || rawResults.teams.length === 0) {
             return { content: [{ type: "text", text: "No iteration capacity assigned to the teams" }], isError: true };
@@ -291,8 +303,12 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         }
 
         if (action === "assign") {
+          if (!team) {
+            return { content: [{ type: "text", text: "Team is required for assign" }], isError: true };
+          }
+
           const workApi = await connection.getWorkApi();
-          const teamContext = { project, team: team! };
+          const teamContext = { project, team };
           const results = [];
 
           for (const { identifier, path } of iterations) {

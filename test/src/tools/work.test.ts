@@ -1297,6 +1297,61 @@ describe("configureWorkTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error assigning iterations: Unknown error occurred");
     });
+
+    it("should return error when team is not provided", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_iteration_write");
+      if (!call) throw new Error("work_iteration_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "assign" as const,
+        project: "Fabrikam",
+        team: undefined,
+        iterations: [{ identifier: "iter-id", path: "Fabrikam\\Sprint 1" }],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Team is required for assign");
+      expect(mockWorkApi.postTeamIteration).not.toHaveBeenCalled();
+    });
+
+    it("should return error when all iterations have missing identifier or path", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_iteration_write");
+      if (!call) throw new Error("work_iteration_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "assign" as const,
+        project: "Fabrikam",
+        team: "Fabrikam Team",
+        iterations: [{ identifier: undefined, path: undefined }],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iterations were assigned to the team");
+      expect(mockWorkApi.postTeamIteration).not.toHaveBeenCalled();
+    });
+
+    it("should return error for an unknown action", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_iteration_write");
+      if (!call) throw new Error("work_iteration_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "invalid_action" as unknown as "create",
+        project: "Fabrikam",
+        iterations: [],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Unknown action: invalid_action");
+    });
   });
 
   describe("create_iterations", () => {
@@ -1524,6 +1579,43 @@ describe("configureWorkTools", () => {
           2
         )
       );
+    });
+
+    it("should skip iterations without iterationName and return error when none created", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_iteration_write");
+      if (!call) throw new Error("work_iteration_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "create" as const,
+        project: "Fabrikam",
+        iterations: [{ startDate: "2025-01-01T00:00:00Z", finishDate: "2025-01-14T00:00:00Z" }],
+      });
+
+      expect(mockWorkItemTrackingApi.createOrUpdateClassificationNode).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iterations were created");
+    });
+
+    it("should return generic error when connection fails with an unmapped action", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_iteration_write");
+      if (!call) throw new Error("work_iteration_write tool not registered");
+      const [, , , handler] = call;
+
+      (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("Connection failed"));
+
+      const result = await handler({
+        action: "invalid_action" as unknown as "create",
+        project: "Fabrikam",
+        iterations: [],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Connection failed");
     });
   });
 
@@ -1972,6 +2064,62 @@ describe("configureWorkTools", () => {
 
       expect(result.content[0].text).toBe("Project selection cancelled.");
       expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).not.toHaveBeenCalled();
+    });
+
+    it("should return error when team is not provided", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work");
+      if (!call) throw new Error("work tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get_team_capacity" as const, project: "SampleProject", team: undefined, iterationId: "iter-1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Team is required for get_team_capacity");
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).not.toHaveBeenCalled();
+    });
+
+    it("should return error when iterationId is not provided", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work");
+      if (!call) throw new Error("work tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get_team_capacity" as const, project: "SampleProject", team: "SampleTeam", iterationId: undefined });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("iterationId is required for get_team_capacity");
+      expect(mockWorkApi.getCapacitiesWithIdentityRefAndTotals).not.toHaveBeenCalled();
+    });
+
+    it("should return error for an unknown action", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work");
+      if (!call) throw new Error("work tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "invalid_action" as unknown as "list_iterations", project: "SampleProject" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Unknown action: invalid_action");
+    });
+
+    it("should return generic error when connection fails with an unmapped action", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work");
+      if (!call) throw new Error("work tool not registered");
+      const [, , , handler] = call;
+
+      (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("Connection failed"));
+
+      const result = await handler({ action: "invalid_action" as unknown as "list_iterations", project: "SampleProject" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Connection failed");
     });
   });
 
@@ -2776,6 +2924,40 @@ describe("configureWorkTools", () => {
 
       expect(result.content[0].text).toBe("Project selection cancelled.");
       expect(mockWorkApi.getTotalIterationCapacities).not.toHaveBeenCalled();
+    });
+
+    it("should return error when iterationId is not provided", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work");
+      if (!call) throw new Error("work tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get_iteration_capacities" as const, project: "SampleProject", iterationId: undefined });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("iterationId is required for get_iteration_capacities");
+      expect(mockWorkApi.getTotalIterationCapacities).not.toHaveBeenCalled();
+    });
+
+    it("should return error when teams array is empty", async () => {
+      configureWorkTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work");
+      if (!call) throw new Error("work tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.getTotalIterationCapacities as jest.Mock).mockResolvedValue({
+        teams: [],
+        totalCapacityPerDay: 0,
+        totalDaysOff: 0,
+      });
+
+      const result = await handler({ action: "get_iteration_capacities" as const, project: "SampleProject", iterationId: "iter-1" });
+
+      expect(mockWorkApi.getTotalIterationCapacities).toHaveBeenCalledWith("SampleProject", "iter-1");
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("No iteration capacity assigned to the teams");
     });
   });
 
