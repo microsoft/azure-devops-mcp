@@ -136,6 +136,18 @@ describe("configureWikiTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching wiki: Unknown error occurred");
     });
+
+    it("should return error when wikiIdentifier is missing", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get_wiki" as const });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("wikiIdentifier is required for get_wiki");
+    });
   });
 
   describe("list_wikis tool", () => {
@@ -348,6 +360,30 @@ describe("configureWikiTools", () => {
       expect(mockWikiApi.getPagesBatch).toHaveBeenCalled();
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error fetching wiki pages: Unknown error occurred");
+    });
+
+    it("should return error when wikiIdentifier is missing", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "list_pages" as const, project: "proj1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("wikiIdentifier is required for list_pages");
+    });
+
+    it("should return error when project is missing", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "list_pages" as const, wikiIdentifier: "wiki1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("project is required for list_pages");
     });
   });
 
@@ -571,6 +607,42 @@ describe("configureWikiTools", () => {
       expect(calledUrl).toBe(
         "https://dev.azure.com/testorg/27927f1c-99f6-432f-8cd5-826576c1a20c/_apis/wiki/wikis/15e3217e-0375-4d00-8895-1b6b6ad32837/pages?path=%2FTesting%2FSetup-Guide&api-version=7.2-preview.1"
       );
+    });
+
+    it("should return error when wikiIdentifier is missing", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get_page" as const, project: "proj1", path: "/Home" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("wikiIdentifier is required for get_page");
+    });
+
+    it("should return error when project is missing", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get_page" as const, wikiIdentifier: "wiki1", path: "/Home" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("project is required for get_page");
+    });
+
+    it("should return error when path is missing", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get_page" as const, wikiIdentifier: "wiki1", project: "proj1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("path is required for get_page");
     });
   });
 
@@ -877,6 +949,22 @@ describe("configureWikiTools", () => {
       expect(mockWikiApi.getPageText).not.toHaveBeenCalled();
     });
 
+    it("should report 'unknown' organization when URL domain is not a recognized Azure DevOps host", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      // A URL that parseWikiUrl accepts but getOrgFromUrl returns null for (non-standard domain)
+      const url = "https://custom.example.com/project/_wiki/wikis/myWiki?pagePath=%2FHome";
+      const result = await handler({ action: "get_page_content" as const, url });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("organization 'unknown'");
+      expect(result.content[0].text).toContain("Cross-organization requests are not allowed");
+      expect(mockWikiApi.getPageText).not.toHaveBeenCalled();
+    });
+
     it("should allow a URL that matches the configured organization regardless of casing", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
@@ -1180,6 +1268,36 @@ describe("configureWikiTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Page '/nonexistent' does not exist in wiki 'my-wiki'");
+    });
+  });
+
+  describe("wiki tool - unknown action", () => {
+    it("should return error for an unknown action", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await handler({ action: "unknown_action" as any });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown action: unknown_action");
+    });
+
+    it("should use generic error message when action is unknown and connectionProvider throws", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("connection failed"));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await handler({ action: "unknown_action" as any });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: connection failed");
     });
   });
 
