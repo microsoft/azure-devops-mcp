@@ -24,6 +24,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | Tool                                                                                                  | Description                                       |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | [mcp_ado_pipelines_create_pipeline](#mcp_ado_pipelines_create_pipeline)                               | Create a new pipeline with YAML configuration     |
+| [mcp_ado_pipelines_rename_pipeline](#mcp_ado_pipelines_rename_pipeline)                               | Rename an existing pipeline (build definition)    |
 | [mcp_ado_pipelines_get_builds](#mcp_ado_pipelines_get_builds)                                         | Retrieve a list of builds with optional filters   |
 | [mcp_ado_pipelines_get_build_status](#mcp_ado_pipelines_get_build_status)                             | Get the status of a specific build                |
 | [mcp_ado_pipelines_get_build_log](#mcp_ado_pipelines_get_build_log)                                   | Retrieve complete logs for a build                |
@@ -190,6 +191,13 @@ Creates a pipeline definition with YAML configuration for a given project.
 
 - **Required**: `project`, `name`, `yamlPath`, `repositoryType`, `repositoryName`
 - **Optional**: `folder`, `repositoryConnectionId`, `repositoryId`
+
+#### mcp_ado_pipelines_rename_pipeline
+
+Renames an existing pipeline (build definition) in a given project.
+
+- **Required**: `project`, `pipelineId`, `name`
+- **Optional**: None
 
 #### mcp_ado_pipelines_get_builds
 

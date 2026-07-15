@@ -1344,6 +1344,78 @@ describe("configurePipelineTools", () => {
     });
   });
 
+  describe("pipelines_rename_pipeline tool", () => {
+    it("should fetch the definition, update its name and return the updated definition", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_rename_pipeline");
+      if (!call) throw new Error("pipelines_rename_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const existingDefinition = { id: 42, name: "Old Name", revision: 3 };
+      const mockBuildApi = {
+        getDefinition: jest.fn().mockResolvedValue(existingDefinition),
+        updateDefinition: jest.fn().mockResolvedValue({ id: 42, name: "New Name", revision: 4 }),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        pipelineId: 42,
+        name: "New Name",
+      };
+
+      const result = await handler(params);
+
+      expect(mockBuildApi.getDefinition).toHaveBeenCalledWith("test-project", 42);
+      expect(mockBuildApi.updateDefinition).toHaveBeenCalledWith({ id: 42, name: "New Name", revision: 3 }, "test-project", 42);
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 42, name: "New Name", revision: 4 }, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should propagate errors when the definition cannot be found", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_rename_pipeline");
+      if (!call) throw new Error("pipelines_rename_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockBuildApi = {
+        getDefinition: jest.fn().mockRejectedValue(new Error("Definition not found")),
+        updateDefinition: jest.fn(),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        pipelineId: 999,
+        name: "New Name",
+      };
+
+      await expect(handler(params)).rejects.toThrow("Definition not found");
+      expect(mockBuildApi.updateDefinition).not.toHaveBeenCalled();
+    });
+
+    it("should propagate errors from updateDefinition", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_rename_pipeline");
+      if (!call) throw new Error("pipelines_rename_pipeline tool not registered");
+      const [, , , handler] = call;
+
+      const mockBuildApi = {
+        getDefinition: jest.fn().mockResolvedValue({ id: 42, name: "Old Name" }),
+        updateDefinition: jest.fn().mockRejectedValue(new Error("API failure")),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const params = {
+        project: "test-project",
+        pipelineId: 42,
+        name: "New Name",
+      };
+
+      await expect(handler(params)).rejects.toThrow("API failure");
+    });
+  });
+
   describe("pipelines_list_runs tool", () => {
     it("should call listRuns with correct parameters", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);

@@ -22,6 +22,7 @@ const PIPELINE_TOOLS = {
   pipelines_get_build_status: "pipelines_get_build_status",
   pipelines_update_build_stage: "pipelines_update_build_stage",
   pipelines_create_pipeline: "pipelines_create_pipeline",
+  pipelines_rename_pipeline: "pipelines_rename_pipeline",
   pipelines_get_run: "pipelines_get_run",
   pipelines_list_runs: "pipelines_list_runs",
   pipelines_run_pipeline: "pipelines_run_pipeline",
@@ -181,6 +182,28 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       const newPipeline = await pipelinesApi.createPipeline(createPipelineParams, project);
       return {
         content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    PIPELINE_TOOLS.pipelines_rename_pipeline,
+    "Renames an existing pipeline (build definition) in a given project.",
+    {
+      project: z.string().describe("Project ID or name that contains the pipeline."),
+      pipelineId: z.coerce.number().min(1).describe("ID of the pipeline (build definition) to rename."),
+      name: z.string().min(1).describe("The new name for the pipeline."),
+    },
+    async ({ project, pipelineId, name }) => {
+      const connection = await connectionProvider();
+      const buildApi = await connection.getBuildApi();
+
+      const definition = await buildApi.getDefinition(project, pipelineId);
+      definition.name = name;
+      const updatedDefinition = await buildApi.updateDefinition(definition, project, pipelineId);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(updatedDefinition, null, 2) }],
       };
     }
   );
