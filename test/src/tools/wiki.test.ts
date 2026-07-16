@@ -1278,7 +1278,6 @@ describe("configureWikiTools", () => {
       if (!call) throw new Error("wiki tool not registered");
       const [, , , handler] = call;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown_action" as any });
 
       expect(result.isError).toBe(true);
@@ -1293,7 +1292,6 @@ describe("configureWikiTools", () => {
 
       (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("connection failed"));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown_action" as any });
 
       expect(result.isError).toBe(true);
