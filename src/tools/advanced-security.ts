@@ -15,7 +15,7 @@ const ADVSEC_TOOLS = {
 function configureAdvSecTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     ADVSEC_TOOLS.get_alerts,
-    "Retrieve Advanced Security alerts for a repository. Results are scoped to the specified project and repository. For secret alerts, branch filters (onlyDefaultBranch, ref) are not applicable and are ignored. When alertType is not specified and a branch filter is applied (onlyDefaultBranch=false or ref set), secret alerts may be excluded from the results because branch filters do not apply to secrets; query with alertType 'Secret' to retrieve all secret alerts.",
+    "Retrieve Advanced Security alerts for a repository. Results are scoped to the specified project and repository. Branch filters (onlyDefaultBranch, ref) apply only to code, dependency, and license alerts; they are not applicable to secret alerts and are ignored by the service, so they neither include nor exclude secrets. To narrow secret alerts by confidence, pass a single 'confidenceLevels' value ('High' or 'Other'); selecting every level is treated as no confidence filter.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repository: z.string().describe("The name or ID of the repository to get alerts for."),
@@ -49,9 +49,8 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
       confidenceLevels: z
         .array(z.enum(getEnumKeys(Confidence) as [string, ...string[]]))
         .optional()
-        .default(getEnumKeys(Confidence))
         .describe(
-          "Only applicable to secret alerts. Accepted values are 'High' and 'Other'; both must be included to return secrets of all confidence levels. Defaults to all confidence levels ('High' and 'Other') so no secrets are hidden by confidence; if the filter were omitted at the service level, only high-confidence secrets would be returned."
+          "Only applicable to secret alerts. Accepted values are 'High' and 'Other'. Pass a single value (e.g. ['High']) to narrow secrets to that confidence level. Leave unset to return secrets without a confidence filter. Do not select both levels to widen results: the Alerts service does not accept a multi-value confidence filter and would return no alerts, so this tool treats an all-levels selection as no filter and omits it."
         ),
       validity: z
         .array(z.enum(getEnumKeys(AlertValidityStatus) as [string, ...string[]]))
@@ -78,6 +77,14 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
         // the result set can contain secrets (an explicit "secret" type or no type filter at all).
         const canIncludeSecrets = !alertType || isSecretOnly;
 
+        // The Alerts service does not accept the multi-value (comma-serialized) confidence filter
+        // that the SDK emits: selecting every level (e.g. both "High" and "Other") returns zero
+        // alerts, and it is a no-op filter regardless. Only forward confidenceLevels when it
+        // narrows the result to a proper subset (a single level); otherwise omit it so secrets are
+        // returned without a confidence filter instead of an empty set.
+        const confidenceLevelValues = confidenceLevels ? mapStringArrayToEnum(confidenceLevels, Confidence) : [];
+        const narrowsByConfidence = confidenceLevelValues.length > 0 && confidenceLevelValues.length < getEnumKeys(Confidence).length;
+
         const criteria = {
           ...(alertType && { alertType: mapStringToEnum(alertType, AlertType) }),
           ...(states && { states: mapStringArrayToEnum(states, State) }),
@@ -87,7 +94,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
           ...(toolName && { toolName }),
           ...(!isSecretOnly && ref && { ref }),
           ...(!isSecretOnly && onlyDefaultBranch !== undefined && { onlyDefaultBranch }),
-          ...(canIncludeSecrets && confidenceLevels && { confidenceLevels: mapStringArrayToEnum(confidenceLevels, Confidence) }),
+          ...(canIncludeSecrets && narrowsByConfidence && { confidenceLevels: confidenceLevelValues }),
           ...(canIncludeSecrets && validity && { validity: mapStringArrayToEnum(validity, AlertValidityStatus) }),
         };
 

@@ -693,7 +693,7 @@ describe("configureAdvSecTools", () => {
     // The following tests drive the real Zod schema (schema = call[2]) instead of calling the
     // handler directly, so that schema-level defaults and enum validation are exercised the same
     // way the MCP runtime applies them before the handler runs.
-    it("applies schema defaults (confidenceLevels, top, orderBy) and drops branch filters for a secret query", async () => {
+    it("applies schema defaults (top, orderBy) and drops branch and confidence filters for a secret query", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
@@ -702,8 +702,9 @@ describe("configureAdvSecTools", () => {
 
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue([]);
 
-      // Enum values must be the PascalCase enum keys the schema exposes (e.g. "Secret"), and
-      // confidenceLevels is intentionally omitted so the schema default is applied.
+      // Enum values must be the PascalCase enum keys the schema exposes (e.g. "Secret").
+      // confidenceLevels is intentionally omitted; it has no default, so no confidence filter is
+      // sent (an all-levels filter makes the Alerts service return zero alerts).
       const parsed = z.object(schema).parse({
         project: "test-project",
         repository: "test-repo",
@@ -719,19 +720,19 @@ describe("configureAdvSecTools", () => {
         "severity", // orderBy default
         expect.objectContaining({
           alertType: AlertType.Secret,
-          confidenceLevels: [Confidence.High, Confidence.Other],
         }),
         undefined, // expand
         undefined // continuationToken
       );
 
       const criteria = (mockAlertApi.getAlerts as jest.Mock).mock.calls[0][4];
+      expect(criteria).not.toHaveProperty("confidenceLevels");
       expect(criteria).not.toHaveProperty("onlyDefaultBranch");
       expect(criteria).not.toHaveProperty("ref");
       expect(criteria).not.toHaveProperty("validity");
     });
 
-    it("does not throw when confidenceLevels is omitted for a minimal query", async () => {
+    it("does not throw and sends no confidence filter when confidenceLevels is omitted for a minimal query", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
@@ -740,8 +741,8 @@ describe("configureAdvSecTools", () => {
 
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue([]);
 
-      // Regression: the schema default for confidenceLevels must be valid against its own enum,
-      // otherwise parsing a call that omits confidenceLevels (the common case) throws.
+      // Omitting confidenceLevels (the common case) must not throw and must NOT send a confidence
+      // filter: an all-levels filter is rejected by the Alerts service and returns zero alerts.
       const parseInput = () =>
         z.object(schema).parse({
           project: "test-project",
@@ -751,20 +752,20 @@ describe("configureAdvSecTools", () => {
 
       await handler(parseInput());
 
+      const criteria = (mockAlertApi.getAlerts as jest.Mock).mock.calls[0][4];
+      expect(criteria).not.toHaveProperty("confidenceLevels");
       expect(mockAlertApi.getAlerts).toHaveBeenLastCalledWith(
         "test-project",
         "test-repo",
         100, // top default
         "severity", // orderBy default
-        expect.objectContaining({
-          confidenceLevels: [Confidence.High, Confidence.Other],
-        }),
+        criteria,
         undefined, // expand
         undefined // continuationToken
       );
     });
 
-    it("still forwards onlyDefaultBranch for a mixed (unspecified alertType) query, which can exclude secrets", async () => {
+    it("forwards onlyDefaultBranch for a mixed (unspecified alertType) query without adding a confidence filter", async () => {
       configureAdvSecTools(server, tokenProvider, connectionProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
@@ -773,8 +774,8 @@ describe("configureAdvSecTools", () => {
 
       (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue([]);
 
-      // Documents the known limitation: with no alertType, the branch filter is still sent, so a
-      // caller asking for all branches (onlyDefaultBranch=false) may not receive secret alerts.
+      // With no alertType the branch filter is still forwarded (it applies to non-secret alerts and
+      // is ignored by the service for secrets). No confidenceLevels default is added.
       const parsed = z.object(schema).parse({
         project: "test-project",
         repository: "test-repo",
@@ -785,7 +786,39 @@ describe("configureAdvSecTools", () => {
 
       const criteria = (mockAlertApi.getAlerts as jest.Mock).mock.calls[0][4];
       expect(criteria).toHaveProperty("onlyDefaultBranch", false);
-      expect(criteria).toHaveProperty("confidenceLevels", [Confidence.High, Confidence.Other]);
+      expect(criteria).not.toHaveProperty("confidenceLevels");
+    });
+
+    it("sends a single confidence level but omits the filter when all levels are selected", async () => {
+      configureAdvSecTools(server, tokenProvider, connectionProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "advsec_get_alerts");
+      if (!call) throw new Error("advsec_get_alerts tool not registered");
+      const [, , schema, handler] = call;
+
+      (mockAlertApi.getAlerts as jest.Mock).mockResolvedValue([]);
+
+      // A single confidence level narrows the query and is forwarded.
+      const single = z.object(schema).parse({
+        project: "test-project",
+        repository: "test-repo",
+        alertType: "Secret",
+        confidenceLevels: ["High"],
+      });
+      await handler(single);
+      const singleCriteria = (mockAlertApi.getAlerts as jest.Mock).mock.calls[0][4];
+      expect(singleCriteria).toHaveProperty("confidenceLevels", [Confidence.High]);
+
+      // Selecting every level is a no-op the Alerts service rejects (returns zero), so it is omitted.
+      const all = z.object(schema).parse({
+        project: "test-project",
+        repository: "test-repo",
+        alertType: "Secret",
+        confidenceLevels: ["High", "Other"],
+      });
+      await handler(all);
+      const allCriteria = (mockAlertApi.getAlerts as jest.Mock).mock.calls[1][4];
+      expect(allCriteria).not.toHaveProperty("confidenceLevels");
     });
   });
 
