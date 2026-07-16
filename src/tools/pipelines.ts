@@ -11,6 +11,179 @@ import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfa
 import { mkdirSync, createWriteStream } from "fs";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 import { join, posix, resolve, win32 } from "path";
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { Command, CommandContext, CommandRegistry, dispatchAction, errorResult } from "../shared/command.js";
+
+const variableSchema = z.object({
+  value: z.string().optional(),
+  isSecret: z.boolean().optional(),
+});
+
+const resourcesSchema = z.object({
+  builds: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
+  containers: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
+  packages: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
+  pipelines: z.record(
+    z.string(),
+    z.object({
+      runId: z.coerce.number().min(1).optional().describe("Id of the source pipeline run."),
+      version: z.string().optional(),
+    })
+  ),
+  repositories: z
+    .record(
+      z.string(),
+      z.object({
+        refName: z.string().describe("Reference name, e.g., refs/heads/main."),
+        token: z.string().optional(),
+        tokenType: z.string().optional(),
+        version: z.string().optional(),
+      })
+    )
+    .optional(),
+});
+
+// ─── pipelines_write commands ────────────────────────────────────────────────
+// Each write action is a self-contained command. Shared infrastructure arrives
+// via `CommandContext`; the action-specific input arrives via a single typed
+// args object. This keeps the dispatcher agnostic of individual argument lists.
+
+type RunPipelineArgs = {
+  project: string;
+  pipelineId?: number;
+  pipelineVersion?: number;
+  previewRun?: boolean;
+  resources?: z.infer<typeof resourcesSchema>;
+  stagesToSkip?: string[];
+  templateParameters?: Record<string, string>;
+  variables?: Record<string, z.infer<typeof variableSchema>>;
+  yamlOverride?: string;
+};
+
+const runPipelineCommand: Command<RunPipelineArgs> = {
+  async execute(context: CommandContext, args: RunPipelineArgs): Promise<CallToolResult> {
+    if (!args.pipelineId) return errorResult("pipelineId is required for run_pipeline");
+    if (!args.previewRun && args.yamlOverride) throw new Error("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
+
+    const connection = await context.connectionProvider();
+    const pipelinesApi = await connection.getPipelinesApi();
+    const runRequest = {
+      previewRun: args.previewRun,
+      resources: { ...args.resources },
+      stagesToSkip: args.stagesToSkip,
+      templateParameters: args.templateParameters,
+      variables: args.variables,
+      yamlOverride: args.yamlOverride,
+    };
+    const pipelineRun = await pipelinesApi.runPipeline(runRequest, args.project, args.pipelineId, args.pipelineVersion);
+
+    if (pipelineRun.id === undefined) throw new Error("Failed to get build ID from pipeline run");
+
+    return { content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }] };
+  },
+};
+
+type CreatePipelineArgs = {
+  project: string;
+  name?: string;
+  folder?: string;
+  yamlPath?: string;
+  repositoryType?: string;
+  repositoryName?: string;
+  repositoryId?: string;
+  repositoryConnectionId?: string;
+};
+
+const createPipelineCommand: Command<CreatePipelineArgs> = {
+  async execute(context: CommandContext, args: CreatePipelineArgs): Promise<CallToolResult> {
+    if (!args.name) return errorResult("name is required for create_pipeline");
+    if (!args.yamlPath) return errorResult("yamlPath is required for create_pipeline");
+    if (!args.repositoryType) return errorResult("repositoryType is required for create_pipeline");
+    if (!args.repositoryName) return errorResult("repositoryName is required for create_pipeline");
+
+    const connection = await context.connectionProvider();
+    const pipelinesApi = await connection.getPipelinesApi();
+    const repositoryTypeEnumValue = safeEnumConvert(RepositoryType, args.repositoryType);
+    const repositoryPayload: Record<string, unknown> = { type: args.repositoryType };
+
+    if (repositoryTypeEnumValue === RepositoryType.AzureReposGit) {
+      repositoryPayload.id = args.repositoryId;
+      repositoryPayload.name = args.repositoryName;
+    } else if (repositoryTypeEnumValue === RepositoryType.GitHub) {
+      if (!args.repositoryConnectionId) throw new Error("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
+      repositoryPayload.connection = { id: args.repositoryConnectionId };
+      repositoryPayload.fullname = args.repositoryName;
+    } else {
+      throw new Error("Unsupported repository type");
+    }
+
+    const yamlConfigurationType = getEnumKeys(ConfigurationType).find((k) => ConfigurationType[k as keyof typeof ConfigurationType] === ConfigurationType.Yaml);
+    const createParams: Record<string, unknown> = {
+      name: args.name,
+      folder: args.folder || "\\",
+      configuration: { type: yamlConfigurationType, path: args.yamlPath, repository: repositoryPayload, variables: undefined },
+    };
+    const newPipeline = await pipelinesApi.createPipeline(createParams, args.project);
+
+    return { content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }] };
+  },
+};
+
+type UpdateBuildStageArgs = {
+  project: string;
+  buildId?: number;
+  stageName?: string;
+  status?: string;
+  forceRetryAllJobs: boolean;
+};
+
+const updateBuildStageCommand: Command<UpdateBuildStageArgs> = {
+  async execute(context: CommandContext, args: UpdateBuildStageArgs): Promise<CallToolResult> {
+    if (!args.buildId) return errorResult("buildId is required for update_build_stage");
+    if (!args.stageName) return errorResult("stageName is required for update_build_stage");
+    if (!args.status) return errorResult("status is required for update_build_stage");
+
+    const connection = await context.connectionProvider();
+    const orgUrl = connection.serverUrl;
+    const endpoint = `${orgUrl}/${encodeURIComponent(args.project)}/_apis/build/builds/${args.buildId}/stages/${encodeURIComponent(args.stageName)}?api-version=${apiVersion}`;
+    const token = await context.tokenProvider();
+    const body = { forceRetryAllJobs: args.forceRetryAllJobs, state: safeEnumConvert(StageUpdateType, args.status) };
+    const response = await fetch(endpoint, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "User-Agent": context.userAgentProvider() },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update build stage: ${response.status} ${errorText}`);
+    }
+
+    const updatedBuild = await response.text();
+
+    return { content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }] };
+  },
+};
+
+/** The full, action-carrying args object accepted by the `pipelines_write` tool. */
+type PipelinesWriteArgs = { action: "run_pipeline" | "create_pipeline" | "update_build_stage" } & RunPipelineArgs & CreatePipelineArgs & UpdateBuildStageArgs;
+
+/**
+ * The registry is the lookup table that couples each action to its command.
+ * Adding a new write action means registering one entry here — the dispatcher
+ * (`dispatchAction`) never changes.
+ */
+const pipelinesWriteCommands: CommandRegistry<PipelinesWriteArgs> = {
+  run_pipeline: runPipelineCommand,
+  create_pipeline: createPipelineCommand,
+  update_build_stage: updateBuildStageCommand,
+};
+
+const pipelinesWriteErrorPrefixes: Record<PipelinesWriteArgs["action"], string> = {
+  run_pipeline: "Error running pipeline: ",
+  create_pipeline: "Error creating pipeline: ",
+  update_build_stage: "Error updating build stage: ",
+};
 
 const PIPELINE_TOOLS = {
   pipelines_build: "pipelines_build",
@@ -329,7 +502,6 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     }
   );
 
-  // ─── pipelines_artifact ─────────────────────────────────────────────────────
   server.tool(
     PIPELINE_TOOLS.pipelines_artifact,
     "Retrieve and download build artifacts. Use the action parameter to specify the operation.",
@@ -419,35 +591,6 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
     }
   );
 
-  const variableSchema = z.object({
-    value: z.string().optional(),
-    isSecret: z.boolean().optional(),
-  });
-
-  const resourcesSchema = z.object({
-    builds: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
-    containers: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
-    packages: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
-    pipelines: z.record(
-      z.string(),
-      z.object({
-        runId: z.coerce.number().min(1).optional().describe("Id of the source pipeline run."),
-        version: z.string().optional(),
-      })
-    ),
-    repositories: z
-      .record(
-        z.string(),
-        z.object({
-          refName: z.string().describe("Reference name, e.g., refs/heads/main."),
-          token: z.string().optional(),
-          tokenType: z.string().optional(),
-          version: z.string().optional(),
-        })
-      )
-      .optional(),
-  });
-
   // ─── pipelines_write ────────────────────────────────────────────────────────
   server.tool(
     PIPELINE_TOOLS.pipelines_write,
@@ -488,120 +631,12 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         .describe("New status for the stage. Required for: update_build_stage."),
       forceRetryAllJobs: z.boolean().default(false).describe("Whether to force retry all jobs in the stage. Used for: update_build_stage."),
     },
-    async ({
-      action,
-      project,
-      pipelineId,
-      pipelineVersion,
-      previewRun,
-      resources,
-      stagesToSkip,
-      templateParameters,
-      variables,
-      yamlOverride,
-      name,
-      folder,
-      yamlPath,
-      repositoryType,
-      repositoryName,
-      repositoryId,
-      repositoryConnectionId,
-      buildId,
-      stageName,
-      status,
-      forceRetryAllJobs,
-    }) => {
-      try {
-        if (action === "run_pipeline") {
-          if (!pipelineId) return { content: [{ type: "text", text: "pipelineId is required for run_pipeline" }], isError: true };
-          if (!previewRun && yamlOverride) throw new Error("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
-        }
-
-        if (action === "create_pipeline") {
-          if (!name) return { content: [{ type: "text", text: "name is required for create_pipeline" }], isError: true };
-          if (!yamlPath) return { content: [{ type: "text", text: "yamlPath is required for create_pipeline" }], isError: true };
-          if (!repositoryType) return { content: [{ type: "text", text: "repositoryType is required for create_pipeline" }], isError: true };
-          if (!repositoryName) return { content: [{ type: "text", text: "repositoryName is required for create_pipeline" }], isError: true };
-        }
-
-        if (action === "update_build_stage") {
-          if (!buildId) return { content: [{ type: "text", text: "buildId is required for update_build_stage" }], isError: true };
-          if (!stageName) return { content: [{ type: "text", text: "stageName is required for update_build_stage" }], isError: true };
-          if (!status) return { content: [{ type: "text", text: "status is required for update_build_stage" }], isError: true };
-        }
-
-        const connection = await connectionProvider();
-
-        if (action === "run_pipeline") {
-          const pipelinesApi = await connection.getPipelinesApi();
-          const runRequest = { previewRun, resources: { ...resources }, stagesToSkip, templateParameters, variables, yamlOverride };
-          const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, pipelineId as number, pipelineVersion);
-
-          if (pipelineRun.id === undefined) throw new Error("Failed to get build ID from pipeline run");
-
-          return { content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }] };
-        }
-
-        if (action === "create_pipeline") {
-          const pipelinesApi = await connection.getPipelinesApi();
-          const repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
-          const repositoryPayload: Record<string, unknown> = { type: repositoryType };
-
-          if (repositoryTypeEnumValue === RepositoryType.AzureReposGit) {
-            repositoryPayload.id = repositoryId;
-            repositoryPayload.name = repositoryName;
-          } else if (repositoryTypeEnumValue === RepositoryType.GitHub) {
-            if (!repositoryConnectionId) throw new Error("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
-            repositoryPayload.connection = { id: repositoryConnectionId };
-            repositoryPayload.fullname = repositoryName;
-          } else {
-            throw new Error("Unsupported repository type");
-          }
-
-          const yamlConfigurationType = getEnumKeys(ConfigurationType).find((k) => ConfigurationType[k as keyof typeof ConfigurationType] === ConfigurationType.Yaml);
-          const createParams: Record<string, unknown> = {
-            name,
-            folder: folder || "\\",
-            configuration: { type: yamlConfigurationType, path: yamlPath, repository: repositoryPayload, variables: undefined },
-          };
-          const newPipeline = await pipelinesApi.createPipeline(createParams, project);
-
-          return { content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }] };
-        }
-
-        if (action === "update_build_stage") {
-          const orgUrl = connection.serverUrl;
-          const endpoint = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId as number}/stages/${encodeURIComponent(stageName as string)}?api-version=${apiVersion}`;
-          const token = await tokenProvider();
-          const body = { forceRetryAllJobs, state: safeEnumConvert(StageUpdateType, status as string) };
-          const response = await fetch(endpoint, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "User-Agent": userAgentProvider() },
-            body: JSON.stringify(body),
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update build stage: ${response.status} ${errorText}`);
-          }
-
-          const updatedBuild = await response.text();
-
-          return { content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }] };
-        }
-
-        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        const msgs: Record<string, string> = {
-          run_pipeline: `Error running pipeline: ${errorMessage}`,
-          create_pipeline: `Error creating pipeline: ${errorMessage}`,
-          update_build_stage: `Error updating build stage: ${errorMessage}`,
-        };
-        return { content: [{ type: "text", text: msgs[action] ?? `Error: ${errorMessage}` }], isError: true };
-      }
+    async (args) => {
+      const context: CommandContext = { connectionProvider, tokenProvider, userAgentProvider };
+      return dispatchAction(pipelinesWriteCommands, context, args as unknown as PipelinesWriteArgs, pipelinesWriteErrorPrefixes);
     }
   );
 }
 
-export { PIPELINE_TOOLS, configurePipelineTools };
+export { PIPELINE_TOOLS, configurePipelineTools, runPipelineCommand, createPipelineCommand, updateBuildStageCommand };
+export type { RunPipelineArgs, CreatePipelineArgs, UpdateBuildStageArgs };

@@ -1852,18 +1852,17 @@ describe("configurePipelineTools", () => {
       expect(result.content[0].text).toBe(expectedMsg);
     });
 
-    it("should use generic error message when action is unknown and connectionProvider throws", async () => {
+    it("should return an unknown action message without opening a connection for an unknown action", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
       if (!call) fail("Tool not found");
       const [, , , handler] = call;
 
-      (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("connection failed"));
-
       const result = await handler({ action: "unknown" as any, project: "test-project" });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Error: connection failed");
+      expect(result.content[0].text).toBe("Unknown action: unknown");
+      expect(connectionProvider as jest.Mock).not.toHaveBeenCalled();
     });
 
     it("should handle non-Error thrown values in pipelines_write", async () => {
