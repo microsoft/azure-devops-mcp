@@ -21,20 +21,24 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 ### Pipelines
 
-| Tool                                                                                                  | Description                                       |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| [mcp_ado_pipelines_create_pipeline](#mcp_ado_pipelines_create_pipeline)                               | Create a new pipeline with YAML configuration     |
-| [mcp_ado_pipelines_get_builds](#mcp_ado_pipelines_get_builds)                                         | Retrieve a list of builds with optional filters   |
-| [mcp_ado_pipelines_get_build_status](#mcp_ado_pipelines_get_build_status)                             | Get the status of a specific build                |
-| [mcp_ado_pipelines_get_build_log](#mcp_ado_pipelines_get_build_log)                                   | Retrieve complete logs for a build                |
-| [mcp_ado_pipelines_get_build_log_by_id](#mcp_ado_pipelines_get_build_log_by_id)                       | Get a specific build log by log ID                |
-| [mcp_ado_pipelines_get_build_changes](#mcp_ado_pipelines_get_build_changes)                           | Get changes (commits) associated with a build     |
-| [mcp_ado_pipelines_get_build_definitions](#mcp_ado_pipelines_get_build_definitions)                   | List build/pipeline definitions in a project      |
-| [mcp_ado_pipelines_get_build_definition_revisions](#mcp_ado_pipelines_get_build_definition_revisions) | Get revision history of a build definition        |
-| [mcp_ado_pipelines_run_pipeline](#mcp_ado_pipelines_run_pipeline)                                     | Start a new pipeline run with optional parameters |
-| [mcp_ado_pipelines_get_run](#mcp_ado_pipelines_get_run)                                               | Get details of a specific pipeline run            |
-| [mcp_ado_pipelines_list_runs](#mcp_ado_pipelines_list_runs)                                           | List recent runs for a pipeline                   |
-| [mcp_ado_pipelines_update_build_stage](#mcp_ado_pipelines_update_build_stage)                         | Update a build stage (cancel, retry, or run)      |
+> **Note:** The pipeline tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#pipelines) tool structure.
+
+| Tool                                          | Action               | Description                                         |
+| --------------------------------------------- | -------------------- | --------------------------------------------------- |
+| [pipelines_build](#pipelines_build)           | `list`               | List builds with optional filters                   |
+| [pipelines_build](#pipelines_build)           | `get_status`         | Get status, issues, and report metadata for a build |
+| [pipelines_build](#pipelines_build)           | `get_changes`        | Get commits and work items associated with a build  |
+| [pipelines_build_log](#pipelines_build_log)   | `list`               | List available logs for a build                     |
+| [pipelines_build_log](#pipelines_build_log)   | `get_content`        | Get the text content of a specific log by ID        |
+| [pipelines_definition](#pipelines_definition) | `list`               | List pipeline definitions with optional filters     |
+| [pipelines_definition](#pipelines_definition) | `list_revisions`     | List revision history for a pipeline definition     |
+| [pipelines_run](#pipelines_run)               | `get`                | Get a single pipeline run                           |
+| [pipelines_run](#pipelines_run)               | `list`               | List runs for a pipeline                            |
+| [pipelines_artifact](#pipelines_artifact)     | `list`               | List artifacts for a build                          |
+| [pipelines_artifact](#pipelines_artifact)     | `download`           | Download a named build artifact                     |
+| [pipelines_write](#pipelines_write)           | `run_pipeline`       | Queue a new pipeline run                            |
+| [pipelines_write](#pipelines_write)           | `create_pipeline`    | Create a new YAML pipeline definition               |
+| [pipelines_write](#pipelines_write)           | `update_build_stage` | Cancel, retry, or run a stage on an in-flight build |
 
 ### Repositories
 
@@ -184,102 +188,65 @@ Retrieve Azure DevOps identity IDs for a provided search filter.
 
 ### Pipelines
 
-#### mcp_ado_pipelines_create_pipeline
+> **Note:** The pipeline tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#pipelines) tool structure.
 
-Creates a pipeline definition with YAML configuration for a given project.
+The pipeline tools are consolidated into grouped dispatchers using an `action` parameter.
 
-- **Required**: `project`, `name`, `yamlPath`, `repositoryType`, `repositoryName`
-- **Optional**: `folder`, `repositoryConnectionId`, `repositoryId`
+#### pipelines_build
 
-#### mcp_ado_pipelines_get_builds
+Retrieve build data for a project.
 
-Retrieves a list of builds for a given project.
+| Action        | Required params      | Optional params                                                                                                                                                                                                                                                                                           |
+| ------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`        | `project`            | `branchName`, `buildIds`, `buildNumber`, `continuationToken`, `definitions`, `deletedFilter`, `maxBuildsPerDefinition`, `maxTime`, `minTime`, `properties`, `queryOrder`, `queues`, `reasonFilter`, `repositoryId`, `repositoryType`, `requestedFor`, `resultFilter`, `statusFilter`, `tagFilters`, `top` |
+| `get_status`  | `project`, `buildId` | None                                                                                                                                                                                                                                                                                                      |
+| `get_changes` | `project`, `buildId` | `continuationToken`, `includeSourceChange`, `top`                                                                                                                                                                                                                                                         |
 
-- **Required**: `project`
-- **Optional**: `branchName`, `buildIds`, `buildNumber`, `continuationToken`, `definitions`, `deletedFilter`, `maxBuildsPerDefinition`, `maxTime`, `minTime`, `properties`, `queryOrder`, `queues`, `reasonFilter`, `repositoryId`, `repositoryType`, `requestedFor`, `resultFilter`, `statusFilter`, `tagFilters`, `top`
+#### pipelines_build_log
 
-#### mcp_ado_pipelines_get_build_status
+Retrieve build log data for a project.
 
-Fetches the status of a specific build.
+| Action        | Required params               | Optional params        |
+| ------------- | ----------------------------- | ---------------------- |
+| `list`        | `project`, `buildId`          | None                   |
+| `get_content` | `project`, `buildId`, `logId` | `startLine`, `endLine` |
 
-- **Required**: `project`, `buildId`
-- **Optional**: None
+#### pipelines_definition
 
-#### mcp_ado_pipelines_get_build_log
+Retrieve pipeline definition data for a project.
 
-Retrieves the logs for a specific build.
+| Action           | Required params           | Optional params                                                                                                                                                                                                                                            |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`           | `project`                 | `builtAfter`, `continuationToken`, `definitionIds`, `includeAllProperties`, `includeLatestBuilds`, `minMetricsTime`, `name`, `notBuiltAfter`, `path`, `processType`, `queryOrder`, `repositoryId`, `repositoryType`, `taskIdFilter`, `top`, `yamlFilename` |
+| `list_revisions` | `project`, `definitionId` | None                                                                                                                                                                                                                                                       |
 
-- **Required**: `project`, `buildId`
-- **Optional**: None
+#### pipelines_run
 
-#### mcp_ado_pipelines_get_build_log_by_id
+Retrieve pipeline run data for a project.
 
-Get a specific build log by log ID.
+| Action | Required params                  | Optional params |
+| ------ | -------------------------------- | --------------- |
+| `get`  | `project`, `pipelineId`, `runId` | None            |
+| `list` | `project`, `pipelineId`          | None            |
 
-- **Required**: `project`, `buildId`, `logId`
-- **Optional**: `endLine`, `startLine`
+#### pipelines_artifact
 
-#### mcp_ado_pipelines_get_build_changes
+Retrieve and download build artifacts.
 
-Get the changes associated with a specific build.
+| Action     | Required params                      | Optional params                                                                 |
+| ---------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| `list`     | `project`, `buildId`                 | None                                                                            |
+| `download` | `project`, `buildId`, `artifactName` | `destinationPath` (relative path; absolute paths and traversal are not allowed) |
 
-- **Required**: `project`, `buildId`
-- **Optional**: `continuationToken`, `includeSourceChange`, `top`
+#### pipelines_write
 
-#### mcp_ado_pipelines_get_build_definitions
+Write operations for pipelines and builds.
 
-Retrieves a list of build definitions for a given project.
-
-- **Required**: `project`
-- **Optional**: `builtAfter`, `continuationToken`, `definitionIds`, `includeAllProperties`, `includeLatestBuilds`, `minMetricsTime`, `name`, `notBuiltAfter`, `path`, `processType`, `queryOrder`, `repositoryId`, `repositoryType`, `taskIdFilter`, `top`, `yamlFilename`
-
-#### mcp_ado_pipelines_get_build_definition_revisions
-
-Retrieves a list of revisions for a specific build definition.
-
-- **Required**: `project`, `definitionId`
-- **Optional**: None
-
-#### mcp_ado_pipelines_run_pipeline
-
-Starts a new run of a pipeline.
-
-- **Required**: `project`, `pipelineId`
-- **Optional**: `pipelineVersion`, `previewRun`, `resources`, `stagesToSkip`, `templateParameters`, `variables`, `yamlOverride`
-
-#### mcp_ado_pipelines_get_run
-
-Gets a run for a particular pipeline.
-
-- **Required**: `project`, `pipelineId`, `runId`
-- **Optional**: None
-
-#### mcp_ado_pipelines_list_runs
-
-Gets top 10000 runs for a particular pipeline.
-
-- **Required**: `project`, `pipelineId`
-- **Optional**: None
-
-#### mcp_ado_pipelines_update_build_stage
-
-Updates the stage of a specific build.
-
-- **Required**: `project`, `buildId`, `stageName`, `status`
-- **Optional**: `forceRetryAllJobs`
-
-#### mcp_ado_pipelines_list_artifacts
-
-Lists artifacts for a given build.
-
-- **Required**: `project`, `buildId`
-
-#### mcp_ado_pipelines_download_artifact
-
-Downloads a pipeline artifact.
-
-- **Required**: `project`, `buildId`, `artifactName`
-- **Optional**: `destinationPath` (relative local path; absolute paths and path traversal are not allowed)
+| Action               | Required params                                                   | Optional params                                                                                                 |
+| -------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `run_pipeline`       | `project`, `pipelineId`                                           | `pipelineVersion`, `previewRun`, `resources`, `stagesToSkip`, `templateParameters`, `variables`, `yamlOverride` |
+| `create_pipeline`    | `project`, `name`, `yamlPath`, `repositoryType`, `repositoryName` | `folder`, `repositoryConnectionId`, `repositoryId`                                                              |
+| `update_build_stage` | `project`, `buildId`, `stageName`, `status`                       | `forceRetryAllJobs`                                                                                             |
 
 ### Repositories
 
