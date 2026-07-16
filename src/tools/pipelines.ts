@@ -235,15 +235,19 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
         if (action === "list") {
           let resolvedRepositoryId = repositoryId;
+
           if (repositoryId) {
             const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repositoryId);
+
             if (!isGuid && (!repositoryType || repositoryType === "TfsGit")) {
               const gitApi = await connection.getGitApi();
               const repositories = await gitApi.getRepositories(project);
               const repo = repositories?.find((r) => r.name === repositoryId);
+
               if (!repo?.id) {
                 return { content: [{ type: "text", text: `Error: Repository '${repositoryId}' not found in project '${project}'.` }], isError: true };
               }
+
               resolvedRepositoryId = repo.id;
             }
           }
@@ -364,24 +368,28 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         }
 
         if (action === "download") {
-          const artifact = await buildApi.getArtifact(project, buildId, artifactName!);
+          const resolvedArtifactName = artifactName as string; // validated in pre-flight check above
+          const artifact = await buildApi.getArtifact(project, buildId, resolvedArtifactName);
+
           if (!artifact) {
-            return { content: [{ type: "text", text: `Artifact ${artifactName} not found in build ${buildId}.` }] };
+            return { content: [{ type: "text", text: `Artifact ${resolvedArtifactName} not found in build ${buildId}.` }] };
           }
 
-          const fileStream = await buildApi.getArtifactContentZip(project, buildId, artifactName!);
+          const fileStream = await buildApi.getArtifactContentZip(project, buildId, resolvedArtifactName);
 
           if (destinationPath) {
             const fullDestinationPath = resolve(destinationPath);
             mkdirSync(fullDestinationPath, { recursive: true });
-            const fileDestinationPath = join(fullDestinationPath, `${artifactName}.zip`);
+            const fileDestinationPath = join(fullDestinationPath, `${resolvedArtifactName}.zip`);
             const writeStream = createWriteStream(fileDestinationPath);
+
             await new Promise<void>((resolve, reject) => {
               fileStream.pipe(writeStream);
               fileStream.on("end", () => resolve());
               fileStream.on("error", (err) => reject(err));
             });
-            return { content: [{ type: "text", text: `Artifact ${artifactName} downloaded to ${destinationPath}.` }] };
+
+            return { content: [{ type: "text", text: `Artifact ${resolvedArtifactName} downloaded to ${destinationPath}.` }] };
           }
 
           const chunks: Buffer[] = [];
@@ -390,8 +398,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
             fileStream.on("end", () => resolve());
             fileStream.on("error", (err) => reject(err));
           });
+
           const buffer = Buffer.concat(chunks);
           const base64Data = buffer.toString("base64");
+
           return {
             content: [{ type: "resource", resource: { uri: `data:application/zip;base64,${base64Data}`, mimeType: "application/zip", text: base64Data } }],
           };
@@ -511,7 +521,9 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
           const pipelinesApi = await connection.getPipelinesApi();
           const runRequest = { previewRun, resources: { ...resources }, stagesToSkip, templateParameters, variables, yamlOverride };
           const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, pipelineId, pipelineVersion);
+
           if (pipelineRun.id === undefined) throw new Error("Failed to get build ID from pipeline run");
+
           return { content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }] };
         }
 
@@ -523,8 +535,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
           const pipelinesApi = await connection.getPipelinesApi();
           const repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const repositoryPayload: any = { type: repositoryType };
+          const repositoryPayload: Record<string, unknown> = { type: repositoryType };
 
           if (repositoryTypeEnumValue === RepositoryType.AzureReposGit) {
             repositoryPayload.id = repositoryId;
@@ -538,9 +549,13 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
           }
 
           const yamlConfigurationType = getEnumKeys(ConfigurationType).find((k) => ConfigurationType[k as keyof typeof ConfigurationType] === ConfigurationType.Yaml);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const createParams: any = { name, folder: folder || "\\", configuration: { type: yamlConfigurationType, path: yamlPath, repository: repositoryPayload, variables: undefined } };
+          const createParams: Record<string, unknown> = {
+            name,
+            folder: folder || "\\",
+            configuration: { type: yamlConfigurationType, path: yamlPath, repository: repositoryPayload, variables: undefined },
+          };
           const newPipeline = await pipelinesApi.createPipeline(createParams, project);
+
           return { content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }] };
         }
 
@@ -558,11 +573,14 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "User-Agent": userAgentProvider() },
             body: JSON.stringify(body),
           });
+
           if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to update build stage: ${response.status} ${errorText}`);
           }
+
           const updatedBuild = await response.text();
+
           return { content: [{ type: "text", text: JSON.stringify(updatedBuild, null, 2) }] };
         }
 

@@ -712,10 +712,31 @@ describe("configurePipelineTools", () => {
       if (!call) throw new Error("pipelines_definition tool not registered");
       const [, , , handler] = call;
       mockConnection.getBuildApi.mockResolvedValue({ getDefinitions: jest.fn() });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown" as any, project: "test-project" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown action: unknown");
+    });
+
+    it("should return error when definitionId is missing for list_revisions", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_definition");
+      if (!call) throw new Error("pipelines_definition tool not registered");
+      const [, , , handler] = call;
+      mockConnection.getBuildApi.mockResolvedValue({ getDefinitionRevisions: jest.fn() });
+      const result = await handler({ action: "list_revisions" as const, project: "test-project" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("definitionId is required for list_revisions");
+    });
+
+    it("should use generic error message when action is unknown and connectionProvider throws a non-Error", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_definition");
+      if (!call) throw new Error("pipelines_definition tool not registered");
+      const [, , , handler] = call;
+      (connectionProvider as jest.Mock).mockRejectedValueOnce("string error");
+      const result = await handler({ action: "unknown" as any, project: "test-project" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Unknown error occurred");
     });
   });
 
@@ -804,7 +825,6 @@ describe("configurePipelineTools", () => {
       if (!call) throw new Error("pipelines_build tool not registered");
       const [, , , handler] = call;
       mockConnection.getBuildApi.mockResolvedValue({ getBuilds: jest.fn() });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown" as any, project: "test-project" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown action: unknown");
@@ -908,10 +928,31 @@ describe("configurePipelineTools", () => {
       if (!call) throw new Error("pipelines_build_log tool not registered");
       const [, , , handler] = call;
       mockConnection.getBuildApi.mockResolvedValue({ getBuildLogs: jest.fn() });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown" as any, project: "test-project", buildId: 1 });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown action: unknown");
+    });
+
+    it("should return error when logId is missing for get_content", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_build_log");
+      if (!call) throw new Error("pipelines_build_log tool not registered");
+      const [, , , handler] = call;
+      mockConnection.getBuildApi.mockResolvedValue({ getBuildLogLines: jest.fn() });
+      const result = await handler({ action: "get_content" as const, project: "test-project", buildId: 1 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("logId is required for get_content");
+    });
+
+    it("should use generic error message when action is unknown and connectionProvider throws a non-Error", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_build_log");
+      if (!call) throw new Error("pipelines_build_log tool not registered");
+      const [, , , handler] = call;
+      (connectionProvider as jest.Mock).mockRejectedValueOnce("string error");
+      const result = await handler({ action: "unknown" as any, project: "test-project", buildId: 1 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Unknown error occurred");
     });
   });
 
@@ -1293,6 +1334,28 @@ describe("configurePipelineTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Changes not available");
     });
+
+    it("should return error when buildId is missing for get_changes", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_build");
+      if (!call) throw new Error("pipelines_build tool not registered");
+      const [, , , handler] = call;
+      mockConnection.getBuildApi.mockResolvedValue({ getBuildChanges: jest.fn() });
+      const result = await handler({ action: "get_changes" as const, project: "test-project" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("buildId is required for get_changes");
+    });
+
+    it("should use generic error message when action is unknown and connectionProvider throws a non-Error", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_build");
+      if (!call) throw new Error("pipelines_build tool not registered");
+      const [, , , handler] = call;
+      (connectionProvider as jest.Mock).mockRejectedValueOnce("string error");
+      const result = await handler({ action: "unknown" as any, project: "test-project" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Unknown error occurred");
+    });
   });
 
   describe("pipelines_run tool", () => {
@@ -1349,10 +1412,31 @@ describe("configurePipelineTools", () => {
       if (!call) fail("Tool not found");
       const [, , , handler] = call;
       mockConnection.getPipelinesApi.mockResolvedValue({ getRun: jest.fn() });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown" as any, project: "test-project", pipelineId: 1 });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown action: unknown");
+    });
+
+    it("should return error when runId is missing for get", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run");
+      if (!call) fail("Tool not found");
+      const [, , , handler] = call;
+      mockConnection.getPipelinesApi.mockResolvedValue({ getRun: jest.fn() });
+      const result = await handler({ action: "get" as const, project: "test-project", pipelineId: 1 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("runId is required for get");
+    });
+
+    it("should use generic error message when action is unknown and connectionProvider throws a non-Error", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_run");
+      if (!call) fail("Tool not found");
+      const [, , , handler] = call;
+      (connectionProvider as jest.Mock).mockRejectedValueOnce("string error");
+      const result = await handler({ action: "unknown" as any, project: "test-project", pipelineId: 1 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Unknown error occurred");
     });
   });
 
@@ -1538,7 +1622,6 @@ describe("configurePipelineTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
       if (!call) throw new Error("pipelines_write tool not registered");
       const [, , , handler] = call;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown" as any, project: "test-project" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown action: unknown");
@@ -1777,11 +1860,24 @@ describe("configurePipelineTools", () => {
 
       (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("connection failed"));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown" as any, project: "test-project" });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error: connection failed");
+    });
+
+    it("should handle non-Error thrown values in pipelines_write", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
+      if (!call) fail("Tool not found");
+      const [, , , handler] = call;
+
+      (connectionProvider as jest.Mock).mockRejectedValueOnce("string error");
+
+      const result = await handler({ action: "run_pipeline" as const, project: "test-project", pipelineId: 1 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown error occurred");
     });
   });
 
@@ -1842,10 +1938,32 @@ describe("configurePipelineTools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
       if (!call) throw new Error("pipelines_artifact tool not registered");
       const [, , , handler] = call;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await handler({ action: "unknown" as any, project: "test-project", buildId: 1 });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown action: unknown");
+    });
+
+    it("should return error when artifactName is missing for download", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+      const result = await handler({ action: "download" as const, project: "test-project", buildId: 1 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("artifactName is required for download");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should use generic error message when action is unknown and connectionProvider throws a non-Error", async () => {
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifacts: jest.fn() });
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+      (connectionProvider as jest.Mock).mockRejectedValueOnce("string error");
+      const result = await handler({ action: "unknown" as any, project: "test-project", buildId: 1 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Unknown error occurred");
     });
   });
 
