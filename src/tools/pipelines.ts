@@ -372,7 +372,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
           const artifact = await buildApi.getArtifact(project, buildId, resolvedArtifactName);
 
           if (!artifact) {
-            return { content: [{ type: "text", text: `Artifact ${resolvedArtifactName} not found in build ${buildId}.` }] };
+            return { content: [{ type: "text", text: `Artifact ${resolvedArtifactName} not found in build ${buildId}.` }], isError: true };
           }
 
           const fileStream = await buildApi.getArtifactContentZip(project, buildId, resolvedArtifactName);
@@ -512,19 +512,9 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       forceRetryAllJobs,
     }) => {
       try {
-        const connection = await connectionProvider();
-
         if (action === "run_pipeline") {
           if (!pipelineId) return { content: [{ type: "text", text: "pipelineId is required for run_pipeline" }], isError: true };
           if (!previewRun && yamlOverride) throw new Error("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
-
-          const pipelinesApi = await connection.getPipelinesApi();
-          const runRequest = { previewRun, resources: { ...resources }, stagesToSkip, templateParameters, variables, yamlOverride };
-          const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, pipelineId, pipelineVersion);
-
-          if (pipelineRun.id === undefined) throw new Error("Failed to get build ID from pipeline run");
-
-          return { content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }] };
         }
 
         if (action === "create_pipeline") {
@@ -532,7 +522,27 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
           if (!yamlPath) return { content: [{ type: "text", text: "yamlPath is required for create_pipeline" }], isError: true };
           if (!repositoryType) return { content: [{ type: "text", text: "repositoryType is required for create_pipeline" }], isError: true };
           if (!repositoryName) return { content: [{ type: "text", text: "repositoryName is required for create_pipeline" }], isError: true };
+        }
 
+        if (action === "update_build_stage") {
+          if (!buildId) return { content: [{ type: "text", text: "buildId is required for update_build_stage" }], isError: true };
+          if (!stageName) return { content: [{ type: "text", text: "stageName is required for update_build_stage" }], isError: true };
+          if (!status) return { content: [{ type: "text", text: "status is required for update_build_stage" }], isError: true };
+        }
+
+        const connection = await connectionProvider();
+
+        if (action === "run_pipeline") {
+          const pipelinesApi = await connection.getPipelinesApi();
+          const runRequest = { previewRun, resources: { ...resources }, stagesToSkip, templateParameters, variables, yamlOverride };
+          const pipelineRun = await pipelinesApi.runPipeline(runRequest, project, pipelineId as number, pipelineVersion);
+
+          if (pipelineRun.id === undefined) throw new Error("Failed to get build ID from pipeline run");
+
+          return { content: [{ type: "text", text: JSON.stringify(pipelineRun, null, 2) }] };
+        }
+
+        if (action === "create_pipeline") {
           const pipelinesApi = await connection.getPipelinesApi();
           const repositoryTypeEnumValue = safeEnumConvert(RepositoryType, repositoryType);
           const repositoryPayload: Record<string, unknown> = { type: repositoryType };
@@ -560,14 +570,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
         }
 
         if (action === "update_build_stage") {
-          if (!buildId) return { content: [{ type: "text", text: "buildId is required for update_build_stage" }], isError: true };
-          if (!stageName) return { content: [{ type: "text", text: "stageName is required for update_build_stage" }], isError: true };
-          if (!status) return { content: [{ type: "text", text: "status is required for update_build_stage" }], isError: true };
-
           const orgUrl = connection.serverUrl;
-          const endpoint = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId}/stages/${encodeURIComponent(stageName)}?api-version=${apiVersion}`;
+          const endpoint = `${orgUrl}/${encodeURIComponent(project)}/_apis/build/builds/${buildId as number}/stages/${encodeURIComponent(stageName as string)}?api-version=${apiVersion}`;
           const token = await tokenProvider();
-          const body = { forceRetryAllJobs, state: safeEnumConvert(StageUpdateType, status) };
+          const body = { forceRetryAllJobs, state: safeEnumConvert(StageUpdateType, status as string) };
           const response = await fetch(endpoint, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "User-Agent": userAgentProvider() },
