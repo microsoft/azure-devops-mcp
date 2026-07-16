@@ -87,14 +87,16 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 ### Wiki
 
-| Tool                                                                      | Description                              |
-| ------------------------------------------------------------------------- | ---------------------------------------- |
-| [mcp_ado_wiki_list_wikis](#mcp_ado_wiki_list_wikis)                       | List wikis in organization or project    |
-| [mcp_ado_wiki_get_wiki](#mcp_ado_wiki_get_wiki)                           | Get details of a specific wiki           |
-| [mcp_ado_wiki_list_pages](#mcp_ado_wiki_list_pages)                       | List pages in a wiki                     |
-| [mcp_ado_wiki_get_page](#mcp_ado_wiki_get_page)                           | Get wiki page metadata (without content) |
-| [mcp_ado_wiki_get_page_content](#mcp_ado_wiki_get_page_content)           | Retrieve wiki page content               |
-| [mcp_ado_wiki_create_or_update_page](#mcp_ado_wiki_create_or_update_page) | Create or update a wiki page             |
+> **Note:** The wiki tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#wiki) tool structure.
+
+| Tool                      | Action             | Description                                  |
+| ------------------------- | ------------------ | -------------------------------------------- |
+| [wiki](#wiki)             | `list_wikis`       | List all wikis in an organization or project |
+| [wiki](#wiki)             | `get_wiki`         | Get details of a specific wiki               |
+| [wiki](#wiki)             | `list_pages`       | List pages in a wiki                         |
+| [wiki](#wiki)             | `get_page`         | Get wiki page metadata (without content)     |
+| [wiki](#wiki)             | `get_page_content` | Retrieve wiki page content                   |
+| [wiki_upsert_page](#wiki) |                    | Create or update a wiki page                 |
 
 ### Work Items
 
@@ -536,47 +538,18 @@ Gets a list of test results for a given project and build ID. Can filter by test
 
 ### Wiki
 
-#### mcp_ado_wiki_list_wikis
+> **Note:** The wiki tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#wiki) tool structure.
 
-Retrieve a list of wikis for an organization or project.
+The wiki tools are consolidated into grouped dispatchers using an `action` parameter.
 
-- **Required**: None
-- **Optional**: `project`
-
-#### mcp_ado_wiki_get_wiki
-
-Get the wiki by wikiIdentifier.
-
-- **Required**: `wikiIdentifier`
-- **Optional**: `project`
-
-#### mcp_ado_wiki_list_pages
-
-Retrieve a list of wiki pages for a specific wiki and project.
-
-- **Required**: `wikiIdentifier`, `project`
-- **Optional**: `continuationToken`, `pageViewsForDays`, `top`
-
-#### mcp_ado_wiki_get_page
-
-Retrieve wiki page metadata by path. This tool does not return page content.
-
-- **Required**: `wikiIdentifier`, `project`, `path`
-- **Optional**: `recursionLevel`
-
-#### mcp_ado_wiki_get_page_content
-
-Retrieve wiki page content.
-
-- **Required**: None (either `url` OR `wikiIdentifier` and `project`)
-- **Optional**: `path`, `project`, `url`, `wikiIdentifier`
-
-#### mcp_ado_wiki_create_or_update_page
-
-Create or update a wiki page with content.
-
-- **Required**: `wikiIdentifier`, `path`, `content`
-- **Optional**: `branch`, `etag`, `project`
+| Tool               | Action             | Description                                  | Read-only |
+| ------------------ | ------------------ | -------------------------------------------- | :-------: |
+| `wiki`             | `list_wikis`       | List all wikis in an organization or project |    ✅     |
+| `wiki`             | `get_wiki`         | Get details of a specific wiki               |    ✅     |
+| `wiki`             | `list_pages`       | List pages in a wiki                         |    ✅     |
+| `wiki`             | `get_page`         | Get wiki page metadata (without content)     |    ✅     |
+| `wiki`             | `get_page_content` | Retrieve wiki page content                   |    ✅     |
+| `wiki_upsert_page` |                    | Create or update a wiki page                 |    ❌     |
 
 ### Work Items
 
