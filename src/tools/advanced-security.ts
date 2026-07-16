@@ -15,7 +15,7 @@ const ADVSEC_TOOLS = {
 function configureAdvSecTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
     ADVSEC_TOOLS.get_alerts,
-    "Retrieve Advanced Security alerts for a repository.",
+    "Retrieve Advanced Security alerts for a repository. Results are scoped to the specified project and repository. Branch filters (onlyDefaultBranch, ref) apply only to code, dependency, and license alerts; they are not applicable to secret alerts and are ignored by the service, so they neither include nor exclude secrets. To narrow secret alerts by confidence, pass a single 'confidenceLevels' value ('High' or 'Other'); selecting every level is treated as no confidence filter.",
     {
       project: z.string().describe("The name or ID of the Azure DevOps project."),
       repository: z.string().describe("The name or ID of the repository to get alerts for."),
@@ -34,17 +34,30 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
       ruleId: z.string().optional().describe("Filter alerts by rule ID."),
       ruleName: z.string().optional().describe("Filter alerts by rule name."),
       toolName: z.string().optional().describe("Filter alerts by tool name."),
-      ref: z.string().optional().describe("Filter alerts by git reference (branch). If not provided and onlyDefaultBranch is true, only includes alerts from default branch."),
-      onlyDefaultBranch: z.boolean().optional().default(true).describe("If true, only return alerts found on the default branch. Defaults to true."),
+      ref: z
+        .string()
+        .optional()
+        .describe(
+          "Filter non-secret alerts by git reference (branch), e.g. 'refs/heads/main'. When omitted and onlyDefaultBranch is true, only alerts on the default branch are returned. Not applicable to secret alerts and ignored by this tool when alertType is 'Secret'. When alertType is unspecified, this filter is still sent and may exclude secret alerts from the results; query alertType 'Secret' separately to retrieve all secrets."
+        ),
+      onlyDefaultBranch: z
+        .boolean()
+        .optional()
+        .describe(
+          "For non-secret alerts: if true (the service default when omitted) only return alerts found on the default branch; if false, return alerts from all branches. Ignored when 'ref' is provided. Not applicable to secret alerts and ignored by this tool when alertType is 'Secret'. When alertType is unspecified, this filter is still sent and may exclude secret alerts from the results; query alertType 'Secret' separately to retrieve all secrets."
+        ),
       confidenceLevels: z
         .array(z.enum(getEnumKeys(Confidence) as [string, ...string[]]))
         .optional()
-        .default(["high", "other"])
-        .describe("Filter alerts by confidence levels. Only applicable for secret alerts. Defaults to both 'high' and 'other'."),
+        .describe(
+          "Only applicable to secret alerts. Accepted values are 'High' and 'Other'. Pass a single value (e.g. ['High']) to narrow secrets to that confidence level. Leave unset to return secrets without a confidence filter. Do not select both levels to widen results: the Alerts service does not accept a multi-value confidence filter and would return no alerts, so this tool treats an all-levels selection as no filter and omits it."
+        ),
       validity: z
         .array(z.enum(getEnumKeys(AlertValidityStatus) as [string, ...string[]]))
         .optional()
-        .describe("Filter alerts by validity status. Only applicable for secret alerts."),
+        .describe(
+          "Only applicable to secret alerts. If omitted, alerts of all validity statuses are returned (no validity filter is applied). Filtering by validity may return fewer alerts than 'top'; use the continuation token to fetch any remaining alerts."
+        ),
       top: z.coerce.number().optional().default(100).describe("Maximum number of alerts to return. Defaults to 100."),
       orderBy: z.enum(["id", "firstSeen", "lastSeen", "fixedOn", "severity"]).optional().default("severity").describe("Order results by specified field. Defaults to 'severity'."),
       continuationToken: z.string().optional().describe("Continuation token for pagination."),
@@ -54,7 +67,24 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
         const connection = await connectionProvider();
         const alertApi = await connection.getAlertApi();
 
-        const isSecretAlert = !alertType || alertType.toLowerCase() === "secret";
+        const normalizedAlertType = alertType?.toLowerCase();
+        // "onlyDefaultBranch" and "ref" are not applicable to secret alerts (secrets are not
+        // branch-scoped and carry a null gitRef). Forwarding them for a secret-only query diverges
+        // from the REST API / Advanced Security UI and can incorrectly return no alerts, so only
+        // include them when the query is not restricted to secret alerts.
+        const isSecretOnly = normalizedAlertType === "secret";
+        // "confidenceLevels" and "validity" only apply to secret alerts, so include them whenever
+        // the result set can contain secrets (an explicit "secret" type or no type filter at all).
+        const canIncludeSecrets = !alertType || isSecretOnly;
+
+        // The Alerts service does not accept the multi-value (comma-serialized) confidence filter
+        // that the SDK emits: selecting every level (e.g. both "High" and "Other") returns zero
+        // alerts, and it is a no-op filter regardless. Only forward confidenceLevels when it
+        // narrows the result to a proper subset (a single level); otherwise omit it so secrets are
+        // returned without a confidence filter instead of an empty set.
+        const confidenceLevelValues = confidenceLevels ? mapStringArrayToEnum(confidenceLevels, Confidence) : [];
+        const narrowsByConfidence = confidenceLevelValues.length > 0 && confidenceLevelValues.length < getEnumKeys(Confidence).length;
+
         const criteria = {
           ...(alertType && { alertType: mapStringToEnum(alertType, AlertType) }),
           ...(states && { states: mapStringArrayToEnum(states, State) }),
@@ -62,10 +92,10 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
           ...(ruleId && { ruleId }),
           ...(ruleName && { ruleName }),
           ...(toolName && { toolName }),
-          ...(ref && { ref }),
-          ...(onlyDefaultBranch !== undefined && { onlyDefaultBranch }),
-          ...(isSecretAlert && confidenceLevels && { confidenceLevels: mapStringArrayToEnum(confidenceLevels, Confidence) }),
-          ...(isSecretAlert && validity && { validity: mapStringArrayToEnum(validity, AlertValidityStatus) }),
+          ...(!isSecretOnly && ref && { ref }),
+          ...(!isSecretOnly && onlyDefaultBranch !== undefined && { onlyDefaultBranch }),
+          ...(canIncludeSecrets && narrowsByConfidence && { confidenceLevels: confidenceLevelValues }),
+          ...(canIncludeSecrets && validity && { validity: mapStringArrayToEnum(validity, AlertValidityStatus) }),
         };
 
         const result = await alertApi.getAlerts(
