@@ -5,7 +5,8 @@ import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
-import { configurePipelineTools } from "../../../src/tools/pipelines";
+import { configurePipelineTools, runPipelineCommand, createPipelineCommand, updateBuildStageCommand } from "../../../src/tools/pipelines";
+import { CommandContext } from "../../../src/shared/command";
 import { apiVersion } from "../../../src/utils.js";
 import { mockUpdateBuildStageResponse, mockMultipleArtifacts, mockArtifact } from "../../mocks/pipelines";
 import { Readable } from "stream";
@@ -1600,10 +1601,10 @@ describe("configurePipelineTools", () => {
     });
 
     it.each([
-      ["name", { yamlPath: "p.yml", repositoryType: "AzureReposGit" as const, repositoryName: "repo" }, "name is required for create_pipeline"],
-      ["yamlPath", { name: "pipe", repositoryType: "AzureReposGit" as const, repositoryName: "repo" }, "yamlPath is required for create_pipeline"],
+      ["name", { yamlPath: "p.yml", repositoryType: "AzureReposGit", repositoryName: "repo" }, "name is required for create_pipeline"],
+      ["yamlPath", { name: "pipe", repositoryType: "AzureReposGit", repositoryName: "repo" }, "yamlPath is required for create_pipeline"],
       ["repositoryType", { name: "pipe", yamlPath: "p.yml", repositoryName: "repo" }, "repositoryType is required for create_pipeline"],
-      ["repositoryName", { name: "pipe", yamlPath: "p.yml", repositoryType: "AzureReposGit" as const }, "repositoryName is required for create_pipeline"],
+      ["repositoryName", { name: "pipe", yamlPath: "p.yml", repositoryType: "AzureReposGit" }, "repositoryName is required for create_pipeline"],
     ])("should return error when %s is missing for create_pipeline", async (_field, extra, expectedMsg) => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
@@ -1850,20 +1851,21 @@ describe("configurePipelineTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe(expectedMsg);
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it("should use generic error message when action is unknown and connectionProvider throws", async () => {
+    it("should return an unknown action message without opening a connection for an unknown action", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
       if (!call) fail("Tool not found");
       const [, , , handler] = call;
 
-      (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("connection failed"));
-
       const result = await handler({ action: "unknown" as any, project: "test-project" });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Error: connection failed");
+      expect(result.content[0].text).toBe("Unknown action: unknown. Supported actions: create_pipeline, run_pipeline, update_build_stage");
+      expect(connectionProvider as jest.Mock).not.toHaveBeenCalled();
     });
 
     it("should handle non-Error thrown values in pipelines_write", async () => {
@@ -2238,6 +2240,256 @@ describe("configurePipelineTools", () => {
       const expectedBase64 = testContent.toString("base64");
       expect(result.content[0].resource.text).toBe(expectedBase64);
       expect(result.content[0].resource.uri).toContain(expectedBase64);
+    });
+  });
+});
+
+// Direct, isolated unit tests for each pipelines_write command. These exercise
+// the Command implementations against a mock CommandContext, independent of the
+// tool dispatcher.
+describe("pipelines_write commands", () => {
+  let tokenProvider: jest.Mock;
+  let userAgentProvider: () => string;
+  let mockConnection: { getPipelinesApi: jest.Mock; serverUrl: string };
+  let connectionProvider: jest.Mock;
+  let context: CommandContext;
+
+  beforeEach(() => {
+    tokenProvider = jest.fn();
+    userAgentProvider = () => "Jest";
+    mockConnection = {
+      getPipelinesApi: jest.fn(),
+      serverUrl: "https://dev.azure.com/test-org",
+    };
+    connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+    context = {
+      connectionProvider: connectionProvider as unknown as CommandContext["connectionProvider"],
+      tokenProvider: tokenProvider as unknown as CommandContext["tokenProvider"],
+      userAgentProvider,
+    };
+    (global.fetch as jest.MockedFunction<typeof fetch>).mockClear();
+  });
+
+  describe("runPipelineCommand", () => {
+    it("runs a pipeline with the given resources and parameters", async () => {
+      const runPipeline = jest.fn().mockResolvedValue({ id: 456 });
+      mockConnection.getPipelinesApi.mockResolvedValue({ runPipeline });
+
+      const result = await runPipelineCommand.execute(context, {
+        project: "test-project",
+        pipelineId: 123,
+        resources: { repositories: { self: { refName: "refs/heads/main" } } },
+        templateParameters: { key1: "value1" },
+      });
+
+      expect(runPipeline).toHaveBeenCalledWith(
+        {
+          previewRun: undefined,
+          resources: { repositories: { self: { refName: "refs/heads/main" } } },
+          stagesToSkip: undefined,
+          templateParameters: { key1: "value1" },
+          variables: undefined,
+          yamlOverride: undefined,
+        },
+        "test-project",
+        123,
+        undefined
+      );
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 456 }, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("returns an error when pipelineId is missing", async () => {
+      const result = await runPipelineCommand.execute(context, { project: "test-project" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("pipelineId is required for run_pipeline");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("throws when yamlOverride is provided without previewRun", async () => {
+      await expect(
+        runPipelineCommand.execute(context, {
+          project: "test-project",
+          pipelineId: 123,
+          previewRun: false,
+          yamlOverride: "some yaml",
+        })
+      ).rejects.toThrow("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
+    });
+
+    it("throws when the pipeline run has no id", async () => {
+      const runPipeline = jest.fn().mockResolvedValue({});
+      mockConnection.getPipelinesApi.mockResolvedValue({ runPipeline });
+
+      await expect(runPipelineCommand.execute(context, { project: "test-project", pipelineId: 123 })).rejects.toThrow("Failed to get build ID from pipeline run");
+    });
+  });
+
+  describe("createPipelineCommand", () => {
+    it("creates a YAML pipeline for AzureReposGit", async () => {
+      const createPipeline = jest.fn().mockResolvedValue({ id: 100, name: "Pipeline" });
+      mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline });
+
+      const result = await createPipelineCommand.execute(context, {
+        project: "ProjectName",
+        name: "Pipeline",
+        yamlPath: "pipeline.yml",
+        repositoryType: "AzureReposGit",
+        repositoryName: "RepositoryName",
+        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+      });
+
+      expect(createPipeline).toHaveBeenCalledWith(
+        {
+          name: "Pipeline",
+          folder: "\\",
+          configuration: {
+            type: "Yaml",
+            path: "pipeline.yml",
+            repository: {
+              type: "AzureReposGit",
+              name: "RepositoryName",
+              id: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+            },
+            variables: undefined,
+          },
+        },
+        "ProjectName"
+      );
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 100, name: "Pipeline" }, null, 2));
+    });
+
+    it("creates a YAML pipeline for GitHub", async () => {
+      const createPipeline = jest.fn().mockResolvedValue({ id: 200, name: "GH Pipeline" });
+      mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline });
+
+      await createPipelineCommand.execute(context, {
+        project: "ProjectName",
+        name: "GH Pipeline",
+        yamlPath: "pipeline.yml",
+        repositoryType: "GitHub",
+        repositoryName: "owner/repo",
+        repositoryConnectionId: "conn-id-123",
+      });
+
+      expect(createPipeline).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configuration: expect.objectContaining({
+            repository: expect.objectContaining({
+              type: "GitHub",
+              fullname: "owner/repo",
+              connection: { id: "conn-id-123" },
+            }),
+          }),
+        }),
+        "ProjectName"
+      );
+    });
+
+    it("throws when repositoryConnectionId is missing for GitHub", async () => {
+      mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline: jest.fn() });
+
+      await expect(
+        createPipelineCommand.execute(context, {
+          project: "ProjectName",
+          name: "GH Pipeline",
+          yamlPath: "pipeline.yml",
+          repositoryType: "GitHub",
+          repositoryName: "owner/repo",
+        })
+      ).rejects.toThrow("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
+    });
+
+    it("throws for an unsupported repository type", async () => {
+      mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline: jest.fn() });
+
+      await expect(
+        createPipelineCommand.execute(context, {
+          project: "ProjectName",
+          name: "Pipeline",
+          yamlPath: "pipeline.yml",
+          repositoryType: "BitbucketCloud",
+          repositoryName: "owner/repo",
+        })
+      ).rejects.toThrow("Unsupported repository type");
+    });
+
+    it.each([
+      ["name", { yamlPath: "p.yml", repositoryType: "AzureReposGit", repositoryName: "repo" }, "name is required for create_pipeline"],
+      ["yamlPath", { name: "pipe", repositoryType: "AzureReposGit", repositoryName: "repo" }, "yamlPath is required for create_pipeline"],
+      ["repositoryType", { name: "pipe", yamlPath: "p.yml", repositoryName: "repo" }, "repositoryType is required for create_pipeline"],
+      ["repositoryName", { name: "pipe", yamlPath: "p.yml", repositoryType: "AzureReposGit" }, "repositoryName is required for create_pipeline"],
+    ])("returns an error when %s is missing", async (_field, extra, expectedMsg) => {
+      const result = await createPipelineCommand.execute(context, { project: "proj", ...(extra as Record<string, string>) });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(expectedMsg);
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateBuildStageCommand", () => {
+    it("sends a PATCH request with encoded path segments and returns the response", async () => {
+      tokenProvider.mockResolvedValue("mock-token");
+      const mockResponse = {
+        ok: true,
+        text: jest.fn().mockResolvedValue(JSON.stringify(mockUpdateBuildStageResponse)),
+      };
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
+
+      const result = await updateBuildStageCommand.execute(context, {
+        project: "test-project",
+        buildId: 123,
+        stageName: "Build",
+        status: "Retry",
+        forceRetryAllJobs: true,
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(`https://dev.azure.com/test-org/test-project/_apis/build/builds/123/stages/Build?api-version=${apiVersion}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer mock-token",
+          "User-Agent": "Jest",
+        },
+        body: JSON.stringify({ forceRetryAllJobs: true, state: StageUpdateType.Retry.valueOf() }),
+      });
+      expect(result.content[0].text).toBe(JSON.stringify(JSON.stringify(mockUpdateBuildStageResponse), null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("throws when the response is not ok", async () => {
+      tokenProvider.mockResolvedValue("mock-token");
+      const mockResponse = {
+        ok: false,
+        status: 404,
+        text: jest.fn().mockResolvedValue("Build stage not found"),
+      };
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
+
+      await expect(
+        updateBuildStageCommand.execute(context, {
+          project: "test-project",
+          buildId: 999,
+          stageName: "Build",
+          status: "Retry",
+          forceRetryAllJobs: false,
+        })
+      ).rejects.toThrow("Failed to update build stage: 404 Build stage not found");
+    });
+
+    it.each([
+      ["buildId", { stageName: "Build", status: "Retry", forceRetryAllJobs: false }, "buildId is required for update_build_stage"],
+      ["stageName", { buildId: 1, status: "Retry", forceRetryAllJobs: false }, "stageName is required for update_build_stage"],
+      ["status", { buildId: 1, stageName: "Build", forceRetryAllJobs: false }, "status is required for update_build_stage"],
+    ])("returns an error when %s is missing", async (_field, extra, expectedMsg) => {
+      const result = await updateBuildStageCommand.execute(context, { project: "test-project", ...(extra as Record<string, unknown>) } as Parameters<typeof updateBuildStageCommand.execute>[1]);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(expectedMsg);
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 });
