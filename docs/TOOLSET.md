@@ -106,31 +106,33 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 ### Work Items
 
-| Tool                                                                                      | Description                                                       |
-| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [mcp_ado_wit_get_work_item](#mcp_ado_wit_get_work_item)                                   | Get a work item by ID                                             |
-| [mcp_ado_wit_get_work_items_batch_by_ids](#mcp_ado_wit_get_work_items_batch_by_ids)       | Retrieve multiple work items by IDs                               |
-| [mcp_ado_wit_create_work_item](#mcp_ado_wit_create_work_item)                             | Create a new work item                                            |
-| [mcp_ado_wit_update_work_item](#mcp_ado_wit_update_work_item)                             | Update fields of a work item                                      |
-| [mcp_ado_wit_update_work_items_batch](#mcp_ado_wit_update_work_items_batch)               | Update multiple work items in batch                               |
-| [mcp_ado_wit_add_child_work_items](#mcp_ado_wit_add_child_work_items)                     | Create child work items under a parent                            |
-| [mcp_ado_wit_work_items_link](#mcp_ado_wit_work_items_link)                               | Link work items together                                          |
-| [mcp_ado_wit_work_item_unlink](#mcp_ado_wit_work_item_unlink)                             | Remove links from a work item                                     |
-| [mcp_ado_wit_add_artifact_link](#mcp_ado_wit_add_artifact_link)                           | Link artifacts (commits, builds, PRs) to work items               |
-| [mcp_ado_wit_link_work_item_to_pull_request](#mcp_ado_wit_link_work_item_to_pull_request) | Link a work item to a pull request                                |
-| [mcp_ado_wit_list_work_item_comments](#mcp_ado_wit_list_work_item_comments)               | List comments on a work item                                      |
-| [mcp_ado_wit_add_work_item_comment](#mcp_ado_wit_add_work_item_comment)                   | Add a comment to a work item                                      |
-| [mcp_ado_wit_update_work_item_comment](#mcp_ado_wit_update_work_item_comment)             | Update an existing comment on a work item                         |
-| [mcp_ado_wit_list_work_item_revisions](#mcp_ado_wit_list_work_item_revisions)             | Get revision history of a work item                               |
-| [mcp_ado_wit_get_work_item_type](#mcp_ado_wit_get_work_item_type)                         | Get details of a work item type                                   |
-| [mcp_ado_wit_my_work_items](#mcp_ado_wit_my_work_items)                                   | List work items relevant to current user                          |
-| [mcp_ado_wit_get_work_items_for_iteration](#mcp_ado_wit_get_work_items_for_iteration)     | Get work items in a specific iteration                            |
-| [mcp_ado_wit_list_backlogs](#mcp_ado_wit_list_backlogs)                                   | List backlogs for a team                                          |
-| [mcp_ado_wit_list_backlog_work_items](#mcp_ado_wit_list_backlog_work_items)               | Get work items in a backlog                                       |
-| [mcp_ado_wit_get_query](#mcp_ado_wit_get_query)                                           | Get a work item query by ID or path                               |
-| [mcp_ado_wit_get_query_results_by_id](#mcp_ado_wit_get_query_results_by_id)               | Execute a query and get results                                   |
-| [mcp_ado_wit_query_by_wiql](#mcp_ado_wit_query_by_wiql)                                   | Execute a WIQL query and return matching work items               |
-| [mcp_ado_wit_get_work_item_attachment](#mcp_ado_wit_get_work_item_attachment)             | Download a work item attachment; save locally or return as base64 |
+> **Note:** The work item tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#work-items) tool structure.
+
+| Tool                                                        | Action                 | Description                                                             |
+| ----------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
+| [wit_work_item](#wit_work_item)                             | `get`                  | Get a single work item by ID                                            |
+| [wit_work_item](#wit_work_item)                             | `get_batch`            | Retrieve multiple work items by IDs                                     |
+| [wit_work_item](#wit_work_item)                             | `list_comments`        | List comments on a work item                                            |
+| [wit_work_item](#wit_work_item)                             | `my`                   | List work items relevant to the authenticated user                      |
+| [wit_work_item](#wit_work_item)                             | `list_revisions`       | Get revision history of a work item                                     |
+| [wit_work_item](#wit_work_item)                             | `list_for_iteration`   | Get work items in a specific team iteration                             |
+| [wit_work_item](#wit_work_item)                             | `get_type`             | Get metadata for a work item type                                       |
+| [wit_work_item_write](#wit_work_item_write)                 | `create`               | Create a new work item                                                  |
+| [wit_work_item_write](#wit_work_item_write)                 | `update`               | Update fields on a single work item                                     |
+| [wit_work_item_write](#wit_work_item_write)                 | `update_batch`         | Update multiple work items in one call                                  |
+| [wit_work_item_write](#wit_work_item_write)                 | `add_child`            | Create child work items under a parent                                  |
+| [wit_work_item_comment_write](#wit_work_item_comment_write) | `add`                  | Add a comment to a work item                                            |
+| [wit_work_item_comment_write](#wit_work_item_comment_write) | `update`               | Update an existing comment on a work item                               |
+| [wit_work_item_link_write](#wit_work_item_link_write)       | `link`                 | Link two work items together                                            |
+| [wit_work_item_link_write](#wit_work_item_link_write)       | `unlink`               | Remove links from a work item                                           |
+| [wit_work_item_link_write](#wit_work_item_link_write)       | `link_to_pull_request` | Link a work item to a pull request                                      |
+| [wit_work_item_link_write](#wit_work_item_link_write)       | `add_artifact_link`    | Add a repository, branch, commit, or build artifact link to a work item |
+| [wit_query](#wit_query)                                     | `get`                  | Get a work item query by ID or path                                     |
+| [wit_query](#wit_query)                                     | `get_results`          | Execute a saved query and return results                                |
+| [wit_query](#wit_query)                                     | `wiql`                 | Execute an ad-hoc WIQL query                                            |
+| [wit_backlog](#wit_backlog)                                 | `list`                 | List backlog levels for a team                                          |
+| [wit_backlog](#wit_backlog)                                 | `list_work_items`      | Get work items in a specific backlog level                              |
+| [wit_work_item_attachment](#wit_work_item_attachment)       |                        | Download a work item attachment; save locally or return as base64       |
 
 ### Work
 
@@ -506,163 +508,77 @@ The wiki tools are consolidated into grouped dispatchers using an `action` param
 
 ### Work Items
 
-#### mcp_ado_wit_get_work_item
+> **Note:** The work item tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#work-items) tool structure.
 
-Get a single work item by ID.
+The work item tools are consolidated into grouped dispatchers using an `action` parameter.
 
-- **Required**: `id`, `project`
-- **Optional**: `asOf`, `expand`, `fields`
+#### wit_work_item
 
-#### mcp_ado_wit_get_work_items_batch_by_ids
+Retrieve work item data for a project.
 
-Retrieve list of work items by IDs in batch.
+| Action               | Required params | Optional params                              |
+| -------------------- | --------------- | -------------------------------------------- |
+| `get`                | `id`            | `project`, `asOf`, `expand`, `fields`        |
+| `get_batch`          | `ids`           | `project`, `fields`, `top`                   |
+| `list_comments`      | `workItemId`    | `project`, `top`                             |
+| `my`                 |                 | `project`, `includeCompleted`, `top`, `type` |
+| `list_revisions`     | `workItemId`    | `project`, `expand`, `skip`, `top`           |
+| `list_for_iteration` | `iterationId`   | `project`, `team`                            |
+| `get_type`           | `workItemType`  | `project`                                    |
 
-- **Required**: `project`, `ids`
-- **Optional**: `fields`
+#### wit_work_item_write
 
-#### mcp_ado_wit_create_work_item
+Write operations for work items.
 
-Create a new work item in a specified project and work item type.
+| Action         | Required params                                | Optional params |
+| -------------- | ---------------------------------------------- | --------------- |
+| `create`       | `project`, `workItemType`, `fields`            | None            |
+| `update`       | `id`, `updates`                                | None            |
+| `update_batch` | `batchUpdates`                                 | None            |
+| `add_child`    | `project`, `workItemType`, `parentId`, `items` | None            |
 
-- **Required**: `project`, `workItemType`, `fields`
-- **Optional**: None
+#### wit_work_item_comment_write
 
-#### mcp_ado_wit_update_work_item
+Write operations for work item comments.
 
-Update a work item by ID with specified fields.
+| Action   | Required params                              | Optional params |
+| -------- | -------------------------------------------- | --------------- |
+| `add`    | `project`, `workItemId`, `text`              | `format`        |
+| `update` | `project`, `workItemId`, `commentId`, `text` | `format`        |
 
-- **Required**: `id`, `updates`
-- **Optional**: None
+#### wit_work_item_link_write
 
-#### mcp_ado_wit_update_work_items_batch
+Write operations for work item links.
 
-Update work items in batch.
+| Action                 | Required params                                            | Optional params                                                                                                                                         |
+| ---------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `link`                 | `updates`                                                  | `project`                                                                                                                                               |
+| `unlink`               | `id`, `type`                                               | `project`, `url`                                                                                                                                        |
+| `link_to_pull_request` | `projectId`, `repositoryId`, `pullRequestId`, `workItemId` | `project`, `pullRequestProjectId`                                                                                                                       |
+| `add_artifact_link`    | `workItemId`, `project`                                    | `artifactUri`, `branchName`, `buildId`, `commitId`, `comment`, `linkType`, `pageId`, `pagePath`, `projectId`, `pullRequestId`, `repositoryId`, `wikiId` |
 
-- **Required**: `updates`
-- **Optional**: None
+#### wit_query
 
-#### mcp_ado_wit_add_child_work_items
+Retrieve work item query data for a project.
 
-Create one or many child work items from a parent by work item type and parent id.
+| Action        | Required params    | Optional params                                         |
+| ------------- | ------------------ | ------------------------------------------------------- |
+| `get`         | `project`, `query` | `depth`, `expand`, `includeDeleted`, `useIsoDateFormat` |
+| `get_results` | `project`, `id`    | `responseType`, `team`, `timePrecision`, `top`          |
+| `wiql`        | `project`, `wiql`  | `team`, `timePrecision`, `top`                          |
 
-- **Required**: `parentId`, `project`, `workItemType`, `items`
-- **Optional**: None
+#### wit_backlog
 
-#### mcp_ado_wit_work_items_link
+Retrieve backlog data for a project and team.
 
-Link work items together in batch.
+| Action            | Required params                | Optional params |
+| ----------------- | ------------------------------ | --------------- |
+| `list`            | `project`, `team`              | None            |
+| `list_work_items` | `project`, `team`, `backlogId` | None            |
 
-- **Required**: `project`, `updates`
-- **Optional**: None
+#### wit_work_item_attachment
 
-#### mcp_ado_wit_work_item_unlink
-
-Remove one or many links from a single work item.
-
-- **Required**: `project`, `id`
-- **Optional**: `type`, `url`
-
-#### mcp_ado_wit_add_artifact_link
-
-Add artifact links (repository, branch, commit, builds) to work items.
-
-- **Required**: `workItemId`, `project`
-- **Optional**: `artifactUri`, `branchName`, `buildId`, `comment`, `commitId`, `linkType`, `projectId`, `pullRequestId`, `repositoryId`
-
-#### mcp_ado_wit_link_work_item_to_pull_request
-
-Link a single work item to an existing pull request.
-
-- **Required**: `projectId`, `repositoryId`, `pullRequestId`, `workItemId`
-- **Optional**: `pullRequestProjectId`
-
-#### mcp_ado_wit_list_work_item_comments
-
-Retrieve list of comments for a work item by ID.
-
-- **Required**: `project`, `workItemId`
-- **Optional**: `top`
-
-#### mcp_ado_wit_add_work_item_comment
-
-Add comment to a work item by ID.
-
-- **Required**: `project`, `workItemId`, `comment`
-- **Optional**: `format`
-
-#### mcp_ado_wit_update_work_item_comment
-
-Update an existing comment on a work item by ID.
-
-- **Required**: `project`, `workItemId`, `commentId`, `text`
-- **Optional**: `format`
-
-#### mcp_ado_wit_list_work_item_revisions
-
-Retrieve list of revisions for a work item by ID.
-
-- **Required**: `project`, `workItemId`
-- **Optional**: `expand`, `skip`, `top`
-
-#### mcp_ado_wit_get_work_item_type
-
-Get a specific work item type.
-
-- **Required**: `project`, `workItemType`
-- **Optional**: None
-
-#### mcp_ado_wit_my_work_items
-
-Retrieve a list of work items relevant to the authenticated user.
-
-- **Required**: `project`
-- **Optional**: `includeCompleted`, `top`, `type`
-
-#### mcp_ado_wit_get_work_items_for_iteration
-
-Retrieve a list of work items for a specified iteration.
-
-- **Required**: `project`, `iterationId`
-- **Optional**: `team`
-
-#### mcp_ado_wit_list_backlogs
-
-Receive a list of backlogs for a given project and team.
-
-- **Required**: `project`, `team`
-- **Optional**: None
-
-#### mcp_ado_wit_list_backlog_work_items
-
-Retrieve a list of backlogs for a given project, team, and backlog category.
-
-- **Required**: `project`, `team`, `backlogId`
-- **Optional**: None
-
-#### mcp_ado_wit_get_query
-
-Get a query by its ID or path.
-
-- **Required**: `project`, `query`
-- **Optional**: `depth`, `expand`, `includeDeleted`, `useIsoDateFormat`
-
-#### mcp_ado_wit_get_query_results_by_id
-
-Retrieve the results of a work item query given the query ID.
-
-- **Required**: `id`
-- **Optional**: `project`, `responseType`, `team`, `timePrecision`, `top`
-
-#### mcp_ado_wit_query_by_wiql
-
-Execute a WIQL (Work Item Query Language) query and return the matching work items. If a project is not specified, you will be prompted to select one.
-
-- **Required**: `wiql`
-- **Optional**: `project`, `team`, `timePrecision`, `top`
-
-#### mcp_ado_wit_get_work_item_attachment
-
-Download a work item attachment by its ID. If `savePath` is provided, saves the file to that local directory and returns the file path. Otherwise returns the content as a base64-encoded resource. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs.
+Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If `savePath` is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs.
 
 - **Required**: `attachmentId`
 - **Optional**: `project`, `fileName`, `savePath`
