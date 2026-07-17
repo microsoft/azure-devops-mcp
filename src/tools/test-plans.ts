@@ -118,7 +118,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           if (nextToken) result.continuationToken = nextToken;
 
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        } else {
+        } else if (action === "list_cases") {
           if (!planId) return { content: [{ type: "text", text: "planId is required for list_cases" }], isError: true };
           if (!suiteId) return { content: [{ type: "text", text: "suiteId is required for list_cases" }], isError: true };
 
