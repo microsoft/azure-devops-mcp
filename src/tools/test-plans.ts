@@ -316,7 +316,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
             content: [{ type: "text", text: "Error creating test suite: Maximum retries exceeded" }],
             isError: true,
           };
-        } else {
+        } else if (action === "add_test_cases") {
           if (!planId) return { content: [{ type: "text", text: "planId is required for add_test_cases" }], isError: true };
           if (!suiteId) return { content: [{ type: "text", text: "suiteId is required for add_test_cases" }], isError: true };
           if (!testCaseIds) return { content: [{ type: "text", text: "testCaseIds is required for add_test_cases" }], isError: true };
