@@ -1864,7 +1864,7 @@ describe("configurePipelineTools", () => {
       const result = await handler({ action: "unknown" as any, project: "test-project" });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Unknown action: unknown");
+      expect(result.content[0].text).toBe("Unknown action: unknown. Supported actions: create_pipeline, run_pipeline, update_build_stage");
       expect(connectionProvider as jest.Mock).not.toHaveBeenCalled();
     });
 
