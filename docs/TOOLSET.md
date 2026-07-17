@@ -561,11 +561,11 @@ Write operations for work item links.
 
 Retrieve work item query data for a project.
 
-| Action        | Required params    | Optional params                                         |
-| ------------- | ------------------ | ------------------------------------------------------- |
-| `get`         | `project`, `query` | `depth`, `expand`, `includeDeleted`, `useIsoDateFormat` |
-| `get_results` | `project`, `id`    | `responseType`, `team`, `timePrecision`, `top`          |
-| `wiql`        | `project`, `wiql`  | `team`, `timePrecision`, `top`                          |
+| Action        | Required params | Optional params                                                    |
+| ------------- | --------------- | ------------------------------------------------------------------ |
+| `get`         | `query`         | `project`, `depth`, `expand`, `includeDeleted`, `useIsoDateFormat` |
+| `get_results` | `id`            | `project`, `responseType`, `team`, `timePrecision`, `top`          |
+| `wiql`        | `wiql`          | `project`, `team`, `timePrecision`, `top`                          |
 
 #### wit_backlog
 

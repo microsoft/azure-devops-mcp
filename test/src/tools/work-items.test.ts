@@ -665,6 +665,26 @@ describe("configureWorkItemTools", () => {
       expect(resultData[0].fields["Microsoft.VSTS.Common.ResolvedBy"]).toBe("Diana Clark <diana.clark@example.com>");
       expect(resultData[0].fields["Microsoft.VSTS.Common.ClosedBy"]).toBe("Edward Davis <edward.davis@example.com>");
     });
+
+    it("should limit ids to top when top is provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item");
+      if (!call) throw new Error("wit_work_item tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.getWorkItemsBatch as jest.Mock).mockResolvedValue([_mockWorkItem]);
+
+      const params = {
+        ids: [1, 2, 3, 4, 5],
+        top: 2,
+        project: "Contoso",
+      };
+
+      await handler({ action: "get_batch", ...params });
+
+      expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(expect.objectContaining({ ids: [1, 2] }), "Contoso");
+    });
   });
 
   describe("get_work_item tool", () => {

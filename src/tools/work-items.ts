@@ -123,7 +123,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           const workItemApi = await connection.getWorkItemTrackingApi();
           const defaultFields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
           const fieldsToUse = !fields || fields.length === 0 ? defaultFields : fields;
-          const workitems = await workItemApi.getWorkItemsBatch({ ids, fields: fieldsToUse }, resolvedProject);
+          const idsToFetch = top ? ids.slice(0, top) : ids;
+          const workitems = await workItemApi.getWorkItemsBatch({ ids: idsToFetch, fields: fieldsToUse }, resolvedProject);
 
           const identityFields = [
             "System.AssignedTo",
@@ -781,7 +782,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           );
 
           if (!response.ok) {
-            throw new Error(`Failed to add a work item comment: ${response.statusText}}`);
+            throw new Error(`Failed to add a work item comment: ${response.statusText}`);
           }
 
           return { content: [{ type: "text", text: await response.text() }] };
