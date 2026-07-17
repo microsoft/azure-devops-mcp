@@ -26,13 +26,15 @@ export const resourcesSchema = z.object({
   builds: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
   containers: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
   packages: z.record(z.string(), z.object({ version: z.string().optional() })).optional(),
-  pipelines: z.record(
-    z.string(),
-    z.object({
-      runId: z.coerce.number().min(1).optional().describe("Id of the source pipeline run."),
-      version: z.string().optional(),
-    })
-  ),
+  pipelines: z
+    .record(
+      z.string(),
+      z.object({
+        runId: z.coerce.number().min(1).optional().describe("Id of the source pipeline run."),
+        version: z.string().optional(),
+      })
+    )
+    .optional(),
   repositories: z
     .record(
       z.string(),
