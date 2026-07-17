@@ -142,6 +142,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
 
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
+        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         const prefix = action === "list_plans" ? "Error listing test plans" : action === "list_suites" ? "Error listing test suites" : "Error listing test cases";
@@ -331,6 +332,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
             content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }],
           };
         }
+        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
@@ -411,7 +413,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           return {
             content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
           };
-        } else if (action == "update_steps") {
+        } else if (action === "update_steps") {
           if (!id) return { content: [{ type: "text", text: "id is required for update_steps" }], isError: true };
           if (!steps) return { content: [{ type: "text", text: "steps is required for update_steps" }], isError: true };
 
@@ -429,6 +431,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
             content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
           };
         }
+        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         const prefix = action === "create" ? "Error creating test case" : "Error updating test case steps";

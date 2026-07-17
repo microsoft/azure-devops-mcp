@@ -987,6 +987,17 @@ describe("configureTestPlanTools", () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.testCases).toEqual([]);
     });
+
+    it("should return error for unknown action", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan");
+      if (!call) throw new Error("testplan tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "unknown_action" as any, project: "proj1", filterActivePlans: true, includePlanDetails: false });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown action: unknown_action");
+    });
   });
 
   describe("test_results_from_build_id tool", () => {
@@ -2900,6 +2911,17 @@ describe("configureTestPlanTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown error occurred");
     });
+
+    it("should return error for unknown action", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_test_case_write");
+      if (!call) throw new Error("testplan_test_case_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "unknown_action" as any });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown action: unknown_action");
+    });
   });
 
   describe("add_test_cases_to_suite tool", () => {
@@ -3033,6 +3055,17 @@ describe("configureTestPlanTools", () => {
       const result = await handler({ action: "add_test_cases" as const, project: "proj1", planId: 1, suiteId: 2 } as any);
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("testCaseIds is required for add_test_cases");
+    });
+
+    it("should return error for unknown action", async () => {
+      configureTestPlanTools(server, tokenProvider, connectionProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_test_suite_write");
+      if (!call) throw new Error("testplan_test_suite_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "unknown_action" as any, project: "proj1" });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown action: unknown_action");
     });
   });
 });
