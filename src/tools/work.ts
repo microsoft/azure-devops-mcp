@@ -8,192 +8,238 @@ import { TreeStructureGroup, TreeNodeStructureType, WorkItemClassificationNode }
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 
 const WORK_TOOLS = {
-  list_team_iterations: "work_list_team_iterations",
-  list_iterations: "work_list_iterations",
-  create_iterations: "work_create_iterations",
-  assign_iterations: "work_assign_iterations",
-  get_team_capacity: "work_get_team_capacity",
-  update_team_capacity: "work_update_team_capacity",
-  get_iteration_capacities: "work_get_iteration_capacities",
-  get_team_settings: "work_get_team_settings",
+  work: "work",
+  work_iteration_write: "work_iteration_write",
+  work_capacity_write: "work_capacity_write",
 };
 
 function configureWorkTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
   server.tool(
-    WORK_TOOLS.list_team_iterations,
-    "Retrieve a list of iterations for a specific team in a project. If a project or team is not specified, you will be prompted to select one.",
+    WORK_TOOLS.work,
+    "Retrieve work-related data for a project or team. Use the action parameter to specify the operation.",
     {
+      action: z
+        .enum(["list_iterations", "list_team_iterations", "get_team_settings", "get_team_capacity", "get_iteration_capacities"])
+        .describe(
+          "The action to perform. Options: list_iterations (list all iterations in a project), list_team_iterations (list iterations assigned to a team), get_team_settings (get team settings including default iteration and area path), get_team_capacity (get team capacity for an iteration), get_iteration_capacities (get capacity for all teams in an iteration)."
+        ),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
-      timeframe: z.enum(["current"]).optional().describe("The timeframe for which to retrieve iterations. Currently, only 'current' is supported."),
+      team: z
+        .string()
+        .optional()
+        .describe("The name or ID of the Azure DevOps team. Required for list_team_iterations, get_team_settings, and get_team_capacity. Reuse from prior context if already known."),
+      iterationId: z.string().optional().describe("The Iteration ID. Required for get_team_capacity and get_iteration_capacities."),
+      timeframe: z.enum(["current"]).optional().describe("The timeframe for list_team_iterations. Only 'current' is supported."),
+      depth: z.coerce.number().default(2).describe("Depth of children to fetch. Used for list_iterations. Defaults to 2."),
+      excludedIds: z.array(z.coerce.number().min(1)).optional().describe("An optional array of iteration IDs, and their children, to exclude from results. Used for list_iterations."),
     },
-    async ({ project, team, timeframe }) => {
+    async ({ action, project, team, iterationId, timeframe, depth, excludedIds }) => {
       try {
         const connection = await connectionProvider();
-
         let resolvedProject = project;
-        if (!resolvedProject) {
-          const result = await elicitProject(server, connection, "Select the Azure DevOps project to list team iterations for.");
-          if ("response" in result) return result.response;
-          resolvedProject = result.resolved;
-        }
 
-        let resolvedTeam = team;
-        if (!resolvedTeam) {
-          const result = await elicitTeam(server, connection, resolvedProject, "Select the Azure DevOps team to list iterations for.");
-          if ("response" in result) return result.response;
-          resolvedTeam = result.resolved;
-        }
-
-        const workApi = await connection.getWorkApi();
-        const iterations = await workApi.getTeamIterations({ project: resolvedProject, team: resolvedTeam }, timeframe);
-
-        if (!iterations) {
-          return { content: [{ type: "text", text: "No iterations found" }], isError: true };
-        }
-
-        return {
-          content: [
-            { type: "text", text: `Project: ${resolvedProject}, Team: ${resolvedTeam}` },
-            { type: "text", text: JSON.stringify(iterations, null, 2) },
-          ],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        return {
-          content: [{ type: "text", text: `Error fetching team iterations: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    WORK_TOOLS.create_iterations,
-    "Create new iterations in a specified Azure DevOps project.",
-    {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      iterations: z
-        .array(
-          z.object({
-            iterationName: z.string().describe("The name of the iteration to create."),
-            startDate: z.string().optional().describe("The start date of the iteration in ISO format (e.g., '2023-01-01T00:00:00Z'). Optional."),
-            finishDate: z.string().optional().describe("The finish date of the iteration in ISO format (e.g., '2023-01-31T23:59:59Z'). Optional."),
-          })
-        )
-        .describe("An array of iterations to create. Each iteration must have a name and can optionally have start and finish dates in ISO format."),
-    },
-    async ({ project, iterations }) => {
-      try {
-        const connection = await connectionProvider();
-        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-        const results = [];
-
-        for (const { iterationName, startDate, finishDate } of iterations) {
-          // Step 1: Create the iteration
-          const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
-            {
-              name: iterationName,
-              attributes: {
-                startDate: startDate ? new Date(startDate) : undefined,
-                finishDate: finishDate ? new Date(finishDate) : undefined,
-              },
-            },
-            project,
-            TreeStructureGroup.Iterations
-          );
-
-          if (iteration) {
-            results.push(iteration);
+        if (action === "list_team_iterations") {
+          if (!resolvedProject) {
+            const result = await elicitProject(server, connection, "Select the Azure DevOps project to list team iterations for.");
+            if ("response" in result) return result.response;
+            resolvedProject = result.resolved;
           }
+
+          let resolvedTeam = team;
+          if (!resolvedTeam) {
+            const result = await elicitTeam(server, connection, resolvedProject, "Select the Azure DevOps team to list iterations for.");
+            if ("response" in result) return result.response;
+            resolvedTeam = result.resolved;
+          }
+
+          const workApi = await connection.getWorkApi();
+          const iterations = await workApi.getTeamIterations({ project: resolvedProject, team: resolvedTeam }, timeframe);
+
+          if (!iterations) {
+            return { content: [{ type: "text", text: "No iterations found" }], isError: true };
+          }
+
+          return {
+            content: [
+              { type: "text", text: `Project: ${resolvedProject}, Team: ${resolvedTeam}` },
+              { type: "text", text: JSON.stringify(iterations, null, 2) },
+            ],
+          };
         }
 
-        if (results.length === 0) {
-          return { content: [{ type: "text", text: "No iterations were created" }], isError: true };
+        if (action === "list_iterations") {
+          if (!resolvedProject) {
+            const result = await elicitProject(server, connection, "Select the Azure DevOps project to list iterations for.");
+            if ("response" in result) return result.response;
+            resolvedProject = result.resolved;
+          }
+
+          const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+          const effectiveDepth = depth ?? 1;
+
+          const results = await workItemTrackingApi.getClassificationNodes(resolvedProject, [], effectiveDepth);
+
+          if (!results) {
+            return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
+          }
+
+          let filteredResults = results.filter((node) => node.structureType === TreeNodeStructureType.Iteration);
+
+          if (excludedIds && excludedIds.length > 0) {
+            const filterOutIds = (nodes: WorkItemClassificationNode[]): WorkItemClassificationNode[] => {
+              return nodes
+                .filter((node) => !node.id || !excludedIds.includes(node.id))
+                .map((node) => {
+                  if (node.children && node.children.length > 0) {
+                    return {
+                      ...node,
+                      children: filterOutIds(node.children),
+                    };
+                  }
+                  return node;
+                });
+            };
+
+            filteredResults = filterOutIds(filteredResults);
+          }
+
+          if (filteredResults.length === 0) {
+            return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
+          }
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(filteredResults, null, 2) }],
+          };
         }
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        if (action === "get_team_settings") {
+          if (!resolvedProject) {
+            const result = await elicitProject(server, connection, "Select the Azure DevOps project to get team settings for.");
+            if ("response" in result) return result.response;
+            resolvedProject = result.resolved;
+          }
 
-        return {
-          content: [{ type: "text", text: `Error creating iterations: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
+          let resolvedTeam = team;
+          if (!resolvedTeam) {
+            const result = await elicitTeam(server, connection, resolvedProject, "Select the Azure DevOps team to get settings for.");
+            if ("response" in result) return result.response;
+            resolvedTeam = result.resolved;
+          }
 
-  server.tool(
-    WORK_TOOLS.list_iterations,
-    "List all iterations in a specified Azure DevOps project. If a project is not specified, you will be prompted to select one.",
-    {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      depth: z.coerce.number().default(2).describe("Depth of children to fetch."),
-      excludedIds: z.array(z.coerce.number().min(1)).optional().describe("An optional array of iteration IDs, and their children, that should not be returned."),
-    },
-    async ({ project, depth, excludedIds: ids }) => {
-      try {
-        const connection = await connectionProvider();
+          const workApi = await connection.getWorkApi();
+          const teamContext = { project: resolvedProject, team: resolvedTeam };
+          const teamSettings = await workApi.getTeamSettings(teamContext);
 
-        let resolvedProject = project;
-        if (!resolvedProject) {
-          const result = await elicitProject(server, connection, "Select the Azure DevOps project to list iterations for.");
-          if ("response" in result) return result.response;
-          resolvedProject = result.resolved;
-        }
+          if (!teamSettings) {
+            return { content: [{ type: "text", text: "No team settings found" }], isError: true };
+          }
 
-        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-        let results = [];
+          const teamFieldValues = await workApi.getTeamFieldValues(teamContext);
 
-        if (depth === undefined) {
-          depth = 1;
-        }
-
-        results = await workItemTrackingApi.getClassificationNodes(resolvedProject, [], depth);
-
-        // Handle null or undefined results
-        if (!results) {
-          return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
-        }
-
-        // Filter out items with structureType=0 (Area nodes), only keep structureType=1 (Iteration nodes)
-        let filteredResults = results.filter((node) => node.structureType === TreeNodeStructureType.Iteration);
-
-        // If specific IDs are provided, filter them out recursively (exclude matching nodes and their children)
-        if (ids && ids.length > 0) {
-          const filterOutIds = (nodes: WorkItemClassificationNode[]): WorkItemClassificationNode[] => {
-            return nodes
-              .filter((node) => !node.id || !ids.includes(node.id))
-              .map((node) => {
-                if (node.children && node.children.length > 0) {
-                  return {
-                    ...node,
-                    children: filterOutIds(node.children),
-                  };
-                }
-                return node;
-              });
+          const settingsResult = {
+            backlogIteration: teamSettings.backlogIteration,
+            defaultIteration: teamSettings.defaultIteration,
+            defaultIterationMacro: teamSettings.defaultIterationMacro,
+            backlogVisibilities: teamSettings.backlogVisibilities,
+            bugsBehavior: teamSettings.bugsBehavior,
+            workingDays: teamSettings.workingDays,
+            defaultAreaPath: teamFieldValues?.defaultValue,
+            areaPathField: teamFieldValues?.field,
+            areaPaths: teamFieldValues?.values,
           };
 
-          filteredResults = filterOutIds(filteredResults);
+          return {
+            content: [
+              { type: "text", text: `Project: ${resolvedProject}, Team: ${resolvedTeam}` },
+              { type: "text", text: JSON.stringify(settingsResult, null, 2) },
+            ],
+          };
         }
 
-        if (filteredResults.length === 0) {
-          return { content: [{ type: "text", text: "No iterations were found" }], isError: true };
+        if (action === "get_team_capacity") {
+          if (!resolvedProject) {
+            const result = await elicitProject(server, connection, "Select the Azure DevOps project to get team capacity for.");
+            if ("response" in result) return result.response;
+            resolvedProject = result.resolved;
+          }
+
+          if (!team) {
+            return { content: [{ type: "text", text: "Team is required for get_team_capacity" }], isError: true };
+          }
+
+          if (!iterationId) {
+            return { content: [{ type: "text", text: "iterationId is required for get_team_capacity" }], isError: true };
+          }
+
+          const workApi = await connection.getWorkApi();
+          const teamContext = { project: resolvedProject, team };
+
+          const rawResults = await workApi.getCapacitiesWithIdentityRefAndTotals(teamContext, iterationId);
+
+          if (!rawResults || rawResults.teamMembers?.length === 0) {
+            return { content: [{ type: "text", text: "No team capacity assigned to the team" }], isError: true };
+          }
+
+          const simplifiedResults = {
+            ...rawResults,
+            teamMembers: (rawResults.teamMembers || []).map((member) => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { url, ...rest } = member;
+              return {
+                ...rest,
+                teamMember: member.teamMember
+                  ? {
+                      displayName: member.teamMember.displayName,
+                      id: member.teamMember.id,
+                      uniqueName: member.teamMember.uniqueName,
+                    }
+                  : undefined,
+              };
+            }),
+          };
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(simplifiedResults, null, 2) }],
+          };
         }
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(filteredResults, null, 2) }],
-        };
+        if (action === "get_iteration_capacities") {
+          if (!resolvedProject) {
+            const result = await elicitProject(server, connection, "Select the Azure DevOps project to get iteration capacities for.");
+            if ("response" in result) return result.response;
+            resolvedProject = result.resolved;
+          }
+
+          if (!iterationId) {
+            return { content: [{ type: "text", text: "iterationId is required for get_iteration_capacities" }], isError: true };
+          }
+
+          const workApi = await connection.getWorkApi();
+          const rawResults = await workApi.getTotalIterationCapacities(resolvedProject, iterationId);
+
+          if (!rawResults || !rawResults.teams || rawResults.teams.length === 0) {
+            return { content: [{ type: "text", text: "No iteration capacity assigned to the teams" }], isError: true };
+          }
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(rawResults, null, 2) }],
+          };
+        }
+
+        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
+        const actionErrorMessages: Record<string, string> = {
+          list_team_iterations: `Error fetching team iterations: ${errorMessage}`,
+          list_iterations: `Error fetching iterations: ${errorMessage}`,
+          get_team_settings: `Error fetching team settings: ${errorMessage}`,
+          get_team_capacity: `Error getting team capacity: ${errorMessage}`,
+          get_iteration_capacities: `Error getting iteration capacities: ${errorMessage}`,
+        };
+
         return {
-          content: [{ type: "text", text: `Error fetching iterations: ${errorMessage}` }],
+          content: [{ type: "text", text: actionErrorMessages[action] ?? `Error: ${errorMessage}` }],
           isError: true,
         };
       }
@@ -201,47 +247,100 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
   );
 
   server.tool(
-    WORK_TOOLS.assign_iterations,
-    "Assign existing iterations to a specific team in a project.",
+    WORK_TOOLS.work_iteration_write,
+    "Create or assign iterations in an Azure DevOps project. Use the action parameter to specify the operation.",
     {
+      action: z.enum(["create", "assign"]).describe("The action to perform. 'create' creates new iterations in the project; 'assign' assigns existing iterations to a team."),
       project: z.string().describe("The name or ID of the Azure DevOps project."),
-      team: z.string().describe("The name or ID of the Azure DevOps team."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Required for assign."),
       iterations: z
         .array(
           z.object({
-            identifier: z.string().describe("The identifier of the iteration to assign."),
-            path: z.string().describe("The path of the iteration to assign, e.g., 'Project/Iteration'."),
+            iterationName: z.string().optional().describe("The name of the iteration to create. Used for create."),
+            startDate: z.string().optional().describe("The start date of the iteration in ISO format (e.g., '2023-01-01T00:00:00Z'). Used for create."),
+            finishDate: z.string().optional().describe("The finish date of the iteration in ISO format (e.g., '2023-01-31T23:59:59Z'). Used for create."),
+            identifier: z.string().optional().describe("The identifier of the iteration to assign. Used for assign."),
+            path: z.string().optional().describe("The path of the iteration to assign, e.g., 'Project/Iteration'. Used for assign."),
           })
         )
-        .describe("An array of iterations to assign. Each iteration must have an identifier and a path."),
+        .describe("An array of iterations to process. For create: provide iterationName and optional dates. For assign: provide identifier and path."),
     },
-    async ({ project, team, iterations }) => {
+    async ({ action, project, team, iterations }) => {
       try {
         const connection = await connectionProvider();
-        const workApi = await connection.getWorkApi();
-        const teamContext = { project, team };
-        const results = [];
 
-        for (const { identifier, path } of iterations) {
-          const assignment = await workApi.postTeamIteration({ path: path, id: identifier }, teamContext);
+        if (action === "create") {
+          const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+          const results = [];
 
-          if (assignment) {
-            results.push(assignment);
+          for (const { iterationName, startDate, finishDate } of iterations) {
+            if (!iterationName) continue;
+
+            const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
+              {
+                name: iterationName,
+                attributes: {
+                  startDate: startDate ? new Date(startDate) : undefined,
+                  finishDate: finishDate ? new Date(finishDate) : undefined,
+                },
+              },
+              project,
+              TreeStructureGroup.Iterations
+            );
+
+            if (iteration) {
+              results.push(iteration);
+            }
           }
+
+          if (results.length === 0) {
+            return { content: [{ type: "text", text: "No iterations were created" }], isError: true };
+          }
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+          };
         }
 
-        if (results.length === 0) {
-          return { content: [{ type: "text", text: "No iterations were assigned to the team" }], isError: true };
+        if (action === "assign") {
+          if (!team) {
+            return { content: [{ type: "text", text: "Team is required for assign" }], isError: true };
+          }
+
+          const workApi = await connection.getWorkApi();
+          const teamContext = { project, team };
+          const results = [];
+
+          for (const { identifier, path } of iterations) {
+            if (!identifier || !path) continue;
+
+            const assignment = await workApi.postTeamIteration({ path: path, id: identifier }, teamContext);
+
+            if (assignment) {
+              results.push(assignment);
+            }
+          }
+
+          if (results.length === 0) {
+            return { content: [{ type: "text", text: "No iterations were assigned to the team" }], isError: true };
+          }
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+          };
         }
 
-        return {
-          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-        };
+        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 
+        const actionErrorMessages: Record<string, string> = {
+          create: `Error creating iterations: ${errorMessage}`,
+          assign: `Error assigning iterations: ${errorMessage}`,
+        };
+
         return {
-          content: [{ type: "text", text: `Error assigning iterations: ${errorMessage}` }],
+          content: [{ type: "text", text: actionErrorMessages[action] ?? `Error: ${errorMessage}` }],
           isError: true,
         };
       }
@@ -249,70 +348,10 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
   );
 
   server.tool(
-    WORK_TOOLS.get_team_capacity,
-    "Get the team capacity of a specific team and iteration in a project. If a project is not specified, you will be prompted to select one.",
-    {
-      project: z.string().optional().describe("The name or Id of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().describe("The name or Id of the Azure DevOps team. Reuse from prior context if already known."),
-      iterationId: z.string().describe("The Iteration Id to get capacity for."),
-    },
-    async ({ project, team, iterationId }) => {
-      try {
-        const connection = await connectionProvider();
-
-        let resolvedProject = project;
-        if (!resolvedProject) {
-          const result = await elicitProject(server, connection, "Select the Azure DevOps project to get team capacity for.");
-          if ("response" in result) return result.response;
-          resolvedProject = result.resolved;
-        }
-
-        const workApi = await connection.getWorkApi();
-        const teamContext = { project: resolvedProject, team };
-
-        const rawResults = await workApi.getCapacitiesWithIdentityRefAndTotals(teamContext, iterationId);
-
-        if (!rawResults || rawResults.teamMembers?.length === 0) {
-          return { content: [{ type: "text", text: "No team capacity assigned to the team" }], isError: true };
-        }
-
-        // Remove unwanted fields from teamMember and url
-        const simplifiedResults = {
-          ...rawResults,
-          teamMembers: (rawResults.teamMembers || []).map((member) => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { url, ...rest } = member;
-            return {
-              ...rest,
-              teamMember: member.teamMember
-                ? {
-                    displayName: member.teamMember.displayName,
-                    id: member.teamMember.id,
-                    uniqueName: member.teamMember.uniqueName,
-                  }
-                : undefined,
-            };
-          }),
-        };
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(simplifiedResults, null, 2) }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        return {
-          content: [{ type: "text", text: `Error getting team capacity: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    WORK_TOOLS.update_team_capacity,
+    WORK_TOOLS.work_capacity_write,
     "Update the team capacity of a team member for a specific iteration in a project.",
     {
+      action: z.literal("update").describe("The action to perform. Only 'update' is supported."),
       project: z.string().describe("The name or Id of the Azure DevOps project."),
       team: z.string().describe("The name or Id of the Azure DevOps team."),
       teamMemberId: z.string().describe("The team member Id for the specific team member."),
@@ -347,7 +386,6 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
           daysOff?: { start: Date; end: Date }[];
         }
 
-        // Prepare the capacity update object
         const capacityPatch: CapacityPatch = {
           activities: activities.map((a) => ({
             name: a.name,
@@ -359,14 +397,12 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
           })),
         };
 
-        // Update the team member's capacity
         const updatedCapacity = await workApi.updateCapacityWithIdentityRef(capacityPatch, teamContext, iterationId, teamMemberId);
 
         if (!updatedCapacity) {
           return { content: [{ type: "text", text: "Failed to update team member capacity" }], isError: true };
         }
 
-        // Simplify output
         const simplifiedResult = {
           teamMember: updatedCapacity.teamMember
             ? {
@@ -384,113 +420,9 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
         return {
           content: [{ type: "text", text: `Error updating team capacity: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    WORK_TOOLS.get_iteration_capacities,
-    "Get an iteration's capacity for all teams in iteration and project. If a project is not specified, you will be prompted to select one.",
-    {
-      project: z.string().optional().describe("The name or Id of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      iterationId: z.string().describe("The Iteration Id to get capacity for."),
-    },
-    async ({ project, iterationId }) => {
-      try {
-        const connection = await connectionProvider();
-
-        let resolvedProject = project;
-        if (!resolvedProject) {
-          const result = await elicitProject(server, connection, "Select the Azure DevOps project to get iteration capacities for.");
-          if ("response" in result) return result.response;
-          resolvedProject = result.resolved;
-        }
-
-        const workApi = await connection.getWorkApi();
-
-        const rawResults = await workApi.getTotalIterationCapacities(resolvedProject, iterationId);
-
-        if (!rawResults || !rawResults.teams || rawResults.teams.length === 0) {
-          return { content: [{ type: "text", text: "No iteration capacity assigned to the teams" }], isError: true };
-        }
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(rawResults, null, 2) }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        return {
-          content: [{ type: "text", text: `Error getting iteration capacities: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    WORK_TOOLS.get_team_settings,
-    "Get team settings including default iteration, backlog iteration, and default area path for a team. If a project or team is not specified, you will be prompted to select one.",
-    {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
-    },
-    async ({ project, team }) => {
-      try {
-        const connection = await connectionProvider();
-
-        let resolvedProject = project;
-        if (!resolvedProject) {
-          const result = await elicitProject(server, connection, "Select the Azure DevOps project to get team settings for.");
-          if ("response" in result) return result.response;
-          resolvedProject = result.resolved;
-        }
-
-        let resolvedTeam = team;
-        if (!resolvedTeam) {
-          const result = await elicitTeam(server, connection, resolvedProject, "Select the Azure DevOps team to get settings for.");
-          if ("response" in result) return result.response;
-          resolvedTeam = result.resolved;
-        }
-
-        const workApi = await connection.getWorkApi();
-        const teamContext = { project: resolvedProject, team: resolvedTeam };
-
-        const teamSettings = await workApi.getTeamSettings(teamContext);
-
-        if (!teamSettings) {
-          return { content: [{ type: "text", text: "No team settings found" }], isError: true };
-        }
-
-        const teamFieldValues = await workApi.getTeamFieldValues(teamContext);
-
-        const result = {
-          backlogIteration: teamSettings.backlogIteration,
-          defaultIteration: teamSettings.defaultIteration,
-          defaultIterationMacro: teamSettings.defaultIterationMacro,
-          backlogVisibilities: teamSettings.backlogVisibilities,
-          bugsBehavior: teamSettings.bugsBehavior,
-          workingDays: teamSettings.workingDays,
-          defaultAreaPath: teamFieldValues?.defaultValue,
-          areaPathField: teamFieldValues?.field,
-          areaPaths: teamFieldValues?.values,
-        };
-
-        return {
-          content: [
-            { type: "text", text: `Project: ${resolvedProject}, Team: ${resolvedTeam}` },
-            { type: "text", text: JSON.stringify(result, null, 2) },
-          ],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        return {
-          content: [{ type: "text", text: `Error fetching team settings: ${errorMessage}` }],
           isError: true,
         };
       }

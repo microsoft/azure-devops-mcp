@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
-import { createEnumMapping, encodeFormattedValue, extractAdoStreamError, getEnumKeys, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
+import { createEnumMapping, encodeFormattedValue, extractAdoStreamError, getEnumKeys, getOrgFromUrl, mapStringArrayToEnum, mapStringToEnum, safeEnumConvert } from "../../src/utils";
 
 describe("utils", () => {
   describe("createEnumMapping", () => {
@@ -521,5 +521,37 @@ describe("encodeFormattedValue", () => {
       expect(once).toBe("Already &lt;tag&gt; plus &lt;new&gt; and $cash");
       expect(twice).toBe(once);
     });
+  });
+});
+
+describe("getOrgFromUrl", () => {
+  it("extracts org from a dev.azure.com URL as the first path segment", () => {
+    expect(getOrgFromUrl("https://dev.azure.com/contoso")).toBe("contoso");
+    expect(getOrgFromUrl("https://dev.azure.com/contoso/project/_wiki/wikis/myWiki?pagePath=%2FHome")).toBe("contoso");
+  });
+
+  it("extracts org from a legacy visualstudio.com URL as the host subdomain", () => {
+    expect(getOrgFromUrl("https://contoso.visualstudio.com/project/_wiki/wikis/myWiki")).toBe("contoso");
+  });
+
+  it("lowercases the org for case-insensitive comparison", () => {
+    expect(getOrgFromUrl("https://dev.azure.com/Contoso/project")).toBe("contoso");
+    expect(getOrgFromUrl("https://Contoso.visualstudio.com/project")).toBe("contoso");
+  });
+
+  it("returns null for invalid URLs", () => {
+    expect(getOrgFromUrl("not-a-url")).toBeNull();
+    expect(getOrgFromUrl("")).toBeNull();
+  });
+
+  it("returns null for non-Azure DevOps hosts", () => {
+    expect(getOrgFromUrl("https://example.com/contoso/project/_wiki/wikis/myWiki")).toBeNull();
+    expect(getOrgFromUrl("https://dev.azure.com.evil.com/contoso/project")).toBeNull();
+    expect(getOrgFromUrl("https://notvisualstudio.com/contoso")).toBeNull();
+  });
+
+  it("returns null when no org segment is present", () => {
+    expect(getOrgFromUrl("https://dev.azure.com/")).toBeNull();
+    expect(getOrgFromUrl("https://dev.azure.com")).toBeNull();
   });
 });

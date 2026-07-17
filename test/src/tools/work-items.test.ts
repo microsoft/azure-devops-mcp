@@ -3758,6 +3758,116 @@ describe("configureWorkItemTools", () => {
         expect(result.content[0].text).toBe("For 'Build' links, 'buildId' is required.");
       });
 
+      it("should build Wiki URI from components and use 'Wiki Page' as attribute name", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Wiki",
+          projectId: "project-guid",
+          wikiId: "wiki-guid",
+          pagePath: "/Home/What-is-Contoso",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Wiki/WikiPage/project-guid%2Fwiki-guid%2FHome%2FWhat-is-Contoso",
+                attributes: {
+                  name: "Wiki Page",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+        expect(response.linkType).toBe("Wiki");
+      });
+
+      it("should build Wiki URI from components when pagePath has no leading slash", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const mockWorkItem = { id: 1234, fields: { "System.Title": "Test Item" } };
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(mockWorkItem);
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Wiki",
+          projectId: "project-guid",
+          wikiId: "wiki-guid",
+          pagePath: "Home/What-is-Contoso",
+        };
+
+        const result = await handler(params);
+
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+          {},
+          [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "ArtifactLink",
+                url: "vstfs:///Wiki/WikiPage/project-guid%2Fwiki-guid%2FHome%2FWhat-is-Contoso",
+                attributes: {
+                  name: "Wiki Page",
+                },
+              },
+            },
+          ],
+          1234,
+          "TestProject"
+        );
+
+        const response = JSON.parse(result.content[0].text);
+        expect(response.success).toBe(true);
+      });
+
+      it("should return error for Wiki link missing required parameters", async () => {
+        configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_add_artifact_link");
+        if (!call) throw new Error("wit_add_artifact_link tool not registered");
+        const [, , , handler] = call;
+
+        const params = {
+          workItemId: 1234,
+          project: "TestProject",
+          linkType: "Wiki",
+          projectId: "project-guid",
+          // Missing wikiId and pagePath
+        };
+
+        const result = await handler(params);
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe("For 'Wiki' links, 'projectId', 'wikiId', and 'pagePath' are required.");
+      });
+
       it("should return error for unsupported link type in URI building", async () => {
         configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
