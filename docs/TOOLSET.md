@@ -77,17 +77,19 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 ### Test Plans
 
-| Tool                                                                                                  | Description                            |
-| ----------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| [mcp_ado_testplan_list_test_plans](#mcp_ado_testplan_list_test_plans)                                 | List test plans in a project           |
-| [mcp_ado_testplan_create_test_plan](#mcp_ado_testplan_create_test_plan)                               | Create a new test plan                 |
-| [mcp_ado_testplan_list_test_suites](#mcp_ado_testplan_list_test_suites)                               | List test suites in a test plan        |
-| [mcp_ado_testplan_create_test_suite](#mcp_ado_testplan_create_test_suite)                             | Create a test suite within a test plan |
-| [mcp_ado_testplan_add_test_cases_to_suite](#mcp_ado_testplan_add_test_cases_to_suite)                 | Add test cases to a test suite         |
-| [mcp_ado_testplan_list_test_cases](#mcp_ado_testplan_list_test_cases)                                 | List test cases in a test suite        |
-| [mcp_ado_testplan_create_test_case](#mcp_ado_testplan_create_test_case)                               | Create a new test case work item       |
-| [mcp_ado_testplan_update_test_case_steps](#mcp_ado_testplan_update_test_case_steps)                   | Update steps of an existing test case  |
-| [mcp_ado_testplan_show_test_results_from_build_id](#mcp_ado_testplan_show_test_results_from_build_id) | Get test results for a specific build  |
+> **Note:** The test plan tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#test-plans) tool structure.
+
+| Tool                                                                                  | Action           | Description                            |
+| ------------------------------------------------------------------------------------- | ---------------- | -------------------------------------- |
+| [testplan](#testplan)                                                                 | `list_plans`     | List test plans in a project           |
+| [testplan](#testplan)                                                                 | `list_suites`    | List test suites under a test plan     |
+| [testplan](#testplan)                                                                 | `list_cases`     | List test cases under a test suite     |
+| [testplan_show_test_results_from_build_id](#testplan_show_test_results_from_build_id) |                  | Get test results for a specific build  |
+| [testplan_test_plan_write](#testplan_test_plan_write)                                 | `create`         | Create a new test plan                 |
+| [testplan_test_suite_write](#testplan_test_suite_write)                               | `create`         | Create a test suite within a test plan |
+| [testplan_test_suite_write](#testplan_test_suite_write)                               | `add_test_cases` | Add test cases to a test suite         |
+| [testplan_test_case_write](#testplan_test_case_write)                                 | `create`         | Create a new test case work item       |
+| [testplan_test_case_write](#testplan_test_case_write)                                 | `update_steps`   | Update steps of an existing test case  |
 
 ### Wiki
 
@@ -440,68 +442,52 @@ Get Azure DevOps Work Item search results for a given search text.
 
 ### Test Plans
 
-#### mcp_ado_testplan_list_test_plans
+> **Note:** The test plan tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#test-plans) tool structure.
 
-Retrieve a paginated list of test plans from an Azure DevOps project.
+The test plan tools are consolidated into grouped dispatchers using an `action` parameter.
 
-- **Required**: `project`
-- **Optional**: `continuationToken`, `filterActivePlans`, `includePlanDetails`
+#### testplan
 
-#### mcp_ado_testplan_create_test_plan
+Retrieve test plan data for a project.
 
-Creates a new test plan in the project.
+| Action        | Required params                | Optional params                                                |
+| ------------- | ------------------------------ | -------------------------------------------------------------- |
+| `list_plans`  | `project`                      | `filterActivePlans`, `includePlanDetails`, `continuationToken` |
+| `list_suites` | `project`, `planId`            | `continuationToken`                                            |
+| `list_cases`  | `project`, `planId`, `suiteId` | `continuationToken`                                            |
 
-- **Required**: `project`, `name`, `iteration`
-- **Optional**: `areaPath`, `description`, `endDate`, `startDate`
-
-#### mcp_ado_testplan_list_test_suites
-
-Retrieve a paginated list of test suites from an Azure DevOps project and Test Plan Id. Returns test suites in a properly nested hierarchical structure.
-
-- **Required**: `project`, `planId`
-- **Optional**: `continuationToken`
-
-#### mcp_ado_testplan_create_test_suite
-
-Creates a new test suite in a test plan.
-
-- **Required**: `project`, `planId`, `parentSuiteId`, `name`
-- **Optional**: None
-
-#### mcp_ado_testplan_add_test_cases_to_suite
-
-Adds existing test cases to a test suite.
-
-- **Required**: `project`, `planId`, `suiteId`, `testCaseIds`
-- **Optional**: None
-
-#### mcp_ado_testplan_list_test_cases
-
-Gets a list of test cases in the test plan.
-
-- **Required**: `project`, `planid`, `suiteid`
-- **Optional**: `continuationToken`
-
-#### mcp_ado_testplan_create_test_case
-
-Creates a new test case work item. Step content supports text formatting — use HTML tags (`<b>`, `<i>`, `<u>`, `<code>`) or Markdown markers (`**bold**`, `*italic*`, `` `code` ``, `[label](url)`) directly in step text and expected results.
-
-- **Required**: `project`, `title`
-- **Optional**: `areaPath`, `iterationPath`, `priority`, `steps`, `testsWorkItemId`
-
-#### mcp_ado_testplan_update_test_case_steps
-
-Update the steps of an existing test case work item. Step content supports text formatting — use HTML tags (`<b>`, `<i>`, `<u>`, `<code>`) or Markdown markers (`**bold**`, `*italic*`, `` `code` ``, `[label](url)`) directly in step text and expected results.
-
-- **Required**: `id`, `steps`
-- **Optional**: None
-
-#### mcp_ado_testplan_show_test_results_from_build_id
+#### testplan_show_test_results_from_build_id
 
 Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes.
 
 - **Required**: `project`, `buildid`
 - **Optional**: `outcomes`
+
+#### testplan_test_plan_write
+
+Write operations for test plans.
+
+| Action   | Required params                | Optional params                                   |
+| -------- | ------------------------------ | ------------------------------------------------- |
+| `create` | `project`, `name`, `iteration` | `description`, `startDate`, `endDate`, `areaPath` |
+
+#### testplan_test_suite_write
+
+Write operations for test suites.
+
+| Action           | Required params                               | Optional params |
+| ---------------- | --------------------------------------------- | --------------- |
+| `create`         | `project`, `planId`, `parentSuiteId`, `name`  | None            |
+| `add_test_cases` | `project`, `planId`, `suiteId`, `testCaseIds` | None            |
+
+#### testplan_test_case_write
+
+Write operations for test cases. Step content supports text formatting — use Markdown markers (`**bold**`, `*italic*`, `__underline__`, `` `code` ``, `[label](url)`) directly in step text and expected results.
+
+| Action         | Required params    | Optional params                                                     |
+| -------------- | ------------------ | ------------------------------------------------------------------- |
+| `create`       | `project`, `title` | `steps`, `priority`, `areaPath`, `iterationPath`, `testsWorkItemId` |
+| `update_steps` | `id`, `steps`      | None                                                                |
 
 ### Wiki
 
