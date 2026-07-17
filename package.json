@@ -1,6 +1,6 @@
 {
   "name": "@azure-devops/mcp",
-  "version": "2.7.0",
+  "version": "2.8.1",
   "mcpName": "microsoft.com/azure-devops",
   "description": "MCP server for interacting with Azure DevOps",
   "license": "MIT",
@@ -22,7 +22,6 @@
     "access": "public"
   },
   "scripts": {
-    "preinstall": "npm config set registry https://registry.npmjs.org/",
     "prebuild": "node -p \"'export const packageVersion = ' + JSON.stringify(require('./package.json').version) + ';\\n'\" > src/version.ts && prettier --write src/version.ts",
     "validate-tools": "tsc --noEmit && node scripts/build-validate-tools.js",
     "build": "tsc && shx chmod +x dist/*.js",
@@ -59,7 +58,7 @@
     "jest": "^30.0.2",
     "jest-extended": "^7.0.0",
     "lint-staged": "^17.0.0",
-    "prettier": "3.8.3",
+    "prettier": "3.9.5",
     "shx": "^0.4.0",
     "ts-jest": "^29.4.6",
     "tsconfig-paths": "^4.2.0",

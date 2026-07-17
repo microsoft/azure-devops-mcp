@@ -69,6 +69,15 @@ function getLinkTypeFromName(name: string) {
   }
 }
 
+function getArtifactLinkAttributeName(linkType: string): string {
+  switch (linkType) {
+    case "Wiki":
+      return "Wiki Page";
+    default:
+      return linkType;
+  }
+}
+
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORKITEM_TOOLS.list_backlogs,
@@ -1297,6 +1306,20 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       commitId: z.string().optional().describe("The commit SHA hash. Required when linkType is 'Fixed in Commit'."),
       pullRequestId: z.coerce.number().min(1).optional().describe("The pull request ID. Required when linkType is 'Pull Request'."),
       buildId: z.coerce.number().min(1).optional().describe("The build ID. Required when linkType is 'Build', 'Found in build', or 'Integrated in build'."),
+      wikiId: z.string().optional().describe("The wiki ID (GUID). Required when linkType is 'Wiki'."),
+      pageId: z.coerce
+        .number()
+        .min(1)
+        .optional()
+        .describe(
+          "The numeric wiki page ID from the browser URL (e.g., '98' in '.../wikis/Contoso.wiki/98/What-is-Contoso'). When provided for 'Wiki' links, the full page path is resolved automatically via the API. Takes precedence over 'pagePath'."
+        ),
+      pagePath: z
+        .string()
+        .optional()
+        .describe(
+          "The full wiki page path from the wiki root (e.g., '/Home/What-is-Contoso'). Required when linkType is 'Wiki' and 'pageId' is not provided. Must be the complete path, not just the page name from the URL."
+        ),
 
       linkType: z
         .enum([
@@ -1319,7 +1342,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .describe("Type of artifact link, defaults to 'Branch'. This determines both the link type and how to build the VSTFS URI from individual components."),
       comment: z.string().optional().describe("Comment to include with the artifact link."),
     },
-    async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, linkType, comment }) => {
+    async ({ workItemId, project, artifactUri, projectId, repositoryId, branchName, commitId, pullRequestId, buildId, wikiId, pageId, pagePath, linkType, comment }) => {
       try {
         const connection = await connectionProvider();
 
@@ -1382,6 +1405,50 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               finalArtifactUri = `vstfs:///Build/Build/${encodeURIComponent(buildId.toString())}`;
               break;
 
+            case "Wiki": {
+              if (!projectId || !wikiId) {
+                return {
+                  content: [{ type: "text", text: "For 'Wiki' links, 'projectId', 'wikiId', and 'pagePath' are required." }],
+                  isError: true,
+                };
+              }
+
+              let resolvedPagePath = pagePath;
+
+              if (pageId !== undefined) {
+                // Look up the actual page path by page ID to get the full path
+                const orgUrl = connection.serverUrl;
+                const accessToken = await tokenProvider();
+                const pageResponse = await fetch(`${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wiki/wikis/${encodeURIComponent(wikiId)}/pages/${pageId}?api-version=7.1`, {
+                  headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                    "User-Agent": userAgentProvider(),
+                  },
+                });
+                if (!pageResponse.ok) {
+                  return {
+                    content: [{ type: "text", text: `Failed to look up wiki page ID ${pageId}: ${pageResponse.statusText}` }],
+                    isError: true,
+                  };
+                }
+                const pageData = await pageResponse.json();
+                resolvedPagePath = pageData.path as string;
+              }
+
+              if (!resolvedPagePath) {
+                return {
+                  content: [{ type: "text", text: "For 'Wiki' links, 'pageId' or 'pagePath' is required." }],
+                  isError: true,
+                };
+              }
+
+              // Strip leading slash, then encode each segment joined by %2F
+              const normalizedPath = resolvedPagePath.startsWith("/") ? resolvedPagePath.slice(1) : resolvedPagePath;
+              const encodedPath = normalizedPath.split("/").map(encodeURIComponent).join("%2F");
+              finalArtifactUri = `vstfs:///Wiki/WikiPage/${encodeURIComponent(projectId)}%2F${encodeURIComponent(wikiId)}%2F${encodedPath}`;
+              break;
+            }
+
             default:
               return {
                 content: [{ type: "text", text: `URI building from components is not supported for link type '${linkType}'. Please provide the full 'artifactUri' instead.` }],
@@ -1399,7 +1466,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               rel: "ArtifactLink",
               url: finalArtifactUri,
               attributes: {
-                name: linkType,
+                name: getArtifactLinkAttributeName(linkType),
                 ...(comment && { comment }),
               },
             },
