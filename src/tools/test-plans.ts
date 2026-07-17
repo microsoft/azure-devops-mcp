@@ -411,7 +411,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           return {
             content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }],
           };
-        } else {
+        } else if (action == "update_steps") {
           if (!id) return { content: [{ type: "text", text: "id is required for update_steps" }], isError: true };
           if (!steps) return { content: [{ type: "text", text: "steps is required for update_steps" }], isError: true };
 
