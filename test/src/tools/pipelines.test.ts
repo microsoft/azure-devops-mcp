@@ -1601,10 +1601,10 @@ describe("configurePipelineTools", () => {
     });
 
     it.each([
-      ["name", { yamlPath: "p.yml", repositoryType: "AzureReposGit" as const, repositoryName: "repo" }, "name is required for create_pipeline"],
-      ["yamlPath", { name: "pipe", repositoryType: "AzureReposGit" as const, repositoryName: "repo" }, "yamlPath is required for create_pipeline"],
+      ["name", { yamlPath: "p.yml", repositoryType: "AzureReposGit", repositoryName: "repo" }, "name is required for create_pipeline"],
+      ["yamlPath", { name: "pipe", repositoryType: "AzureReposGit", repositoryName: "repo" }, "yamlPath is required for create_pipeline"],
       ["repositoryType", { name: "pipe", yamlPath: "p.yml", repositoryName: "repo" }, "repositoryType is required for create_pipeline"],
-      ["repositoryName", { name: "pipe", yamlPath: "p.yml", repositoryType: "AzureReposGit" as const }, "repositoryName is required for create_pipeline"],
+      ["repositoryName", { name: "pipe", yamlPath: "p.yml", repositoryType: "AzureReposGit" }, "repositoryName is required for create_pipeline"],
     ])("should return error when %s is missing for create_pipeline", async (_field, extra, expectedMsg) => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
@@ -1851,6 +1851,8 @@ describe("configurePipelineTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe(expectedMsg);
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it("should return an unknown action message without opening a connection for an unknown action", async () => {

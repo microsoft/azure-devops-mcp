@@ -76,7 +76,10 @@ export async function dispatchAction<TArgs extends { action: string }>(
   errorPrefixes?: Partial<Record<TArgs["action"], string>>
 ): Promise<CallToolResult> {
   const command = commands[args.action as TArgs["action"]];
-  if (!command) return errorResult(`Unknown action: ${args.action}`);
+  if (!command) {
+    const supportedActions = Object.keys(commands).sort().join(", ");
+    return errorResult(`Unknown action: ${args.action}. Supported actions: ${supportedActions}`);
+  }
 
   try {
     return await command.execute(context, args);
