@@ -6,6 +6,139 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { TreeStructureGroup, TreeNodeStructureType, WorkItemClassificationNode } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { Command, CommandContext, CommandRegistry, dispatchAction, errorResult } from "../shared/command.js";
+import { workIterationWriteShape, WorkIterationWriteArgs, CreateIterationArgs, AssignIterationArgs, workCapacityWriteShape, WorkCapacityWriteArgs, UpdateCapacityArgs } from "./work.dto.js";
+
+// ─── work_iteration_write commands ──────────────────────────────────────────
+// Each write action is a self-contained command. Shared infrastructure arrives
+// via `CommandContext`; the action-specific input arrives via a single typed
+// args object (see work.dto.ts). This keeps the dispatcher agnostic of
+// individual argument lists.
+
+const createIterationCommand: Command<CreateIterationArgs> = {
+  async execute(context: CommandContext, args: CreateIterationArgs): Promise<CallToolResult> {
+    const connection = await context.connectionProvider();
+    const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+    const results = [];
+
+    for (const { iterationName, startDate, finishDate } of args.iterations) {
+      if (!iterationName) continue;
+
+      const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
+        {
+          name: iterationName,
+          attributes: {
+            startDate: startDate ? new Date(startDate) : undefined,
+            finishDate: finishDate ? new Date(finishDate) : undefined,
+          },
+        },
+        args.project,
+        TreeStructureGroup.Iterations
+      );
+
+      if (iteration) {
+        results.push(iteration);
+      }
+    }
+
+    if (results.length === 0) {
+      return errorResult("No iterations were created");
+    }
+
+    return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
+  },
+};
+
+const assignIterationCommand: Command<AssignIterationArgs> = {
+  async execute(context: CommandContext, args: AssignIterationArgs): Promise<CallToolResult> {
+    if (!args.team) return errorResult("Team is required for assign");
+
+    const connection = await context.connectionProvider();
+    const workApi = await connection.getWorkApi();
+    const teamContext = { project: args.project, team: args.team };
+    const results = [];
+
+    for (const { identifier, path } of args.iterations) {
+      if (!identifier || !path) continue;
+
+      const assignment = await workApi.postTeamIteration({ path, id: identifier }, teamContext);
+
+      if (assignment) {
+        results.push(assignment);
+      }
+    }
+
+    if (results.length === 0) {
+      return errorResult("No iterations were assigned to the team");
+    }
+
+    return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
+  },
+};
+
+/**
+ * The registry is the lookup table that couples each action to its command.
+ * Adding a new write action means registering one entry here — the dispatcher
+ * (`dispatchAction`) never changes.
+ */
+const workIterationWriteCommands: CommandRegistry<WorkIterationWriteArgs> = {
+  create: createIterationCommand,
+  assign: assignIterationCommand,
+};
+
+const workIterationWriteErrorPrefixes: Record<WorkIterationWriteArgs["action"], string> = {
+  create: "Error creating iterations: ",
+  assign: "Error assigning iterations: ",
+};
+
+// ─── work_capacity_write commands ────────────────────────────────────────────
+
+const updateCapacityCommand: Command<UpdateCapacityArgs> = {
+  async execute(context: CommandContext, args: UpdateCapacityArgs): Promise<CallToolResult> {
+    const connection = await context.connectionProvider();
+    const workApi = await connection.getWorkApi();
+    const teamContext = { project: args.project, team: args.team };
+
+    interface CapacityPatch {
+      activities: { name: string; capacityPerDay: number }[];
+      daysOff?: { start: Date; end: Date }[];
+    }
+
+    const capacityPatch: CapacityPatch = {
+      activities: args.activities.map((a) => ({ name: a.name, capacityPerDay: a.capacityPerDay })),
+      daysOff: (args.daysOff || []).map((d) => ({ start: new Date(d.start), end: new Date(d.end) })),
+    };
+
+    const updatedCapacity = await workApi.updateCapacityWithIdentityRef(capacityPatch, teamContext, args.iterationId, args.teamMemberId);
+
+    if (!updatedCapacity) {
+      return errorResult("Failed to update team member capacity");
+    }
+
+    const simplifiedResult = {
+      teamMember: updatedCapacity.teamMember
+        ? {
+            displayName: updatedCapacity.teamMember.displayName,
+            id: updatedCapacity.teamMember.id,
+            uniqueName: updatedCapacity.teamMember.uniqueName,
+          }
+        : undefined,
+      activities: updatedCapacity.activities,
+      daysOff: updatedCapacity.daysOff,
+    };
+
+    return { content: [{ type: "text", text: JSON.stringify(simplifiedResult, null, 2) }] };
+  },
+};
+
+const workCapacityWriteCommands: CommandRegistry<WorkCapacityWriteArgs> = {
+  update: updateCapacityCommand,
+};
+
+const workCapacityWriteErrorPrefixes: Record<WorkCapacityWriteArgs["action"], string> = {
+  update: "Error updating team capacity: ",
+};
 
 const WORK_TOOLS = {
   work: "work",
@@ -13,7 +146,7 @@ const WORK_TOOLS = {
   work_capacity_write: "work_capacity_write",
 };
 
-function configureWorkTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
+function configureWorkTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   server.tool(
     WORK_TOOLS.work,
     "Retrieve work-related data for a project or team. Use the action parameter to specify the operation.",
@@ -246,188 +379,16 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     }
   );
 
-  server.tool(
-    WORK_TOOLS.work_iteration_write,
-    "Create or assign iterations in an Azure DevOps project. Use the action parameter to specify the operation.",
-    {
-      action: z.enum(["create", "assign"]).describe("The action to perform. 'create' creates new iterations in the project; 'assign' assigns existing iterations to a team."),
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Required for assign."),
-      iterations: z
-        .array(
-          z.object({
-            iterationName: z.string().optional().describe("The name of the iteration to create. Used for create."),
-            startDate: z.string().optional().describe("The start date of the iteration in ISO format (e.g., '2023-01-01T00:00:00Z'). Used for create."),
-            finishDate: z.string().optional().describe("The finish date of the iteration in ISO format (e.g., '2023-01-31T23:59:59Z'). Used for create."),
-            identifier: z.string().optional().describe("The identifier of the iteration to assign. Used for assign."),
-            path: z.string().optional().describe("The path of the iteration to assign, e.g., 'Project/Iteration'. Used for assign."),
-          })
-        )
-        .describe("An array of iterations to process. For create: provide iterationName and optional dates. For assign: provide identifier and path."),
-    },
-    async ({ action, project, team, iterations }) => {
-      try {
-        const connection = await connectionProvider();
+  server.tool(WORK_TOOLS.work_iteration_write, "Create or assign iterations in an Azure DevOps project. Use the action parameter to specify the operation.", workIterationWriteShape, async (args) => {
+    const context: CommandContext = { connectionProvider, tokenProvider, userAgentProvider };
+    return dispatchAction(workIterationWriteCommands, context, args as unknown as WorkIterationWriteArgs, workIterationWriteErrorPrefixes);
+  });
 
-        if (action === "create") {
-          const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-          const results = [];
-
-          for (const { iterationName, startDate, finishDate } of iterations) {
-            if (!iterationName) continue;
-
-            const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
-              {
-                name: iterationName,
-                attributes: {
-                  startDate: startDate ? new Date(startDate) : undefined,
-                  finishDate: finishDate ? new Date(finishDate) : undefined,
-                },
-              },
-              project,
-              TreeStructureGroup.Iterations
-            );
-
-            if (iteration) {
-              results.push(iteration);
-            }
-          }
-
-          if (results.length === 0) {
-            return { content: [{ type: "text", text: "No iterations were created" }], isError: true };
-          }
-
-          return {
-            content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-          };
-        }
-
-        if (action === "assign") {
-          if (!team) {
-            return { content: [{ type: "text", text: "Team is required for assign" }], isError: true };
-          }
-
-          const workApi = await connection.getWorkApi();
-          const teamContext = { project, team };
-          const results = [];
-
-          for (const { identifier, path } of iterations) {
-            if (!identifier || !path) continue;
-
-            const assignment = await workApi.postTeamIteration({ path: path, id: identifier }, teamContext);
-
-            if (assignment) {
-              results.push(assignment);
-            }
-          }
-
-          if (results.length === 0) {
-            return { content: [{ type: "text", text: "No iterations were assigned to the team" }], isError: true };
-          }
-
-          return {
-            content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-          };
-        }
-
-        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        const actionErrorMessages: Record<string, string> = {
-          create: `Error creating iterations: ${errorMessage}`,
-          assign: `Error assigning iterations: ${errorMessage}`,
-        };
-
-        return {
-          content: [{ type: "text", text: actionErrorMessages[action] ?? `Error: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    WORK_TOOLS.work_capacity_write,
-    "Update the team capacity of a team member for a specific iteration in a project.",
-    {
-      action: z.literal("update").describe("The action to perform. Only 'update' is supported."),
-      project: z.string().describe("The name or Id of the Azure DevOps project."),
-      team: z.string().describe("The name or Id of the Azure DevOps team."),
-      teamMemberId: z.string().describe("The team member Id for the specific team member."),
-      iterationId: z.string().describe("The Iteration Id to update the capacity for."),
-      activities: z
-        .array(
-          z.object({
-            name: z.string().describe("The name of the activity (e.g., 'Development')."),
-            capacityPerDay: z.number().describe("The capacity per day for this activity."),
-          })
-        )
-        .describe("Array of activities and their daily capacities for the team member."),
-      daysOff: z
-        .array(
-          z.object({
-            start: z.string().describe("Start date of the day off in ISO format."),
-            end: z.string().describe("End date of the day off in ISO format."),
-          })
-        )
-        .optional()
-        .describe("Array of days off for the team member, each with a start and end date in ISO format."),
-    },
-    async ({ project, team, teamMemberId, iterationId, activities, daysOff }) => {
-      try {
-        const connection = await connectionProvider();
-        const workApi = await connection.getWorkApi();
-        const teamContext = { project, team };
-
-        // Define interface for capacity patch
-        interface CapacityPatch {
-          activities: { name: string; capacityPerDay: number }[];
-          daysOff?: { start: Date; end: Date }[];
-        }
-
-        const capacityPatch: CapacityPatch = {
-          activities: activities.map((a) => ({
-            name: a.name,
-            capacityPerDay: a.capacityPerDay,
-          })),
-          daysOff: (daysOff || []).map((d) => ({
-            start: new Date(d.start),
-            end: new Date(d.end),
-          })),
-        };
-
-        const updatedCapacity = await workApi.updateCapacityWithIdentityRef(capacityPatch, teamContext, iterationId, teamMemberId);
-
-        if (!updatedCapacity) {
-          return { content: [{ type: "text", text: "Failed to update team member capacity" }], isError: true };
-        }
-
-        const simplifiedResult = {
-          teamMember: updatedCapacity.teamMember
-            ? {
-                displayName: updatedCapacity.teamMember.displayName,
-                id: updatedCapacity.teamMember.id,
-                uniqueName: updatedCapacity.teamMember.uniqueName,
-              }
-            : undefined,
-          activities: updatedCapacity.activities,
-          daysOff: updatedCapacity.daysOff,
-        };
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(simplifiedResult, null, 2) }],
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-
-        return {
-          content: [{ type: "text", text: `Error updating team capacity: ${errorMessage}` }],
-          isError: true,
-        };
-      }
-    }
-  );
+  server.tool(WORK_TOOLS.work_capacity_write, "Update the team capacity of a team member for a specific iteration in a project.", workCapacityWriteShape, async (args) => {
+    const context: CommandContext = { connectionProvider, tokenProvider, userAgentProvider };
+    return dispatchAction(workCapacityWriteCommands, context, args as unknown as WorkCapacityWriteArgs, workCapacityWriteErrorPrefixes);
+  });
 }
 
-export { WORK_TOOLS, configureWorkTools };
+export { WORK_TOOLS, configureWorkTools, createIterationCommand, assignIterationCommand, updateCapacityCommand };
+export type { CreateIterationArgs, AssignIterationArgs, WorkIterationWriteArgs, UpdateCapacityArgs, WorkCapacityWriteArgs };
