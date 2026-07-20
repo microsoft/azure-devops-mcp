@@ -7,7 +7,13 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcp.dev.azure.com"
+      "url": "https://mcp.dev.azure.com/{organization}",
+      "variables": {
+        "organization": {
+          "description": "Your Azure DevOps organization identifier (e.g., 'contoso', 'fabrikam')",
+          "isRequired": false
+        }
+      }
     }
   ],
   "packages": [
