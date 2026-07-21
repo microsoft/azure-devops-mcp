@@ -76,7 +76,6 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
 
           const workItemTrackingApi = await connection.getWorkItemTrackingApi();
           const effectiveDepth = depth ?? 1;
-
           const results = await workItemTrackingApi.getClassificationNodes(resolvedProject, [], effectiveDepth);
 
           if (!results) {
