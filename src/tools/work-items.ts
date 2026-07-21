@@ -83,7 +83,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .enum(getEnumKeys(WorkItemExpand) as [string, ...string[]])
         .optional()
         .describe("Expand options (None, Fields, Relations, Links, All). Used for: get, list_revisions. For get, cannot be combined with fields."),
-      top: z.coerce.number().optional().describe("Maximum number of results to return. Used for: get_batch, list_comments, my, list_revisions. Defaults vary by action."),
+      top: z.coerce.number().optional().describe("Maximum number of results to return. Used for: list_comments, my, list_revisions. Defaults vary by action."),
       includeCompleted: z.boolean().optional().default(false).describe("Include completed work items. Used for: my. Defaults to false."),
       type: z.enum(["assignedtome", "myactivity"]).optional().describe("Type of work items to retrieve. Used for: my. Defaults to 'assignedtome'."),
       skip: z.coerce.number().optional().describe("Number of results to skip for pagination. Used for: list_revisions."),
@@ -123,8 +123,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           const workItemApi = await connection.getWorkItemTrackingApi();
           const defaultFields = ["System.Id", "System.WorkItemType", "System.Title", "System.State", "System.Parent", "System.Tags", "Microsoft.VSTS.Common.StackRank", "System.AssignedTo"];
           const fieldsToUse = !fields || fields.length === 0 ? defaultFields : fields;
-          const idsToFetch = top ? ids.slice(0, top) : ids;
-          const workitems = await workItemApi.getWorkItemsBatch({ ids: idsToFetch, fields: fieldsToUse }, resolvedProject);
+          const workitems = await workItemApi.getWorkItemsBatch({ ids, fields: fieldsToUse }, resolvedProject);
 
           const identityFields = [
             "System.AssignedTo",
