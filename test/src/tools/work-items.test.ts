@@ -666,7 +666,7 @@ describe("configureWorkItemTools", () => {
       expect(resultData[0].fields["Microsoft.VSTS.Common.ClosedBy"]).toBe("Edward Davis <edward.davis@example.com>");
     });
 
-    it("should limit ids to top when top is provided", async () => {
+    it("should pass all ids to getWorkItemsBatch regardless of top", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item");
@@ -683,7 +683,7 @@ describe("configureWorkItemTools", () => {
 
       await handler({ action: "get_batch", ...params });
 
-      expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(expect.objectContaining({ ids: [1, 2] }), "Contoso");
+      expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith(expect.objectContaining({ ids: [1, 2, 3, 4, 5] }), "Contoso");
     });
   });
 
