@@ -4,6 +4,18 @@
   "description": "The MCP server for Azure DevOps, bringing the power of Azure DevOps directly to your agents.",
   "version": "2.4.0",
   "title": "Azure DevOps",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.dev.azure.com/{organization}",
+      "variables": {
+        "organization": {
+          "description": "Your Azure DevOps organization identifier (e.g., 'contoso', 'fabrikam')",
+          "isRequired": false
+        }
+      }
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
