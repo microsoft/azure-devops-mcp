@@ -1683,6 +1683,40 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
     });
 
+    it("should handle Markdown format for short fields", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+
+      if (!call) throw new Error("wit_work_item_write tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkItemTrackingApi.createWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      const shortDescription = "Short markdown";
+
+      const params = {
+        project: "Contoso",
+        workItemType: "Task",
+        fields: [
+          { name: "System.Title", value: "Hello World!" },
+          { name: "System.Description", value: shortDescription, format: "Markdown" },
+        ],
+      };
+
+      const expectedDocument = [
+        { op: "add", path: "/fields/System.Title", value: "Hello World!" },
+        { op: "add", path: "/fields/System.Description", value: shortDescription },
+        { op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown" },
+      ];
+
+      const result = await handler({ action: "create", ...params });
+
+      expect(mockWorkItemTrackingApi.createWorkItem).toHaveBeenCalledWith(null, expectedDocument, params.project, params.workItemType);
+
+      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItem, null, 2));
+    });
+
     it("should handle null response from createWorkItem", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -1987,6 +2021,68 @@ describe("configureWorkItemTools", () => {
           body: [
             { op: "Add", path: "/fields/System.Description", value: longDescription },
             { op: "Add", path: "/fields/System.Title", value: "Simple Title" },
+            {
+              op: "Add",
+              path: "/multilineFieldsFormat/System.Description",
+              value: "Markdown",
+            },
+          ],
+        },
+      ];
+
+      expect(fetch).toHaveBeenCalledWith(
+        "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: expect.objectContaining({
+            "Authorization": "Bearer fake-token",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(expectedBody),
+        })
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, success: true }], null, 2));
+    });
+
+    it("should handle Markdown format for short fields in batch update", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      (fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue([{ id: 1, success: true }]),
+      });
+
+      const shortDescription = "Short markdown";
+
+      const params = {
+        batchUpdates: [
+          {
+            op: "Add",
+            id: 1,
+            path: "/fields/System.Description",
+            value: shortDescription,
+            format: "Markdown",
+          },
+        ],
+      };
+
+      const result = await handler({ action: "update_batch", ...params });
+
+      const expectedBody = [
+        {
+          method: "PATCH",
+          uri: "/_apis/wit/workitems/1?api-version=5.0",
+          headers: { "Content-Type": "application/json-patch+json" },
+          body: [
+            { op: "Add", path: "/fields/System.Description", value: shortDescription },
             {
               op: "Add",
               path: "/multilineFieldsFormat/System.Description",
