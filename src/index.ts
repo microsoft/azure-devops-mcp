@@ -109,8 +109,18 @@ async function main() {
   const authenticator = createAuthenticator(argv.authentication, tenantId);
 
   if (argv.authentication === "pat") {
-    const basicValue = await authenticator();
-    // basicValue is already base64("{email}:{token}") — use it directly in the Authorization header
+    // authenticator() returns base64("{username}:{token}"). Azure DevOps rejects Basic auth
+    // when the username is a non-empty, non-identity value (e.g. the docs' "kiro"), returning
+    // 401 on the raw-fetch endpoints (e.g. wit $batch, comments, wiki) even though the
+    // azure-devops-node-api tools work. Normalize to base64(":{token}") — an empty username —
+    // matching getAzureDevOpsClient() above, so the "text before the colon is ignored" contract
+    // holds for every code path.
+    const rawToken = Buffer.from(await authenticator(), "base64")
+      .toString("utf8")
+      .split(":")
+      .slice(1)
+      .join(":");
+    const basicValue = Buffer.from(`:${rawToken}`).toString("base64");
     const _originalFetch = globalThis.fetch;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.headers) {
