@@ -1,5 +1,7 @@
 # ⭐ Azure DevOps MCP Server
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.PremierInc%2Fazure-devops.svg)](https://mcptoplist.com/server/io.github.PremierInc%2Fazure-devops)
+
 > [!IMPORTANT]
 > The Azure DevOps Remote MCP Server is now available in public preview for all organizations. We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
 >
