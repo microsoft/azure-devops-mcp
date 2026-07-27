@@ -19,7 +19,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
   // ─── testplan (read-only) ────────────────────────────────────────────
   server.tool(
     TEST_PLAN_TOOLS.testplan,
-    "Retrieve test plan data for a project. Use the action parameter to specify the operation.",
+    "Retrieve paginated test plan, suite, and case data for a project. Use the action parameter to specify the operation. When a response includes a continuationToken, pass it back with the same action and query parameters to fetch the next batch; null token indicates the last batch.",
     {
       action: z
         .enum(["list_plans", "list_suites", "list_cases"])
