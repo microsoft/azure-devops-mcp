@@ -1,7 +1,7 @@
 # ⭐ Azure DevOps MCP Server
 
 > [!IMPORTANT]
-> We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
+> We recommend using the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) instead of this local server. It requires no installation and gets new features first.
 >
 > [Learn more](#-remote-mcp-server-recommended)
 
