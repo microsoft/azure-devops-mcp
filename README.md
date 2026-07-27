@@ -1,7 +1,7 @@
 # ⭐ Azure DevOps MCP Server
 
 > [!IMPORTANT]
-> The Azure DevOps Remote MCP Server is now available in public preview for all organizations. We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
+> We recommend migrating to the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) going forward.
 >
 > [Learn more](#-remote-mcp-server-recommended)
 
@@ -44,18 +44,13 @@ The Azure DevOps MCP Server is built around tools that are concise, simple, focu
 
 ## 🚀 Remote MCP Server (Recommended)
 
-The Azure DevOps **Remote MCP Server** is now available in [public preview](https://devblogs.microsoft.com/devops/azure-devops-remote-mcp-server-public-preview).
+For complete instructions, see the [Remote MCP Server onboarding documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops).
 
 Over time, the Remote MCP Server will replace this local MCP Server. We will continue to support the local server for now, but future investments will primarily focus on the remote experience.
 
 We encourage all users of the local MCP Server to begin migrating to the Remote MCP Server.
 
 If you encounter issues with tools, need support, or have a feature request, you can report an issue using the [Remote MCP Server issue template](https://github.com/microsoft/azure-devops-mcp/issues/new?template=remote-mcp-server-issue.md). During the preview period, we will track Remote MCP Server issues through this repository.
-
-> [!WARNING]
-> Internal Microsoft users of the Remote MCP Server should **not** create issues in this repository. Please use the dedicated Teams channel instead.
-
-For complete instructions, see the [Remote MCP Server onboarding documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops).
 
 ### Quick start with `.vscode/mcp.json`
 
