@@ -566,8 +566,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             value: encodeFormattedValue(value, format),
           }));
 
-          fields.forEach(({ name, value, format }) => {
-            if (value.length > 100 && format === "Markdown") {
+          fields.forEach(({ name, format }) => {
+            if (format === "Markdown") {
               document.push({
                 op: "add",
                 path: `/multilineFieldsFormat/${name}`,
@@ -610,8 +610,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               value: encodeFormattedValue(value, format),
             }));
 
-            workItemUpdates.forEach(({ path: fieldPath, value, format }) => {
-              if (format === "Markdown" && value && value.length > 100) {
+            workItemUpdates.forEach(({ path: fieldPath, format }) => {
+              if (format === "Markdown") {
                 operations.push({
                   op: "Add",
                   path: `/multilineFieldsFormat${fieldPath.replace("/fields", "")}`,
