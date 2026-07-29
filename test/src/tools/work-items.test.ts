@@ -9,6 +9,7 @@ import { Readable } from "stream";
 import * as fs from "fs";
 import * as path from "path";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { z } from "zod";
 
 jest.mock("fs");
 import {
@@ -2182,6 +2183,79 @@ describe("configureWorkItemTools", () => {
       );
 
       expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, success: true }], null, 2));
+    });
+
+    it("should add a hyperlink to a work item", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_link_write");
+      if (!call) throw new Error("wit_work_item_link_write tool not registered");
+      const [, , schema, handler] = call;
+
+      expect(
+        z.object(schema).parse({
+          action: "link",
+          project: "TestProject",
+          updates: [{ id: 1, type: "hyperlink", url: "https://www.google.com/", comment: "Search" }],
+        })
+      ).toEqual({
+        action: "link",
+        project: "TestProject",
+        updates: [{ id: 1, type: "hyperlink", url: "https://www.google.com/", comment: "Search" }],
+      });
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue([{ id: 1, success: true }]),
+      });
+
+      await handler({
+        action: "link",
+        project: "TestProject",
+        updates: [{ id: 1, type: "hyperlink", url: "https://www.google.com/", comment: "Search" }],
+      });
+
+      const request = (fetch as jest.Mock).mock.calls[0][1];
+      const body = JSON.parse(request.body);
+      expect(body[0].body).toEqual([
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "Hyperlink",
+            url: "https://www.google.com/",
+            attributes: { comment: "Search" },
+          },
+        },
+      ]);
+    });
+
+    it("should require a URL when adding a hyperlink", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_link_write");
+      if (!call) throw new Error("wit_work_item_link_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "link", project: "TestProject", updates: [{ id: 1, type: "hyperlink" }] });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error linking work items: url is required for hyperlink links");
+    });
+
+    it("should require linkToId when linking work items", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_link_write");
+      if (!call) throw new Error("wit_work_item_link_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "link", project: "TestProject", updates: [{ id: 1, type: "related" }] });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error linking work items: linkToId is required for work item links");
     });
 
     it("should handle linking failure", async () => {
