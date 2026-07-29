@@ -10,6 +10,6 @@ updates:
 
     cooldown:
       default-days: 7
-      semver-major-days: 7
+      semver-major-days: 8
       semver-minor-days: 7
       semver-patch-days: 5
