@@ -9,7 +9,7 @@ updates:
       prefix: "[dependencies]"
 
     cooldown:
-      default-days: 7
+      default-days: 8
       semver-major-days: 8
       semver-minor-days: 7
       semver-patch-days: 5
