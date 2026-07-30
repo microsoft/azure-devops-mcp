@@ -48,6 +48,8 @@ function getLinkTypeFromName(name: string) {
       return "Microsoft.VSTS.Common.Affects-Reverse";
     case "artifact":
       return "ArtifactLink";
+    case "hyperlink":
+      return "Hyperlink";
     default:
       throw new Error(`Unknown link type: ${name}`);
   }
@@ -838,9 +840,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .array(
           z.object({
             id: z.coerce.number().min(1).describe("The ID of the work item to update."),
-            linkToId: z.coerce.number().min(1).describe("The ID of the work item to link to."),
+            linkToId: z.coerce.number().min(1).optional().describe("The ID of the work item to link to. Required unless type is 'hyperlink'."),
+            url: z.string().optional().describe("The URL for a hyperlink. Required when type is 'hyperlink'."),
             type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
+              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "hyperlink"])
               .default("related")
               .describe("Type of link. Defaults to 'related'."),
             comment: z.string().optional().describe("Optional comment for the link."),
@@ -851,7 +854,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       // unlink
       id: z.coerce.number().min(1).optional().describe("Work item ID to remove links from. Required for: unlink."),
       type: z
-        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
+        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact", "hyperlink"])
         .optional()
         .describe("Link type to remove. Required for: unlink."),
       url: z.string().optional().describe("URL to match when removing a link. Used for: unlink. If not provided, all links of the specified type are removed."),
@@ -935,15 +938,24 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             headers: { "Content-Type": "application/json-patch+json" },
             body: updates
               .filter((update) => update.id === uid)
-              .map(({ linkToId, type: linkTypeName, comment: linkComment }) => ({
-                op: "add",
-                path: "/relations/-",
-                value: {
-                  rel: `${getLinkTypeFromName(linkTypeName)}`,
-                  url: `${orgUrl}/${resolvedProject}/_apis/wit/workItems/${linkToId}`,
-                  attributes: { comment: linkComment || "" },
-                },
-              })),
+              .map(({ linkToId, url: linkUrl, type: linkTypeName, comment: linkComment }) => {
+                if (linkTypeName === "hyperlink" && !linkUrl) {
+                  throw new Error("url is required for hyperlink links");
+                }
+                if (linkTypeName !== "hyperlink" && !linkToId) {
+                  throw new Error("linkToId is required for work item links");
+                }
+
+                return {
+                  op: "add",
+                  path: "/relations/-",
+                  value: {
+                    rel: getLinkTypeFromName(linkTypeName),
+                    url: linkTypeName === "hyperlink" ? linkUrl : `${orgUrl}/${resolvedProject}/_apis/wit/workItems/${linkToId}`,
+                    attributes: { comment: linkComment || "" },
+                  },
+                };
+              }),
           }));
 
           const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
