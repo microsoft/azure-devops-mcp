@@ -1,13 +1,18 @@
 # ⭐ Azure DevOps MCP Server
 
-> [!IMPORTANT]
-> We recommend using the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) instead of this local server. It requires no installation and gets new features first.
+> [!WARNING]
+> We recently completed a full tool consolidation that includes renaming of existing tools. Please see the [Toolset documentation](docs/TOOLSET.md) for the complete list of new tool names.
 >
-> [Learn more](#-remote-mcp-server-recommended)
+> If this is a breaking change for your agents or skills, you can temporarily pin the version to `@azure-devops/mcp@2.8.1`
 
 This project provides Azure DevOps MCP tooling for AI agents, with a **remote-first** onboarding experience and a local server option when you need it.
 
 ## 📄 Table of Contents
+
+> [!IMPORTANT]
+> We recommend using the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) instead of this local server. It requires no installation and gets new features first.
+>
+> [Learn more](#-remote-mcp-server-recommended)
 
 1. [📺 Overview](#-overview)
 2. [🏆 Expectations](#-expectations)
