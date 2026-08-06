@@ -11,6 +11,7 @@ import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
+import { getUserIdentityFromEmail } from "./auth.js";
 
 const WORKITEM_TOOLS = {
   wit_work_item: "wit_work_item",
@@ -62,6 +63,44 @@ function getArtifactLinkAttributeName(linkType: string): string {
     default:
       return linkType;
   }
+}
+
+function escapeHtml(value: string): string {
+  const entities: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+
+  return value.replace(/[&<>"']/g, (character) => entities[character]);
+}
+
+async function resolveCommentMentions(
+  text: string,
+  format: "Markdown" | "Html" | undefined,
+  tokenProvider: () => Promise<string>,
+  connectionProvider: () => Promise<WebApi>,
+  userAgentProvider: () => string
+): Promise<string> {
+  const emailMatches = [...text.matchAll(/@<([^<>\s]+@[^<>\s]+)>/g)];
+  if (emailMatches.length === 0) return text;
+
+  const identities = new Map<string, { id: string; displayName: string }>();
+  for (const email of new Set(emailMatches.map((match) => match[1]))) {
+    try {
+      identities.set(email, await getUserIdentityFromEmail(email, tokenProvider, connectionProvider, userAgentProvider));
+    } catch {
+      // Leave mentions unchanged when their identities cannot be resolved.
+    }
+  }
+
+  return text.replace(/@<([^<>\s]+@[^<>\s]+)>/g, (mention, email: string) => {
+    const identity = identities.get(email);
+    if (!identity) return escapeHtml(mention);
+    return format === "Markdown" || format === undefined ? `@<${identity.id}>` : `<a href="#" data-vss-mention="version:2.0,${identity.id}">@${escapeHtml(identity.displayName)}</a>`;
+  });
 }
 
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -767,6 +806,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
         const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
+        const resolvedText = await resolveCommentMentions(text, format, tokenProvider, connectionProvider, userAgentProvider);
 
         if (action === "add") {
           const response = await fetch(
@@ -778,7 +818,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
                 "Content-Type": "application/json",
                 "User-Agent": userAgentProvider(),
               },
-              body: JSON.stringify({ text }),
+              body: JSON.stringify({ text: resolvedText }),
             }
           );
 
@@ -801,7 +841,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
                 "Content-Type": "application/json",
                 "User-Agent": userAgentProvider(),
               },
-              body: JSON.stringify({ text }),
+              body: JSON.stringify({ text: resolvedText }),
             }
           );
 
