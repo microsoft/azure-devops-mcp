@@ -32,6 +32,8 @@ type ConnectionProviderMock = () => Promise<WebApi>;
 interface WorkApiMock {
   getBacklogs: jest.Mock;
   getBacklogLevelWorkItems: jest.Mock;
+  reorderBacklogWorkItems: jest.Mock;
+  reorderIterationWorkItems: jest.Mock;
   getPredefinedQueryResults: jest.Mock;
   getTeamIterations: jest.Mock;
   getIterationWorkItems: jest.Mock;
@@ -75,6 +77,8 @@ describe("configureWorkItemTools", () => {
     mockWorkApi = {
       getBacklogs: jest.fn(),
       getBacklogLevelWorkItems: jest.fn(),
+      reorderBacklogWorkItems: jest.fn(),
+      reorderIterationWorkItems: jest.fn(),
       getPredefinedQueryResults: jest.fn(),
       getTeamIterations: jest.fn(),
       getIterationWorkItems: jest.fn(),
@@ -204,6 +208,116 @@ describe("configureWorkItemTools", () => {
           2
         )
       );
+    });
+  });
+
+  describe("reorder_backlog_work_items tool", () => {
+    it("should reorder work items in the team backlog", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      const reorderedItems = [
+        { id: 101, order: 1 },
+        { id: 102, order: 2 },
+      ];
+      (mockWorkApi.reorderBacklogWorkItems as jest.Mock).mockResolvedValue(reorderedItems);
+
+      const params = {
+        project: "Contoso",
+        team: "Fabrikam",
+        ids: [101, 102],
+        previousId: 0,
+        nextId: 103,
+        parentId: 0,
+      };
+
+      const result = await handler({ action: "reorder", ...params });
+
+      expect(mockWorkApi.reorderBacklogWorkItems).toHaveBeenCalledWith(
+        {
+          ids: params.ids,
+          previousId: params.previousId,
+          nextId: params.nextId,
+          parentId: params.parentId,
+          iterationPath: undefined,
+        },
+        { project: params.project, team: params.team }
+      );
+      expect(mockWorkApi.reorderIterationWorkItems).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(reorderedItems, null, 2));
+    });
+
+    it("should reorder work items in an iteration and pass optional fields", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      const reorderedItems = [{ id: 101, order: 4 }];
+      (mockWorkApi.reorderIterationWorkItems as jest.Mock).mockResolvedValue(reorderedItems);
+
+      const params = {
+        project: "Contoso",
+        team: "Fabrikam",
+        iterationId: "iteration-1",
+        ids: [101],
+        nextId: 0,
+        iterationPath: "Contoso\\Sprint 1",
+      };
+
+      const result = await handler({ action: "reorder", ...params });
+
+      expect(mockWorkApi.reorderIterationWorkItems).toHaveBeenCalledWith(
+        {
+          ids: params.ids,
+          previousId: undefined,
+          nextId: params.nextId,
+          parentId: undefined,
+          iterationPath: params.iterationPath,
+        },
+        { project: params.project, team: params.team },
+        params.iterationId
+      );
+      expect(mockWorkApi.reorderBacklogWorkItems).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(reorderedItems, null, 2));
+    });
+
+    it("should return an error when ids are missing", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "reorder", project: "Contoso", team: "Fabrikam" });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: "ids is required for reorder" }],
+        isError: true,
+      });
+      expect(mockWorkApi.reorderBacklogWorkItems).not.toHaveBeenCalled();
+      expect(mockWorkApi.reorderIterationWorkItems).not.toHaveBeenCalled();
+    });
+
+    it("should return an error when the reorder API fails", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.reorderBacklogWorkItems as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const result = await handler({ action: "reorder", project: "Contoso", team: "Fabrikam", ids: [101] });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Error reordering backlog work items: API Error" }],
+        isError: true,
+      });
     });
   });
 

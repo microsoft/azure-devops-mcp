@@ -374,12 +374,27 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.wit_backlog,
     "Retrieve backlog data for a project and team. Use the action parameter to specify the operation.",
     {
-      action: z.enum(["list", "list_work_items"]).describe("The action to perform. Options: list (list backlog levels for a team), list_work_items (list work items in a specific backlog level)."),
+      action: z
+        .enum(["list", "list_work_items", "reorder"])
+        .describe(
+          "The action to perform. Options: list (list backlog levels for a team), list_work_items (list work items in a specific backlog level), reorder (move work items to a new position in a backlog or iteration)."
+        ),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
       team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
       backlogId: z.string().optional().describe("The ID of the backlog category to retrieve work items from. Required for: list_work_items."),
+      ids: z.array(z.coerce.number().int().min(1)).min(1).optional().describe("The IDs of the work items to reorder. Required for: reorder."),
+      previousId: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("The ID of the work item that should be before the reordered items. Use 0 to specify the beginning of the list. Optional for: reorder."),
+      nextId: z.coerce.number().int().min(0).optional().describe("The ID of the work item that should be after the reordered items. Use 0 to specify the end of the list. Optional for: reorder."),
+      parentId: z.coerce.number().int().min(0).optional().describe("The parent ID for all work items involved in the operation. Use 0 to indicate the items have no parent. Optional for: reorder."),
+      iterationPath: z.string().optional().describe("The iteration path for the reorder operation. Used when reordering items in an iteration backlog. Optional for: reorder."),
+      iterationId: z.string().optional().describe("The iteration ID. When provided, reorder items in that iteration instead of the team backlog. Used for: reorder."),
     },
-    async ({ action, project, team, backlogId }) => {
+    async ({ action, project, team, backlogId, ids, previousId, nextId, parentId, iterationPath, iterationId }) => {
       try {
         const connection = await connectionProvider();
 
@@ -413,12 +428,22 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           return { content: [{ type: "text", text: JSON.stringify(workItems, null, 2) }] };
         }
 
+        if (action === "reorder") {
+          if (!ids?.length) return { content: [{ type: "text", text: "ids is required for reorder" }], isError: true };
+
+          const operation = { ids, previousId, nextId, parentId, iterationPath };
+          const reorderedItems = iterationId ? await workApi.reorderIterationWorkItems(operation, teamContext, iterationId) : await workApi.reorderBacklogWorkItems(operation, teamContext);
+
+          return { content: [{ type: "text", text: JSON.stringify(reorderedItems, null, 2) }] };
+        }
+
         return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         const msgs: Record<string, string> = {
           list: `Error listing backlogs: ${errorMessage}`,
           list_work_items: `Error listing backlog work items: ${errorMessage}`,
+          reorder: `Error reordering backlog work items: ${errorMessage}`,
         };
         return { content: [{ type: "text", text: msgs[action] ?? `Error: ${errorMessage}` }], isError: true };
       }
