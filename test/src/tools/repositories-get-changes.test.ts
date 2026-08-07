@@ -90,7 +90,7 @@ describe("repo_pull_request get_changes", () => {
     expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith(REPOSITORY_ID, 42, 7, "project", 100, 0);
     expect(parsed(result)).toEqual({
       iterationId: 7,
-      iterationReason: { value: IterationReason.Push, name: "Push" },
+      iterationReason: { value: IterationReason.Push, names: ["Push"], unrecognizedBits: 0 },
       commonRefCommit: { commitId: COMMON_COMMIT },
       sourceRefCommit: { commitId: SOURCE_COMMIT },
       targetRefCommit: { commitId: TARGET_COMMIT },
@@ -150,11 +150,46 @@ describe("repo_pull_request get_changes", () => {
     );
 
     expect(parsed(await invoke({ iterationId: 7 }))).toMatchObject({
-      iterationReason: { value: IterationReason.Retarget, name: "Retarget" },
+      iterationReason: { value: IterationReason.Retarget, names: ["Retarget"], unrecognizedBits: 0 },
       oldTargetRefName: "refs/heads/main",
       newTargetRefName: "refs/heads/release",
       commitsTruncated: true,
     });
+  });
+
+  it.each([
+    [IterationReason.Push, ["Push"], 0],
+    [IterationReason.ForcePush, ["ForcePush"], 0],
+    [IterationReason.Create, ["Create"], 0],
+    [IterationReason.Rebase, ["Rebase"], 0],
+    [IterationReason.Unknown, ["Unknown"], 0],
+    [IterationReason.Retarget, ["Retarget"], 0],
+    [IterationReason.ResolveConflicts, ["ResolveConflicts"], 0],
+    [IterationReason.ForcePush | IterationReason.Rebase, ["ForcePush", "Rebase"], 0],
+    [IterationReason.Retarget | IterationReason.ResolveConflicts, ["Retarget", "ResolveConflicts"], 0],
+    [IterationReason.ResolveConflicts | IterationReason.Unknown | IterationReason.Create | IterationReason.ForcePush, ["ForcePush", "Create", "Unknown", "ResolveConflicts"], 0],
+    [64, [], 64],
+    [IterationReason.Unknown | 64, ["Unknown"], 64],
+  ])("returns iteration reason %s as ordered lossless flags", async (reason, names, unrecognizedBits) => {
+    prime(iteration({ reason }));
+
+    expect(parsed(await invoke()).iterationReason).toEqual({ value: reason, names, unrecognizedBits });
+  });
+
+  it.each([undefined, null])("returns a stable nullable shape for absent iteration reason %s", async (reason) => {
+    prime(iteration({ reason }));
+
+    expect(parsed(await invoke()).iterationReason).toEqual({ value: null, names: [], unrecognizedBits: 0 });
+  });
+
+  it.each([-1, 1.5])("fails closed on malformed iteration reason %s", async (reason) => {
+    prime(iteration({ reason }));
+
+    const result = await invoke();
+
+    expect(result.isError).toBe(true);
+    expect(parsed(result).error.code).toBe("INVALID_ITERATION_BINDING");
+    expect(mockGitApi.getPullRequestIterationChanges).not.toHaveBeenCalled();
   });
 
   it.each([

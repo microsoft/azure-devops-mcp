@@ -45,6 +45,14 @@ const REPO_TOOLS = {
 const CHANGE_PAGE_SIZE_MAX = 1000;
 const COMMIT_ID_PATTERN = /^[0-9a-f]{40}$/i;
 const REPOSITORY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ITERATION_REASON_FLAGS = [
+  { value: IterationReason.ForcePush, name: "ForcePush" },
+  { value: IterationReason.Create, name: "Create" },
+  { value: IterationReason.Rebase, name: "Rebase" },
+  { value: IterationReason.Unknown, name: "Unknown" },
+  { value: IterationReason.Retarget, name: "Retarget" },
+  { value: IterationReason.ResolveConflicts, name: "ResolveConflicts" },
+] as const;
 
 class PullRequestChangesError extends Error {
   constructor(
@@ -77,10 +85,22 @@ function requireBranchRef(refName: string | undefined, label: string): string {
   return refName;
 }
 
+function formatIterationReason(reason: IterationReason | null | undefined) {
+  if (reason === null || reason === undefined) return { value: null, names: [], unrecognizedBits: 0 };
+  if (!Number.isSafeInteger(reason) || reason < 0) {
+    throw new PullRequestChangesError("INVALID_ITERATION_BINDING", "The selected iteration reason is malformed.");
+  }
+  if (reason === IterationReason.Push) return { value: reason, names: ["Push"], unrecognizedBits: 0 };
+
+  const names = ITERATION_REASON_FLAGS.filter((flag) => Math.floor(reason / flag.value) % 2 === 1).map((flag) => flag.name);
+  const knownValue = ITERATION_REASON_FLAGS.filter((flag) => names.includes(flag.name)).reduce((value, flag) => value + flag.value, 0);
+  return { value: reason, names, unrecognizedBits: reason - knownValue };
+}
+
 function iterationIdentity(iteration: GitPullRequestIteration) {
   return {
     id: iteration.id,
-    reason: iteration.reason,
+    reason: iteration.reason ?? null,
     commonRefCommit: iteration.commonRefCommit?.commitId,
     sourceRefCommit: iteration.sourceRefCommit?.commitId,
     targetRefCommit: iteration.targetRefCommit?.commitId,
@@ -95,6 +115,7 @@ function validateIterationBinding(iteration: GitPullRequestIteration) {
   if (!Number.isInteger(iteration.id) || (iteration.id ?? 0) < 1) {
     throw new PullRequestChangesError("INVALID_ITERATION_BINDING", "The selected iteration ID is absent or malformed.");
   }
+  const iterationReason = formatIterationReason(iteration.reason);
   const commonRefCommit = requireCommitId(iteration.commonRefCommit?.commitId, "commonRefCommit.commitId");
   const sourceRefCommit = requireCommitId(iteration.sourceRefCommit?.commitId, "sourceRefCommit.commitId");
   const targetRefCommit = requireCommitId(iteration.targetRefCommit?.commitId, "targetRefCommit.commitId");
@@ -108,6 +129,7 @@ function validateIterationBinding(iteration: GitPullRequestIteration) {
     requireBranchRef(iteration.newTargetRefName, "newTargetRefName");
   }
   return {
+    iterationReason,
     commonRefCommit: { commitId: commonRefCommit },
     sourceRefCommit: { commitId: sourceRefCommit },
     targetRefCommit: { commitId: targetRefCommit },
@@ -317,7 +339,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       action: z
         .enum(["get", "list", "list_by_commits", "get_changes"])
         .describe(
-          "The action to perform. Options: get (get a pull request by ID), list (list pull requests in a repository or project), list_by_commits (find pull requests that contain specific commit IDs), get_changes (get one bounded page of changes with exact pull request iteration commit identity)."
+          "The action to perform. Options: get (get a pull request by ID), list (list pull requests in a repository or project), list_by_commits (find pull requests that contain specific commit IDs), get_changes (get one bounded page of changes with exact pull request iteration commit identity and lossless reason flags)."
         ),
       repositoryId: z.string().optional().describe("The ID or name of the repository. Required for get. Optional for list. When using a name instead of a GUID, project must also be provided."),
       pullRequestId: z.coerce.number().min(1).optional().describe("The ID of the pull request. Required for get."),
@@ -546,7 +568,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                   text: JSON.stringify(
                     {
                       iterationId: selectedIterationId,
-                      iterationReason: { value: selectedIteration.reason, name: IterationReason[selectedIteration.reason ?? IterationReason.Unknown] ?? "Unknown" },
                       ...binding,
                       oldTargetRefName: selectedIteration.oldTargetRefName ?? null,
                       newTargetRefName: selectedIteration.newTargetRefName ?? null,
