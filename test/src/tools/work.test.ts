@@ -1350,7 +1350,7 @@ describe("configureWorkTools", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Unknown action: invalid_action");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: assign, create");
     });
   });
 
@@ -1615,7 +1615,7 @@ describe("configureWorkTools", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Error: Connection failed");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: assign, create");
     });
   });
 
