@@ -898,6 +898,33 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemComment));
     });
 
+    it("should resolve all email mentions and preserve unresolved Markdown mentions as visible text", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-one" }] }) })
+        .mockResolvedValueOnce({ ok: false, status: 404, text: () => Promise.resolve("Not Found") })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-two" }] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({
+        action: "add",
+        project: "Contoso",
+        workItemId: 299,
+        text: "Hello @<one@example.com>, @<missing@example.com>, and @<two@example.com>",
+      });
+
+      expect(JSON.parse(mockFetch.mock.calls[3][1].body)).toEqual({ text: "Hello @<guid-one>, @&lt;missing@example.com&gt;, and @<guid-two>" });
+    });
+
     it("should call Add Work Item Comments API with format=1 when format is Html", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -913,6 +940,48 @@ describe("configureWorkItemTools", () => {
       await handler({ action: "add", text: "hello world!", project: "Contoso", workItemId: 299, format: "Html" });
 
       expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/contoso/Contoso/_apis/wit/workItems/299/comments?format=1&api-version=7.2-preview.4", expect.objectContaining({ method: "POST" }));
+    });
+
+    it("should use HTML mention syntax when the comment format is Html", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-one", providerDisplayName: `Jane & <Doe> "Admin" O'Neil` }] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({ action: "add", text: "Hello @<jane@example.com>", project: "Contoso", workItemId: 299, format: "Html" });
+
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({
+        text: 'Hello <a href="#" data-vss-mention="version:2.0,guid-one">@Jane &amp; &lt;Doe&gt; &quot;Admin&quot; O&#39;Neil</a>',
+      });
+    });
+
+    it("should preserve unresolved email mentions as visible text when the comment format is Html", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({ action: "add", text: "Hello @<missing@example.com>", project: "Contoso", workItemId: 299, format: "Html" });
+
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({ text: "Hello @&lt;missing@example.com&gt;" });
     });
 
     it("should handle fetch failure response", async () => {
@@ -1049,6 +1118,33 @@ describe("configureWorkItemTools", () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.text).toBe("Updated comment text");
+    });
+
+    it("should resolve repeated email mentions before updating a comment", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-one" }] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({
+        action: "update",
+        project: "Contoso",
+        workItemId: 299,
+        commentId: 1,
+        text: "@<one@example.com> follow up with @<one@example.com>",
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({ text: "@<guid-one> follow up with @<guid-one>" });
     });
 
     it("should handle update work item comment failure", async () => {
