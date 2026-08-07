@@ -18,14 +18,9 @@ import {
   GitPullRequestMergeStrategy,
   GitPullRequest,
   GitPullRequestCommentThread,
-  GitPullRequestChange,
   GitPullRequestIteration,
-  FileDiff,
   IterationReason,
-  LineDiffBlock,
-  LineDiffBlockChangeType,
   Comment,
-  VersionControlChangeType,
   VersionControlRecursionType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
@@ -47,13 +42,7 @@ const REPO_TOOLS = {
   repo_create_branch: "repo_create_branch",
 };
 
-const CHANGE_PAGE_SIZE_MAX = 200;
-const CHANGE_COUNT_MAX = 1000;
-const FILE_DIFF_BATCH_SIZE = 10;
-const FILE_DIFF_PATH_MAX = 20;
-const FILE_DIFF_BLOCK_MAX = 5000;
-const FILE_DIFF_LINE_MAX = 200000;
-const FILE_DIFF_RESPONSE_BYTE_MAX = 2 * 1024 * 1024;
+const CHANGE_PAGE_SIZE_MAX = 1000;
 const COMMIT_ID_PATTERN = /^[0-9a-f]{40}$/i;
 const REPOSITORY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -72,14 +61,6 @@ function pullRequestChangesError(error: PullRequestChangesError) {
     content: [{ type: "text" as const, text: JSON.stringify({ error: { code: error.code, message: error.message, ...error.details } }, null, 2) }],
     isError: true,
   };
-}
-
-function normalizeGitPath(path: string | undefined): string | undefined {
-  if (path === undefined) return undefined;
-  if (path.includes("\\") || path.includes("\0")) throw new PullRequestChangesError("INVALID_PATH", `Invalid Git path '${path}'.`);
-  const normalized = path.replace(/^\/+/, "");
-  if (!normalized || normalized.split("/").includes("..")) throw new PullRequestChangesError("INVALID_PATH", `Invalid Git path '${path}'.`);
-  return normalized;
 }
 
 function requireCommitId(commitId: string | undefined, label: string): string {
@@ -126,7 +107,11 @@ function validateIterationBinding(iteration: GitPullRequestIteration) {
     requireBranchRef(iteration.oldTargetRefName, "oldTargetRefName");
     requireBranchRef(iteration.newTargetRefName, "newTargetRefName");
   }
-  return { commonRefCommit, sourceRefCommit, targetRefCommit };
+  return {
+    commonRefCommit: { commitId: commonRefCommit },
+    sourceRefCommit: { commitId: sourceRefCommit },
+    targetRefCommit: { commitId: targetRefCommit },
+  };
 }
 
 function latestIteration(iterations: GitPullRequestIteration[]) {
@@ -149,177 +134,23 @@ function latestIteration(iterations: GitPullRequestIteration[]) {
   return { ...latest, id: latestId };
 }
 
-async function getAllIterationChanges(
-  gitApi: Awaited<ReturnType<WebApi["getGitApi"]>>,
-  repositoryId: string,
-  pullRequestId: number,
-  iterationId: number,
-  project: string | undefined,
-  pageSize: number,
-  changeLimit: number
-) {
-  const changeEntries: GitPullRequestChange[] = [];
-  let nextSkip = 0;
-  let nextTop = Math.min(pageSize, changeLimit);
-  let pages = 0;
-
-  while (true) {
-    const page = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, iterationId, project, nextTop, nextSkip);
-    const entries = page.changeEntries ?? [];
-    pages += 1;
-    if (changeEntries.length + entries.length > changeLimit) {
-      throw new PullRequestChangesError("CHANGES_TRUNCATED", `The iteration contains more than the configured ${changeLimit} change-entry limit.`, {
-        pagination: { complete: false, truncated: true, pages, changeCount: changeEntries.length, nextSkip, nextTop, changeLimit },
-      });
-    }
-    changeEntries.push(...entries);
-
-    const serverNextSkip = page.nextSkip ?? 0;
-    const serverNextTop = page.nextTop ?? 0;
-    if (serverNextSkip === 0 && serverNextTop === 0) {
-      return { changeEntries, pagination: { complete: true, truncated: false, pages, changeCount: changeEntries.length, nextSkip: 0, nextTop: 0, changeLimit } };
-    }
-    if (changeEntries.length >= changeLimit) {
-      throw new PullRequestChangesError("CHANGES_TRUNCATED", `The iteration contains more than the configured ${changeLimit} change-entry limit.`, {
-        pagination: { complete: false, truncated: true, pages, changeCount: changeEntries.length, nextSkip: serverNextSkip, nextTop: serverNextTop, changeLimit },
-      });
-    }
-    if (!Number.isInteger(serverNextSkip) || !Number.isInteger(serverNextTop) || serverNextSkip !== nextSkip + entries.length || serverNextTop < 1 || entries.length === 0) {
-      throw new PullRequestChangesError("INCOMPLETE_PAGINATION", "Azure DevOps returned incomplete or malformed iteration-change pagination.", {
-        pagination: { complete: false, truncated: true, pages, changeCount: changeEntries.length, nextSkip: serverNextSkip, nextTop: serverNextTop, changeLimit },
-      });
-    }
-    nextSkip = serverNextSkip;
-    nextTop = Math.min(serverNextTop, pageSize, changeLimit - changeEntries.length);
+function validateIterationChangesPage(changeEntries: unknown, nextSkip: number, nextTop: number, skip: number, top: number) {
+  if (!Array.isArray(changeEntries)) {
+    throw new PullRequestChangesError("INCOMPLETE_PAGINATION", "Azure DevOps returned malformed iteration change entries.");
   }
-}
-
-function changeTypeNames(changeType: number): string[] {
-  return Object.entries(VersionControlChangeType)
-    .filter(([name, value]) => typeof value === "number" && value !== 0 && (changeType & value) === value && !/^\d+$/.test(name))
-    .map(([name]) => name);
-}
-
-function lineSpan(start: number | undefined, count: number | undefined) {
-  if (count === 0) {
-    if (start !== undefined && start !== 0) throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "An empty side of a line diff block has a nonzero start line.");
-    return null;
+  const hasNextPage = nextSkip !== 0 || nextTop !== 0;
+  if (
+    changeEntries.length > top ||
+    !Number.isInteger(nextSkip) ||
+    !Number.isInteger(nextTop) ||
+    nextSkip < 0 ||
+    nextTop < 0 ||
+    nextTop > CHANGE_PAGE_SIZE_MAX ||
+    (hasNextPage && (changeEntries.length === 0 || nextSkip !== skip + changeEntries.length || nextTop === 0))
+  ) {
+    throw new PullRequestChangesError("INCOMPLETE_PAGINATION", "Azure DevOps returned incomplete or malformed iteration-change pagination.");
   }
-  if (typeof start !== "number" || typeof count !== "number" || !Number.isInteger(start) || !Number.isInteger(count) || start < 1 || count < 1) {
-    throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "Azure DevOps returned a malformed line diff block.");
-  }
-  return { startLine: start, endLine: start + count - 1, lineCount: count };
-}
-
-function validateLineDiffBlock(block: LineDiffBlock) {
-  const changeType = block.changeType;
-  const originalCount = block.originalLinesCount;
-  const modifiedCount = block.modifiedLinesCount;
-  if (changeType === undefined || ![LineDiffBlockChangeType.None, LineDiffBlockChangeType.Add, LineDiffBlockChangeType.Delete, LineDiffBlockChangeType.Edit].includes(changeType)) {
-    throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "Azure DevOps returned an unknown line diff block change type.");
-  }
-  if (!Number.isInteger(originalCount) || !Number.isInteger(modifiedCount) || (originalCount ?? -1) < 0 || (modifiedCount ?? -1) < 0) {
-    throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "Azure DevOps returned a malformed line diff block.");
-  }
-  if (changeType === LineDiffBlockChangeType.Add && (originalCount !== 0 || modifiedCount === 0)) {
-    throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "An add block has invalid base/source orientation.");
-  }
-  if (changeType === LineDiffBlockChangeType.Delete && (originalCount === 0 || modifiedCount !== 0)) {
-    throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "A delete block has invalid base/source orientation.");
-  }
-  if (changeType === LineDiffBlockChangeType.Edit && (originalCount === 0 || modifiedCount === 0)) {
-    throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "An edit block has invalid base/source orientation.");
-  }
-  if (changeType === LineDiffBlockChangeType.None && originalCount !== modifiedCount) {
-    throw new PullRequestChangesError("MALFORMED_FILE_DIFF", "A context block has inconsistent base/source line counts.");
-  }
-  return {
-    ...block,
-    changeTypeName: LineDiffBlockChangeType[changeType],
-    originalSpan: lineSpan(block.originalLineNumberStart, originalCount),
-    modifiedSpan: lineSpan(block.modifiedLineNumberStart, modifiedCount),
-  };
-}
-
-function bindRequestedChanges(changeEntries: GitPullRequestChange[], requestedPaths: string[]) {
-  const aliases = new Map<string, Set<GitPullRequestChange>>();
-  const requestedEntries = new Set<GitPullRequestChange>();
-  const normalizedRequested = requestedPaths.map((path) => {
-    const normalizedPath = normalizeGitPath(path);
-    if (!normalizedPath) throw new PullRequestChangesError("INVALID_PATH", `Invalid Git path '${path}'.`);
-    return normalizedPath;
-  });
-  if (new Set(normalizedRequested).size !== normalizedRequested.length) {
-    throw new PullRequestChangesError("DUPLICATE_PATH", "Requested paths contain duplicates after normalization.");
-  }
-
-  for (const entry of changeEntries) {
-    const currentPath = normalizeGitPath(entry.item?.path);
-    const originalPath = normalizeGitPath(entry.originalPath);
-    if (!currentPath && !originalPath) throw new PullRequestChangesError("MALFORMED_CHANGE_ENTRY", "A change entry has no current or original path.");
-    for (const alias of new Set([currentPath, originalPath].filter((path): path is string => path !== undefined))) {
-      const matchingEntries = aliases.get(alias) ?? new Set<GitPullRequestChange>();
-      matchingEntries.add(entry);
-      aliases.set(alias, matchingEntries);
-    }
-  }
-
-  return normalizedRequested.map((requestedPath) => {
-    const matchingEntries = aliases.get(requestedPath);
-    if (!matchingEntries) throw new PullRequestChangesError("PATH_NOT_IN_ITERATION", `Requested path '${requestedPath}' is not present in the selected iteration changes.`);
-    if (matchingEntries.size !== 1) throw new PullRequestChangesError("CONFLICTING_PATH", `Multiple change entries resolve to requested path '${requestedPath}'.`);
-    const [entry] = matchingEntries;
-    if (requestedEntries.has(entry)) throw new PullRequestChangesError("DUPLICATE_PATH", `Multiple requested paths resolve to the same change entry at '${requestedPath}'.`);
-    requestedEntries.add(entry);
-    if (entry.item?.isFolder || entry.item?.contentMetadata?.isBinary) {
-      throw new PullRequestChangesError("UNSUPPORTED_FILE", `Requested path '${requestedPath}' is a folder or binary file.`);
-    }
-    const path = normalizeGitPath(entry.item?.path) ?? normalizeGitPath(entry.originalPath);
-    if (!path) throw new PullRequestChangesError("MALFORMED_CHANGE_ENTRY", "A requested change entry has no current or original path.");
-    const originalPath = normalizeGitPath(entry.originalPath);
-    return { requestedPath, entry, path, originalPath };
-  });
-}
-
-function bindFileDiffs(requests: ReturnType<typeof bindRequestedChanges>, fileDiffs: FileDiff[]) {
-  if (Buffer.byteLength(JSON.stringify(fileDiffs), "utf8") > FILE_DIFF_RESPONSE_BYTE_MAX) {
-    throw new PullRequestChangesError("FILE_DIFF_TOO_LARGE", `FileDiffs response exceeds the ${FILE_DIFF_RESPONSE_BYTE_MAX}-byte safety limit.`);
-  }
-  let blockCount = 0;
-  let lineCount = 0;
-  const unmatched = [...fileDiffs];
-
-  const results = requests.map(({ requestedPath, entry, path, originalPath }) => {
-    const matchIndex = unmatched.findIndex((diff) => {
-      const diffPath = normalizeGitPath(diff.path);
-      const diffOriginalPath = normalizeGitPath(diff.originalPath);
-      return diffPath === path || (originalPath !== undefined && diffOriginalPath === originalPath) || diffPath === requestedPath || diffOriginalPath === requestedPath;
-    });
-    if (matchIndex < 0) throw new PullRequestChangesError("MISSING_FILE_DIFF", `Azure DevOps did not return a FileDiff for '${requestedPath}'.`);
-    const diff = unmatched.splice(matchIndex, 1)[0];
-    const blocks = diff.lineDiffBlocks ?? [];
-    const changeType = entry.changeType ?? VersionControlChangeType.None;
-    const renameOnly = (changeType & VersionControlChangeType.Rename) !== 0 && (changeType & (VersionControlChangeType.Add | VersionControlChangeType.Edit | VersionControlChangeType.Delete)) === 0;
-    if (blocks.length === 0 && !renameOnly) throw new PullRequestChangesError("UNSUPPORTED_FILE_DIFF", `Azure DevOps returned no line diff blocks for '${requestedPath}'.`);
-    blockCount += blocks.length;
-    lineCount += blocks.reduce((total, block) => total + (block.originalLinesCount ?? 0) + (block.modifiedLinesCount ?? 0), 0);
-    if (blockCount > FILE_DIFF_BLOCK_MAX || lineCount > FILE_DIFF_LINE_MAX) {
-      throw new PullRequestChangesError("FILE_DIFF_TOO_LARGE", "FileDiffs response exceeds the line or block safety limit.");
-    }
-    return {
-      provenance: {
-        source: "getFileDiffs",
-        requestedPath,
-        iterationChangeTrackingId: entry.changeTrackingId,
-        orientation: { original: "commonRefCommit", modified: "sourceRefCommit" },
-      },
-      path: normalizeGitPath(diff.path) ?? path,
-      originalPath: normalizeGitPath(diff.originalPath) ?? originalPath ?? null,
-      lineDiffBlocks: blocks.map(validateLineDiffBlock),
-    };
-  });
-  if (unmatched.length > 0) throw new PullRequestChangesError("UNEXPECTED_FILE_DIFF", "Azure DevOps returned FileDiff results that were not requested.");
-  return results;
+  return { changeEntries, hasMoreChanges: hasNextPage };
 }
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
@@ -481,21 +312,24 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   // --- repo_pull_request -----------------------------------------------------
   server.tool(
     REPO_TOOLS.repo_pull_request,
-    "Retrieve pull request data and authoritative, iteration-bound change spans. Use the action parameter to specify the operation.",
+    "Retrieve pull request data and iteration-bound change pages. Use the action parameter to specify the operation.",
     {
       action: z
         .enum(["get", "list", "list_by_commits", "get_changes"])
         .describe(
-          "The action to perform. Options: get (get a pull request by ID), list (list pull requests in a repository or project), list_by_commits (find pull requests that contain specific commit IDs), get_changes (get bounded change entries and optional authoritative line diffs for one immutable pull request iteration)."
+          "The action to perform. Options: get (get a pull request by ID), list (list pull requests in a repository or project), list_by_commits (find pull requests that contain specific commit IDs), get_changes (get one bounded page of changes with exact pull request iteration commit identity)."
         ),
       repositoryId: z.string().optional().describe("The ID or name of the repository. Required for get. Optional for list. When using a name instead of a GUID, project must also be provided."),
       pullRequestId: z.coerce.number().min(1).optional().describe("The ID of the pull request. Required for get."),
-      project: z.string().optional().describe("Project ID or project name. Required for list_by_commits. Optional for get and list."),
+      project: z.string().optional().describe("Project ID or project name. Required for list_by_commits and for get_changes when repositoryId is a name. Optional for get and list."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to include work item references. Used for get."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include labels. Used for get."),
       includeChangedFiles: z.boolean().optional().default(false).describe("Whether to include the list of changed files. Used for get."),
-      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Used for list. Defaults to 100."),
-      skip: z.coerce.number().default(0).describe("The number of pull requests to skip. Used for list. Defaults to 0."),
+      top: z.coerce
+        .number()
+        .default(100)
+        .describe(`The maximum number of results to return. Used for list and get_changes. Defaults to 100; get_changes requires an integer from 1 through ${CHANGE_PAGE_SIZE_MAX}.`),
+      skip: z.coerce.number().default(0).describe("The number of results to skip. Used for list and get_changes. Defaults to 0; get_changes requires a non-negative integer."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user. Used for list."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user email. Used for list."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer. Used for list."),
@@ -514,17 +348,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .default(GitPullRequestQueryType[GitPullRequestQueryType.LastMergeCommit])
         .describe("Type of commit query. Used for list_by_commits."),
       iterationId: z.coerce.number().int().min(1).optional().describe("Exact pull request iteration to select. Used for get_changes; defaults to the latest iteration."),
-      includeLineDiffs: z.boolean().optional().default(false).describe("Call FileDiffs for explicitly requested paths. Used for get_changes; defaults to false."),
-      paths: z.array(z.string().min(1)).max(FILE_DIFF_PATH_MAX).optional().describe(`Paths to retrieve line diffs for. Required when includeLineDiffs is true; maximum ${FILE_DIFF_PATH_MAX}.`),
-      changePageSize: z.coerce.number().int().min(1).max(CHANGE_PAGE_SIZE_MAX).optional().default(100).describe(`Iteration-change page size. Used for get_changes; maximum ${CHANGE_PAGE_SIZE_MAX}.`),
-      changeLimit: z.coerce
-        .number()
-        .int()
-        .min(1)
-        .max(CHANGE_COUNT_MAX)
-        .optional()
-        .default(500)
-        .describe(`Maximum complete iteration change count. Used for get_changes; maximum ${CHANGE_COUNT_MAX}; exceeding it fails closed.`),
     },
     async ({
       action,
@@ -547,10 +370,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       commits,
       queryType,
       iterationId,
-      includeLineDiffs,
-      paths,
-      changePageSize = 100,
-      changeLimit = 500,
     }) => {
       try {
         const connection = await connectionProvider();
@@ -682,24 +501,17 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         if (action === "get_changes") {
           if (!repositoryId) return { content: [{ type: "text", text: "repositoryId is required for get_changes" }], isError: true };
           if (!pullRequestId) return { content: [{ type: "text", text: "pullRequestId is required for get_changes" }], isError: true };
-          if (includeLineDiffs && !project) return pullRequestChangesError(new PullRequestChangesError("PROJECT_REQUIRED", "project is required when includeLineDiffs is true."));
-          if (includeLineDiffs && (!paths || paths.length === 0)) return pullRequestChangesError(new PullRequestChangesError("PATHS_REQUIRED", "paths is required when includeLineDiffs is true."));
-          if ((paths?.length ?? 0) > FILE_DIFF_PATH_MAX)
-            return pullRequestChangesError(new PullRequestChangesError("PATH_LIMIT_EXCEEDED", `paths cannot contain more than ${FILE_DIFF_PATH_MAX} entries.`));
-          if (!includeLineDiffs && paths?.length) return pullRequestChangesError(new PullRequestChangesError("INVALID_ARGUMENT", "paths can only be used when includeLineDiffs is true."));
+          if (!Number.isInteger(top) || top < 1 || top > CHANGE_PAGE_SIZE_MAX) {
+            return pullRequestChangesError(new PullRequestChangesError("INVALID_ARGUMENT", `top must be an integer from 1 through ${CHANGE_PAGE_SIZE_MAX} for get_changes.`));
+          }
+          if (!Number.isInteger(skip) || skip < 0) {
+            return pullRequestChangesError(new PullRequestChangesError("INVALID_ARGUMENT", "skip must be a non-negative integer for get_changes."));
+          }
+          if (!REPOSITORY_ID_PATTERN.test(repositoryId) && !project) {
+            return pullRequestChangesError(new PullRequestChangesError("PROJECT_REQUIRED", "project is required when repositoryId is a name."));
+          }
 
           try {
-            const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project);
-            const repositoryMatches = REPOSITORY_ID_PATTERN.test(repositoryId)
-              ? pullRequest.repository?.id?.toLowerCase() === repositoryId.toLowerCase()
-              : pullRequest.repository?.name === repositoryId;
-            if (!repositoryMatches) throw new PullRequestChangesError("REPOSITORY_MISMATCH", "The pull request resolved to a different repository.");
-            if (pullRequest.forkSource || pullRequest.hasMultipleMergeBases || pullRequest.supportsIterations === false) {
-              throw new PullRequestChangesError("AMBIGUOUS_REPOSITORY", "Fork pull requests and pull requests with multiple merge bases are not supported.");
-            }
-            const sourceRefName = requireBranchRef(pullRequest.sourceRefName, "pullRequest.sourceRefName");
-            const targetRefName = requireBranchRef(pullRequest.targetRefName, "pullRequest.targetRefName");
-
             const initialIterations = await gitApi.getPullRequestIterations(repositoryId, pullRequestId, project);
             const initialLatest = latestIteration(initialIterations);
             const selectedIterationId = iterationId ?? initialLatest.id;
@@ -707,60 +519,23 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               throw new PullRequestChangesError("ITERATION_NOT_FOUND", `Iteration ${selectedIterationId} was not found on this pull request.`);
             }
             const selectedIteration = await gitApi.getPullRequestIteration(repositoryId, pullRequestId, selectedIterationId, project);
-            const commits = validateIterationBinding(selectedIteration);
-            const changes = await getAllIterationChanges(gitApi, repositoryId, pullRequestId, selectedIterationId, project, changePageSize, changeLimit);
-
-            const seenCurrentPaths = new Set<string>();
-            const responseChanges = changes.changeEntries.map((entry) => {
-              const changeType = entry.changeType;
-              if (typeof changeType !== "number" || !Number.isInteger(changeType) || changeType < 1 || (changeType & ~VersionControlChangeType.All) !== 0)
-                throw new PullRequestChangesError("MALFORMED_CHANGE_ENTRY", "A change entry has an absent or malformed changeType.");
-              const path = normalizeGitPath(entry.item?.path);
-              const originalPath = normalizeGitPath(entry.originalPath);
-              if (!path && !originalPath) throw new PullRequestChangesError("MALFORMED_CHANGE_ENTRY", "A change entry has no current or original path.");
-              const identityPath = path ?? originalPath;
-              if (!identityPath) throw new PullRequestChangesError("MALFORMED_CHANGE_ENTRY", "A change entry has no identity path.");
-              if (seenCurrentPaths.has(identityPath)) throw new PullRequestChangesError("DUPLICATE_PATH", `Duplicate change path '${identityPath}'.`);
-              seenCurrentPaths.add(identityPath);
-              return {
-                provenance: { source: "getPullRequestIterationChanges", iterationId: selectedIterationId, changeTrackingId: entry.changeTrackingId },
-                changeType: { value: changeType, names: changeTypeNames(changeType) },
-                path: path ?? null,
-                originalPath: originalPath ?? null,
-              };
-            });
-
-            let fileDiffs;
-            if (includeLineDiffs) {
-              if (!project || !paths) throw new PullRequestChangesError("INVALID_ARGUMENT", "project and paths are required when includeLineDiffs is true.");
-              const requests = bindRequestedChanges(changes.changeEntries, paths);
-              const allFileDiffs: FileDiff[] = [];
-              for (let index = 0; index < requests.length; index += FILE_DIFF_BATCH_SIZE) {
-                const batch = requests.slice(index, index + FILE_DIFF_BATCH_SIZE);
-                const batchDiffs = await gitApi.getFileDiffs(
-                  {
-                    baseVersionCommit: commits.commonRefCommit,
-                    targetVersionCommit: commits.sourceRefCommit,
-                    fileDiffParams: batch.map(({ entry, path, originalPath }) => {
-                      const changeType = entry.changeType ?? VersionControlChangeType.None;
-                      return {
-                        path,
-                        ...((changeType & VersionControlChangeType.Add) === 0 ? { originalPath: originalPath ?? path } : {}),
-                      };
-                    }),
-                  },
-                  project,
-                  repositoryId
-                );
-                allFileDiffs.push(...batchDiffs);
-              }
-              fileDiffs = bindFileDiffs(requests, allFileDiffs);
+            const binding = validateIterationBinding(selectedIteration);
+            if (selectedIteration.id !== selectedIterationId) {
+              throw new PullRequestChangesError("INVALID_ITERATION_BINDING", "Azure DevOps returned a different iteration than requested.");
             }
+            const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, selectedIterationId, project, top, skip);
+            const changeEntries: unknown = changes.changeEntries ?? [];
+            const nextSkip = changes.nextSkip ?? 0;
+            const nextTop = changes.nextTop ?? 0;
+            const validatedPage = validateIterationChangesPage(changeEntries, nextSkip, nextTop, skip, top);
 
             const finalIterations = await gitApi.getPullRequestIterations(repositoryId, pullRequestId, project);
             const finalLatest = latestIteration(finalIterations);
             const finalSelected = await gitApi.getPullRequestIteration(repositoryId, pullRequestId, selectedIterationId, project);
-            if (finalLatest?.id !== initialLatest.id || JSON.stringify(iterationIdentity(finalSelected)) !== JSON.stringify(iterationIdentity(selectedIteration))) {
+            if (
+              JSON.stringify(iterationIdentity(finalLatest)) !== JSON.stringify(iterationIdentity(initialLatest)) ||
+              JSON.stringify(iterationIdentity(finalSelected)) !== JSON.stringify(iterationIdentity(selectedIteration))
+            ) {
               throw new PullRequestChangesError("ITERATION_MOVED", "The pull request iteration binding changed during the request.");
             }
 
@@ -770,28 +545,16 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                   type: "text",
                   text: JSON.stringify(
                     {
-                      provenance: {
-                        source: "Azure DevOps Git API",
-                        repository: { id: pullRequest.repository?.id, name: pullRequest.repository?.name },
-                        pullRequestId,
-                        currentPullRequestRefs: { sourceRefName, targetRefName },
-                        iteration: {
-                          id: selectedIterationId,
-                          reason: { value: selectedIteration.reason, name: IterationReason[selectedIteration.reason ?? IterationReason.Unknown] ?? "Unknown" },
-                          commonRefCommit: { commitId: commits.commonRefCommit, role: "fileDiffBase" },
-                          sourceRefCommit: { commitId: commits.sourceRefCommit, role: "fileDiffTarget" },
-                          targetRefCommit: { commitId: commits.targetRefCommit, role: "targetTipAtIteration" },
-                          retarget: { oldTargetRefName: selectedIteration.oldTargetRefName ?? null, newTargetRefName: selectedIteration.newTargetRefName ?? null },
-                        },
-                        pagination: changes.pagination,
-                        truncation: {
-                          iterationCommits: selectedIteration.hasMoreCommits ?? false,
-                          changeEntries: false,
-                          fileDiffs: includeLineDiffs ? { responseLimitHit: false, apiProvidesTruncationIndicator: false } : null,
-                        },
-                      },
-                      changes: responseChanges,
-                      ...(fileDiffs ? { fileDiffs } : {}),
+                      iterationId: selectedIterationId,
+                      iterationReason: { value: selectedIteration.reason, name: IterationReason[selectedIteration.reason ?? IterationReason.Unknown] ?? "Unknown" },
+                      ...binding,
+                      oldTargetRefName: selectedIteration.oldTargetRefName ?? null,
+                      newTargetRefName: selectedIteration.newTargetRefName ?? null,
+                      commitsTruncated: selectedIteration.hasMoreCommits ?? false,
+                      hasMoreChanges: validatedPage.hasMoreChanges,
+                      nextSkip,
+                      nextTop,
+                      changes: validatedPage.changeEntries,
                     },
                     null,
                     2

@@ -66,7 +66,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [repo_pull_request](#repo_pull_request)                           | `get`              | Get a pull request by ID                                            |
 | [repo_pull_request](#repo_pull_request)                           | `list`             | List pull requests in a repository or project                       |
 | [repo_pull_request](#repo_pull_request)                           | `list_by_commits`  | Find pull requests that contain specific commit IDs                 |
-| [repo_pull_request](#repo_pull_request)                           | `get_changes`      | Get bounded iteration changes and optional authoritative line diffs |
+| [repo_pull_request](#repo_pull_request)                           | `get_changes`      | Get a bounded PR iteration page with exact commit identity          |
 | [repo_pull_request_thread](#repo_pull_request_thread)             | `list`             | List comment threads on a pull request                              |
 | [repo_pull_request_thread](#repo_pull_request_thread)             | `list_comments`    | List comments in a specific thread                                  |
 | [repo_branch](#repo_branch)                                       | `get`              | Get a branch by name                                                |
