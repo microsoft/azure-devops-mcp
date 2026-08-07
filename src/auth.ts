@@ -75,8 +75,8 @@ class OAuthAuthenticator {
   }
 }
 
-function createAuthenticator(type: string, tenantId?: string): () => Promise<string> {
-  logger.debug(`Creating authenticator of type '${type}' with tenantId='${tenantId ?? "undefined"}'`);
+function createAuthenticator(type: string, orgTenantId?: string, tenantIdOverride?: string): () => Promise<string> {
+  logger.debug(`Creating authenticator of type '${type}' with orgTenantId='${orgTenantId ?? "undefined"}' and tenantIdOverride='${tenantIdOverride ?? "undefined"}'`);
   switch (type) {
     case "pat":
       logger.debug(`Authenticator: Using PAT authentication (PERSONAL_ACCESS_TOKEN)`);
@@ -113,6 +113,7 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
         process.env.AZURE_TOKEN_CREDENTIALS = "dev";
       }
       let credential: TokenCredential = new DefaultAzureCredential(); // CodeQL [SM05138] resolved by explicitly setting AZURE_TOKEN_CREDENTIALS
+      const tenantId = tenantIdOverride ?? orgTenantId;
       if (tenantId) {
         // Use Azure CLI credential if tenantId is provided for multi-tenant scenarios
         const azureCliCredential = new AzureCliCredential({ tenantId });
@@ -130,7 +131,7 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
 
     default:
       logger.debug(`Authenticator: Using OAuth interactive authentication (default)`);
-      const authenticator = new OAuthAuthenticator(tenantId);
+      const authenticator = new OAuthAuthenticator(orgTenantId);
       return () => {
         return authenticator.getToken();
       };

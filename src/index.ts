@@ -52,7 +52,7 @@ const argv = yargs(hideBin(process.argv))
   })
   .option("tenant", {
     alias: "t",
-    describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
+    describe: "Azure tenant ID (optional, only applied when using 'azcli' type of authentication)",
     type: "string",
   })
   .help()
@@ -105,8 +105,8 @@ async function main() {
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
-  const tenantId = (await getOrgTenant(orgName)) ?? argv.tenant;
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
+  const orgTenantId = await getOrgTenant(orgName);
+  const authenticator = createAuthenticator(argv.authentication, orgTenantId, argv.tenant);
 
   if (argv.authentication === "pat") {
     const basicValue = await authenticator();
