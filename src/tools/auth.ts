@@ -59,10 +59,12 @@ async function searchIdentities(identity: string, tokenProvider: () => Promise<s
   return await response.json();
 }
 
-/**
- * Gets the user ID from email or unique name using Azure DevOps Identity API
- */
-async function getUserIdFromEmail(userEmail: string, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): Promise<string> {
+async function getUserIdentityFromEmail(
+  userEmail: string,
+  tokenProvider: () => Promise<string>,
+  connectionProvider: () => Promise<WebApi>,
+  userAgentProvider: () => string
+): Promise<{ id: string; displayName: string }> {
   const identities = await searchIdentities(userEmail, tokenProvider, connectionProvider, userAgentProvider);
 
   if (!identities || identities.value?.length === 0) {
@@ -74,7 +76,15 @@ async function getUserIdFromEmail(userEmail: string, tokenProvider: () => Promis
     throw new Error(`No ID found for user with email/unique name: ${userEmail}`);
   }
 
-  return firstIdentity.id;
+  return { id: firstIdentity.id, displayName: firstIdentity.providerDisplayName ?? userEmail };
 }
 
-export { getCurrentUserDetails, getUserIdFromEmail, searchIdentities };
+/**
+ * Gets the user ID from email or unique name using Azure DevOps Identity API
+ */
+async function getUserIdFromEmail(userEmail: string, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string): Promise<string> {
+  const identity = await getUserIdentityFromEmail(userEmail, tokenProvider, connectionProvider, userAgentProvider);
+  return identity.id;
+}
+
+export { getCurrentUserDetails, getUserIdFromEmail, getUserIdentityFromEmail, searchIdentities };

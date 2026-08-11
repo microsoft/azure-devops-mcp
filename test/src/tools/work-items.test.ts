@@ -32,6 +32,8 @@ type ConnectionProviderMock = () => Promise<WebApi>;
 interface WorkApiMock {
   getBacklogs: jest.Mock;
   getBacklogLevelWorkItems: jest.Mock;
+  reorderBacklogWorkItems: jest.Mock;
+  reorderIterationWorkItems: jest.Mock;
   getPredefinedQueryResults: jest.Mock;
   getTeamIterations: jest.Mock;
   getIterationWorkItems: jest.Mock;
@@ -75,6 +77,8 @@ describe("configureWorkItemTools", () => {
     mockWorkApi = {
       getBacklogs: jest.fn(),
       getBacklogLevelWorkItems: jest.fn(),
+      reorderBacklogWorkItems: jest.fn(),
+      reorderIterationWorkItems: jest.fn(),
       getPredefinedQueryResults: jest.fn(),
       getTeamIterations: jest.fn(),
       getIterationWorkItems: jest.fn(),
@@ -204,6 +208,116 @@ describe("configureWorkItemTools", () => {
           2
         )
       );
+    });
+  });
+
+  describe("reorder_backlog_work_items tool", () => {
+    it("should reorder work items in the team backlog", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      const reorderedItems = [
+        { id: 101, order: 1 },
+        { id: 102, order: 2 },
+      ];
+      (mockWorkApi.reorderBacklogWorkItems as jest.Mock).mockResolvedValue(reorderedItems);
+
+      const params = {
+        project: "Contoso",
+        team: "Fabrikam",
+        ids: [101, 102],
+        previousId: 0,
+        nextId: 103,
+        parentId: 0,
+      };
+
+      const result = await handler({ action: "reorder", ...params });
+
+      expect(mockWorkApi.reorderBacklogWorkItems).toHaveBeenCalledWith(
+        {
+          ids: params.ids,
+          previousId: params.previousId,
+          nextId: params.nextId,
+          parentId: params.parentId,
+          iterationPath: undefined,
+        },
+        { project: params.project, team: params.team }
+      );
+      expect(mockWorkApi.reorderIterationWorkItems).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(reorderedItems, null, 2));
+    });
+
+    it("should reorder work items in an iteration and pass optional fields", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      const reorderedItems = [{ id: 101, order: 4 }];
+      (mockWorkApi.reorderIterationWorkItems as jest.Mock).mockResolvedValue(reorderedItems);
+
+      const params = {
+        project: "Contoso",
+        team: "Fabrikam",
+        iterationId: "iteration-1",
+        ids: [101],
+        nextId: 0,
+        iterationPath: "Contoso\\Sprint 1",
+      };
+
+      const result = await handler({ action: "reorder", ...params });
+
+      expect(mockWorkApi.reorderIterationWorkItems).toHaveBeenCalledWith(
+        {
+          ids: params.ids,
+          previousId: undefined,
+          nextId: params.nextId,
+          parentId: undefined,
+          iterationPath: params.iterationPath,
+        },
+        { project: params.project, team: params.team },
+        params.iterationId
+      );
+      expect(mockWorkApi.reorderBacklogWorkItems).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(reorderedItems, null, 2));
+    });
+
+    it("should return an error when ids are missing", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "reorder", project: "Contoso", team: "Fabrikam" });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: "ids is required for reorder" }],
+        isError: true,
+      });
+      expect(mockWorkApi.reorderBacklogWorkItems).not.toHaveBeenCalled();
+      expect(mockWorkApi.reorderIterationWorkItems).not.toHaveBeenCalled();
+    });
+
+    it("should return an error when the reorder API fails", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_backlog");
+      if (!call) throw new Error("wit_backlog tool not registered");
+      const [, , , handler] = call;
+
+      (mockWorkApi.reorderBacklogWorkItems as jest.Mock).mockRejectedValue(new Error("API Error"));
+
+      const result = await handler({ action: "reorder", project: "Contoso", team: "Fabrikam", ids: [101] });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Error reordering backlog work items: API Error" }],
+        isError: true,
+      });
     });
   });
 
@@ -898,6 +1012,33 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemComment));
     });
 
+    it("should resolve all email mentions and preserve unresolved Markdown mentions as visible text", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-one" }] }) })
+        .mockResolvedValueOnce({ ok: false, status: 404, text: () => Promise.resolve("Not Found") })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-two" }] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({
+        action: "add",
+        project: "Contoso",
+        workItemId: 299,
+        text: "Hello @<one@example.com>, @<missing@example.com>, and @<two@example.com>",
+      });
+
+      expect(JSON.parse(mockFetch.mock.calls[3][1].body)).toEqual({ text: "Hello @<guid-one>, @&lt;missing@example.com&gt;, and @<guid-two>" });
+    });
+
     it("should call Add Work Item Comments API with format=1 when format is Html", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -913,6 +1054,48 @@ describe("configureWorkItemTools", () => {
       await handler({ action: "add", text: "hello world!", project: "Contoso", workItemId: 299, format: "Html" });
 
       expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/contoso/Contoso/_apis/wit/workItems/299/comments?format=1&api-version=7.2-preview.4", expect.objectContaining({ method: "POST" }));
+    });
+
+    it("should use HTML mention syntax when the comment format is Html", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-one", providerDisplayName: `Jane & <Doe> "Admin" O'Neil` }] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({ action: "add", text: "Hello @<jane@example.com>", project: "Contoso", workItemId: 299, format: "Html" });
+
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({
+        text: 'Hello <a href="#" data-vss-mention="version:2.0,guid-one">@Jane &amp; &lt;Doe&gt; &quot;Admin&quot; O&#39;Neil</a>',
+      });
+    });
+
+    it("should preserve unresolved email mentions as visible text when the comment format is Html", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({ action: "add", text: "Hello @<missing@example.com>", project: "Contoso", workItemId: 299, format: "Html" });
+
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({ text: "Hello @&lt;missing@example.com&gt;" });
     });
 
     it("should handle fetch failure response", async () => {
@@ -1049,6 +1232,33 @@ describe("configureWorkItemTools", () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.text).toBe("Updated comment text");
+    });
+
+    it("should resolve repeated email mentions before updating a comment", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_comment_write");
+      if (!call) throw new Error("wit_work_item_comment_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: [{ id: "guid-one" }] }) })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(JSON.stringify(_mockWorkItemComment)) });
+      global.fetch = mockFetch;
+
+      await handler({
+        action: "update",
+        project: "Contoso",
+        workItemId: 299,
+        commentId: 1,
+        text: "@<one@example.com> follow up with @<one@example.com>",
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({ text: "@<guid-one> follow up with @<guid-one>" });
     });
 
     it("should handle update work item comment failure", async () => {
