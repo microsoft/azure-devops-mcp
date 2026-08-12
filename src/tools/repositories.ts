@@ -290,7 +290,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                     changedFilesSummary: {
                       changeEntries: changes?.changeEntries ?? [],
                       fileCount: changes?.changeEntries?.length ?? 0,
-                      firstComparingIteration: latestIteration.id,
+                      firstComparingIteration: Math.max(0, latestIteration.id - 1),
                       secondComparingIteration: latestIteration.id,
                       nextSkip: changes?.nextSkip,
                       nextTop: changes?.nextTop,
