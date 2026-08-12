@@ -57,6 +57,7 @@ function trimPullRequestThread(thread: GitPullRequestCommentThread) {
     status: thread.status,
     comments: trimComments(thread.comments),
     threadContext: thread.threadContext,
+    pullRequestThreadContext: thread.pullRequestThreadContext,
   };
 }
 
@@ -289,6 +290,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                     changedFilesSummary: {
                       changeEntries: changes?.changeEntries ?? [],
                       fileCount: changes?.changeEntries?.length ?? 0,
+                      firstComparingIteration: latestIteration.id,
+                      secondComparingIteration: latestIteration.id,
                       nextSkip: changes?.nextSkip,
                       nextTop: changes?.nextTop,
                     },
@@ -935,8 +938,28 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       rightFileStartOffset: z.number().optional().describe("Start character offset in the right file. Used for create."),
       rightFileEndLine: z.number().optional().describe("End line in the right file. Used for create."),
       rightFileEndOffset: z.number().optional().describe("End character offset in the right file. Used for create."),
+      changeTrackingId: z.coerce.number().int().min(1).optional().describe("The file change tracking ID from the pull request iteration changes. Used for create."),
+      firstComparingIteration: z.coerce.number().int().min(0).optional().describe("The iteration on the left side of the diff. Used for create."),
+      secondComparingIteration: z.coerce.number().int().min(1).optional().describe("The iteration on the right side of the diff. Used for create."),
     },
-    async ({ action, repositoryId, pullRequestId, project, threadId, content, status, filePath, fullResponse, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
+    async ({
+      action,
+      repositoryId,
+      pullRequestId,
+      project,
+      threadId,
+      content,
+      status,
+      filePath,
+      fullResponse,
+      rightFileStartLine,
+      rightFileStartOffset,
+      rightFileEndLine,
+      rightFileEndOffset,
+      changeTrackingId,
+      firstComparingIteration,
+      secondComparingIteration,
+    }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -987,8 +1010,21 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             }
           }
 
+          const iterationContextValues = [changeTrackingId, firstComparingIteration, secondComparingIteration];
+          if (iterationContextValues.some((value) => value !== undefined) && iterationContextValues.some((value) => value === undefined)) {
+            return {
+              content: [{ type: "text", text: "changeTrackingId, firstComparingIteration, and secondComparingIteration must all be specified together." }],
+              isError: true,
+            };
+          }
+
+          const pullRequestThreadContext =
+            changeTrackingId !== undefined && firstComparingIteration !== undefined && secondComparingIteration !== undefined
+              ? { changeTrackingId, iterationContext: { firstComparingIteration, secondComparingIteration } }
+              : undefined;
+
           const thread = await gitApi.createThread(
-            { comments: [{ content, commentType: 1 }], threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
+            { comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
             repositoryId,
             pullRequestId,
             project

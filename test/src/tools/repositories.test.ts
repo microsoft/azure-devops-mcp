@@ -4259,6 +4259,8 @@ describe("repos tools", () => {
       expect(resultData.changedFilesSummary).toEqual({
         changeEntries: mockChangeEntries,
         fileCount: 2,
+        firstComparingIteration: 2,
+        secondComparingIteration: 2,
       });
     });
 
@@ -4383,7 +4385,12 @@ describe("repos tools", () => {
 
       const resultData = JSON.parse(result.content[0].text);
       expect(resultData.labelSummary).toEqual({ labels: ["bug"], labelCount: 1 });
-      expect(resultData.changedFilesSummary).toEqual({ changeEntries: mockChangeEntries, fileCount: 1 });
+      expect(resultData.changedFilesSummary).toEqual({
+        changeEntries: mockChangeEntries,
+        fileCount: 1,
+        firstComparingIteration: 1,
+        secondComparingIteration: 1,
+      });
     });
   });
 
@@ -4534,6 +4541,67 @@ describe("repos tools", () => {
       );
 
       expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
+    });
+
+    it("should create pull request thread with iteration context", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      const mockThread = { id: 123 };
+      mockGitApi.createThread.mockResolvedValue(mockThread);
+
+      const result = await handler({
+        action: "create",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        content: "Thread on the latest diff",
+        filePath: "/src/test.ts",
+        changeTrackingId: 17,
+        firstComparingIteration: 2,
+        secondComparingIteration: 3,
+      });
+
+      expect(mockGitApi.createThread).toHaveBeenCalledWith(
+        {
+          comments: [{ content: "Thread on the latest diff", commentType: 1 }],
+          threadContext: { filePath: "/src/test.ts" },
+          pullRequestThreadContext: {
+            changeTrackingId: 17,
+            iterationContext: { firstComparingIteration: 2, secondComparingIteration: 3 },
+          },
+          status: undefined,
+        },
+        "repo123",
+        456,
+        undefined
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockThread, null, 2));
+    });
+
+    it("should reject incomplete pull request iteration context", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "create",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        content: "Thread with incomplete iteration context",
+        changeTrackingId: 17,
+      });
+
+      expect(mockGitApi.createThread).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        content: [{ type: "text", text: "changeTrackingId, firstComparingIteration, and secondComparingIteration must all be specified together." }],
+        isError: true,
+      });
     });
 
     it("should normalize file path by adding leading slash if missing", async () => {
