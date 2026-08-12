@@ -4259,7 +4259,7 @@ describe("repos tools", () => {
       expect(resultData.changedFilesSummary).toEqual({
         changeEntries: mockChangeEntries,
         fileCount: 2,
-        firstComparingIteration: 2,
+        firstComparingIteration: 1,
         secondComparingIteration: 2,
       });
     });
@@ -4388,7 +4388,7 @@ describe("repos tools", () => {
       expect(resultData.changedFilesSummary).toEqual({
         changeEntries: mockChangeEntries,
         fileCount: 1,
-        firstComparingIteration: 1,
+        firstComparingIteration: 0,
         secondComparingIteration: 1,
       });
     });
