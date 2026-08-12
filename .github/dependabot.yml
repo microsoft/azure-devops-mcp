@@ -13,3 +13,12 @@ updates:
       semver-major-days: 15
       semver-minor-days: 10
       semver-patch-days: 8
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
