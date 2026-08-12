@@ -924,6 +924,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name instead of a GUID."),
       threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply and update_status."),
       content: z.string().optional().describe("The content of the comment. Required for create and reply."),
+      parentCommentId: z.coerce.number().int().min(1).optional().describe("The ID of the parent comment. Used for reply."),
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
@@ -936,7 +937,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       rightFileEndLine: z.number().optional().describe("End line in the right file. Used for create."),
       rightFileEndOffset: z.number().optional().describe("End character offset in the right file. Used for create."),
     },
-    async ({ action, repositoryId, pullRequestId, project, threadId, content, status, filePath, fullResponse, rightFileStartLine, rightFileStartOffset, rightFileEndLine, rightFileEndOffset }) => {
+    async ({
+      action,
+      repositoryId,
+      pullRequestId,
+      project,
+      threadId,
+      content,
+      parentCommentId,
+      status,
+      filePath,
+      fullResponse,
+      rightFileStartLine,
+      rightFileStartOffset,
+      rightFileEndLine,
+      rightFileEndOffset,
+    }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -988,7 +1004,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           }
 
           const thread = await gitApi.createThread(
-            { comments: [{ content, commentType: 1 }], threadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
+            {
+              comments: [{ content, commentType: 1 }],
+              threadContext,
+              status: CommentThreadStatus[status as keyof typeof CommentThreadStatus],
+            },
             repositoryId,
             pullRequestId,
             project
@@ -1001,7 +1021,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           if (!threadId) return { content: [{ type: "text", text: "threadId is required for reply" }], isError: true };
           if (!content) return { content: [{ type: "text", text: "content is required for reply" }], isError: true };
 
-          const comment = await gitApi.createComment({ content, commentType: 1 }, repositoryId, pullRequestId, threadId, project);
+          const comment = await gitApi.createComment({ content, commentType: 1, parentCommentId }, repositoryId, pullRequestId, threadId, project);
 
           if (!comment) {
             return { content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }], isError: true };

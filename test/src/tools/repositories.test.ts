@@ -4412,6 +4412,27 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe("Comment successfully added to thread 789.");
     });
 
+    it("should reply to a parent comment", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createComment.mockResolvedValue({ id: 2, content: "Nested reply" });
+
+      await handler({
+        action: "reply",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        content: "Nested reply",
+        parentCommentId: 1,
+      });
+
+      expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Nested reply", commentType: 1, parentCommentId: 1 }, "repo123", 456, 789, undefined);
+    });
+
     it("should return full response when requested", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
