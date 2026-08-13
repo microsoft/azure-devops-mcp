@@ -1,8 +1,9 @@
-# Azure DevOps MCP Server: Example Usage
+# Examples
 
-This guide offers step-by-step examples for using the Azure DevOps MCP Server to interact with your Azure DevOps organization. For additional tips and best practices, see the [How To guide](./HOWTO.md).
+Use these example prompts to get started with the Azure DevOps MCP Server. Replace names such as `Contoso` and IDs such as `1234` with values from your organization.
 
-> 📝 These examples have been tested and validated only in English. If you encounter issues when using a different language, please open an issue in the repository so we can investigate.
+> [!NOTE]
+> These examples have been tested only in English. If you have problems using another language, [open an issue](https://github.com/microsoft/azure-devops-mcp/issues).
 
 - [Get List of Projects](#get-list-of-projects)
 - [Get List of Teams](#get-list-of-teams)
@@ -11,209 +12,200 @@ This guide offers step-by-step examples for using the Azure DevOps MCP Server to
 - [Retrieve and Edit Work Items](#retrieve-and-edit-work-items)
 - [Create and Link Test Cases](#create-and-link-test-cases)
 - [Triage Work](#triage-work)
-- [Using Markdown Format](#adding-and-updating-work-items-using-the-format-paramater)
+- [Use Markdown for Work Item Fields](#use-markdown-for-work-item-fields)
 - [Remove Links from a Work Item](#remove-one-or-more-links-from-a-work-item)
-- [Adding Artifact Links](#adding-artifact-links)
-- [Reading, Creating, and Updating Wiki Page Content](#reading-creating-and-updating-wiki-page-content)
+- [Add Artifact Links](#add-artifact-links)
+- [Read, Create, and Update Wiki Pages](#read-create-and-update-wiki-pages)
 
-## 🙋‍♂️ Projects and Teams
+## Projects and Teams
 
 ### Get List of Projects
 
-Most work item tools require project context. You can retrieve the list of projects and specify the desired project:
+**Tool:** `core_list_projects`
+
+List the projects you can access:
 
 ```text
-get list of ado projects
+List my Azure DevOps projects.
 ```
 
 ### Get List of Teams
 
-This command returns all Azure DevOps projects for the organization defined in the `mcp.json` file. Similarly, you can retrieve the team context:
+**Tool:** `core_list_project_teams`
+
+After choosing a project, list its teams:
 
 ```text
-get list of teams for project contoso
+List teams for the Contoso project.
 ```
 
-📽️ [Azure DevOps MCP Server: Get list of projects and teams](https://youtu.be/x579E4_jNtY)
-
-## 📅 Work Items
+## Work Items
 
 ### Get My Work Items
 
-Retrieve a list of work items assigned to you. This tool requires project context:
+**Tools:** `wit_work_item` with `my`, followed by `wit_work_item` with `get_batch` for details
+
+List work items assigned to you in a project:
 
 ```text
-get my work items for project contoso
+List my work items in the Contoso project.
 ```
 
-The model should automatically use the `wit_get_work_items_batch_by_ids` tool to fetch work item details.
-
-📽️ [Azure DevOps MCP Server: Get my work items](https://youtu.be/y_ri8n7mBlg)
+The `my` action returns work item references. The agent can pass those IDs to `get_batch` to retrieve work item fields.
 
 ### Get All Work Items in a Backlog
 
-You need project, team and backlog (Epics, Stories, Features) context in order to get a list of all the work items in a backlog.
+**Tools:** `wit_backlog` with `list` and `list_work_items`, followed by `wit_work_item` with `get_batch` for details
+
+First, list the backlog levels for a project and team:
 
 ```text
-get backlogs for Contoso project and Fabrikam team
+List backlog levels for the Contoso project and Fabrikam team.
 ```
 
-Once you have the backlog levels, you can then get work items for that backlog.
+Then select a backlog level and list its work items:
 
 ```text
-get list of work items for Features backlog
+List work items in the Features backlog.
 ```
 
-The model should automatically use the `wit_get_work_items_batch_by_ids` tool to fetch work item details.
-
-📽️ [Azure DevOps MCP Server: Get backlog](https://youtu.be/LouuyoscNrI)
+The `list_work_items` action requires the backlog ID returned by `list`. The agent can pass the resulting work item IDs to `get_batch` to retrieve fields.
 
 ### Retrieve and Edit Work Items
 
-Get a work item, get the work item comments, update the work item fields, and add a new comment.
+**Tools:** `wit_work_item` with `get` and `list_comments`; `wit_work_item_write` with `update`; `wit_work_item_comment_write` with `add`
+
+You can retrieve a work item and its comments, update fields, assign it, and add a comment.
 
 ```text
-Get work item 12345 and show me fields ID, Type, State, Repro Steps, Story Points, and Priority. Get all comments for the work item and summarize them for me.
+Get work item 12345. Show its ID, type, state, repro steps, story points, and priority. Summarize all comments.
 ```
 
-The model now has context of the work item. You can then update specific fields. In this case, we want the LLM to generate a better set of Repro Steps and then update the work item with those new steps. Along with updating the Story Points and State fields.
+Continue in the same conversation to update it:
 
 ```text
-Polish the Repro Steps with more information and details. Then take that value and update the work item. Also update StoryPoints = 5 and State = Active.
+Rewrite the repro steps with clearer details, then update the work item. Also set Story Points to 5 and State to Active.
 ```
 
-Assign the work item to me and add a new comment.
+You can then assign the item and add a comment:
 
 ```text
-Assign this work item to myemail@outlook.com and add a comment "I will own this Bug and get it fixed"
+Assign this work item to myemail@outlook.com and add this comment: "I will own this bug and get it fixed."
 ```
-
-📽️ [Azure DevOps MCP Server: Work with Work Items](https://youtu.be/tT7wqSIPKdA)
 
 ### Create and Link Test Cases
 
-Open a user story and automatically generate test cases with detailed steps based on the story's description. Link the generated test cases back to the original user story.
+**Tools:** `wit_work_item` with `get`; `testplan_test_case_write` with `create`
+
+Ask the agent to draft test cases from a user story and link the approved cases to it:
 
 ```text
-Open work item 1234 in 'Contoso' project. Then look at the description and create 1-3 Test Cases with test steps. But show me a preview first before creating the Test Case in Azure DevOps. Be sure to link the new Test Case to the User Story 1234 when you do.
+Open work item 1234 in the Contoso project. Draft one to three test cases based on its description. Include an action and expected result for each step. Show me a preview before creating them. After I approve, create the test cases and link them to user story 1234.
 ```
 
-📽️ [Azure DevOps MCP Server: Creating Test Cases from Work Item](https://youtu.be/G7fnYjlSh_w)
+The `create` action links each test case to the story when it receives the story ID as `testsWorkItemId`.
 
 ### Triage Work
 
-Retrieve all work items in a backlog and triage them according to your own criteria. For example, you can fetch all bugs and user stories, identify security-related bugs, and assign them to the current team iteration. Similarly, you can select a few high-priority user stories and assign them to the most recent iteration.
+**Tools:** `work` with `list_team_iterations`; `wit_backlog` with `list` and `list_work_items`; `wit_work_item` with `get_batch`; `wit_work_item_write` with `update_batch`
 
-Retrieve the team's iterations and backlog levels to provide the LLM with the necessary context for accurate work item management.
+First, retrieve the team's iterations and backlog levels:
 
 ```text
-list iterations for Contoso team
+List iterations for the Fabrikam team in the Contoso project.
 ```
 
 ```text
-list backlog levels for Contoso team
+List backlog levels for the Fabrikam team in the Contoso project.
 ```
 
-Retrieve the work items and their details, then instruct the LLM to identify security-related bugs and high-priority user stories. Assign the identified items to the current iteration and, if needed, to the next iteration.
+Then provide clear triage rules and ask for confirmation before changing work items:
 
 ```text
-List of work items for Stories backlog. But then go thru and find all the security related bugs. Assign the first 4 to the current iteration. If there are more than four, assign the rest to the next iteration. Then find 2-3 high priority user stories and assign them to the current iteration. Do it!
+List work items in the Stories backlog. Identify security-related bugs and high-priority user stories. Propose assigning the first four security bugs and up to three high-priority user stories to the current iteration, and any remaining security bugs to the next iteration. Show me the proposed changes before updating the work items.
 ```
 
-📽️ [Azure DevOps MCP Server: Triage Work](https://youtu.be/gCI_pPS76C8)
+### Use Markdown for Work Item Fields
 
-### Adding and Updating Work Items Using the `format` Parameter
+**Tool:** `wit_work_item_write`
 
-You can use the `format` parameter to indicate markdown formatting for large text fields. It is now available on the following tools:
+Markdown formatting is configured on individual values rather than as a top-level tool parameter:
 
-- **wit_update_work_items_batch**
-- **wit_add_child_work_items**
-- **wit_create_work_item**
+- `create`: set `fields[].format` to `Markdown`.
+- `update_batch`: set `batchUpdates[].format` to `Markdown`.
+- `add_child`: set `items[].format` to `Markdown`; this action defaults to Markdown.
 
-> 🚩 HTML is the default unless `Markdown` is explicitly set.
+> [!NOTE]
+> For `create` and `update_batch`, Azure DevOps treats large text fields as HTML unless you set their format to Markdown. The single-item `update` action does not expose a format option.
 
 ```text
-Update work item 12345 with a new description and use Markdown text. Use Markdown format param. Use bulk update.
+Update work item 12345 with the following description. Use Markdown format and a batch update: [description]
 ```
-
-📽️ [Azure DevOps MCP Server: Using Markdown format for create and update work items](https://youtu.be/OD4c2m7Fj9U)
 
 ### Remove One or More Links from a Work Item
 
-Use this tool to remove one or more links from a work item, either by specifying individual links or by link type.
+**Tools:** `wit_work_item` with `get` and `expand: Relations`; `wit_work_item_link_write` with `unlink`
 
-First, retrieve the work item whose links you want to remove:
-
-```text
-Get work item 1234 in Contoso project and show me the relations
-```
-
-Next, remove a specific link to a work item, pull request, etc. or remove links by type (for example, "related"):
+First, retrieve the work item and inspect its links:
 
 ```text
-Remove link 5678 and 91011 from work item 1234. Also remove any related links and links to pull request 121314
+Get work item 1234 in the Contoso project and show its links.
 ```
 
-### 🔗 Adding Artifact Links
-
-### Add Artifact Links to Work Items
-
-Use this tool to associate work items with repository artifacts such as branches, commits, and pull requests.
-
-You have two options for linking artifacts:
-
-Supply the complete artifact `vstfs` URI in the required format. For example:
-
-**Branch**:
-`vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName}`
-
-**Commit**:
-`vstfs:///Git/Commit/{projectId}%2F{repositoryId}%2F{commitId}`
-
-**Pull Request**:
-`vstfs:///Git/PullRequestId/{projectId}%2F{repositoryId}%2F{pullRequestId}`
+The `unlink` action accepts one relation type and, optionally, one exact relation URL per call. Without a URL, it removes every relation of that type. Use separate calls for different relation types:
 
 ```text
-Add a branch artifact link to work item 1234 in project "Contoso" with URI "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain" and link type "Branch" with comment "Linked to main branch for GitHub Copilot integration"
+Remove all links with type `related` from work item 1234. Then remove the link with type `artifact` whose exact relation URL points to pull request 121314. Use a separate unlink operation for each type.
 ```
 
-Alternatively, you can simply provide the branch, commit, pull request, or build identifiers directly, and the tool will automatically construct the required artifact URI for you.
+### Add Artifact Links
+
+**Tools:** `repo_repository` with `get`; `repo_pull_request` with `list`; `wit_work_item_link_write` with `link_to_pull_request` or `add_artifact_link`
+
+The dedicated `link_to_pull_request` action requires the project GUID, repository GUID, pull request ID, and work item ID. Pull request results include the project and repository names, so retrieve the repository details to resolve both GUIDs before linking:
+
+```text
+Get the Fabrikam repository in the Contoso project, then list its pull requests. Link the first pull request to work item 12345 using the project and repository GUIDs from the repository details.
+```
+
+Use `add_artifact_link` for branches, commits, pull requests, builds, and wiki pages. Provide the artifact components or a complete `vstfs` URI. These are the Git artifact URI formats:
+
+- Branch: `vstfs:///Git/Ref/{projectId}%2F{repositoryId}%2FGB{branchName}`
+- Fixed in Commit: `vstfs:///Git/Commit/{projectId}%2F{repositoryId}%2F{commitId}`
+- Pull request: `vstfs:///Git/PullRequestId/{projectId}%2F{repositoryId}%2F{pullRequestId}`
 
 For example:
 
 ```text
-Get me the list of pull requests for Constoso project and Frabrikam repo. Then link the first pull request to work item 12345.
+Add a branch artifact link to work item 1234 in the Contoso project. Use URI "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain", link type "Branch", and comment "Linked to main branch for GitHub Copilot integration."
 ```
 
-📽️ [Azure Devops MCP Server: Adding artifact links](https://youtu.be/t8HqEt8cZtY)
+## Wiki
 
-## 📖 Wiki
+### Read, Create, and Update Wiki Pages
 
-### Reading, Creating, and Updating Wiki Page Content
+**Tools:** `wiki` with `list_wikis`, `list_pages`, and `get_page_content`; `wiki_upsert_page` to create or update a page
 
-You can read, create, and update wiki pages in Azure DevOps. Follow these steps:
-
-1. Retrieve the list of wikis in your project.
-2. Get the pages available in a specific wiki.
-3. Read the content of an existing wiki page.
-4. Update the content of a wiki page or create a new page.
+You can complete the whole workflow in one prompt:
 
 ```text
-Get list of wikis in project Contoso.
+List wikis in the Contoso project. In the Fabrikam wiki, list the pages and get the content of 'sample-page-name'. Suggest improvements and show me a preview before updating the page.
 ```
 
+You can also perform each step separately:
+
 ```text
-Get list of pages for Fabrikam wiki.
+List wikis in the Contoso project.
 ```
 
 ```text
-Get wiki page 'sample-page-name' content. Review and suggest improvements, then update the page with the revised content.
+List pages in the Fabrikam wiki.
 ```
 
 ```text
-Create new wiki page called 'how to bake a cake' and add the following content:
-
-<content>
+Get the content of 'sample-page-name' in the Fabrikam wiki.
 ```
 
-📽️ [Azure Devops MCP Server: Reading, creating, and updating wiki pages](https://youtu.be/z_WQ_QefpGU)
+```text
+Create a wiki page at '/How-to-bake-a-cake' in the Fabrikam wiki in the Contoso project with this content: [content]
+```

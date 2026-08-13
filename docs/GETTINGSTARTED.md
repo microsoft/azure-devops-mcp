@@ -1,51 +1,45 @@
-# 🚀 Getting Started with Azure DevOps MCP Server
+# Getting Started
 
-This guide will help you get started with the Azure DevOps MCP Server in different environments.
+This guide explains how to run the local Azure DevOps MCP Server with supported MCP clients. For the simplest setup, use the hosted [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server).
 
-- [Prerequisites](#-prerequisites)
-- [Authentication Methods](#-authentication-methods)
-- [Getting started with Visual Studio Code & GitHub Copilot](#️-visual-studio-code--github-copilot)
-- [Getting started with Visual Studio 2022 & GitHub Copilot](#%EF%B8%8F-visual-studio-2022--github-copilot)
-- [Getting started with GitHub Copilot CLI](#-using-mcp-server-with-github-copilot-cli)
-- [Getting started with Codex](#-using-mcp-server-with-codex)
-- [Getting started with Claude Code](#-using-mcp-server-with-claude-code)
-- [Getting started with Claude Desktop](#️-using-mcp-server-with-claude-desktop)
-- [Getting started with Cursor](#-using-mcp-server-with-cursor)
-- [Getting started with Opencode](#-using-mcp-server-with-opencode)
-- [Getting started with Kilocode](#-using-mcp-server-with-kilocode)
-- [Optimizing Your Experience](#-optimizing-your-experience)
+- [Prerequisites](#prerequisites)
+- [Authentication](#authentication)
+- [Visual Studio Code](#visual-studio-code)
+- [Visual Studio](#visual-studio)
+- [GitHub Copilot CLI](#github-copilot-cli)
+- [Codex](#codex)
+- [Claude Code](#claude-code)
+- [Claude Desktop](#claude-desktop)
+- [Cursor](#cursor)
+- [OpenCode](#opencode)
+- [Kilo Code](#kilo-code)
+- [Run from Source](#run-from-source)
 
-## 🕐 Prerequisites
+## Prerequisites
 
-For the best experience, use Visual Studio Code and GitHub Copilot.
+All local setups require:
 
-Before you begin, make sure you have:
+1. [Node.js 20 or later](https://nodejs.org/en/download).
+2. Access to an Azure DevOps organization.
+3. An MCP client listed below.
 
-### For Visual Studio Code
+Visual Studio Code users need [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders). Visual Studio users need [Visual Studio 2022 version 17.14 or later](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history).
 
-1. Install [VS Code](https://code.visualstudio.com/download) or [VS Code Insiders](https://code.visualstudio.com/insiders)
-2. Install [Node.js](https://nodejs.org/en/download) 20+
-3. Open VS Code in an empty folder
+## Authentication
 
-### For Visual Studio 2022
+Interactive authentication is the default. To use another method, add `--authentication <value>` or `-a <value>` to the server arguments.
 
-1. Install [VS Studio 2022 version 17.14](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history) or later
-2. Open a project in Visual Studio
+| Method                   | Value         | Required setup             |
+| ------------------------ | ------------- | -------------------------- |
+| Interactive (default)    | `interactive` | Microsoft account sign-in  |
+| Azure CLI                | `azcli`       | Active `az login` session  |
+| Azure credential chain   | `env`         | Azure Identity environment |
+| Bearer token environment | `envvar`      | `ADO_MCP_AUTH_TOKEN`       |
+| Personal Access Token    | `pat`         | `PERSONAL_ACCESS_TOKEN`    |
 
-## 🔐 Authentication Methods
+### Interactive
 
-The Azure DevOps MCP Server supports several authentication methods. Pass the desired method via the `--authentication` (`-a`) flag in your `mcp.json` configuration.
-
-| Method                        | Flag value    | Environment variable    | Best for                                              |
-| ----------------------------- | ------------- | ----------------------- | ----------------------------------------------------- |
-| Interactive (default)         | `interactive` | —                       | Local development, first-time setup                   |
-| Azure CLI                     | `azcli`       | —                       | Workstations already signed in with `az login`        |
-| Environment variable (bearer) | `envvar`      | `ADO_MCP_AUTH_TOKEN`    | CI/CD, automation                                     |
-| Personal Access Token         | `pat`         | `PERSONAL_ACCESS_TOKEN` | CI/CD, service accounts, non-interactive environments |
-
-### 🔵 Interactive (Default)
-
-Opens a browser window for Microsoft account login. No extra configuration needed — this is the default when `--authentication` is omitted.
+This method opens a browser for Microsoft account sign-in. Omit the authentication argument to use it:
 
 ```json
 {
@@ -59,7 +53,7 @@ Opens a browser window for Microsoft account login. No extra configuration neede
 }
 ```
 
-### 🟢 Azure CLI (`azcli`)
+### Azure CLI
 
 Uses the token from an active `az login` session. Requires the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) to be installed and signed in.
 
@@ -75,86 +69,41 @@ Uses the token from an active `az login` session. Requires the [Azure CLI](https
 }
 ```
 
-### 🟡 Environment Variable — Bearer Token (`envvar`)
+### Azure Credential Chain
 
-Reads a raw bearer token from the `ADO_MCP_AUTH_TOKEN` environment variable. Useful when another tool or pipeline injects the token at runtime.
-
-1. Set the environment variable:
-
-   ```bash
-   export ADO_MCP_AUTH_TOKEN="<your-azure-devops-bearer-token>"
-   ```
-
-2. Configure `.vscode/mcp.json`:
-
-   ```json
-   {
-     "inputs": [
-       {
-         "id": "ado_org",
-         "type": "promptString",
-         "description": "Azure DevOps organization name (e.g. 'contoso')"
-       }
-     ],
-     "servers": {
-       "ado": {
-         "type": "stdio",
-         "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
-       }
-     }
-   }
-   ```
-
-### 🔑 Personal Access Token (`pat`)
-
-Authenticates using an Azure DevOps [Personal Access Token (PAT)](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate). The token must be stored in the `PERSONAL_ACCESS_TOKEN` environment variable as a **base64-encoded** string.
-
-#### PAT format
-
-The value stored in `PERSONAL_ACCESS_TOKEN` must be the base64 encoding of `<email>:<pat>`, where `<email>` is any non-empty string (the Azure DevOps API only uses the token portion) and `<pat>` is the raw PAT you copied from Azure DevOps.
-
-#### `.vscode/mcp.json` configuration
+Use `env` to authenticate through `DefaultAzureCredential`. Configure a supported Azure Identity credential, then use this argument list:
 
 ```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "pat"],
-      "env": {
-        "PERSONAL_ACCESS_TOKEN": "<base64encoded email:pat>"
-      }
-    }
-  }
-}
+["-y", "@azure-devops/mcp", "<your-org>", "--authentication", "env"]
 ```
 
-> **Security note:** Avoid hard-coding the PAT value directly in `mcp.json` when committing to source control. Prefer injecting it via an environment variable set outside the config file, or use a secrets manager.
+### Bearer Token Environment Variable
 
-## 🍕 Installation Options
+Use `envvar` to read a bearer token from `ADO_MCP_AUTH_TOKEN`. Set the variable in the environment that starts your MCP client, then add `"--authentication", "envvar"` to the server arguments.
 
-### ➡️ Visual Studio Code & GitHub Copilot
+```bash
+export ADO_MCP_AUTH_TOKEN="<bearer-token>"
+```
 
-For the best experience, use Visual Studio Code and GitHub Copilot.
+### Personal Access Token
 
-#### 🧨 Install from Public Feed (Recommended)
+Use `pat` to authenticate with an Azure DevOps [Personal Access Token](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate). `PERSONAL_ACCESS_TOKEN` must contain the base64 encoding of `<email>:<pat>`. The email can be any non-empty value.
 
-This installation method is the easiest for all users of Visual Studio Code.
+For example:
 
-🎥 [Watch this quick start video to get up and running in under two minutes!](https://youtu.be/EUmFM6qXoYk)
+```bash
+export PERSONAL_ACCESS_TOKEN="$(printf '%s' '<email>:<pat>' | base64)"
+```
 
-##### Steps
+Then add `"--authentication", "pat"` to the server arguments.
 
-In your project, add a `.vscode\mcp.json` file with the following content:
+> [!IMPORTANT]
+> Do not commit tokens to an MCP configuration file. Set them outside the file or use a secrets manager.
+
+## Visual Studio Code
+
+1. Create `.vscode/mcp.json` in your project.
+2. Add this configuration:
 
 ```json
 {
@@ -175,117 +124,20 @@ In your project, add a `.vscode\mcp.json` file with the following content:
 }
 ```
 
-Save the file, then click 'Start'.
+3. Save the file and start `ado` from the MCP view.
+4. Open GitHub Copilot Chat and switch to [Agent mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
+5. Select the Azure DevOps tools and try `List ADO projects`.
+6. Sign in with an account that can access the selected organization.
 
-![start mcp server](../docs/media/start-mcp-server.gif)
+> [!NOTE]
+> VS Code's Agent Host does not support MCP configurations that require `${input:...}` prompts. If you use Agent Host, replace `${input:ado_org}` with your organization name or move the configuration to a workspace `.mcp.json` file.
 
-In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
+## Visual Studio
 
-Click "Select Tools" and choose the available tools.
+Use Visual Studio 2022 version 17.14 or later, or Visual Studio 2026.
 
-![configure mcp server tools](../docs/media/configure-mcp-server-tools.gif)
-
-> 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
-
-##### Start using it
-
-1. Open GitHub Copilot in VS Code and switch to Agent mode.
-2. Start the Azure DevOps MCP Server.
-3. The server appears in the tools list.
-4. Try prompts like "List ADO projects".
-
-##### Using Token Authentication via Environment Variables
-
-For automated scenarios or when you want to use a token stored in an environment variable, you can use the `envvar` authentication type:
-
-1. **Set your token in the ADO_MCP_AUTH_TOKEN environment variable:**
-
-   ```bash
-   export ADO_MCP_AUTH_TOKEN="your-azure-devops-token"
-   ```
-
-2. **Update your `.vscode/mcp.json` to use token authentication:**
-   ```json
-   {
-     "inputs": [
-       {
-         "id": "ado_org",
-         "type": "promptString",
-         "description": "Azure DevOps organization name (e.g. 'contoso')"
-       }
-     ],
-     "servers": {
-       "ado": {
-         "type": "stdio",
-         "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
-       }
-     }
-   }
-   ```
-
-This approach is particularly useful for CI/pipeline scenarios or when you want to avoid interactive authentication and use another credential source.
-
-#### 🛠️ Install from Source (Dev Mode)
-
-This installation method is recommended for advanced users and contributors who want immediate access to the latest updates from the main branch. It is ideal if you are developing new tools, enhancing existing features, or maintaining a custom fork.
-
-> **Note:** For most users, installing from the public feed is simpler and preferred. Use the source installation only if you need the latest changes or are actively contributing to the project.
-
-##### Steps
-
-Clone the repository.
-
-Install dependencies:
-
-```sh
-npm install
-```
-
-Edit or add `.vscode/mcp.json`:
-
-```json
-{
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization's name  (e.g. 'contoso')"
-    }
-  ],
-  "servers": {
-    "ado": {
-      "type": "stdio",
-      "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}"]
-    }
-  }
-}
-```
-
-Start the Azure DevOps MCP Server.
-
-![start mcp server](../docs/media/start-mcp-server.gif)
-
-In chat, switch to [Agent Mode](https://code.visualstudio.com/blogs/2025/02/24/introducing-copilot-agent-mode).
-
-Click "Select Tools" and choose the available tools.
-
-![configure mcp server tools](../docs/media/configure-mcp-server-tools.gif)
-
-> 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will help you get the best experience using the Azure DevOps MCP Server in GitHub Copilot Chat.
-
-### ➡️ Visual Studio 2022 & GitHub Copilot
-
-#### 🧨 Install from Public Feed (Recommended)
-
-This installation method is the easiest for all users of Visual Studio 2022.
-
-🎥 [Watch this quick start video to get up and running in under two minutes!](https://youtu.be/nz_Gn-WL7j0)
-
-##### Steps
-
-Add a `.mcp.json` file to the solution folder with the following content:
+1. Create `.mcp.json` in the solution folder.
+2. Add this configuration:
 
 ```json
 {
@@ -306,32 +158,13 @@ Add a `.mcp.json` file to the solution folder with the following content:
 }
 ```
 
-Save the file.
+3. Save the file and enter your organization name when prompted.
+4. Open Copilot Chat and select **Agent** from the mode selector.
+5. Open the tool picker, select the `ado` tools, and try `List ADO projects`.
 
-Add your organization name by clicking on the `input` option.
+See the [Visual Studio MCP server documentation](https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers?view=vs-2022) for more details.
 
-![start mcp server from visual studio 2022](../docs/media/start-mcp-server-from-vs.png)
-
-Open Copilot chat and switch to [Agent Mode](https://learn.microsoft.com/en-us/visualstudio/ide/copilot-agent-mode?view=vs-2022).
-
-Click the "Tools" icon and choose the available tools.
-
-![set tools to use in visual studio 2022](../docs/media/set-tools-from-vs.png)
-
-> 💥 We strongly recommend creating a `.github\copilot-instructions.md` in your project and copying the contents from this [copilot-instructions.md](../.github/copilot-instructions.md) file. This will enhance your experience using the Azure DevOps MCP Server with GitHub Copilot Chat.
-
-##### Start using it
-
-> _Prerequisites:_ Visual Studio 2022 v17.14+, Agent mode enabled in Tools > Options > GitHub > Copilot > Copilot Chat.
-
-1. Switch to Agent mode in the Copilot Chat window.
-2. Enter your Azure DevOps organization name.
-3. Select desired `ado` tools.
-4. Try prompts like "List ADO projects".
-
-For more details, see [Visual Studio MCP Servers documentation](https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers?view=vs-2022) and the [Getting Started Video](https://www.youtube.com/watch?v=oPFecZHBCkg).
-
-### 💻 Using MCP Server with GitHub Copilot CLI
+## GitHub Copilot CLI
 
 Use the Copilot CLI to interactively add the MCP server:
 
@@ -357,11 +190,11 @@ Replace `{Contoso}` with your Azure DevOps organization name.
 
 For more information, see the [Copilot CLI documentation](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli).
 
-### 🤖 Using MCP Server with Codex
+## Codex
 
 Codex can run the Azure DevOps MCP Server as a local stdio MCP server from either the Codex CLI or IDE extension. The configuration is shared through `~/.codex/config.toml`.
 
-#### Interactive authentication
+### Interactive Authentication
 
 For local development, start with the default interactive authentication flow:
 
@@ -379,7 +212,7 @@ codex mcp list
 
 On first use of an Azure DevOps tool, the MCP server opens a browser window for Microsoft account sign-in. Use an account that has access to the selected Azure DevOps organization.
 
-#### Azure CLI authentication
+### Azure CLI Authentication
 
 If your workstation already uses Azure CLI sign-in, authenticate first and configure the MCP server with `azcli`:
 
@@ -388,7 +221,7 @@ az login
 codex mcp add azure-devops -- npx -y @azure-devops/mcp Contoso --authentication azcli
 ```
 
-#### Manual `config.toml` configuration
+### Manual Configuration
 
 You can also edit `~/.codex/config.toml` directly:
 
@@ -400,25 +233,26 @@ args = ["-y", "@azure-devops/mcp", "Contoso"]
 
 Restart Codex after editing the config manually, then ask for a simple read-only operation such as `List ADO projects`.
 
-### 🤖 Using MCP Server with Claude Code
+## Claude Code
 
-See https://docs.anthropic.com/en/docs/claude-code/mcp for general guidance on adding MCP Server to Claude Code experience.
+See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for general guidance.
 
 For the Azure DevOps MCP Server, use the following command:
 
 ```bash
-claude mcp add azure-devops -- npx -y @azure-devops/mcp Contoso
+claude mcp add --transport stdio azure-devops -- npx -y @azure-devops/mcp Contoso
 ```
 
-Replace `Contoso` with your own organization name
+Replace `Contoso` with your organization name, then verify the connection:
 
-### ✴️ Using MCP Server with Claude Desktop
+```bash
+claude mcp list
+```
 
-Open Claude Desktop and navigate to **File > Settings > Developer**. Click **Edit Config**.
+## Claude Desktop
 
-![Configuring MCP servers in Claude Desktop](../docs/media/claude-desktop-getting-started-1.png)
-
-Open the configuration file in your preferred editor (e.g., VS Code) and add the following JSON:
+1. Open **File > Settings > Developer** in Claude Desktop.
+2. Select **Edit Config** and add this configuration:
 
 ```json
 {
@@ -431,19 +265,14 @@ Open the configuration file in your preferred editor (e.g., VS Code) and add the
 }
 ```
 
-Replace `{Contoso}` with your Azure DevOps organization name. Save the file and perform a hard restart of the Claude app.
-
-Start a new chat, then click the **Search and Tools** icon. The `ado` toolset should now be available.
-
-![ADO tools in Claude Desktop](../docs/media/claude-desktop-getting-started-2.png)
-
-You’re ready to start using the Azure DevOps MCP Server in Claude Desktop. Try a simple request such as: `get list of ado projects`.
+3. Replace `{Contoso}` with your organization name, save the file, completely quit Claude Desktop, and restart it.
+4. Start a chat, select **Add files, connectors, and more > Connectors**, confirm that `ado` is available, and try `List ADO projects`.
 
 For additional guidance on Claude Desktop, see the [Quickstart](https://modelcontextprotocol.io/quickstart/user#installing-the-filesystem-server).
 
-### 🍇 Using MCP Server with Cursor
+## Cursor
 
-To integrate the Azure DevOps MCP Server with Cursor, create a `.cursor\mcp.json` file and add your Azure DevOps organization to the `mcpServers` list.
+Create `.cursor/mcp.json` in your project and add:
 
 ```json
 {
@@ -456,35 +285,15 @@ To integrate the Azure DevOps MCP Server with Cursor, create a `.cursor\mcp.json
 }
 ```
 
-Replace `{Contoso}` with your actual Azure DevOps organization name.
+Replace `{Contoso}` with your organization name and save the file. Open **Cursor Settings > Tools & Integrations**, confirm that the `ado` MCP server is enabled, and use its tools in Agent chat.
 
-Save the file, and when Cursor detects the MCP Server, click **Enable**.
+See the [Cursor MCP documentation](https://cursor.com/docs/context/mcp) for global configuration and server management options.
 
-![enable mcp server from cursor](../docs/media/enable-mcp-server-from-cursor.png)
+## OpenCode
 
-#### Start the Azure DevOps MCP Server
+Add the Azure DevOps MCP server to your OpenCode configuration file.
 
-Open the terminal and start the MCP Server with:
-
-```bash
-npx -y @azure-devops/mcp {Contoso}
-```
-
-Replace `Contoso` with your Azure DevOps organization.
-
-You can now use the Azure DevOps MCP Server tools directly in chat.
-
-📽️ [Azure DevOps MCP Server: Getting started with Cursor](https://youtu.be/550VPTnjYRg)
-
-### 🟢 Using MCP Server with Opencode
-
-Add the Azure DevOps MCP server to your Opencode config file.
-
-**Config file location:**
-
-- macOS / Linux: `~/.config/opencode/opencode.json`
-
-Add the `azure-devops` entry under the `mcp` key:
+On macOS or Linux, edit `~/.config/opencode/opencode.json` and add the `azure-devops` entry under `mcp`:
 
 ```json
 {
@@ -499,28 +308,29 @@ Add the `azure-devops` entry under the `mcp` key:
 }
 ```
 
-Replace `<your-org>` with your Azure DevOps organization name (e.g. `contoso`).
+Replace `<your-org>` with your Azure DevOps organization name.
 
-> **Note:** On first use, Opencode will trigger browser-based Microsoft account login.
+> [!NOTE]
+> OpenCode starts the interactive Microsoft account sign-in on first use.
 
 > **Tip:** Limit loaded tools using domain filtering by appending `-d` flags to the command:
 >
 > ```json
-> "command": ["npx", "-y", "@azure-devops/mcp", "<your-org>", "-d", "core", "work", "work-items"]
+> ["npx", "-y", "@azure-devops/mcp", "<your-org>", "-d", "core", "work", "work-items"]
 > ```
 >
 > Available domains: `core`, `work`, `work-items`, `repositories`, `wiki`, `pipelines`, `search`, `test-plans`, `advanced-security`
 
-For more on Opencode MCP configuration, see the [Opencode MCP docs](https://opencode.ai/docs/mcp-servers/).
+For more on OpenCode MCP configuration, see the [OpenCode MCP documentation](https://opencode.ai/docs/mcp-servers/).
 
-### ⬛ Using MCP Server with Kilocode
+## Kilo Code
 
-Kilocode supports MCP servers at two levels — **global** (all workspaces) or **project** (repo-specific).
+Kilo Code supports global configuration for all workspaces and project configuration for one repository.
 
-#### Option A — Global config
+### Global Configuration
 
-1. Open the Kilocode pane → click the ⚙️ icon → **Agent Behaviour** → **MCP Servers**
-2. Click **Edit Global MCP** to open `mcp_settings.json`
+1. Open **Agent Behaviour > MCP Servers** in the Kilo Code pane.
+2. Select **Edit Global MCP** to open `mcp_settings.json`.
 3. Add the `azure-devops` entry:
 
 ```json
@@ -534,12 +344,12 @@ Kilocode supports MCP servers at two levels — **global** (all workspaces) or *
 }
 ```
 
-#### Option B — Project config
+### Project Configuration
 
 Create `.kilocode/mcp.json` in your project root with the same content as above. This file can be committed to version control to share the setup with your team.
 
-> **Windows users:** Wrap the command for the Windows Command Prompt:
->
+For Windows Command Prompt, wrap the `npx` command:
+
 > ```json
 > {
 >   "mcpServers": {
@@ -553,4 +363,39 @@ Create `.kilocode/mcp.json` in your project root with the same content as above.
 
 Replace `<your-org>` with your Azure DevOps organization name. On first use, a browser window will open for Microsoft account login.
 
-For more on Kilocode MCP configuration, see the [Kilocode MCP docs](https://kilo.ai/docs/automate/mcp/using-in-kilo-code).
+For more on Kilo Code MCP configuration, see the [Kilo Code MCP documentation](https://kilo.ai/docs/automate/mcp/using-in-kilo-code).
+
+## Run from Source
+
+Use the npm package unless you are developing the server or testing an unreleased change.
+
+1. Clone this repository.
+2. Install dependencies and build the server:
+
+   ```bash
+   npm install
+   npm run build
+   ```
+
+3. Configure your MCP client to run the built entry point. For VS Code, use:
+
+   ```json
+   {
+     "inputs": [
+       {
+         "id": "ado_org",
+         "type": "promptString",
+         "description": "Azure DevOps organization name (e.g. 'contoso')"
+       }
+     ],
+     "servers": {
+       "ado": {
+         "type": "stdio",
+         "command": "node",
+         "args": ["${workspaceFolder}/dist/index.js", "${input:ado_org}"]
+       }
+     }
+   }
+   ```
+
+4. Start the server from the MCP view and select its tools in Agent mode.
