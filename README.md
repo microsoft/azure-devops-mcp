@@ -98,8 +98,6 @@ These steps use Visual Studio Code and GitHub Copilot. For other supported clien
 
 #### Install from npm
 
-🎥 [Watch this quick start video to get up and running in under two minutes!](https://youtu.be/EUmFM6qXoYk)
-
 1. Create `.vscode/mcp.json` in your project.
 2. Add this configuration:
 
