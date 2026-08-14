@@ -2,7 +2,6 @@
 
 ## Supporting material
 
-- [How to guide](./docs/HOWTO.md)
 - [Troubleshooting](./docs/TROUBLESHOOTING.md)
 
 ## Security Related
