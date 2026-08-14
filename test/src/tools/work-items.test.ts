@@ -3290,13 +3290,58 @@ describe("configureWorkItemTools", () => {
           body: expect.stringContaining("multilineFieldsFormat/System.Description"),
         })
       );
+    });
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://dev.azure.com/contoso/_apis/wit/$batch?api-version=5.0",
-        expect.objectContaining({
-          body: expect.stringContaining("multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps"),
-        })
+    it("should use repro steps for Bug child work items", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ responses: [{ body: { id: 123 } }] }),
+      });
+      global.fetch = mockFetch;
+
+      await handler({
+        action: "add_child",
+        parentId: 1,
+        project: "TestProject",
+        workItemType: "Bug",
+        items: [
+          {
+            title: "Markdown Bug",
+            description: "Bug repro steps in **Markdown**",
+            format: "Markdown",
+          },
+          {
+            title: "HTML Bug",
+            description: "<p>Bug repro steps in HTML</p>",
+            format: "Html",
+          },
+        ],
+      });
+
+      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+
+      expect(requestBody[0].body).toEqual(
+        expect.arrayContaining([
+          { op: "add", path: "/fields/Microsoft.VSTS.TCM.ReproSteps", value: "Bug repro steps in **Markdown**" },
+          { op: "add", path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps", value: "Markdown" },
+        ])
       );
+      expect(requestBody[1].body).toContainEqual({
+        op: "add",
+        path: "/fields/Microsoft.VSTS.TCM.ReproSteps",
+        value: "<p>Bug repro steps in HTML</p>",
+      });
+      expect(requestBody[1].body).not.toContainEqual(expect.objectContaining({ path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps" }));
+      expect(mockFetch.mock.calls[0][1].body).not.toContain("System.Description");
     });
 
     it("should handle fetch failure response", async () => {
