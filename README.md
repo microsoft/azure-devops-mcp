@@ -214,6 +214,10 @@ Read the [Contributions Guide](./CONTRIBUTING.md) before creating a pull request
 This project follows the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For questions, see the [FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [open@microsoft.com](mailto:open@microsoft.com).
 
+## Project Stats
+
+[![Star History Chart](https://star-history.dera.page/svg?repos=microsoft/azure-devops-mcp&type=Date)](https://star-history.dera.page/#microsoft/azure-devops-mcp&type=Date)
+
 ## Hall of Fame
 
 Thanks to all contributors who make this project awesome! ❤️
