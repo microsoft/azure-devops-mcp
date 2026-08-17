@@ -5,8 +5,7 @@ import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
-import { configurePipelineTools, runPipelineCommand, createPipelineCommand, updateBuildStageCommand } from "../../../src/tools/pipelines";
-import { CommandContext } from "../../../src/shared/command";
+import { configurePipelineTools, runPipeline as runPipelineAction, createPipeline as createPipelineAction, updateBuildStage as updateBuildStageAction } from "../../../src/tools/pipelines";
 import { apiVersion } from "../../../src/utils.js";
 import { mockUpdateBuildStageResponse, mockMultipleArtifacts, mockArtifact } from "../../mocks/pipelines";
 import { Readable } from "stream";
@@ -2244,15 +2243,15 @@ describe("configurePipelineTools", () => {
   });
 });
 
-// Direct, isolated unit tests for each pipelines_write command. These exercise
-// the Command implementations against a mock CommandContext, independent of the
-// tool dispatcher.
-describe("pipelines_write commands", () => {
+// Direct, isolated unit tests for each pipelines_write action, independent of
+// the tool dispatcher.
+describe("pipelines_write actions", () => {
   let tokenProvider: jest.Mock;
   let userAgentProvider: () => string;
   let mockConnection: { getPipelinesApi: jest.Mock; serverUrl: string };
   let connectionProvider: jest.Mock;
-  let context: CommandContext;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let typedTokenProvider: () => Promise<string>;
 
   beforeEach(() => {
     tokenProvider = jest.fn();
@@ -2262,25 +2261,25 @@ describe("pipelines_write commands", () => {
       serverUrl: "https://dev.azure.com/test-org",
     };
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
-    context = {
-      connectionProvider: connectionProvider as unknown as CommandContext["connectionProvider"],
-      tokenProvider: tokenProvider as unknown as CommandContext["tokenProvider"],
-      userAgentProvider,
-    };
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+    typedTokenProvider = tokenProvider as unknown as () => Promise<string>;
     (global.fetch as jest.MockedFunction<typeof fetch>).mockClear();
   });
 
-  describe("runPipelineCommand", () => {
+  describe("runPipeline", () => {
     it("runs a pipeline with the given resources and parameters", async () => {
       const runPipeline = jest.fn().mockResolvedValue({ id: 456 });
       mockConnection.getPipelinesApi.mockResolvedValue({ runPipeline });
 
-      const result = await runPipelineCommand.execute(context, {
-        project: "test-project",
-        pipelineId: 123,
-        resources: { repositories: { self: { refName: "refs/heads/main" } } },
-        templateParameters: { key1: "value1" },
-      });
+      const result = await runPipelineAction(
+        {
+          project: "test-project",
+          pipelineId: 123,
+          resources: { repositories: { self: { refName: "refs/heads/main" } } },
+          templateParameters: { key1: "value1" },
+        },
+        typedConnectionProvider
+      );
 
       expect(runPipeline).toHaveBeenCalledWith(
         {
@@ -2300,7 +2299,7 @@ describe("pipelines_write commands", () => {
     });
 
     it("returns an error when pipelineId is missing", async () => {
-      const result = await runPipelineCommand.execute(context, { project: "test-project" });
+      const result = await runPipelineAction({ project: "test-project" }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("pipelineId is required for run_pipeline");
@@ -2309,12 +2308,15 @@ describe("pipelines_write commands", () => {
 
     it("throws when yamlOverride is provided without previewRun", async () => {
       await expect(
-        runPipelineCommand.execute(context, {
-          project: "test-project",
-          pipelineId: 123,
-          previewRun: false,
-          yamlOverride: "some yaml",
-        })
+        runPipelineAction(
+          {
+            project: "test-project",
+            pipelineId: 123,
+            previewRun: false,
+            yamlOverride: "some yaml",
+          },
+          typedConnectionProvider
+        )
       ).rejects.toThrow("Parameter 'yamlOverride' can only be specified together with parameter 'previewRun'.");
     });
 
@@ -2322,23 +2324,26 @@ describe("pipelines_write commands", () => {
       const runPipeline = jest.fn().mockResolvedValue({});
       mockConnection.getPipelinesApi.mockResolvedValue({ runPipeline });
 
-      await expect(runPipelineCommand.execute(context, { project: "test-project", pipelineId: 123 })).rejects.toThrow("Failed to get build ID from pipeline run");
+      await expect(runPipelineAction({ project: "test-project", pipelineId: 123 }, typedConnectionProvider)).rejects.toThrow("Failed to get build ID from pipeline run");
     });
   });
 
-  describe("createPipelineCommand", () => {
+  describe("createPipeline", () => {
     it("creates a YAML pipeline for AzureReposGit", async () => {
       const createPipeline = jest.fn().mockResolvedValue({ id: 100, name: "Pipeline" });
       mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline });
 
-      const result = await createPipelineCommand.execute(context, {
-        project: "ProjectName",
-        name: "Pipeline",
-        yamlPath: "pipeline.yml",
-        repositoryType: "AzureReposGit",
-        repositoryName: "RepositoryName",
-        repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
-      });
+      const result = await createPipelineAction(
+        {
+          project: "ProjectName",
+          name: "Pipeline",
+          yamlPath: "pipeline.yml",
+          repositoryType: "AzureReposGit",
+          repositoryName: "RepositoryName",
+          repositoryId: "46DEE968-EAE5-41AA-97B1-E8B71DC287C2",
+        },
+        typedConnectionProvider
+      );
 
       expect(createPipeline).toHaveBeenCalledWith(
         {
@@ -2364,14 +2369,17 @@ describe("pipelines_write commands", () => {
       const createPipeline = jest.fn().mockResolvedValue({ id: 200, name: "GH Pipeline" });
       mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline });
 
-      await createPipelineCommand.execute(context, {
-        project: "ProjectName",
-        name: "GH Pipeline",
-        yamlPath: "pipeline.yml",
-        repositoryType: "GitHub",
-        repositoryName: "owner/repo",
-        repositoryConnectionId: "conn-id-123",
-      });
+      await createPipelineAction(
+        {
+          project: "ProjectName",
+          name: "GH Pipeline",
+          yamlPath: "pipeline.yml",
+          repositoryType: "GitHub",
+          repositoryName: "owner/repo",
+          repositoryConnectionId: "conn-id-123",
+        },
+        typedConnectionProvider
+      );
 
       expect(createPipeline).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2391,13 +2399,16 @@ describe("pipelines_write commands", () => {
       mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline: jest.fn() });
 
       await expect(
-        createPipelineCommand.execute(context, {
-          project: "ProjectName",
-          name: "GH Pipeline",
-          yamlPath: "pipeline.yml",
-          repositoryType: "GitHub",
-          repositoryName: "owner/repo",
-        })
+        createPipelineAction(
+          {
+            project: "ProjectName",
+            name: "GH Pipeline",
+            yamlPath: "pipeline.yml",
+            repositoryType: "GitHub",
+            repositoryName: "owner/repo",
+          },
+          typedConnectionProvider
+        )
       ).rejects.toThrow("Parameter 'repositoryConnectionId' is required for GitHub repositories.");
     });
 
@@ -2405,13 +2416,16 @@ describe("pipelines_write commands", () => {
       mockConnection.getPipelinesApi.mockResolvedValue({ createPipeline: jest.fn() });
 
       await expect(
-        createPipelineCommand.execute(context, {
-          project: "ProjectName",
-          name: "Pipeline",
-          yamlPath: "pipeline.yml",
-          repositoryType: "BitbucketCloud",
-          repositoryName: "owner/repo",
-        })
+        createPipelineAction(
+          {
+            project: "ProjectName",
+            name: "Pipeline",
+            yamlPath: "pipeline.yml",
+            repositoryType: "BitbucketCloud",
+            repositoryName: "owner/repo",
+          },
+          typedConnectionProvider
+        )
       ).rejects.toThrow("Unsupported repository type");
     });
 
@@ -2421,7 +2435,7 @@ describe("pipelines_write commands", () => {
       ["repositoryType", { name: "pipe", yamlPath: "p.yml", repositoryName: "repo" }, "repositoryType is required for create_pipeline"],
       ["repositoryName", { name: "pipe", yamlPath: "p.yml", repositoryType: "AzureReposGit" }, "repositoryName is required for create_pipeline"],
     ])("returns an error when %s is missing", async (_field, extra, expectedMsg) => {
-      const result = await createPipelineCommand.execute(context, { project: "proj", ...(extra as Record<string, string>) });
+      const result = await createPipelineAction({ project: "proj", ...(extra as Record<string, string>) }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe(expectedMsg);
@@ -2429,7 +2443,7 @@ describe("pipelines_write commands", () => {
     });
   });
 
-  describe("updateBuildStageCommand", () => {
+  describe("updateBuildStage", () => {
     it("sends a PATCH request with encoded path segments and returns the response", async () => {
       tokenProvider.mockResolvedValue("mock-token");
       const mockResponse = {
@@ -2438,13 +2452,18 @@ describe("pipelines_write commands", () => {
       };
       (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await updateBuildStageCommand.execute(context, {
-        project: "test-project",
-        buildId: 123,
-        stageName: "Build",
-        status: "Retry",
-        forceRetryAllJobs: true,
-      });
+      const result = await updateBuildStageAction(
+        {
+          project: "test-project",
+          buildId: 123,
+          stageName: "Build",
+          status: "Retry",
+          forceRetryAllJobs: true,
+        },
+        typedConnectionProvider,
+        typedTokenProvider,
+        userAgentProvider
+      );
 
       expect(global.fetch).toHaveBeenCalledWith(`https://dev.azure.com/test-org/test-project/_apis/build/builds/123/stages/Build?api-version=${apiVersion}`, {
         method: "PATCH",
@@ -2469,13 +2488,18 @@ describe("pipelines_write commands", () => {
       (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(
-        updateBuildStageCommand.execute(context, {
-          project: "test-project",
-          buildId: 999,
-          stageName: "Build",
-          status: "Retry",
-          forceRetryAllJobs: false,
-        })
+        updateBuildStageAction(
+          {
+            project: "test-project",
+            buildId: 999,
+            stageName: "Build",
+            status: "Retry",
+            forceRetryAllJobs: false,
+          },
+          typedConnectionProvider,
+          typedTokenProvider,
+          userAgentProvider
+        )
       ).rejects.toThrow("Failed to update build stage: 404 Build stage not found");
     });
 
@@ -2484,7 +2508,12 @@ describe("pipelines_write commands", () => {
       ["stageName", { buildId: 1, status: "Retry", forceRetryAllJobs: false }, "stageName is required for update_build_stage"],
       ["status", { buildId: 1, stageName: "Build", forceRetryAllJobs: false }, "status is required for update_build_stage"],
     ])("returns an error when %s is missing", async (_field, extra, expectedMsg) => {
-      const result = await updateBuildStageCommand.execute(context, { project: "test-project", ...(extra as Record<string, unknown>) } as Parameters<typeof updateBuildStageCommand.execute>[1]);
+      const result = await updateBuildStageAction(
+        { project: "test-project", ...(extra as Record<string, unknown>) } as Parameters<typeof updateBuildStageAction>[0],
+        typedConnectionProvider,
+        typedTokenProvider,
+        userAgentProvider
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe(expectedMsg);
