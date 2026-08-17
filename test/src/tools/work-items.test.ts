@@ -5653,21 +5653,23 @@ describe("configureWorkItemTools", () => {
       });
     });
 
-    it.each(["add", "replace", "test"])("should require a value for %s operations", async (op) => {
+    it.each(["add", "replace", "test"])("should return an error when %s is missing a value", async (op) => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
       if (!call) throw new Error("wit_work_item_write not registered");
-      const [, , schemaShape] = call;
+      const [, , , handler] = call;
 
-      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const result = await handler({
+        action: "update",
+        id: 1,
+        updates: [{ op, path: op === "test" ? "/rev" : "/fields/System.Title" }],
+      });
 
-      expect(() =>
-        fullSchema.parse({
-          action: "update",
-          id: 1,
-          updates: [{ op, path: op === "test" ? "/rev" : "/fields/System.Title" }],
-        })
-      ).toThrow(`value is required for ${op}`);
+      expect(result).toEqual({
+        content: [{ type: "text", text: `value is required for ${op}` }],
+        isError: true,
+      });
+      expect(mockWorkItemTrackingApi.updateWorkItem).not.toHaveBeenCalled();
     });
   });
 

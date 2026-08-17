@@ -570,29 +570,19 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .describe("Field values to set on the work item. Required for: create."),
       updates: z
         .array(
-          z
-            .object({
-              op: z
-                .string()
-                .transform((val) => val.toLowerCase())
-                .pipe(z.enum(["add", "replace", "remove", "test"]))
-                .default("add")
-                .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
-              path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
-              value: z
-                .union([z.string(), z.number(), z.boolean(), z.null()])
-                .optional()
-                .describe("The operation value. Required for add, replace, and test; omit for remove. For a test on '/rev', pass the numeric revision previously read."),
-            })
-            .superRefine((update, context) => {
-              if (update.op !== "remove" && update.value === undefined) {
-                context.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: ["value"],
-                  message: `value is required for ${update.op}`,
-                });
-              }
-            })
+          z.object({
+            op: z
+              .string()
+              .transform((val) => val.toLowerCase())
+              .pipe(z.enum(["add", "replace", "remove", "test"]))
+              .default("add")
+              .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
+            path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
+            value: z
+              .union([z.string(), z.number(), z.boolean(), z.null()])
+              .optional()
+              .describe("The operation value. Required for add, replace, and test; omit for remove. For a test on '/rev', pass the numeric revision previously read."),
+          })
         )
         .optional()
         .describe(
@@ -669,6 +659,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         if (action === "update") {
           if (!id) return { content: [{ type: "text", text: "id is required for update" }], isError: true };
           if (!updates || updates.length === 0) return { content: [{ type: "text", text: "updates is required for update" }], isError: true };
+          const updateWithoutValue = updates.find((update) => update.op !== "remove" && update.value === undefined);
+          if (updateWithoutValue) {
+            return { content: [{ type: "text", text: `value is required for ${updateWithoutValue.op}` }], isError: true };
+          }
 
           const workItemApi = await connection.getWorkItemTrackingApi();
           const apiUpdates = updates.map((update) => ({ ...update, op: update.op }));
