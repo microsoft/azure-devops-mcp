@@ -90,3 +90,4 @@ jobs:
         run: |
           git push origin HEAD:main
         shell: pwsh
+[![Update Package Version](https://github.com/microsoft/azure-devops-mcp/actions/workflows/version-update.yml/badge.svg?event=deployment)](https://github.com/microsoft/azure-devops-mcp/actions/workflows/version-update.yml)
