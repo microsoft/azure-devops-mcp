@@ -744,8 +744,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             const ops: { op: string; path: string; value: unknown }[] = [
               { op: "add", path: "/id", value: `-${x + 1}` },
               { op: "add", path: "/fields/System.Title", value: item.title },
-              { op: "add", path: "/fields/System.Description", value: encodedDescription },
-              { op: "add", path: "/fields/Microsoft.VSTS.TCM.ReproSteps", value: encodedDescription },
               {
                 op: "add",
                 path: "/relations/-",
@@ -764,9 +762,20 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               ops.push({ op: "add", path: "/fields/System.IterationPath", value: item.iterationPath });
             }
 
-            if (item.format && item.format === "Markdown") {
-              ops.push({ op: "add", path: "/multilineFieldsFormat/System.Description", value: item.format });
-              ops.push({ op: "add", path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps", value: item.format });
+            // check if the work item type is "Bug" to determine which field to use for the description
+            // ReproSteps is used for Bugs, while Description is used for other work item types
+            if (workItemType.toLowerCase() === "bug") {
+              ops.push({ op: "add", path: "/fields/Microsoft.VSTS.TCM.ReproSteps", value: encodedDescription });
+
+              if (item.format && item.format === "Markdown") {
+                ops.push({ op: "add", path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps", value: item.format });
+              }
+            } else {
+              ops.push({ op: "add", path: "/fields/System.Description", value: encodedDescription });
+
+              if (item.format && item.format === "Markdown") {
+                ops.push({ op: "add", path: "/multilineFieldsFormat/System.Description", value: item.format });
+              }
             }
 
             return {
