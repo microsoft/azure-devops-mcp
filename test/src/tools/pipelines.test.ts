@@ -1441,6 +1441,52 @@ describe("configurePipelineTools", () => {
   });
 
   describe("pipelines_write tool", () => {
+    it("should rename a pipeline while preserving the complete build definition", async () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
+      if (!call) throw new Error("pipelines_write tool not registered");
+      const [, , , handler] = call;
+
+      const definition = {
+        id: 42,
+        name: "Old Pipeline Name",
+        path: "\\Production",
+        revision: 7,
+        repository: { id: "repo-id", type: "TfsGit", defaultBranch: "refs/heads/main" },
+        process: { type: 2, yamlFilename: "azure-pipelines.yml" },
+        variables: { configuration: { value: "Release", isSecret: false } },
+      };
+      const renamedDefinition = { ...definition, name: "New Pipeline Name", revision: 8 };
+      const mockBuildApi = {
+        getDefinition: jest.fn().mockResolvedValue(definition),
+        updateDefinition: jest.fn().mockResolvedValue(renamedDefinition),
+      };
+      mockConnection.getBuildApi.mockResolvedValue(mockBuildApi);
+
+      const result = await handler({ action: "rename_pipeline", project: "ProjectName", pipelineId: 42, name: "New Pipeline Name" });
+
+      expect(mockBuildApi.getDefinition).toHaveBeenCalledWith("ProjectName", 42);
+      expect(mockBuildApi.updateDefinition).toHaveBeenCalledWith({ ...definition, name: "New Pipeline Name" }, "ProjectName", 42);
+      expect(result.content[0].text).toBe(JSON.stringify(renamedDefinition, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it.each([
+      ["pipelineId", { name: "New Pipeline Name" }, "pipelineId is required for rename_pipeline"],
+      ["name", { pipelineId: 42 }, "name is required for rename_pipeline"],
+    ])("should return error when %s is missing for rename_pipeline", async (_field, extra, expectedMessage) => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
+      if (!call) throw new Error("pipelines_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "rename_pipeline", project: "ProjectName", ...extra });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(expectedMessage);
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
     it("should create a YAML pipeline for AzureReposGit and return created pipeline", async () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_write");
@@ -1863,7 +1909,7 @@ describe("configurePipelineTools", () => {
       const result = await handler({ action: "unknown" as any, project: "test-project" });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Unknown action: unknown. Supported actions: create_pipeline, run_pipeline, update_build_stage");
+      expect(result.content[0].text).toBe("Unknown action: unknown. Supported actions: create_pipeline, rename_pipeline, run_pipeline, update_build_stage");
       expect(connectionProvider as jest.Mock).not.toHaveBeenCalled();
     });
 

@@ -69,7 +69,7 @@ export const runPipelineShape = {
 /** create_pipeline inputs. */
 export const createPipelineShape = {
   ...projectShape,
-  name: z.string().optional().describe("Name of the new pipeline. Required for: create_pipeline."),
+  name: z.string().optional().describe("Pipeline name. Required for: create_pipeline, rename_pipeline."),
   folder: z.string().optional().describe("Folder path for the new pipeline. Used for: create_pipeline."),
   yamlPath: z.string().optional().describe("Path to the YAML file in the repository. Required for: create_pipeline."),
   repositoryType: z
@@ -79,6 +79,13 @@ export const createPipelineShape = {
   repositoryName: z.string().optional().describe("Name of the repository (for GitHub: owner/repo). Required for: create_pipeline."),
   repositoryId: z.string().optional().describe("ID of the repository. Used for: create_pipeline."),
   repositoryConnectionId: z.string().optional().describe("Service connection ID for GitHub repositories. Used for: create_pipeline."),
+};
+
+/** rename_pipeline inputs. */
+export const renamePipelineShape = {
+  ...projectShape,
+  pipelineId: z.coerce.number().min(1).optional().describe("ID of the pipeline. Required for: run_pipeline, rename_pipeline."),
+  name: z.string().optional().describe("Pipeline name. Required for: create_pipeline, rename_pipeline."),
 };
 
 /** update_build_stage inputs. */
@@ -96,12 +103,13 @@ export const updateBuildStageShape = {
 /** The composed input shape for the grouped `pipelines_write` tool. */
 export const pipelinesWriteShape = {
   action: z
-    .enum(["run_pipeline", "create_pipeline", "update_build_stage"])
+    .enum(["run_pipeline", "create_pipeline", "rename_pipeline", "update_build_stage"])
     .describe(
-      "The action to perform. Options: run_pipeline (queue a new pipeline run), create_pipeline (create a new YAML pipeline definition), update_build_stage (cancel, retry, or run a stage on an in-flight build)."
+      "The action to perform. Options: run_pipeline (queue a new pipeline run), create_pipeline (create a new YAML pipeline definition), rename_pipeline (rename an existing pipeline definition), update_build_stage (cancel, retry, or run a stage on an in-flight build)."
     ),
   ...runPipelineShape,
   ...createPipelineShape,
+  ...renamePipelineShape,
   ...updateBuildStageShape,
 };
 
@@ -109,10 +117,12 @@ export const pipelinesWriteShape = {
 // lockstep with the schemas above.
 export const runPipelineSchema = z.object(runPipelineShape);
 export const createPipelineSchema = z.object(createPipelineShape);
+export const renamePipelineSchema = z.object(renamePipelineShape);
 export const updateBuildStageSchema = z.object(updateBuildStageShape);
 export const pipelinesWriteSchema = z.object(pipelinesWriteShape);
 
 export type RunPipelineArgs = z.infer<typeof runPipelineSchema>;
 export type CreatePipelineArgs = z.infer<typeof createPipelineSchema>;
+export type RenamePipelineArgs = z.infer<typeof renamePipelineSchema>;
 export type UpdateBuildStageArgs = z.infer<typeof updateBuildStageSchema>;
 export type PipelinesWriteArgs = z.infer<typeof pipelinesWriteSchema>;

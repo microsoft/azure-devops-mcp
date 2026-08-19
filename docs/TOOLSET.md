@@ -103,6 +103,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [pipelines_artifact](#pipelines_artifact)     | `download`           | Download a named build artifact                     |
 | [pipelines_write](#pipelines_write)           | `run_pipeline`       | Queue a new pipeline run                            |
 | [pipelines_write](#pipelines_write)           | `create_pipeline`    | Create a new YAML pipeline definition               |
+| [pipelines_write](#pipelines_write)           | `rename_pipeline`    | Rename an existing pipeline definition              |
 | [pipelines_write](#pipelines_write)           | `update_build_stage` | Cancel, retry, or run a stage on an in-flight build |
 
 ### Test Plans
