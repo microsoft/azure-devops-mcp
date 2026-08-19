@@ -12,7 +12,7 @@ import { mkdirSync, createWriteStream } from "fs";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 import { join, posix, resolve, win32 } from "path";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { pipelinesWriteShape, RunPipelineArgs, CreatePipelineArgs, UpdateBuildStageArgs, PipelinesWriteArgs } from "./pipelines.dto.js";
+import { pipelinesWriteShape, RunPipelineArgs, CreatePipelineArgs, RenamePipelineArgs, UpdateBuildStageArgs, PipelinesWriteArgs } from "./pipelines.dto.js";
 
 const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
 
@@ -70,6 +70,18 @@ async function createPipeline(args: CreatePipelineArgs, connectionProvider: () =
   return { content: [{ type: "text", text: JSON.stringify(newPipeline, null, 2) }] };
 }
 
+async function renamePipeline(args: RenamePipelineArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+  if (!args.pipelineId) return errorResult("pipelineId is required for rename_pipeline");
+  if (!args.name) return errorResult("name is required for rename_pipeline");
+
+  const connection = await connectionProvider();
+  const buildApi = await connection.getBuildApi();
+  const definition = await buildApi.getDefinition(args.project, args.pipelineId);
+  const updatedDefinition = await buildApi.updateDefinition({ ...definition, name: args.name }, args.project, args.pipelineId);
+
+  return { content: [{ type: "text", text: JSON.stringify(updatedDefinition, null, 2) }] };
+}
+
 async function updateBuildStage(args: UpdateBuildStageArgs, connectionProvider: () => Promise<WebApi>, tokenProvider: () => Promise<string>, userAgentProvider: () => string): Promise<CallToolResult> {
   if (!args.buildId) return errorResult("buildId is required for update_build_stage");
   if (!args.stageName) return errorResult("stageName is required for update_build_stage");
@@ -99,6 +111,7 @@ async function updateBuildStage(args: UpdateBuildStageArgs, connectionProvider: 
 const pipelinesWriteErrorPrefixes: Record<PipelinesWriteArgs["action"], string> = {
   run_pipeline: "Error running pipeline: ",
   create_pipeline: "Error creating pipeline: ",
+  rename_pipeline: "Error renaming pipeline: ",
   update_build_stage: "Error updating build stage: ",
 };
 
@@ -516,6 +529,8 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
           return await runPipeline(args, connectionProvider);
         case "create_pipeline":
           return await createPipeline(args, connectionProvider);
+        case "rename_pipeline":
+          return await renamePipeline(args, connectionProvider);
         case "update_build_stage":
           return await updateBuildStage(args, connectionProvider, tokenProvider, userAgentProvider);
         default: {
@@ -530,5 +545,5 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
   });
 }
 
-export { PIPELINE_TOOLS, configurePipelineTools, runPipeline, createPipeline, updateBuildStage };
-export type { RunPipelineArgs, CreatePipelineArgs, UpdateBuildStageArgs };
+export { PIPELINE_TOOLS, configurePipelineTools, runPipeline, createPipeline, renamePipeline, updateBuildStage };
+export type { RunPipelineArgs, CreatePipelineArgs, RenamePipelineArgs, UpdateBuildStageArgs };
