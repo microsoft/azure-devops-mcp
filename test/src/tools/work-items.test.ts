@@ -1800,6 +1800,59 @@ describe("configureWorkItemTools", () => {
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItem], null, 2));
     });
+
+    it("should preserve a numeric revision test before applying field updates", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write tool not registered");
+      const [, , schemaShape, handler] = call;
+
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const params = fullSchema.parse({
+        action: "update",
+        id: 131489,
+        updates: [
+          { op: "Test", path: "/rev", value: 12 },
+          { op: "Replace", path: "/fields/System.Title", value: "Updated title" },
+        ],
+      });
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      await handler(params);
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+        null,
+        [
+          { op: "test", path: "/rev", value: 12 },
+          { op: "replace", path: "/fields/System.Title", value: "Updated title" },
+        ],
+        131489
+      );
+    });
+
+    it("should surface a revision conflict without applying a stale update", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write tool not registered");
+      const [, , , handler] = call;
+
+      const conflict = Object.assign(new Error("Test Operation for path /rev failed."), { statusCode: 412 });
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockRejectedValue(conflict);
+
+      const result = await handler({
+        action: "update",
+        id: 131489,
+        updates: [
+          { op: "test", path: "/rev", value: 12 },
+          { op: "replace", path: "/fields/System.Title", value: "Updated title" },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error updating work item [HTTP 412 Precondition Failed]: Test Operation for path /rev failed.");
+    });
   });
 
   describe("get_work_item_type tool", () => {
@@ -5604,6 +5657,64 @@ describe("configureWorkItemTools", () => {
 
       // After the transform, "Replace" should become "replace"
       expect((parsed as { updates: { op: string }[] }).updates[0].op).toBe("replace");
+    });
+
+    it.each(["Test", "test", "TEST"])("should accept %s with a numeric revision value", async (op) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape] = call;
+
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const parsed = fullSchema.parse({
+        action: "update",
+        id: 1,
+        updates: [{ op, path: "/rev", value: 9 }],
+      });
+
+      expect((parsed as { updates: { op: string; value: unknown }[] }).updates[0]).toEqual({
+        op: "test",
+        path: "/rev",
+        value: 9,
+      });
+    });
+
+    it("should continue accepting remove operations without a value", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape] = call;
+
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const parsed = fullSchema.parse({
+        action: "update",
+        id: 1,
+        updates: [{ op: "remove", path: "/fields/System.Description" }],
+      });
+
+      expect((parsed as { updates: { op: string; value?: unknown }[] }).updates[0]).toEqual({
+        op: "remove",
+        path: "/fields/System.Description",
+      });
+    });
+
+    it.each(["add", "replace", "test"])("should return an error when %s is missing a value", async (op) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "update",
+        id: 1,
+        updates: [{ op, path: op === "test" ? "/rev" : "/fields/System.Title" }],
+      });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: `value is required for ${op}` }],
+        isError: true,
+      });
+      expect(mockWorkItemTrackingApi.updateWorkItem).not.toHaveBeenCalled();
     });
   });
 
