@@ -3,6 +3,7 @@
 
 import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential, TokenCredential } from "@azure/identity";
 import { AccountInfo, AuthenticationResult, PublicClientApplication } from "@azure/msal-node";
+import { NativeBrokerPlugin } from "@azure/msal-node-extensions";
 import open from "open";
 import { logger } from "./logger.js";
 
@@ -15,6 +16,7 @@ class OAuthAuthenticator {
 
   private accountId: AccountInfo | null;
   private publicClientApp: PublicClientApplication;
+  private publicClientAppFallback: PublicClientApplication;
 
   constructor(tenantId?: string) {
     this.accountId = null;
@@ -28,6 +30,22 @@ class OAuthAuthenticator {
     }
 
     this.publicClientApp = new PublicClientApplication({
+      auth: {
+        clientId: OAuthAuthenticator.clientId,
+        authority,
+      },
+      broker: {
+        nativeBrokerPlugin: new NativeBrokerPlugin(),
+      },
+      system: {
+        loggerOptions: {
+          loggerCallback: (level, message) => {
+            logger.debug(`MSALClient[${level}]: ${message}`);
+          },
+        },
+      },
+    });
+    this.publicClientAppFallback = new PublicClientApplication({
       auth: {
         clientId: OAuthAuthenticator.clientId,
         authority,
@@ -55,18 +73,35 @@ class OAuthAuthenticator {
     }
     if (!authResult) {
       logger.debug(`OAuthAuthenticator: Starting interactive token acquisition`);
-      authResult = await this.publicClientApp.acquireTokenInteractive({
+      try {
+        authResult = await this.publicClientApp.acquireTokenInteractive({
+          scopes,
+          openBrowser: async (url) => {
+            logger.debug(`OAuthAuthenticator: Opening browser for authentication with target URL: ${url}`);
+            open(url);
+          },
+        });
+        this.accountId = authResult.account;
+        logger.debug(`OAuthAuthenticator: Successfully acquired token interactively, account cached`);
+      } catch (error) {
+        const msalErrorMessage = (error as any).platformBrokerError ? JSON.stringify((error as any).platformBrokerError) : "";
+        logger.debug(`OAuthAuthenticator: Interactive token acquisition failed: ${error instanceof Error ? error.message + msalErrorMessage : String(error)}`);
+        authResult = null;
+      }
+    }
+    if (!authResult) {
+      logger.debug(`OAuthAuthenticator: Starting interactive token acquisition without broker`);
+      authResult = await this.publicClientAppFallback.acquireTokenInteractive({
         scopes,
         openBrowser: async (url) => {
-          logger.debug(`OAuthAuthenticator: Opening browser for authentication`);
+          logger.debug(`OAuthAuthenticator: Opening browser for authentication with target URL: ${url}`);
           open(url);
         },
       });
-      this.accountId = authResult.account;
-      logger.debug(`OAuthAuthenticator: Successfully acquired token interactively, account cached`);
+      logger.debug(`OAuthAuthenticator: Successfully acquired token interactively without broker`);
     }
 
-    if (!authResult.accessToken) {
+    if (!authResult?.accessToken) {
       logger.error(`OAuthAuthenticator: Authentication result contains no access token`);
       throw new Error("Failed to obtain Azure DevOps OAuth token.");
     }
