@@ -574,15 +574,20 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             op: z
               .string()
               .transform((val) => val.toLowerCase())
-              .pipe(z.enum(["add", "replace", "remove"]))
+              .pipe(z.enum(["add", "replace", "remove", "test"]))
               .default("add")
-              .describe("The operation to perform."),
-            path: z.string().describe("The field path, e.g. '/fields/System.Title'."),
-            value: z.string().describe("The new value for the field."),
+              .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
+            path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
+            value: z
+              .union([z.string(), z.number(), z.boolean(), z.null()])
+              .optional()
+              .describe("The operation value. Required for add, replace, and test; omit for remove. For a test on '/rev', pass the numeric revision previously read."),
           })
         )
         .optional()
-        .describe("Field updates for a single work item. Required for: update."),
+        .describe(
+          'Field updates for a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
+        ),
       batchUpdates: z
         .array(
           z.object({
@@ -654,6 +659,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         if (action === "update") {
           if (!id) return { content: [{ type: "text", text: "id is required for update" }], isError: true };
           if (!updates || updates.length === 0) return { content: [{ type: "text", text: "updates is required for update" }], isError: true };
+          const updateWithoutValue = updates.find((update) => update.op !== "remove" && update.value === undefined);
+          if (updateWithoutValue) {
+            return { content: [{ type: "text", text: `value is required for ${updateWithoutValue.op}` }], isError: true };
+          }
 
           const workItemApi = await connection.getWorkItemTrackingApi();
           const apiUpdates = updates.map((update) => ({ ...update, op: update.op }));
@@ -799,9 +808,12 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        const statusCode = typeof error === "object" && error !== null && "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : undefined;
+        const statusText = statusCode === 409 ? " Conflict" : statusCode === 412 ? " Precondition Failed" : "";
+        const updateStatus = statusCode !== undefined ? ` [HTTP ${statusCode}${statusText}]` : "";
         const msgs: Record<string, string> = {
           create: `Error creating work item: ${errorMessage}`,
-          update: `Error updating work item: ${errorMessage}`,
+          update: `Error updating work item${updateStatus}: ${errorMessage}`,
           update_batch: `Error updating work items in batch: ${errorMessage}`,
           add_child: `Error creating child work items: ${errorMessage}`,
         };

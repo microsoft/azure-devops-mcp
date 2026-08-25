@@ -39,7 +39,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [wit_work_item](#wit_work_item)                             | `list_for_iteration`   | Get work items in a specific team iteration                             |
 | [wit_work_item](#wit_work_item)                             | `get_type`             | Get metadata for a work item type                                       |
 | [wit_work_item_write](#wit_work_item_write)                 | `create`               | Create a new work item                                                  |
-| [wit_work_item_write](#wit_work_item_write)                 | `update`               | Update fields on a single work item                                     |
+| [wit_work_item_write](#wit_work_item_write)                 | `update`               | Update fields on a single work item; supports `test /rev` concurrency   |
 | [wit_work_item_write](#wit_work_item_write)                 | `update_batch`         | Update multiple work items in one call                                  |
 | [wit_work_item_write](#wit_work_item_write)                 | `add_child`            | Create child work items under a parent                                  |
 | [wit_work_item_comment_write](#wit_work_item_comment_write) | `add`                  | Add a comment to a work item                                            |
