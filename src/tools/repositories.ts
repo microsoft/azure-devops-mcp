@@ -27,6 +27,7 @@ import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.j
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { extractAdoStreamError, getEnumKeys, streamToString, apiVersion } from "../utils.js";
 import { orgName } from "../index.js";
+import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const REPO_TOOLS = {
   repo_repository: "repo_repository",
@@ -308,7 +309,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             }
           }
 
-          return { content: [{ type: "text", text: JSON.stringify(enhancedResponse, null, 2) }] };
+          return createExternalContentResponse(enhancedResponse, "pull request");
         }
 
         if (action === "list") {
