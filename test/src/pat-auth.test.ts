@@ -28,10 +28,11 @@ jest.mock("@azure/msal-node", () => ({
 
 jest.mock("open", () => jest.fn());
 
-import { createAuthenticator } from "../../src/auth";
+import { createAuthenticator, installPatFetchInterceptor } from "../../src/auth";
 
 describe("PAT authentication", () => {
   const originalEnv = process.env;
+  const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -44,6 +45,62 @@ describe("PAT authentication", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    globalThis.fetch = originalFetch;
+  });
+
+  describe("installPatFetchInterceptor", () => {
+    const basicValue = Buffer.from("user@example.com:myrawpat").toString("base64");
+
+    it.each(["https://dev.azure.com/org", "https://vssps.dev.azure.com/org", "https://almsearch.dev.azure.com/org"])("rewrites this PAT for trusted Azure DevOps host %s", async (url) => {
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
+      globalThis.fetch = fetchMock;
+      installPatFetchInterceptor(basicValue);
+
+      await fetch(url, { headers: { Authorization: `Bearer ${basicValue}` } });
+
+      const rewrittenInit = fetchMock.mock.calls[0][1];
+      expect(new Headers(rewrittenInit?.headers).get("Authorization")).toBe(`Basic ${basicValue}`);
+    });
+
+    it.each(["https://attacker.example/path", "http://dev.azure.com/org", "https://dev.azure.com.attacker.example/org"])("refuses to send this PAT to untrusted destination %s", async (url) => {
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
+      globalThis.fetch = fetchMock;
+      installPatFetchInterceptor(basicValue);
+
+      await expect(fetch(url, { headers: { Authorization: `Bearer ${basicValue}` } })).rejects.toThrow("Refusing to send a Personal Access Token to untrusted destination");
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("does not replace an unrelated bearer token", async () => {
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
+      globalThis.fetch = fetchMock;
+      installPatFetchInterceptor(basicValue);
+
+      await fetch("https://attacker.example/path", { headers: { Authorization: "Bearer unrelated-token" } });
+
+      expect(fetchMock).toHaveBeenCalledWith("https://attacker.example/path", { headers: { Authorization: "Bearer unrelated-token" } });
+    });
+
+    it("passes through requests without headers", async () => {
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
+      globalThis.fetch = fetchMock;
+      installPatFetchInterceptor(basicValue);
+
+      await fetch("https://example.com/path");
+
+      expect(fetchMock).toHaveBeenCalledWith("https://example.com/path", undefined);
+    });
+
+    it("rewrites headers supplied by a Request object", async () => {
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
+      globalThis.fetch = fetchMock;
+      installPatFetchInterceptor(basicValue);
+
+      await fetch(new Request("https://dev.azure.com/org", { headers: { Authorization: `Bearer ${basicValue}` } }));
+
+      const rewrittenRequest = fetchMock.mock.calls[0][0] as Request;
+      expect(rewrittenRequest.headers.get("Authorization")).toBe(`Basic ${basicValue}`);
+    });
   });
 
   describe("createAuthenticator('pat')", () => {
@@ -138,6 +195,34 @@ describe("PAT authentication", () => {
   });
 
   describe("OAuth authentication", () => {
+    it("forwards MSAL log messages to the application logger", () => {
+      (PublicClientApplication as unknown as jest.Mock).mockImplementation(() => ({ acquireTokenInteractive: jest.fn() }));
+
+      createAuthenticator("oauth");
+
+      const config = (PublicClientApplication as unknown as jest.Mock).mock.calls[0][0];
+      expect(() => config.system.loggerOptions.loggerCallback(2, "MSAL message")).not.toThrow();
+    });
+
+    it.each([new Error("broker failure"), { platformBrokerError: { code: "broker_failure" } }])(
+      "falls back to browser authentication when broker authentication rejects with %p",
+      async (brokerError) => {
+        const brokerAcquireTokenInteractive = jest.fn().mockRejectedValue(brokerError);
+        const fallbackAcquireTokenInteractive = jest.fn().mockImplementation(async ({ openBrowser }) => {
+          await openBrowser("https://login.example.com/fallback");
+          return { accessToken: "fallback-token", account: null };
+        });
+        (PublicClientApplication as unknown as jest.Mock)
+          .mockImplementationOnce(() => ({ acquireTokenInteractive: brokerAcquireTokenInteractive }))
+          .mockImplementationOnce(() => ({ acquireTokenInteractive: fallbackAcquireTokenInteractive }));
+
+        await expect(createAuthenticator("oauth")()).resolves.toBe("fallback-token");
+
+        expect(fallbackAcquireTokenInteractive).toHaveBeenCalledWith(expect.objectContaining({ scopes: ["499b84ac-1321-427f-aa17-267ca6975798/.default"] }));
+        expect(open).toHaveBeenCalledWith("https://login.example.com/fallback");
+      }
+    );
+
     it("should use tenant-specific interactive authentication, open the browser, and cache the account", async () => {
       const account = { homeAccountId: "account-id" };
       const acquireTokenSilent = jest.fn().mockResolvedValue({ accessToken: "silent-token", account });
