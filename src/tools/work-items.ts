@@ -517,9 +517,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const mimeType = getMimeType(fileName);
 
         if (mimeType.startsWith("text/")) {
-          return {
-            content: [{ type: "text", text: buffer.toString("utf-8") }],
-          };
+          return createExternalContentResponse(buffer.toString("utf-8"), "work item attachment");
         }
 
         const base64Data = buffer.toString("base64");
