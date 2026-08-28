@@ -51,18 +51,27 @@ describe("PAT authentication", () => {
   describe("installPatFetchInterceptor", () => {
     const basicValue = Buffer.from("user@example.com:myrawpat").toString("base64");
 
-    it.each(["https://dev.azure.com/org", "https://vssps.dev.azure.com/org", "https://almsearch.dev.azure.com/org"])("rewrites this PAT for trusted Azure DevOps host %s", async (url) => {
-      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
-      globalThis.fetch = fetchMock;
-      installPatFetchInterceptor(basicValue);
+    it.each(["https://dev.azure.com/org", "https://vssps.dev.azure.com/org", "https://almsearch.dev.azure.com/org", "https://contoso.visualstudio.com/project"])(
+      "rewrites this PAT for trusted Azure DevOps host %s",
+      async (url) => {
+        const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
+        globalThis.fetch = fetchMock;
+        installPatFetchInterceptor(basicValue);
 
-      await fetch(url, { headers: { Authorization: `Bearer ${basicValue}` } });
+        await fetch(url, { headers: { Authorization: `Bearer ${basicValue}` } });
 
-      const rewrittenInit = fetchMock.mock.calls[0][1];
-      expect(new Headers(rewrittenInit?.headers).get("Authorization")).toBe(`Basic ${basicValue}`);
-    });
+        const rewrittenInit = fetchMock.mock.calls[0][1];
+        expect(new Headers(rewrittenInit?.headers).get("Authorization")).toBe(`Basic ${basicValue}`);
+      }
+    );
 
-    it.each(["https://attacker.example/path", "http://dev.azure.com/org", "https://dev.azure.com.attacker.example/org"])("refuses to send this PAT to untrusted destination %s", async (url) => {
+    it.each([
+      "https://attacker.example/path",
+      "http://dev.azure.com/org",
+      "https://dev.azure.com.attacker.example/org",
+      "https://visualstudio.com",
+      "https://contoso.visualstudio.com.attacker.example",
+    ])("refuses to send this PAT to untrusted destination %s", async (url) => {
       const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(new Response());
       globalThis.fetch = fetchMock;
       installPatFetchInterceptor(basicValue);

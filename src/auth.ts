@@ -11,6 +11,11 @@ const scopes = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
 
 const patAllowedHosts = new Set(["dev.azure.com", "vssps.dev.azure.com", "almsearch.dev.azure.com"]);
 
+function isPatAllowedHost(hostname: string): boolean {
+  const normalizedHostname = hostname.toLowerCase();
+  return patAllowedHosts.has(normalizedHostname) || normalizedHostname.endsWith(".visualstudio.com");
+}
+
 function installPatFetchInterceptor(basicValue: string): void {
   const originalFetch = globalThis.fetch;
   const patBearerValue = `Bearer ${basicValue}`;
@@ -22,7 +27,7 @@ function installPatFetchInterceptor(basicValue: string): void {
     }
 
     const requestUrl = new URL(input instanceof Request ? input.url : input.toString());
-    if (requestUrl.protocol !== "https:" || !patAllowedHosts.has(requestUrl.hostname.toLowerCase())) {
+    if (requestUrl.protocol !== "https:" || !isPatAllowedHost(requestUrl.hostname)) {
       throw new Error(`Refusing to send a Personal Access Token to untrusted destination '${requestUrl.origin}'`);
     }
 
