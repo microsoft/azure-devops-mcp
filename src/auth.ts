@@ -9,6 +9,36 @@ import { logger } from "./logger.js";
 
 const scopes = ["499b84ac-1321-427f-aa17-267ca6975798/.default"];
 
+const patAllowedHosts = new Set(["dev.azure.com", "vssps.dev.azure.com", "almsearch.dev.azure.com"]);
+
+function isPatAllowedHost(hostname: string): boolean {
+  const normalizedHostname = hostname.toLowerCase();
+  return patAllowedHosts.has(normalizedHostname) || normalizedHostname.endsWith(".visualstudio.com");
+}
+
+function installPatFetchInterceptor(basicValue: string): void {
+  const originalFetch = globalThis.fetch;
+  const patBearerValue = `Bearer ${basicValue}`;
+
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    if (headers.get("Authorization") !== patBearerValue) {
+      return originalFetch(input, init);
+    }
+
+    const requestUrl = new URL(input instanceof Request ? input.url : input.toString());
+    if (requestUrl.protocol !== "https:" || !isPatAllowedHost(requestUrl.hostname)) {
+      throw new Error(`Refusing to send a Personal Access Token to untrusted destination '${requestUrl.origin}'`);
+    }
+
+    headers.set("Authorization", `Basic ${basicValue}`);
+    if (input instanceof Request) {
+      return originalFetch(new Request(input, { ...init, headers }));
+    }
+    return originalFetch(input, { ...init, headers });
+  };
+}
+
 class OAuthAuthenticator {
   static clientId = "0d50963b-7bb9-4fe7-94c7-a99af00b5136";
   static defaultAuthority = "https://login.microsoftonline.com/common";
@@ -171,4 +201,4 @@ function createAuthenticator(type: string, tenantId?: string): () => Promise<str
       };
   }
 }
-export { createAuthenticator };
+export { createAuthenticator, installPatFetchInterceptor };
