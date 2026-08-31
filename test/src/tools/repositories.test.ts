@@ -48,6 +48,7 @@ describe("repos tools", () => {
     createPullRequestLabel: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     deletePullRequestLabels: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createComment: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    updateComment: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     createThread: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     updateThread: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getCommits: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
@@ -82,6 +83,7 @@ describe("repos tools", () => {
       createPullRequestLabel: jest.fn(),
       deletePullRequestLabels: jest.fn(),
       createComment: jest.fn(),
+      updateComment: jest.fn(),
       createThread: jest.fn(),
       updateThread: jest.fn(),
       getCommits: jest.fn(),
@@ -4494,6 +4496,77 @@ describe("repos tools", () => {
     });
   });
 
+  describe("repo_update_comment", () => {
+    it("should update a comment successfully", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      const mockComment = { id: 321, content: "Updated content" };
+      mockGitApi.updateComment.mockResolvedValue(mockComment);
+
+      const result = await handler({
+        action: "update",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        commentId: 321,
+        content: "Updated content",
+        project: "TestProject",
+      });
+
+      expect(mockGitApi.updateComment).toHaveBeenCalledWith({ content: "Updated content" }, "repo123", 456, 789, 321, "TestProject");
+      expect(result.content[0].text).toBe("Comment 321 successfully updated in thread 789.");
+    });
+
+    it("should return the full updated comment when requested", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      const mockComment = { id: 321, content: "Updated content" };
+      mockGitApi.updateComment.mockResolvedValue(mockComment);
+
+      const result = await handler({
+        action: "update",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        commentId: 321,
+        content: "Updated content",
+        fullResponse: true,
+      });
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockComment, null, 2));
+    });
+
+    it("should return an error when the comment update fails", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.updateComment.mockResolvedValue(null);
+
+      const result = await handler({
+        action: "update",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        commentId: 321,
+        content: "Updated content",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to update comment 321 in thread 789");
+    });
+  });
+
   describe("repo_create_pull_request_thread", () => {
     it("should create pull request thread with basic content", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
@@ -8228,6 +8301,24 @@ describe("repos tools", () => {
     it("repo_pull_request_thread_write reply: missing content", async () => {
       const h = getHandler(REPO_TOOLS.repo_pull_request_thread_write);
       const r = await h({ action: "reply", repositoryId: "r", pullRequestId: 1, threadId: 1 });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain("content is required");
+    });
+    it("repo_pull_request_thread_write update: missing threadId", async () => {
+      const h = getHandler(REPO_TOOLS.repo_pull_request_thread_write);
+      const r = await h({ action: "update", repositoryId: "r", pullRequestId: 1 });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain("threadId is required");
+    });
+    it("repo_pull_request_thread_write update: missing commentId", async () => {
+      const h = getHandler(REPO_TOOLS.repo_pull_request_thread_write);
+      const r = await h({ action: "update", repositoryId: "r", pullRequestId: 1, threadId: 1 });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain("commentId is required");
+    });
+    it("repo_pull_request_thread_write update: missing content", async () => {
+      const h = getHandler(REPO_TOOLS.repo_pull_request_thread_write);
+      const r = await h({ action: "update", repositoryId: "r", pullRequestId: 1, threadId: 1, commentId: 2 });
       expect(r.isError).toBe(true);
       expect(r.content[0].text).toContain("content is required");
     });
