@@ -925,22 +925,23 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     "Write operations for pull request comment threads. Use the action parameter to specify the operation.",
     {
       action: z
-        .enum(["create", "reply", "update_status"])
+        .enum(["create", "reply", "update", "update_status"])
         .describe(
-          "The action to perform. Options: create (create a new comment thread on a pull request), reply (reply to a comment in a thread), update_status (update the status of a comment thread)."
+          "The action to perform. Options: create (create a new comment thread on a pull request), reply (reply to a comment in a thread), update (update an existing comment), update_status (update the status of a comment thread)."
         ),
       repositoryId: z.string().describe("The ID or name of the repository. When using a name instead of a GUID, project must also be provided."),
       pullRequestId: z.coerce.number().min(1).describe("The ID of the pull request."),
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name instead of a GUID."),
-      threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply and update_status."),
-      content: z.string().optional().describe("The content of the comment. Required for create and reply."),
+      threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply, update, and update_status."),
+      commentId: z.coerce.number().min(1).optional().describe("The ID of the comment to update. Required for update."),
+      content: z.string().optional().describe("The content of the comment. Required for create, reply, and update."),
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
         .default(CommentThreadStatus[CommentThreadStatus.Active])
         .describe("The thread status. Used for create (defaults to 'Active') and required for update_status."),
       filePath: z.string().optional().describe("The file path for the comment thread. Used for create."),
-      fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply."),
+      fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply and update."),
       rightFileStartLine: z.coerce.number().min(1).optional().describe("Start line in the right file. Used for create."),
       rightFileStartOffset: z.number().optional().describe("Start character offset in the right file. Used for create."),
       rightFileEndLine: z.number().optional().describe("End line in the right file. Used for create."),
@@ -955,6 +956,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       pullRequestId,
       project,
       threadId,
+      commentId,
       content,
       status,
       filePath,
@@ -1053,6 +1055,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
 
           return { content: [{ type: "text", text: `Comment successfully added to thread ${threadId}.` }] };
+        }
+
+        if (action === "update") {
+          if (!threadId) return { content: [{ type: "text", text: "threadId is required for update" }], isError: true };
+          if (!commentId) return { content: [{ type: "text", text: "commentId is required for update" }], isError: true };
+          if (!content) return { content: [{ type: "text", text: "content is required for update" }], isError: true };
+
+          const comment = await gitApi.updateComment({ content }, repositoryId, pullRequestId, threadId, commentId, project);
+
+          if (!comment) {
+            return { content: [{ type: "text", text: `Error: Failed to update comment ${commentId} in thread ${threadId}. The comment was not updated successfully.` }], isError: true };
+          }
+
+          if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
+
+          return { content: [{ type: "text", text: `Comment ${commentId} successfully updated in thread ${threadId}.` }] };
         }
 
         if (action === "update_status") {
