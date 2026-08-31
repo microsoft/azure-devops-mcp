@@ -72,5 +72,9 @@
     "**/*.(js|ts|jsx|tsx|json|css|md)": [
       "npm run format"
     ]
+  },
+  "allowScripts": {
+    "keytar@7.9.0": true,
+    "@azure/msal-node-extensions@5.3.5": true
   }
 }
