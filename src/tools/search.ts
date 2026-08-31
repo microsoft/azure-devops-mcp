@@ -4,11 +4,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { IGitApi } from "azure-devops-node-api/GitApi.js";
+import { GitItem, VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { apiVersion } from "../utils.js";
 import { orgName } from "../index.js";
-import { VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
-import { GitItem } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import { createExternalContentResponse } from "../shared/content-safety.js";
 
 const SEARCH_TOOLS = {
   search_code: "search_code",
@@ -75,9 +75,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       const gitApi = await connection.getGitApi();
       const combinedResults = await fetchCombinedResults(resultJson.results ?? [], gitApi);
 
-      return {
-        content: [{ type: "text", text: resultText + JSON.stringify(combinedResults) }],
-      };
+      return createExternalContentResponse(resultText + JSON.stringify(combinedResults), "code search results");
     }
   );
 
@@ -126,9 +124,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       }
 
       const result = await response.text();
-      return {
-        content: [{ type: "text", text: result }],
-      };
+      return createExternalContentResponse(result, "wiki search results");
     }
   );
 
@@ -183,9 +179,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
       }
 
       const result = await response.text();
-      return {
-        content: [{ type: "text", text: result }],
-      };
+      return createExternalContentResponse(result, "work item search results");
     }
   );
 }
