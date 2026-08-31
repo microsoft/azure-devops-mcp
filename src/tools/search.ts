@@ -209,7 +209,7 @@ async function fetchCombinedResults(topSearchResults: SearchResult[], gitApi: IG
         continue;
       }
 
-      const versionDescriptor = changeId ? { version: changeId, versionType: 2, versionOptions: 0 } : undefined;
+      const versionDescriptor = { version: changeId, versionType: 2, versionOptions: 0 };
 
       const item = await gitApi.getItem(
         repositoryId,
