@@ -251,6 +251,16 @@ describe("DomainsManager: backward compatibility and domain enabling", () => {
       expect(result).toEqual(["all"]);
     });
 
+    it("returns 'all' when a whitespace-only string is provided", () => {
+      const result = DomainsManager.parseDomainsInput(" \n\t ");
+      expect(result).toEqual(["all"]);
+    });
+
+    it("returns 'all' when an empty array is provided", () => {
+      const result = DomainsManager.parseDomainsInput([]);
+      expect(result).toEqual(["all"]);
+    });
+
     it("parses comma-separated string input", () => {
       const result = DomainsManager.parseDomainsInput("repositories,pipelines,core");
       expect(result).toEqual(["repositories", "pipelines", "core"]);
