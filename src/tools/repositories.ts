@@ -705,7 +705,8 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       mergeCommitMessage: z.string().optional().describe("Commit message for autocomplete. Used for update."),
       deleteSourceBranch: z.boolean().optional().default(false).describe("Delete source branch on autocomplete. Used for update."),
       transitionWorkItems: z.boolean().optional().default(true).describe("Transition work items on autocomplete. Used for update."),
-      bypassReason: z.string().optional().describe("Reason for bypassing branch policies. Used for update."),
+      bypassPolicy: z.boolean().optional().default(false).describe("Explicitly bypass branch policies on autocomplete. Used for update and requires bypassReason when true."),
+      bypassReason: z.string().optional().describe("Reason for bypassing branch policies. Used for update only when bypassPolicy is true."),
       reviewerIds: z.array(z.string()).optional().describe("List of reviewer IDs. Required for update_reviewers."),
       reviewerAction: z.enum(["add", "remove"]).optional().describe("Whether to add or remove reviewers. Required for update_reviewers."),
       vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).optional().describe("The vote to cast. Required for vote."),
@@ -729,6 +730,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       mergeCommitMessage,
       deleteSourceBranch,
       transitionWorkItems,
+      bypassPolicy,
       bypassReason,
       reviewerIds,
       reviewerAction,
@@ -787,18 +789,22 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           if (autoComplete !== undefined) {
             if (autoComplete) {
+              if (bypassPolicy && !bypassReason) {
+                return { content: [{ type: "text", text: "bypassReason is required when bypassPolicy is true" }], isError: true };
+              }
+
               const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
               updateRequest.autoCompleteSetBy = { id: data.authenticatedUser.id };
 
               const completionOptions: GitPullRequestCompletionOptions = {
                 deleteSourceBranch: deleteSourceBranch || false,
                 transitionWorkItems: transitionWorkItems !== false,
-                bypassPolicy: !!bypassReason,
+                bypassPolicy: bypassPolicy === true,
               };
 
               if (mergeStrategy) completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
               if (mergeCommitMessage) completionOptions.mergeCommitMessage = mergeCommitMessage;
-              if (bypassReason) completionOptions.bypassReason = bypassReason;
+              if (bypassPolicy && bypassReason) completionOptions.bypassReason = bypassReason;
 
               updateRequest.completionOptions = completionOptions;
             } else {
