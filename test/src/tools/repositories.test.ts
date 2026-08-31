@@ -7894,7 +7894,9 @@ describe("repos tools", () => {
         });
 
         expect(result.isError).toBeFalsy();
-        expect(result.content[0].text).toBe(fileContent);
+        expect(result.content[0].text).toContain("UNTRUSTED REPOSITORY FILE CONTENT");
+        expect(result.content[0].text).toContain(fileContent);
+        expect(result.content[0].text).not.toBe(fileContent);
       });
 
       it("returns isError: true when getItemText throws", async () => {
@@ -8365,7 +8367,8 @@ describe("repos tools", () => {
       if (!call) throw new Error("not registered");
       const handler = call[3] as (p: unknown) => Promise<{ content: [{ text: string }] }>;
       const r = await handler({ action: "get_content", repositoryId: "r", path: "/file.ts" });
-      expect(r.content[0].text).toBe("file content");
+      expect(r.content[0].text).toContain("UNTRUSTED REPOSITORY FILE CONTENT");
+      expect(r.content[0].text).toContain("file content");
       expect(mockGitApi.getItemText).toHaveBeenCalledWith("r", "/file.ts", undefined, undefined, undefined, undefined, undefined, false, undefined, true);
     });
 
@@ -8485,7 +8488,9 @@ describe("repos tools", () => {
       if (!call) throw new Error("not registered");
       const handler = call[3] as (p: unknown) => Promise<{ content: [{ text: string }] }>;
       const r = await handler({ action: "get_content", repositoryId: "r", path: "/file.ts", version: "abc123", versionType: "Commit" });
-      expect(r.content[0].text).toBe("content");
+      expect(r.content[0].text).toContain("UNTRUSTED REPOSITORY FILE CONTENT");
+      expect(r.content[0].text).toContain("content");
+      expect(r.content[0].text).not.toBe("content");
       expect(mockGitApi.getItemText).toHaveBeenCalledWith(
         "r",
         "/file.ts",

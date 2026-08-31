@@ -564,7 +564,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             return { content: [{ type: "text", text: `Error getting file content for '${path}': ${streamError}` }], isError: true };
           }
 
-          return { content: [{ type: "text", text: content }] };
+          return createExternalContentResponse(content, "repository file");
         }
 
         if (action === "list_directory") {
