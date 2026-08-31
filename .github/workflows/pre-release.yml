@@ -11,7 +11,7 @@ on:
 
 jobs:
   pre-release:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -37,8 +37,9 @@ jobs:
         run: npm test
 
       - name: Publish to npm with nightly version
+        shell: pwsh
         run: |
-          DATE_STRING=$(date +%Y%m%d)
-          CURRENT_VERSION=$(npm pkg get version | tr -d '"')
-          npm version "$CURRENT_VERSION-nightly.$DATE_STRING" --no-git-tag-version
+          $dateString = Get-Date -Format "yyyyMMdd"
+          $currentVersion = (npm pkg get version).Trim('"')
+          npm version "$currentVersion-nightly.$dateString" --no-git-tag-version
           npm publish --access public --tag nightly --tag next --provenance
