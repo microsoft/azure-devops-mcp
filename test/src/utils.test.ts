@@ -27,6 +27,17 @@ describe("utils", () => {
     it("returns an empty array when only the runtime and script are present", () => {
       expect(getCliArgs(["node.exe", "dist/index.js"])).toEqual([]);
     });
+
+    it("uses process.argv when no argument is provided", () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "dist/index.js", "my_org-name", "--authentication", "azcli"];
+
+      try {
+        expect(getCliArgs()).toEqual(["my_org-name", "--authentication", "azcli"]);
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
   });
 
   describe("createEnumMapping", () => {
@@ -577,5 +588,9 @@ describe("getOrgFromUrl", () => {
   it("returns null when no org segment is present", () => {
     expect(getOrgFromUrl("https://dev.azure.com/")).toBeNull();
     expect(getOrgFromUrl("https://dev.azure.com")).toBeNull();
+  });
+
+  it("returns null when the legacy host has no organization subdomain", () => {
+    expect(getOrgFromUrl("https://visualstudio.com")).toBeNull();
   });
 });
