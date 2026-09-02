@@ -667,7 +667,7 @@ describe("repos tools", () => {
       expect(result.isError).toBeFalsy();
     });
 
-    it("should automatically bypass policies when bypassReason is provided", async () => {
+    it("should not bypass policies when only bypassReason is provided", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
@@ -706,6 +706,61 @@ describe("repos tools", () => {
       expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           autoCompleteSetBy: { id: "user123" },
+          completionOptions: expect.objectContaining({
+            bypassPolicy: false,
+          }),
+        }),
+        "test-repo-id",
+        123,
+        "test-project"
+      );
+      const update = mockGitApi.updatePullRequest.mock.calls[0][0];
+      expect(update.completionOptions).not.toHaveProperty("bypassReason");
+      expect(result.isError).toBeFalsy();
+    });
+
+    it("should require a reason to explicitly bypass policies", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "update",
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        project: "test-project",
+        autoComplete: true,
+        bypassPolicy: true,
+      });
+
+      expect(mockGitApi.updatePullRequest).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("bypassReason is required when bypassPolicy is true");
+    });
+
+    it("should bypass policies only when explicitly requested with a reason", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.updatePullRequest.mockResolvedValue({ pullRequestId: 123 });
+
+      const result = await handler({
+        action: "update",
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        project: "test-project",
+        autoComplete: true,
+        bypassPolicy: true,
+        bypassReason: "Emergency fix needed",
+      });
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
           completionOptions: expect.objectContaining({
             bypassPolicy: true,
             bypassReason: "Emergency fix needed",
