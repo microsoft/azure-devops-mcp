@@ -5230,18 +5230,6 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toBe("Project selection cancelled.");
     });
 
-    it("get_work_item: should return elicitation response when project selection is declined", async () => {
-      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item");
-      if (!call) throw new Error("wit_work_item not registered");
-      const [, , , handler] = call;
-
-      setupElicitMocks("decline");
-
-      const result = await handler({ action: "get", id: 1 });
-      expect(result.content[0].text).toBe("Project selection cancelled.");
-    });
-
     it("list_work_item_comments: should return elicitation response when project selection is declined", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item");
@@ -5489,17 +5477,17 @@ describe("configureWorkItemTools", () => {
       expect(mockWorkItemTrackingApi.getWorkItemsBatch).toHaveBeenCalledWith({ ids: [1, 2], fields: expect.any(Array) }, "Contoso");
     });
 
-    it("get_work_item: should use elicited project when project is not provided", async () => {
+    it("get_work_item: should retrieve at organization scope when project is not provided", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item");
       if (!call) throw new Error("wit_work_item not registered");
       const [, , , handler] = call;
 
-      setupAcceptMocks();
       (mockWorkItemTrackingApi.getWorkItem as jest.Mock).mockResolvedValue({ id: 1 });
 
       await handler({ action: "get", id: 1 });
-      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, undefined, undefined, undefined, "Contoso");
+      expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, undefined, undefined, undefined, undefined);
+      expect((server as unknown as { server: { elicitInput: jest.Mock } }).server.elicitInput).not.toHaveBeenCalled();
     });
 
     it("list_work_item_comments: should use elicited project when project is not provided", async () => {

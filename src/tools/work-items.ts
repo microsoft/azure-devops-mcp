@@ -107,14 +107,19 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
   // --- wit_work_item ----------------------------------------------------------
   server.tool(
     WORKITEM_TOOLS.wit_work_item,
-    "Retrieve work item data for a project. Use the action parameter to specify the operation.",
+    "Retrieve work item data. Use the action parameter to specify the operation.",
     {
       action: z
         .enum(["get", "get_batch", "list_comments", "my", "list_revisions", "list_for_iteration", "get_type"])
         .describe(
           "The action to perform. Options: get (get a single work item by ID), get_batch (get multiple work items by IDs), list_comments (list comments on a work item), my (get work items relevant to the authenticated user), list_revisions (list revisions of a work item), list_for_iteration (list work items for a team iteration), get_type (get metadata for a work item type)."
         ),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: z
+        .string()
+        .optional()
+        .describe(
+          "The name or ID of the Azure DevOps project. Optional for get; when omitted, the work item is retrieved at organization scope. For other actions, a project selection prompt will be shown if omitted."
+        ),
       id: z.coerce.number().min(1).optional().describe("Work item ID. Required for: get."),
       ids: z.array(z.coerce.number().min(1)).optional().describe("Work item IDs. Required for: get_batch."),
       workItemId: z.coerce.number().min(1).optional().describe("Work item ID. Required for: list_comments, list_revisions."),
@@ -140,11 +145,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (action === "get") {
           if (!id) return { content: [{ type: "text", text: "id is required for get" }], isError: true };
-          if (!resolvedProject) {
-            const result = await elicitProject(server, connection, "Select the Azure DevOps project to retrieve the work item from.");
-            if ("response" in result) return result.response;
-            resolvedProject = result.resolved;
-          }
           let effectiveExpand = expand;
           if (fields && fields.length > 0 && effectiveExpand != null) {
             effectiveExpand = "none";
