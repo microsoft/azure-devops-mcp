@@ -32,6 +32,7 @@ import { createExternalContentResponse } from "../shared/content-safety.js";
 const REPO_TOOLS = {
   repo_repository: "repo_repository",
   repo_pull_request: "repo_pull_request",
+  repo_pull_request_org: "repo_pull_request_org",
   repo_pull_request_thread: "repo_pull_request_thread",
   repo_branch: "repo_branch",
   repo_file: "repo_file",
@@ -124,6 +125,40 @@ function trimPullRequest(pr: GitPullRequest | null | undefined, includeDescripti
     targetRefName: pr.targetRefName,
     project: pr.repository?.project?.name,
   };
+}
+
+function trimOrganizationPullRequest(pr: GitPullRequest) {
+  return {
+    ...trimPullRequest(pr),
+    projectId: pr.repository?.project?.id,
+    repositoryId: pr.repository?.id,
+    createdBy: {
+      id: pr.createdBy?.id,
+      displayName: pr.createdBy?.displayName,
+      uniqueName: pr.createdBy?.uniqueName,
+    },
+    reviewers: pr.reviewers?.map((reviewer) => ({
+      id: reviewer.id,
+      displayName: reviewer.displayName,
+      uniqueName: reviewer.uniqueName,
+      vote: reviewer.vote,
+      isRequired: reviewer.isRequired,
+    })),
+    webUrl: pr.remoteUrl,
+  };
+}
+
+async function getOrganizationPullRequests(connection: WebApi, identityFilter: "creatorId" | "reviewerId", identityId: string, status: number, skip: number, top: number): Promise<GitPullRequest[]> {
+  const url = new URL(`${connection.serverUrl.replace(/\/$/, "")}/_apis/git/pullrequests`);
+
+  url.searchParams.set("api-version", "7.1");
+  url.searchParams.set("$skip", String(skip));
+  url.searchParams.set("$top", String(top));
+  url.searchParams.set(`searchCriteria.${identityFilter}`, identityId);
+  url.searchParams.set("searchCriteria.status", String(status));
+
+  const response = await connection.rest.get<{ value?: GitPullRequest[] }>(url.toString(), { deserializeDates: true });
+  return response.result?.value ?? [];
 }
 
 function buildVersionDescriptor(version?: string, versionType?: string): GitVersionDescriptor | undefined {
@@ -388,6 +423,42 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return { content: [{ type: "text", text: `Error with pull request operation: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  // --- repo_pull_request_org -------------------------------------------------
+  server.tool(
+    REPO_TOOLS.repo_pull_request_org,
+    "List pull requests across the organization for a user as either the creator or a reviewer.",
+    {
+      userEmail: z.string().email().describe("The email address of the user."),
+      is_reviewer: z.boolean().default(false).describe("Whether to find pull requests where the user is a reviewer instead of the creator."),
+      reviewStatus: z.enum(["all", "approved", "pending"]).default("all").describe("Filter by the user's review status when is_reviewer is true."),
+      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Defaults to 100."),
+      skip: z.coerce.number().default(0).describe("The number of pull requests to skip. Defaults to 0."),
+    },
+    async ({ userEmail, is_reviewer, reviewStatus, top, skip }) => {
+      try {
+        const userId = await getUserIdFromEmail(userEmail, tokenProvider, connectionProvider, userAgentProvider);
+        const identityFilter = is_reviewer ? "reviewerId" : "creatorId";
+        const connection = await connectionProvider();
+        const pullRequests = await getOrganizationPullRequests(connection, identityFilter, userId, PullRequestStatus.Active, skip, top);
+
+        const filteredPullRequests = pullRequests.filter((pullRequest) => {
+          if (!is_reviewer || reviewStatus === "all") return true;
+
+          const reviewer = pullRequest.reviewers?.find((item) => item.id === userId);
+          if (reviewStatus === "approved") return reviewer?.vote === 10 || reviewer?.vote === 5;
+          return reviewer?.vote === 0;
+        });
+
+        const trimmedPullRequests = filteredPullRequests.map((pullRequest) => trimOrganizationPullRequest(pullRequest));
+
+        return { content: [{ type: "text", text: JSON.stringify(trimmedPullRequests, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error with organization pull request operation: ${errorMessage}` }], isError: true };
       }
     }
   );
