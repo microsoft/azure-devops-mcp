@@ -17,8 +17,6 @@ import {
   GitPullRequestCompletionOptions,
   GitPullRequestMergeStrategy,
   GitPullRequest,
-  GitPullRequestSearchCriteria,
-  PullRequestTimeRangeType,
   GitPullRequestCommentThread,
   Comment,
   VersionControlRecursionType,
@@ -150,24 +148,14 @@ function trimOrganizationPullRequest(pr: GitPullRequest) {
   };
 }
 
-async function getOrganizationPullRequests(connection: WebApi, searchCriteria: GitPullRequestSearchCriteria, skip: number, top: number): Promise<GitPullRequest[]> {
+async function getOrganizationPullRequests(connection: WebApi, identityFilter: "creatorId" | "reviewerId", identityId: string, status: number, skip: number, top: number): Promise<GitPullRequest[]> {
   const url = new URL(`${connection.serverUrl.replace(/\/$/, "")}/_apis/git/pullrequests`);
 
   url.searchParams.set("api-version", "7.1");
   url.searchParams.set("$skip", String(skip));
   url.searchParams.set("$top", String(top));
-
-  if (searchCriteria.creatorId) url.searchParams.set("searchCriteria.creatorId", searchCriteria.creatorId);
-  if (searchCriteria.reviewerId) url.searchParams.set("searchCriteria.reviewerId", searchCriteria.reviewerId);
-  if (searchCriteria.status !== undefined) url.searchParams.set("searchCriteria.status", String(searchCriteria.status));
-  if (searchCriteria.repositoryId) url.searchParams.set("searchCriteria.repositoryId", searchCriteria.repositoryId);
-  if (searchCriteria.sourceRefName) url.searchParams.set("searchCriteria.sourceRefName", searchCriteria.sourceRefName);
-  if (searchCriteria.sourceRepositoryId) url.searchParams.set("searchCriteria.sourceRepositoryId", searchCriteria.sourceRepositoryId);
-  if (searchCriteria.targetRefName) url.searchParams.set("searchCriteria.targetRefName", searchCriteria.targetRefName);
-  if (searchCriteria.minTime) url.searchParams.set("searchCriteria.minTime", searchCriteria.minTime.toISOString());
-  if (searchCriteria.maxTime) url.searchParams.set("searchCriteria.maxTime", searchCriteria.maxTime.toISOString());
-  if (searchCriteria.queryTimeRangeType !== undefined) url.searchParams.set("searchCriteria.queryTimeRangeType", String(searchCriteria.queryTimeRangeType));
-  if (searchCriteria.includeLinks !== undefined) url.searchParams.set("searchCriteria.includeLinks", String(searchCriteria.includeLinks));
+  url.searchParams.set(`searchCriteria.${identityFilter}`, identityId);
+  url.searchParams.set("searchCriteria.status", String(status));
 
   const response = await connection.rest.get<{ value?: GitPullRequest[] }>(url.toString(), { deserializeDates: true });
   return response.result?.value ?? [];
@@ -442,88 +430,30 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   // --- repo_pull_request_org -------------------------------------------------
   server.tool(
     REPO_TOOLS.repo_pull_request_org,
-    "List pull requests across all projects and repositories in the organization.",
+    "List pull requests across the organization for a user as either the creator or a reviewer.",
     {
-      repositoryId: z.string().optional().describe("Filter by target repository ID."),
-      creatorId: z.string().optional().describe("Filter by creator identity ID."),
-      reviewerId: z.string().optional().describe("Filter by reviewer identity ID."),
-      created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
-      created_by_user: z.string().optional().describe("Filter pull requests created by a specific user email."),
-      i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
-      user_is_reviewer: z.string().optional().describe("Filter pull requests where a specific user is a reviewer."),
-      status: z
-        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
-        .default("Active")
-        .describe("Filter pull requests by status. Defaults to 'Active'."),
-      sourceRefName: z.string().optional().describe("Filter by source branch."),
-      sourceRepositoryId: z.string().optional().describe("Filter by source repository ID."),
-      targetRefName: z.string().optional().describe("Filter by target branch."),
-      minTime: z.string().datetime().optional().describe("Filter pull requests created or closed after this ISO 8601 date."),
-      maxTime: z.string().datetime().optional().describe("Filter pull requests created or closed before this ISO 8601 date."),
-      queryTimeRangeType: z.enum(["Created", "Closed"]).optional().describe("Whether minTime and maxTime apply to creation or closure time."),
-      includeLinks: z.boolean().optional().describe("Whether to include links in shallow references."),
+      userEmail: z.string().email().describe("The email address of the user."),
+      is_reviewer: z.boolean().default(false).describe("Whether to find pull requests where the user is a reviewer instead of the creator."),
+      reviewStatus: z.enum(["all", "approved", "pending"]).default("all").describe("Filter by the user's review status when is_reviewer is true."),
       top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Defaults to 100."),
       skip: z.coerce.number().default(0).describe("The number of pull requests to skip. Defaults to 0."),
     },
-    async ({
-      repositoryId,
-      creatorId,
-      reviewerId,
-      created_by_me,
-      created_by_user,
-      i_am_reviewer,
-      user_is_reviewer,
-      status,
-      sourceRefName,
-      sourceRepositoryId,
-      targetRefName,
-      minTime,
-      maxTime,
-      queryTimeRangeType,
-      includeLinks,
-      top,
-      skip,
-    }) => {
+    async ({ userEmail, is_reviewer, reviewStatus, top, skip }) => {
       try {
-        if ((creatorId && (created_by_user || created_by_me)) || (created_by_user && created_by_me)) {
-          return { content: [{ type: "text", text: "Only one of creatorId, created_by_user, or created_by_me may be specified." }], isError: true };
-        }
-
-        if ((reviewerId && (user_is_reviewer || i_am_reviewer)) || (user_is_reviewer && i_am_reviewer)) {
-          return { content: [{ type: "text", text: "Only one of reviewerId, user_is_reviewer, or i_am_reviewer may be specified." }], isError: true };
-        }
-
-        const searchCriteria: GitPullRequestSearchCriteria = {
-          repositoryId,
-          creatorId,
-          reviewerId,
-          status: pullRequestStatusStringToInt(status),
-          sourceRefName,
-          sourceRepositoryId,
-          targetRefName,
-          minTime: minTime ? new Date(minTime) : undefined,
-          maxTime: maxTime ? new Date(maxTime) : undefined,
-          queryTimeRangeType: queryTimeRangeType ? PullRequestTimeRangeType[queryTimeRangeType] : undefined,
-          includeLinks,
-        };
-
-        if (created_by_user) {
-          searchCriteria.creatorId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
-        } else if (created_by_me) {
-          const currentUser = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-          searchCriteria.creatorId = currentUser.authenticatedUser.id;
-        }
-
-        if (user_is_reviewer) {
-          searchCriteria.reviewerId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
-        } else if (i_am_reviewer) {
-          const currentUser = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-          searchCriteria.reviewerId = currentUser.authenticatedUser.id;
-        }
-
+        const userId = await getUserIdFromEmail(userEmail, tokenProvider, connectionProvider, userAgentProvider);
+        const identityFilter = is_reviewer ? "reviewerId" : "creatorId";
         const connection = await connectionProvider();
-        const pullRequests = await getOrganizationPullRequests(connection, searchCriteria, skip, top);
-        const trimmedPullRequests = pullRequests.map((pullRequest) => trimOrganizationPullRequest(pullRequest));
+        const pullRequests = await getOrganizationPullRequests(connection, identityFilter, userId, PullRequestStatus.Active, skip, top);
+
+        const filteredPullRequests = pullRequests.filter((pullRequest) => {
+          if (!is_reviewer || reviewStatus === "all") return true;
+
+          const reviewer = pullRequest.reviewers?.find((item) => item.id === userId);
+          if (reviewStatus === "approved") return reviewer?.vote === 10 || reviewer?.vote === 5;
+          return reviewer?.vote === 0;
+        });
+
+        const trimmedPullRequests = filteredPullRequests.map((pullRequest) => trimOrganizationPullRequest(pullRequest));
 
         return { content: [{ type: "text", text: JSON.stringify(trimmedPullRequests, null, 2) }] };
       } catch (error) {
