@@ -17,6 +17,8 @@ import {
   GitPullRequestCompletionOptions,
   GitPullRequestMergeStrategy,
   GitPullRequest,
+  GitPullRequestSearchCriteria,
+  PullRequestTimeRangeType,
   GitPullRequestCommentThread,
   Comment,
   VersionControlRecursionType,
@@ -32,6 +34,7 @@ import { createExternalContentResponse } from "../shared/content-safety.js";
 const REPO_TOOLS = {
   repo_repository: "repo_repository",
   repo_pull_request: "repo_pull_request",
+  repo_pull_request_org: "repo_pull_request_org",
   repo_pull_request_thread: "repo_pull_request_thread",
   repo_branch: "repo_branch",
   repo_file: "repo_file",
@@ -124,6 +127,50 @@ function trimPullRequest(pr: GitPullRequest | null | undefined, includeDescripti
     targetRefName: pr.targetRefName,
     project: pr.repository?.project?.name,
   };
+}
+
+function trimOrganizationPullRequest(pr: GitPullRequest) {
+  return {
+    ...trimPullRequest(pr),
+    projectId: pr.repository?.project?.id,
+    repositoryId: pr.repository?.id,
+    createdBy: {
+      id: pr.createdBy?.id,
+      displayName: pr.createdBy?.displayName,
+      uniqueName: pr.createdBy?.uniqueName,
+    },
+    reviewers: pr.reviewers?.map((reviewer) => ({
+      id: reviewer.id,
+      displayName: reviewer.displayName,
+      uniqueName: reviewer.uniqueName,
+      vote: reviewer.vote,
+      isRequired: reviewer.isRequired,
+    })),
+    webUrl: pr.remoteUrl,
+  };
+}
+
+async function getOrganizationPullRequests(connection: WebApi, searchCriteria: GitPullRequestSearchCriteria, skip: number, top: number): Promise<GitPullRequest[]> {
+  const url = new URL(`${connection.serverUrl.replace(/\/$/, "")}/_apis/git/pullrequests`);
+
+  url.searchParams.set("api-version", "7.1");
+  url.searchParams.set("$skip", String(skip));
+  url.searchParams.set("$top", String(top));
+
+  if (searchCriteria.creatorId) url.searchParams.set("searchCriteria.creatorId", searchCriteria.creatorId);
+  if (searchCriteria.reviewerId) url.searchParams.set("searchCriteria.reviewerId", searchCriteria.reviewerId);
+  if (searchCriteria.status !== undefined) url.searchParams.set("searchCriteria.status", String(searchCriteria.status));
+  if (searchCriteria.repositoryId) url.searchParams.set("searchCriteria.repositoryId", searchCriteria.repositoryId);
+  if (searchCriteria.sourceRefName) url.searchParams.set("searchCriteria.sourceRefName", searchCriteria.sourceRefName);
+  if (searchCriteria.sourceRepositoryId) url.searchParams.set("searchCriteria.sourceRepositoryId", searchCriteria.sourceRepositoryId);
+  if (searchCriteria.targetRefName) url.searchParams.set("searchCriteria.targetRefName", searchCriteria.targetRefName);
+  if (searchCriteria.minTime) url.searchParams.set("searchCriteria.minTime", searchCriteria.minTime.toISOString());
+  if (searchCriteria.maxTime) url.searchParams.set("searchCriteria.maxTime", searchCriteria.maxTime.toISOString());
+  if (searchCriteria.queryTimeRangeType !== undefined) url.searchParams.set("searchCriteria.queryTimeRangeType", String(searchCriteria.queryTimeRangeType));
+  if (searchCriteria.includeLinks !== undefined) url.searchParams.set("searchCriteria.includeLinks", String(searchCriteria.includeLinks));
+
+  const response = await connection.rest.get<{ value?: GitPullRequest[] }>(url.toString(), { deserializeDates: true });
+  return response.result?.value ?? [];
 }
 
 function buildVersionDescriptor(version?: string, versionType?: string): GitVersionDescriptor | undefined {
@@ -388,6 +435,100 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return { content: [{ type: "text", text: `Error with pull request operation: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  // --- repo_pull_request_org -------------------------------------------------
+  server.tool(
+    REPO_TOOLS.repo_pull_request_org,
+    "List pull requests across all projects and repositories in the organization.",
+    {
+      repositoryId: z.string().optional().describe("Filter by target repository ID."),
+      creatorId: z.string().optional().describe("Filter by creator identity ID."),
+      reviewerId: z.string().optional().describe("Filter by reviewer identity ID."),
+      created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user."),
+      created_by_user: z.string().optional().describe("Filter pull requests created by a specific user email."),
+      i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer."),
+      user_is_reviewer: z.string().optional().describe("Filter pull requests where a specific user is a reviewer."),
+      status: z
+        .enum(getEnumKeys(PullRequestStatus) as [string, ...string[]])
+        .default("Active")
+        .describe("Filter pull requests by status. Defaults to 'Active'."),
+      sourceRefName: z.string().optional().describe("Filter by source branch."),
+      sourceRepositoryId: z.string().optional().describe("Filter by source repository ID."),
+      targetRefName: z.string().optional().describe("Filter by target branch."),
+      minTime: z.string().datetime().optional().describe("Filter pull requests created or closed after this ISO 8601 date."),
+      maxTime: z.string().datetime().optional().describe("Filter pull requests created or closed before this ISO 8601 date."),
+      queryTimeRangeType: z.enum(["Created", "Closed"]).optional().describe("Whether minTime and maxTime apply to creation or closure time."),
+      includeLinks: z.boolean().optional().describe("Whether to include links in shallow references."),
+      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Defaults to 100."),
+      skip: z.coerce.number().default(0).describe("The number of pull requests to skip. Defaults to 0."),
+    },
+    async ({
+      repositoryId,
+      creatorId,
+      reviewerId,
+      created_by_me,
+      created_by_user,
+      i_am_reviewer,
+      user_is_reviewer,
+      status,
+      sourceRefName,
+      sourceRepositoryId,
+      targetRefName,
+      minTime,
+      maxTime,
+      queryTimeRangeType,
+      includeLinks,
+      top,
+      skip,
+    }) => {
+      try {
+        if ((creatorId && (created_by_user || created_by_me)) || (created_by_user && created_by_me)) {
+          return { content: [{ type: "text", text: "Only one of creatorId, created_by_user, or created_by_me may be specified." }], isError: true };
+        }
+
+        if ((reviewerId && (user_is_reviewer || i_am_reviewer)) || (user_is_reviewer && i_am_reviewer)) {
+          return { content: [{ type: "text", text: "Only one of reviewerId, user_is_reviewer, or i_am_reviewer may be specified." }], isError: true };
+        }
+
+        const searchCriteria: GitPullRequestSearchCriteria = {
+          repositoryId,
+          creatorId,
+          reviewerId,
+          status: pullRequestStatusStringToInt(status),
+          sourceRefName,
+          sourceRepositoryId,
+          targetRefName,
+          minTime: minTime ? new Date(minTime) : undefined,
+          maxTime: maxTime ? new Date(maxTime) : undefined,
+          queryTimeRangeType: queryTimeRangeType ? PullRequestTimeRangeType[queryTimeRangeType] : undefined,
+          includeLinks,
+        };
+
+        if (created_by_user) {
+          searchCriteria.creatorId = await getUserIdFromEmail(created_by_user, tokenProvider, connectionProvider, userAgentProvider);
+        } else if (created_by_me) {
+          const currentUser = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          searchCriteria.creatorId = currentUser.authenticatedUser.id;
+        }
+
+        if (user_is_reviewer) {
+          searchCriteria.reviewerId = await getUserIdFromEmail(user_is_reviewer, tokenProvider, connectionProvider, userAgentProvider);
+        } else if (i_am_reviewer) {
+          const currentUser = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+          searchCriteria.reviewerId = currentUser.authenticatedUser.id;
+        }
+
+        const connection = await connectionProvider();
+        const pullRequests = await getOrganizationPullRequests(connection, searchCriteria, skip, top);
+        const trimmedPullRequests = pullRequests.map((pullRequest) => trimOrganizationPullRequest(pullRequest));
+
+        return { content: [{ type: "text", text: JSON.stringify(trimmedPullRequests, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error with organization pull request operation: ${errorMessage}` }], isError: true };
       }
     }
   );
