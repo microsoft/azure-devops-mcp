@@ -47,13 +47,6 @@ module.exports = {
   },
 
   moduleNameMapper: {
-    "^(.+)/version\\.js$": "$1/version.ts",
-    "^(.+)/utils\\.js$": "$1/utils.ts",
-    "^(.+)/auth\\.js$": "$1/auth.ts",
-    "^(.+)/logger\\.js$": "$1/logger.ts",
-    "^(.+)/elicitations\\.js$": "$1/elicitations.ts",
-    "^(.+)/content-safety\\.js$": "$1/content-safety.ts",
-    "^(.+)/pipelines\\.dto\\.js$": "$1/pipelines.dto.ts",
-    "^(.+)/index\\.js$": "$1/index.ts",
+    "^(\\.{1,2}/.*)\\.js$": "$1",
   },
 };
