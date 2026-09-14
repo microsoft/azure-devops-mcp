@@ -236,7 +236,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   // --- repo_pull_request -----------------------------------------------------
   server.tool(
     REPO_TOOLS.repo_pull_request,
-    "Retrieve pull request data. Use the action parameter to specify the operation.",
+    "Retrieve pull request data for a specific repository or project, or retrieve one pull request by ID. For the authenticated user's active pull requests across the entire organization, use repo_pull_request_org.",
     {
       action: z
         .enum(["get", "list", "list_by_commits"])
@@ -430,17 +430,25 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   // --- repo_pull_request_org -------------------------------------------------
   server.tool(
     REPO_TOOLS.repo_pull_request_org,
-    "List pull requests across the organization for a user as either the creator or a reviewer.",
+    "List active pull requests across all projects and repositories in the organization for the authenticated user. Use this tool for organization-wide requests such as 'my pull requests' or 'pull requests awaiting my review'. For a specific project, repository, or pull request ID, use repo_pull_request.",
     {
-      userEmail: z.string().email().describe("The email address of the user."),
-      is_reviewer: z.boolean().default(false).describe("Whether to find pull requests where the user is a reviewer instead of the creator."),
-      reviewStatus: z.enum(["all", "approved", "pending"]).default("all").describe("Filter by the user's review status when is_reviewer is true."),
-      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Defaults to 100."),
-      skip: z.coerce.number().default(0).describe("The number of pull requests to skip. Defaults to 0."),
+      is_reviewer: z
+        .boolean()
+        .default(false)
+        .describe("Set to true for active pull requests where the authenticated user is a reviewer. Set to false for active pull requests created by the authenticated user."),
+      reviewStatus: z
+        .enum(["all", "approved", "pending"])
+        .default("all")
+        .describe(
+          "Filter by the authenticated user's reviewer vote when is_reviewer is true: all includes every vote, approved includes Approved and Approved with suggestions, and pending includes only No vote."
+        ),
+      top: z.coerce.number().default(100).describe("The maximum number of active pull requests to retrieve before applying the reviewStatus filter. Defaults to 100."),
+      skip: z.coerce.number().default(0).describe("The number of active pull requests to skip before applying the reviewStatus filter. Defaults to 0."),
     },
-    async ({ userEmail, is_reviewer, reviewStatus, top, skip }) => {
+    async ({ is_reviewer, reviewStatus, top, skip }) => {
       try {
-        const userId = await getUserIdFromEmail(userEmail, tokenProvider, connectionProvider, userAgentProvider);
+        const currentUser = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
+        const userId = currentUser.authenticatedUser.id;
         const identityFilter = is_reviewer ? "reviewerId" : "creatorId";
         const connection = await connectionProvider();
         const pullRequests = await getOrganizationPullRequests(connection, identityFilter, userId, PullRequestStatus.Active, skip, top);
