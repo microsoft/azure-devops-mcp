@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import * as fs from "fs";
+import { Readable } from "stream";
 import * as path from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTool } from "../shared/tool-registration.js";
@@ -36,6 +37,7 @@ const WORKITEM_TOOLS = {
   work_item_unlink: "wit_work_item_unlink",
   add_artifact_link: "wit_add_artifact_link",
   get_work_item_attachment: "wit_get_work_item_attachment",
+  create_attachment: "wit_create_attachment",
   query_by_wiql: "wit_query_by_wiql",
 };
 
@@ -1527,6 +1529,66 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           content: [{ type: "text", text: `Error executing WIQL query: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.create_attachment,
+    "Upload a file as a work item attachment, optionally attaching it to a work item in the same call. Pass the file content inline: plain text as-is, or binary (images, archives, PDFs) base64-encoded with contentIsBase64 set. If a project is not specified, you will be prompted to select one.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      fileName: z.string().describe("The file name to store the attachment under, e.g. 'repro-steps.md' or 'screenshot.png'. The extension determines how Azure DevOps renders it."),
+      content: z.string().describe("The file content. Plain text by default; base64-encoded when contentIsBase64 is true."),
+      contentIsBase64: z.boolean().default(false).describe("Set to true when 'content' is base64-encoded, which is required for binary files."),
+      workItemId: z.coerce.number().min(1).optional().describe("If provided, the uploaded file is also attached to this work item. Omit to only upload and get an attachment URL back."),
+      comment: z.string().optional().describe("Comment stored on the attachment link. Only used when workItemId is provided."),
+      areaPath: z.string().optional().describe("Area path to associate the upload with. Rarely needed."),
+    },
+    async ({ project, fileName, content, contentIsBase64, workItemId, comment, areaPath }) => {
+      try {
+        const connection = await connectionProvider();
+
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to upload the attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const buffer = Buffer.from(content, contentIsBase64 ? "base64" : "utf8");
+        // Wrap the buffer in an array: Readable.from(buffer) would iterate the
+        // Buffer byte by byte and upload a stream of individual numbers.
+        const attachment = await workItemTrackingApi.createAttachment({}, Readable.from([buffer]), fileName, "simple", resolvedProject, areaPath);
+
+        if (!attachment?.url) {
+          return { content: [{ type: "text", text: "Attachment upload did not return a URL." }], isError: true };
+        }
+
+        if (!workItemId) {
+          return { content: [{ type: "text", text: JSON.stringify(attachment, null, 2) }] };
+        }
+
+        const patchDocument = [
+          {
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "AttachedFile",
+              url: attachment.url,
+              attributes: comment ? { comment } : {},
+            },
+          },
+        ];
+
+        const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+
+        return { content: [{ type: "text", text: JSON.stringify({ attachment, workItem: { id: workItem?.id, rev: workItem?.rev } }, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error creating work item attachment: ${errorMessage}` }], isError: true };
       }
     }
   );

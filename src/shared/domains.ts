@@ -38,6 +38,7 @@ export enum Domain {
   FEATURE_MANAGEMENT = "feature-management",
   GALLERY = "gallery",
   PROFILE = "profile",
+  APPROVALS = "approvals",
 }
 
 export const ALL_DOMAINS = "all";

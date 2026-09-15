@@ -49,6 +49,7 @@ interface WorkItemTrackingApiMock {
   queryById: jest.Mock;
   queryByWiql: jest.Mock;
   getAttachmentContent: jest.Mock;
+  createAttachment: jest.Mock;
 }
 
 interface MockConnection {
@@ -92,6 +93,7 @@ describe("configureWorkItemTools", () => {
       queryById: jest.fn(),
       queryByWiql: jest.fn(),
       getAttachmentContent: jest.fn(),
+      createAttachment: jest.fn(),
     };
 
     mockConnection = {
@@ -3822,6 +3824,89 @@ describe("configureWorkItemTools", () => {
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe("Work item update failed");
       });
+    });
+  });
+
+  describe("wit_create_attachment tool", () => {
+    function getHandler() {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_create_attachment");
+      if (!call) throw new Error("wit_create_attachment tool not registered");
+      return call[3];
+    }
+
+    async function readStream(stream: NodeJS.ReadableStream): Promise<Buffer> {
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk as Buffer));
+      }
+      return Buffer.concat(chunks);
+    }
+
+    it("uploads text content and returns the attachment reference", async () => {
+      const handler = getHandler();
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({ id: "att-1", url: "https://dev.azure.com/org/_apis/wit/attachments/att-1" });
+
+      const result = await handler({ project: "TestProject", fileName: "notes.md", content: "hello", contentIsBase64: false });
+
+      const [, stream, fileName, uploadType, project] = mockWorkItemTrackingApi.createAttachment.mock.calls[0];
+      expect(await readStream(stream)).toEqual(Buffer.from("hello", "utf8"));
+      expect(fileName).toBe("notes.md");
+      expect(uploadType).toBe("simple");
+      expect(project).toBe("TestProject");
+      expect(mockWorkItemTrackingApi.updateWorkItem).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain("att-1");
+    });
+
+    it("decodes base64 content before uploading", async () => {
+      const handler = getHandler();
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({ id: "att-2", url: "https://example/att-2" });
+      const binary = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+      await handler({ project: "TestProject", fileName: "img.png", content: binary.toString("base64"), contentIsBase64: true });
+
+      const stream = mockWorkItemTrackingApi.createAttachment.mock.calls[0][1];
+      expect(await readStream(stream)).toEqual(binary);
+    });
+
+    it("attaches the upload to a work item when workItemId is given", async () => {
+      const handler = getHandler();
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({ id: "att-3", url: "https://example/att-3" });
+      mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue({ id: 42, rev: 7 });
+
+      const result = await handler({ project: "TestProject", fileName: "log.txt", content: "trace", contentIsBase64: false, workItemId: 42, comment: "build log" });
+
+      const [, patchDocument, workItemId, project] = mockWorkItemTrackingApi.updateWorkItem.mock.calls[0];
+      expect(patchDocument).toEqual([
+        {
+          op: "add",
+          path: "/relations/-",
+          value: { rel: "AttachedFile", url: "https://example/att-3", attributes: { comment: "build log" } },
+        },
+      ]);
+      expect(workItemId).toBe(42);
+      expect(project).toBe("TestProject");
+      expect(JSON.parse(result.content[0].text).workItem).toEqual({ id: 42, rev: 7 });
+    });
+
+    it("reports an upload that returns no URL as an error", async () => {
+      const handler = getHandler();
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({ id: "att-4" });
+
+      const result = await handler({ project: "TestProject", fileName: "x.txt", content: "y", contentIsBase64: false });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("did not return a URL");
+    });
+
+    it("surfaces upload failures as an error result", async () => {
+      const handler = getHandler();
+      mockWorkItemTrackingApi.createAttachment.mockRejectedValue(new Error("TF401019: attachment too large"));
+
+      const result = await handler({ project: "TestProject", fileName: "big.bin", content: "AAAA", contentIsBase64: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating work item attachment: TF401019: attachment too large");
     });
   });
 
