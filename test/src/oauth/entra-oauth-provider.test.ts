@@ -60,11 +60,15 @@ describe("EntraOAuthProvider", () => {
   });
 
   describe("dynamic client registration", () => {
-    it("issues a client_id", () => {
-      const registered = provider.clientsStore.registerClient?.({ redirect_uris: ["https://client.example/cb"] } as never);
+    it("issues a client_id and persists the registration in the state store", async () => {
+      const registered = await provider.clientsStore.registerClient?.({ redirect_uris: ["https://client.example/cb"] } as never);
       if (!registered) throw new Error("registerClient not implemented");
       expect(registered.client_id).toBeTruthy();
-      expect(provider.clientsStore.getClient(registered.client_id)).toBe(registered);
+      await expect(provider.clientsStore.getClient(registered.client_id)).resolves.toEqual(registered);
+    });
+
+    it("does not know a client that was never registered", async () => {
+      await expect(provider.clientsStore.getClient("never-seen")).resolves.toBeUndefined();
     });
   });
 

@@ -49,6 +49,15 @@ param entraClientId string = ''
 @secure()
 param entraClientSecret string = ''
 
+@description('Name of the storage account holding the OAuth server state (client registrations, pending authorizations, issued codes). Leave empty to keep that state in memory, which means every restart invalidates it and the app is pinned to a single replica.')
+param oauthStateStorageAccountName string = ''
+
+@description('Table that holds the OAuth server state.')
+param oauthStateTableName string = 'oauthstate'
+
+@description('Whether to create the "Storage Table Data Contributor" assignment for the app identity on the state storage account. Requires the deployer to be able to manage role assignments; set to false when it is granted out-of-band.')
+param assignTableRole bool = true
+
 @description('Tool domains to enable (space-separated), or "all".')
 param enabledDomains string = 'all'
 
@@ -131,12 +140,58 @@ module acrPullAssignment 'acr-pull-role.bicep' = if (assignAcrPullRole) {
   }
 }
 
+// Storage for the OAuth authorization server's own state. Shared-key access is
+// disabled: the app reads and writes with its managed identity, so no account
+// key exists to leak or rotate.
+resource stateStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = if (persistOAuthState) {
+  name: oauthStateStorageAccountName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
+  }
+}
+
+resource stateTableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' = if (persistOAuthState) {
+  parent: stateStorage
+  name: 'default'
+}
+
+resource stateTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = if (persistOAuthState) {
+  parent: stateTableService
+  name: oauthStateTableName
+}
+
+resource stateTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (persistOAuthState && assignTableRole) {
+  name: guid(stateStorage.id, identity.id, tableDataContributorRoleId)
+  scope: stateStorage
+  properties: {
+    principalId: identity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', tableDataContributorRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Public FQDN of the app: "<appName>.<environment default domain>". This is the
 // Host header callers send, so it is exactly what DNS rebinding protection must
 // allow.
 var appFqdn = '${appName}.${environment.properties.defaultDomain}'
 
 var isOAuth = authMode == 'oauth'
+
+// OAuth state is persisted only when a storage account is named. Without it the
+// state lives in process memory, which forces a single replica and loses every
+// client registration on restart.
+var persistOAuthState = isOAuth && !empty(oauthStateStorageAccountName)
+
+// Built-in Storage Table Data Contributor role.
+var tableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 
 var baseEnv = [
   { name: 'AZURE_DEVOPS_ORG', value: adoOrg }
@@ -160,6 +215,16 @@ var oauthEnv = isOAuth
     ]
   : []
 
+// Pointing the app at the table switches it off in-memory OAuth state.
+// AZURE_CLIENT_ID picks the user-assigned identity for the storage credential.
+var oauthStateEnv = persistOAuthState
+  ? [
+      { name: 'OAUTH_STATE_TABLE_ENDPOINT', value: stateStorage!.properties.primaryEndpoints.table }
+      { name: 'OAUTH_STATE_TABLE_NAME', value: oauthStateTableName }
+      { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
+    ]
+  : []
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: appName
   location: location
@@ -169,9 +234,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       '${identity.id}': {}
     }
   }
-  // Ensure the AcrPull role exists before the app attempts its first image pull.
+  // Ensure the AcrPull role exists before the app attempts its first image pull,
+  // and that the state table is reachable before the first authorization.
   dependsOn: [
     acrPullAssignment
+    stateTable
+    stateTableRole
   ]
   properties: {
     managedEnvironmentId: environment.id
@@ -207,12 +275,16 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json(cpu)
             memory: memory
           }
-          env: concat(baseEnv, oauthEnv)
+          env: concat(baseEnv, oauthEnv, oauthStateEnv)
         }
       ]
       scale: {
+        // OAuth mode stays warm so a sign-in in flight is never dropped.
         minReplicas: isOAuth ? 1 : minReplicas
-        maxReplicas: isOAuth ? 1 : maxReplicas
+        // Several replicas are only safe once the OAuth state is shared; with
+        // in-memory state a second replica would not recognise the first one's
+        // client registrations or codes.
+        maxReplicas: isOAuth && !persistOAuthState ? 1 : maxReplicas
       }
     }
   }
@@ -291,3 +363,6 @@ output fqdn string = containerApp.properties.configuration.ingress.fqdn
 
 @description('MCP endpoint URL to configure in clients.')
 output mcpUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}/mcp'
+
+@description('Table endpoint holding the OAuth server state, empty when that state is kept in memory.')
+output oauthStateTableEndpoint string = persistOAuthState ? stateStorage!.properties.primaryEndpoints.table : ''

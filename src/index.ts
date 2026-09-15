@@ -20,6 +20,9 @@ import { DomainsManager } from "./shared/domains.js";
 import { getRequestToken, startHttpServer } from "./transports/http.js";
 import { startOAuthHttpServer } from "./transports/http-oauth.js";
 import { EntraOAuthProvider } from "./shared/oauth/entra-oauth-provider.js";
+import { OAuthStateStore } from "./shared/oauth/state-store.js";
+import { TableOAuthStateStore } from "./shared/oauth/table-state-store.js";
+import { DefaultAzureCredential } from "@azure/identity";
 
 function isGitHubCodespaceEnv(): boolean {
   return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
@@ -189,6 +192,32 @@ function instrumentToolErrors(server: McpServer): void {
   (server as unknown as { tool: (...args: unknown[]) => unknown }).tool = wrapped;
 }
 
+/**
+ * Builds the store for the OAuth server's own state (client registrations,
+ * pending authorizations, issued codes).
+ *
+ * With OAUTH_STATE_TABLE_ENDPOINT set, the state lives in Azure Table Storage
+ * and survives restarts, so a deploy no longer invalidates every client's
+ * registration and grant. Authentication uses the workload's managed identity
+ * (AZURE_CLIENT_ID selects it when several are assigned) — no storage key.
+ *
+ * Without it the state stays in memory: fine for a single local process,
+ * lossy for a deployed server, hence the warning.
+ */
+function createOAuthStateStore(): OAuthStateStore | undefined {
+  const tableEndpoint = process.env.OAUTH_STATE_TABLE_ENDPOINT;
+  if (!tableEndpoint) {
+    logger.warn("OAuth state is kept in memory; a restart invalidates client registrations and issued grants. Set OAUTH_STATE_TABLE_ENDPOINT to persist it.");
+    return undefined;
+  }
+
+  const tableName = process.env.OAUTH_STATE_TABLE_NAME || "oauthstate";
+  const managedIdentityClientId = process.env.AZURE_CLIENT_ID;
+  logger.info("OAuth state persisted in Azure Table Storage", { tableEndpoint, tableName, managedIdentityClientId });
+
+  return new TableOAuthStateStore(tableEndpoint, tableName, new DefaultAzureCredential(managedIdentityClientId ? { managedIdentityClientId } : {}));
+}
+
 async function runHttpTransport(userAgentComposer: UserAgentComposer) {
   // In both HTTP auth modes the Azure DevOps bearer token is resolved per-request
   // from the in-flight context (token pass-through), so no credential is stored.
@@ -207,7 +236,7 @@ async function runHttpTransport(userAgentComposer: UserAgentComposer) {
       throw new Error("OAuth mode requires ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET, and MCP_PUBLIC_URL environment variables.");
     }
 
-    const provider = new EntraOAuthProvider({ tenantId, clientId, clientSecret, publicBaseUrl });
+    const provider = new EntraOAuthProvider({ tenantId, clientId, clientSecret, publicBaseUrl }, { stateStore: createOAuthStateStore() });
     logger.info("HTTP transport using OAuth (Entra ID bridge). Clients authenticate via browser sign-in; the '--authentication' option is ignored.");
 
     await startOAuthHttpServer({

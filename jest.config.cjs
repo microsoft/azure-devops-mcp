@@ -55,5 +55,7 @@ module.exports = {
     "^(.+)/content-safety\\.js$": "$1/content-safety.ts",
     "^(.+)/tool-registration\\.js$": "$1/tool-registration.ts",
     "^(.+)/ado-rest\\.js$": "$1/ado-rest.ts",
+    "^(.+)/state-store\\.js$": "$1/state-store.ts",
+    "^(.+)/table-state-store\\.js$": "$1/table-state-store.ts",
   },
 };

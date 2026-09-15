@@ -278,6 +278,37 @@ Then set `AZURE_CLIENT_ID=$APP_ID`, `AZURE_TENANT_ID`, and
 > a manual approval gate before each production deploy. The federated
 > credential `subject` above must match the environment name.
 
+## OAuth state storage
+
+In OAuth mode the server is itself an authorization server: it holds the client
+registrations created via DCR, the authorizations waiting on the Entra login,
+and the codes it issues to clients. Keeping that in process memory means every
+deploy silently invalidates it — clients then fail to refresh and report the
+server as unreachable — and it pins the app to a single replica.
+
+Set `oauthStateStorageAccountName` (workflow variable `OAUTH_STATE_STORAGE_ACCOUNT`)
+and the template creates a storage account with **shared-key access disabled**
+plus the `oauthstate` table. The app reads and writes it with its managed
+identity (`OAUTH_STATE_TABLE_ENDPOINT` and `AZURE_CLIENT_ID` are injected), so no
+storage key exists anywhere. With the state shared, `maxReplicas` applies in
+OAuth mode too.
+
+The identity needs **Storage Table Data Contributor** on that account. The
+template creates the assignment unless `assignTableRole=false` (the CI workflow
+passes false, since the deploy identity is only Contributor). To grant it
+out-of-band:
+
+```bash
+ACCOUNT_ID=$(az storage account show -g <my-rg> -n <account> --query id -o tsv)
+APP_PID=$(az identity show -g <my-rg> -n ado-mcp-id --query principalId -o tsv)
+az role assignment create --assignee-object-id "$APP_PID" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Storage Table Data Contributor" --scope "$ACCOUNT_ID"
+```
+
+Leave the parameter empty to keep the old in-memory behaviour; the server logs a
+warning at startup when it does.
+
 ## Configuration reference
 
 The image is configured entirely through environment variables (see

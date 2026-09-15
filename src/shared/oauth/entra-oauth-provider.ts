@@ -31,6 +31,7 @@ import {
 import { OAuthClientInformationFull, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 
 import { logger } from "../../logger.js";
+import { CODE_TTL_MS, InMemoryOAuthStateStore, OAuthStateStore } from "./state-store.js";
 
 /**
  * Translates an Entra token-endpoint failure into the matching OAuth 2.1 error.
@@ -111,51 +112,32 @@ export interface EntraOAuthConfig {
 // Azure DevOps resource ID — tokens for this audience work against the ADO REST API.
 const ADO_DEFAULT_SCOPE = "499b84ac-1321-427f-aa17-267ca6975798/.default";
 
-interface PendingAuthorization {
-  clientId: string;
-  redirectUri: string;
-  clientState?: string;
-  codeChallenge: string;
-  createdAt: number;
-}
+class StateBackedClientsStore implements OAuthRegisteredClientsStore {
+  constructor(private readonly state: OAuthStateStore) {}
 
-interface IssuedCode {
-  tokens: OAuthTokens;
-  codeChallenge: string;
-  clientId: string;
-  expiresAt: number;
-}
-
-const PENDING_TTL_MS = 10 * 60 * 1000; // 10 minutes to complete the Entra login
-const CODE_TTL_MS = 60 * 1000; // 1 minute to redeem our authorization code
-
-class InMemoryClientsStore implements OAuthRegisteredClientsStore {
-  private readonly clients = new Map<string, OAuthClientInformationFull>();
-
-  getClient(clientId: string): OAuthClientInformationFull | undefined {
-    return this.clients.get(clientId);
+  async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
+    return this.state.getClient(clientId);
   }
 
-  registerClient(client: Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">): OAuthClientInformationFull {
+  async registerClient(client: Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">): Promise<OAuthClientInformationFull> {
     const registered: OAuthClientInformationFull = {
       ...client,
       client_id: randomUUID(),
       client_id_issued_at: Math.floor(Date.now() / 1000),
     };
-    this.clients.set(registered.client_id, registered);
+    await this.state.saveClient(registered);
     return registered;
   }
 }
 
 export class EntraOAuthProvider implements OAuthServerProvider {
-  public readonly clientsStore = new InMemoryClientsStore();
+  public readonly clientsStore: StateBackedClientsStore;
   // false → the MCP SDK token handler validates the client's PKCE locally
   // against the challenge we stored (challengeForAuthorizationCode). Entra is
   // not involved in the client's PKCE; the upstream leg uses our own redirect.
   public readonly skipLocalPkceValidation = false;
 
-  private readonly pending = new Map<string, PendingAuthorization>();
-  private readonly issuedCodes = new Map<string, IssuedCode>();
+  private readonly state: OAuthStateStore;
   private readonly callbackPath: string;
   /** Scopes requested from Entra; also advertised as the server's supported scopes. */
   public readonly scopes: string[];
@@ -163,8 +145,10 @@ export class EntraOAuthProvider implements OAuthServerProvider {
 
   constructor(
     private readonly config: EntraOAuthConfig,
-    options?: { verifyJwt?: JwtVerifier }
+    options?: { verifyJwt?: JwtVerifier; stateStore?: OAuthStateStore }
   ) {
+    this.state = options?.stateStore ?? new InMemoryOAuthStateStore();
+    this.clientsStore = new StateBackedClientsStore(this.state);
     this.callbackPath = config.callbackPath ?? "/auth/callback";
     this.scopes = config.scopes ?? [ADO_DEFAULT_SCOPE, "offline_access"];
     this.verifyJwt = options?.verifyJwt ?? createEntraJwtVerifier(config.tenantId);
@@ -183,10 +167,10 @@ export class EntraOAuthProvider implements OAuthServerProvider {
   }
 
   async authorize(client: OAuthClientInformationFull, params: AuthorizationParams, res: Response): Promise<void> {
-    this.evictExpired();
+    void this.state.evictExpired();
 
     const state = randomUUID();
-    this.pending.set(state, {
+    await this.state.savePending(state, {
       clientId: client.client_id,
       redirectUri: params.redirectUri,
       clientState: params.state,
@@ -210,18 +194,17 @@ export class EntraOAuthProvider implements OAuthServerProvider {
    * code for tokens and redirects back to the MCP client with our own code.
    */
   handleCallback = async (req: { query: Record<string, unknown> }, res: Response): Promise<void> => {
-    this.evictExpired();
+    void this.state.evictExpired();
 
     const state = typeof req.query.state === "string" ? req.query.state : undefined;
     const code = typeof req.query.code === "string" ? req.query.code : undefined;
     const error = typeof req.query.error === "string" ? req.query.error : undefined;
 
-    const pending = state ? this.pending.get(state) : undefined;
+    const pending = state ? await this.state.takePending(state) : undefined;
     if (!state || !pending) {
       res.status(400).send("Invalid or expired authorization state.");
       return;
     }
-    this.pending.delete(state);
 
     if (error || !code) {
       const desc = typeof req.query.error_description === "string" ? req.query.error_description : "Authorization failed.";
@@ -250,7 +233,7 @@ export class EntraOAuthProvider implements OAuthServerProvider {
     }
 
     const ourCode = randomUUID();
-    this.issuedCodes.set(ourCode, {
+    await this.state.saveCode(ourCode, {
       tokens,
       codeChallenge: pending.codeChallenge,
       clientId: pending.clientId,
@@ -264,24 +247,24 @@ export class EntraOAuthProvider implements OAuthServerProvider {
   };
 
   async challengeForAuthorizationCode(_client: OAuthClientInformationFull, authorizationCode: string): Promise<string> {
-    const entry = this.issuedCodes.get(authorizationCode);
-    if (!entry || entry.expiresAt < Date.now()) {
-      // Codes live in memory, so a server restart also loses them. Reported as
-      // invalid_grant, which tells the client to re-authorize rather than retry.
+    const entry = await this.state.getCode(authorizationCode);
+    if (!entry) {
+      // Unknown, expired or already redeemed. Reported as invalid_grant, which
+      // tells the client to re-authorize rather than retry.
       throw new InvalidGrantError("Invalid or expired authorization code.");
     }
     return entry.codeChallenge;
   }
 
   async exchangeAuthorizationCode(client: OAuthClientInformationFull, authorizationCode: string): Promise<OAuthTokens> {
-    const entry = this.issuedCodes.get(authorizationCode);
-    if (!entry || entry.expiresAt < Date.now()) {
+    const entry = await this.state.getCode(authorizationCode);
+    if (!entry) {
       throw new InvalidGrantError("Invalid or expired authorization code.");
     }
     if (entry.clientId !== client.client_id) {
       throw new InvalidGrantError("Authorization code was issued to a different client.");
     }
-    this.issuedCodes.delete(authorizationCode);
+    await this.state.deleteCode(authorizationCode);
     return entry.tokens;
   }
 
@@ -353,15 +336,5 @@ export class EntraOAuthProvider implements OAuthServerProvider {
       refresh_token: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
       scope: typeof data.scope === "string" ? data.scope : this.scopes.join(" "),
     };
-  }
-
-  private evictExpired(): void {
-    const now = Date.now();
-    for (const [k, v] of this.pending) {
-      if (now - v.createdAt > PENDING_TTL_MS) this.pending.delete(k);
-    }
-    for (const [k, v] of this.issuedCodes) {
-      if (v.expiresAt < now) this.issuedCodes.delete(k);
-    }
   }
 }

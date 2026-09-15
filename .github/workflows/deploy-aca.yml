@@ -14,7 +14,9 @@ name: Deploy to Azure Container Apps
 #   Secrets:   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
 #              ENTRA_CLIENT_SECRET
 #   Variables: AZURE_RESOURCE_GROUP, ACR_NAME, ACR_RESOURCE_GROUP,
-#              CONTAINER_APP_NAME, ADO_ORG, ENTRA_TENANT_ID, ENTRA_CLIENT_ID
+#              CONTAINER_APP_NAME, ADO_ORG, ENTRA_TENANT_ID, ENTRA_CLIENT_ID,
+#              OAUTH_STATE_STORAGE_ACCOUNT (storage account holding the OAuth
+#              server state; unset = state kept in memory and lost on restart)
 #   Optional:  ALERT_EMAIL (variable) - email for the 401/403 spike alert;
 #              unset = no alert resources are created.
 # See deploy/azure/README.md ("CI/CD") for one-time setup.
@@ -114,7 +116,9 @@ jobs:
               authMode=oauth \
               entraTenantId="${{ vars.ENTRA_TENANT_ID }}" \
               entraClientId="${{ vars.ENTRA_CLIENT_ID }}" \
-              entraClientSecret="${{ secrets.ENTRA_CLIENT_SECRET }}"
+              entraClientSecret="${{ secrets.ENTRA_CLIENT_SECRET }}" \
+              oauthStateStorageAccountName="${{ vars.OAUTH_STATE_STORAGE_ACCOUNT }}" \
+              assignTableRole=false
 
           MCP_URL=$(az deployment group show \
             -g "${{ vars.AZURE_RESOURCE_GROUP }}" \
