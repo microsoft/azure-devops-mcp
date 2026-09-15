@@ -47,6 +47,15 @@ const WORKITEM_TOOLS = {
   get_tag: "wit_get_tag",
   update_tag: "wit_update_tag",
   delete_tag: "wit_delete_tag",
+  list_templates: "wit_list_templates",
+  get_template: "wit_get_template",
+  create_template: "wit_create_template",
+  replace_template: "wit_replace_template",
+  delete_template: "wit_delete_template",
+  list_queries: "wit_list_queries",
+  create_query: "wit_create_query",
+  update_query: "wit_update_query",
+  delete_query: "wit_delete_query",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -1905,6 +1914,283 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return { content: [{ type: "text", text: `Error deleting tag: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  // Templates are team-scoped, so they need both a project and a team.
+  async function resolveTeamContext(connection: WebApi, project: string | undefined, team: string | undefined, message: string) {
+    const projectCtx = await resolveProject(connection, project, message);
+    if ("response" in projectCtx) return projectCtx;
+
+    if (team) return { teamContext: { project: projectCtx.project, team } };
+
+    const result = await elicitTeam(server, connection, projectCtx.project, "Select the Azure DevOps team that owns the templates.");
+    if ("response" in result) return result;
+    return { teamContext: { project: projectCtx.project, team: result.resolved } };
+  }
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_templates,
+    "List a team's work item templates: the preset field values a team applies when creating recurring work. Returns shallow references without the field values; use wit_get_template for those.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the templates. If not provided, a team selection prompt will be shown."),
+      workItemType: z.string().optional().describe("Only return templates for this work item type, e.g. 'Bug'."),
+    },
+    async ({ project, team, workItemType }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveTeamContext(connection, project, team, "Select the Azure DevOps project whose templates to list.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const templates = await workItemTrackingApi.getTemplates(ctx.teamContext, workItemType);
+
+        return { content: [{ type: "text", text: JSON.stringify(templates, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing work item templates: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.get_template,
+    "Get a work item template with the field values it presets.",
+    {
+      templateId: z.string().describe("The ID (GUID) of the template."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+    },
+    async ({ templateId, project, team }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveTeamContext(connection, project, team, "Select the Azure DevOps project the template belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const template = await workItemTrackingApi.getTemplate(ctx.teamContext, templateId);
+
+        if (!template) {
+          return { content: [{ type: "text", text: `Template '${templateId}' not found` }], isError: true };
+        }
+
+        return { content: [{ type: "text", text: JSON.stringify(template, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error fetching work item template: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  const templateFieldsSchema = z
+    .record(z.string())
+    .describe('Field values the template presets, keyed by reference name, e.g. { "System.Title": "Release checklist", "System.AreaPath": "Contoso\\\\Team" }.');
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.create_template,
+    "Create a work item template for a team, so recurring work can be raised with its fields already filled in.",
+    {
+      name: z.string().describe("The name of the template as shown to the team."),
+      workItemTypeName: z.string().describe("The work item type the template applies to, e.g. 'Task'."),
+      fields: templateFieldsSchema,
+      description: z.string().optional().describe("What the template is for."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+    },
+    async ({ name, workItemTypeName, fields, description, project, team }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveTeamContext(connection, project, team, "Select the Azure DevOps project to create the template in.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const created = await workItemTrackingApi.createTemplate({ name, workItemTypeName, fields, description }, ctx.teamContext);
+
+        return { content: [{ type: "text", text: JSON.stringify(created, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error creating work item template: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.replace_template,
+    "Replace a work item template. The whole template is overwritten, so pass every field it should keep — omitted fields are dropped, not merged.",
+    {
+      templateId: z.string().describe("The ID (GUID) of the template to replace."),
+      name: z.string().describe("The name of the template."),
+      workItemTypeName: z.string().describe("The work item type the template applies to, e.g. 'Task'."),
+      fields: templateFieldsSchema,
+      description: z.string().optional().describe("What the template is for."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+    },
+    async ({ templateId, name, workItemTypeName, fields, description, project, team }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveTeamContext(connection, project, team, "Select the Azure DevOps project the template belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const replaced = await workItemTrackingApi.replaceTemplate({ id: templateId, name, workItemTypeName, fields, description }, ctx.teamContext, templateId);
+
+        return { content: [{ type: "text", text: JSON.stringify(replaced, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error replacing work item template: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.delete_template,
+    "Delete a team's work item template. Work items already created from it are untouched.",
+    {
+      templateId: z.string().describe("The ID (GUID) of the template to delete."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+    },
+    async ({ templateId, project, team }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveTeamContext(connection, project, team, "Select the Azure DevOps project the template belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        await workItemTrackingApi.deleteTemplate(ctx.teamContext, templateId);
+
+        return { content: [{ type: "text", text: `Template '${templateId}' was deleted.` }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error deleting work item template: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_queries,
+    "List the saved query tree of a project: the 'My Queries' and 'Shared Queries' folders and what is inside them. Use it to find a query's ID or path before running it with wit_get_query_results_by_id.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      depth: z.coerce.number().min(0).max(2).optional().describe("How many levels of the folder tree to return. 0 returns only the root folders."),
+      expand: z
+        .enum(getEnumKeys(QueryExpand) as [string, ...string[]])
+        .optional()
+        .describe("How much detail to include for each query, e.g. 'wiql' to get the query text."),
+      includeDeleted: z.boolean().optional().describe("Also return queries sitting in the query recycle bin."),
+    },
+    async ({ project, depth, expand, includeDeleted }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project whose queries to list.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const queries = await workItemTrackingApi.getQueries(ctx.project, safeEnumConvert(QueryExpand, expand), depth, includeDeleted);
+
+        return { content: [{ type: "text", text: JSON.stringify(queries, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing queries: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.create_query,
+    "Create a saved query or a query folder. Queries are saved under a parent folder path such as 'Shared Queries' or 'My Queries'.",
+    {
+      parentPath: z.string().describe("Folder the item is created in, e.g. 'Shared Queries' or 'Shared Queries/Release'."),
+      name: z.string().describe("Name of the query or folder."),
+      wiql: z.string().optional().describe("The WIQL text of the query. Required for a query, omitted for a folder."),
+      isFolder: z.boolean().default(false).describe("Create a folder instead of a query."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      validateWiqlOnly: z.boolean().optional().describe("Only validate the WIQL without saving anything."),
+    },
+    async ({ parentPath, name, wiql, isFolder, project, validateWiqlOnly }) => {
+      try {
+        if (!isFolder && !wiql) {
+          return { content: [{ type: "text", text: "A query needs 'wiql'; pass isFolder: true to create a folder instead." }], isError: true };
+        }
+
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project to create the query in.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const created = await workItemTrackingApi.createQuery({ name, wiql, isFolder }, ctx.project, parentPath, validateWiqlOnly);
+
+        return { content: [{ type: "text", text: JSON.stringify(created, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error creating query: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.update_query,
+    "Update a saved query: rename it, change its WIQL, or move it by setting a new parent path. Only the properties you pass are changed.",
+    {
+      query: z.string().describe("ID (GUID) or path of the query to update, e.g. 'Shared Queries/Active bugs'."),
+      name: z.string().optional().describe("New name for the query."),
+      wiql: z.string().optional().describe("New WIQL text for the query."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      undeleteDescendants: z.boolean().optional().describe("When restoring a folder from the query recycle bin, also restore what was inside it."),
+    },
+    async ({ query, name, wiql, project, undeleteDescendants }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the query belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const update: { name?: string; wiql?: string } = {};
+        if (name !== undefined) update.name = name;
+        if (wiql !== undefined) update.wiql = wiql;
+
+        const updated = await workItemTrackingApi.updateQuery(update, ctx.project, query, undeleteDescendants);
+
+        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error updating query: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.delete_query,
+    "Delete a saved query or query folder. Deleting a folder deletes the queries inside it; both go to the query recycle bin and can be restored with wit_update_query.",
+    {
+      query: z.string().describe("ID (GUID) or path of the query or folder to delete, e.g. 'Shared Queries/Old'."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ query, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the query belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        await workItemTrackingApi.deleteQuery(ctx.project, query);
+
+        return { content: [{ type: "text", text: `Query '${query}' was deleted.` }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error deleting query: ${errorMessage}` }], isError: true };
       }
     }
   );

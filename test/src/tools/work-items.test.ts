@@ -59,6 +59,15 @@ interface WorkItemTrackingApiMock {
   getTag: jest.Mock;
   updateTag: jest.Mock;
   deleteTag: jest.Mock;
+  getTemplates: jest.Mock;
+  getTemplate: jest.Mock;
+  createTemplate: jest.Mock;
+  replaceTemplate: jest.Mock;
+  deleteTemplate: jest.Mock;
+  getQueries: jest.Mock;
+  createQuery: jest.Mock;
+  updateQuery: jest.Mock;
+  deleteQuery: jest.Mock;
 }
 
 interface MockConnection {
@@ -112,6 +121,15 @@ describe("configureWorkItemTools", () => {
       getTag: jest.fn(),
       updateTag: jest.fn(),
       deleteTag: jest.fn(),
+      getTemplates: jest.fn(),
+      getTemplate: jest.fn(),
+      createTemplate: jest.fn(),
+      replaceTemplate: jest.fn(),
+      deleteTemplate: jest.fn(),
+      getQueries: jest.fn(),
+      createQuery: jest.fn(),
+      updateQuery: jest.fn(),
+      deleteQuery: jest.fn(),
     };
 
     mockConnection = {
@@ -5314,6 +5332,150 @@ describe("configureWorkItemTools", () => {
       await handler({});
 
       expect(mockWorkItemTrackingApi.getTags).toHaveBeenCalledWith("Picked");
+    });
+  });
+
+  describe("work item templates and saved queries", () => {
+    function getHandler(toolName: string) {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === toolName);
+      if (!call) throw new Error(`${toolName} not registered`);
+      return call[3];
+    }
+
+    const teamContext = { project: "TestProject", team: "TestTeam" };
+
+    it("wit_list_templates passes the team context and the type filter", async () => {
+      const handler = getHandler("wit_list_templates");
+      mockWorkItemTrackingApi.getTemplates.mockResolvedValue([{ id: "t1", name: "Release checklist" }]);
+
+      const result = await handler({ project: "TestProject", team: "TestTeam", workItemType: "Task" });
+
+      expect(mockWorkItemTrackingApi.getTemplates).toHaveBeenCalledWith(teamContext, "Task");
+      expect(result.content[0].text).toContain("Release checklist");
+    });
+
+    it("wit_get_template reports a missing template as an error", async () => {
+      const handler = getHandler("wit_get_template");
+      mockWorkItemTrackingApi.getTemplate.mockResolvedValue(undefined);
+
+      const result = await handler({ templateId: "nope", project: "TestProject", team: "TestTeam" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not found");
+    });
+
+    it("wit_create_template sends the preset fields", async () => {
+      const handler = getHandler("wit_create_template");
+      mockWorkItemTrackingApi.createTemplate.mockResolvedValue({ id: "t2" });
+
+      await handler({
+        name: "Bug triage",
+        workItemTypeName: "Bug",
+        fields: { "System.AreaPath": "Contoso\\Team", "System.Tags": "triage" },
+        description: "Preset for triage",
+        project: "TestProject",
+        team: "TestTeam",
+      });
+
+      expect(mockWorkItemTrackingApi.createTemplate).toHaveBeenCalledWith(
+        { name: "Bug triage", workItemTypeName: "Bug", fields: { "System.AreaPath": "Contoso\\Team", "System.Tags": "triage" }, description: "Preset for triage" },
+        teamContext
+      );
+    });
+
+    it("wit_replace_template carries the id in both the body and the path", async () => {
+      const handler = getHandler("wit_replace_template");
+      mockWorkItemTrackingApi.replaceTemplate.mockResolvedValue({ id: "t3" });
+
+      await handler({ templateId: "t3", name: "Updated", workItemTypeName: "Task", fields: { "System.Title": "x" }, project: "TestProject", team: "TestTeam" });
+
+      const [body, ctx, id] = mockWorkItemTrackingApi.replaceTemplate.mock.calls[0];
+      expect(body).toMatchObject({ id: "t3", name: "Updated" });
+      expect(ctx).toEqual(teamContext);
+      expect(id).toBe("t3");
+    });
+
+    it("wit_delete_template deletes by id", async () => {
+      const handler = getHandler("wit_delete_template");
+      mockWorkItemTrackingApi.deleteTemplate.mockResolvedValue(undefined);
+
+      const result = await handler({ templateId: "t4", project: "TestProject", team: "TestTeam" });
+
+      expect(mockWorkItemTrackingApi.deleteTemplate).toHaveBeenCalledWith(teamContext, "t4");
+      expect(result.content[0].text).toContain("deleted");
+    });
+
+    it("wit_list_queries maps the expand keyword to the SDK enum", async () => {
+      const handler = getHandler("wit_list_queries");
+      mockWorkItemTrackingApi.getQueries.mockResolvedValue([{ name: "Shared Queries" }]);
+
+      await handler({ project: "TestProject", depth: 1, expand: "Wiql", includeDeleted: true });
+
+      // QueryExpand.Wiql === 1
+      expect(mockWorkItemTrackingApi.getQueries).toHaveBeenCalledWith("TestProject", 1, 1, true);
+    });
+
+    it("wit_create_query refuses a query without wiql", async () => {
+      const handler = getHandler("wit_create_query");
+
+      const result = await handler({ parentPath: "Shared Queries", name: "No WIQL", isFolder: false, project: "TestProject" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("needs 'wiql'");
+      expect(mockWorkItemTrackingApi.createQuery).not.toHaveBeenCalled();
+    });
+
+    it("wit_create_query allows a folder without wiql", async () => {
+      const handler = getHandler("wit_create_query");
+      mockWorkItemTrackingApi.createQuery.mockResolvedValue({ id: "q1", isFolder: true });
+
+      await handler({ parentPath: "Shared Queries", name: "Release", isFolder: true, project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.createQuery).toHaveBeenCalledWith({ name: "Release", wiql: undefined, isFolder: true }, "TestProject", "Shared Queries", undefined);
+    });
+
+    it("wit_create_query saves a query under the parent path", async () => {
+      const handler = getHandler("wit_create_query");
+      mockWorkItemTrackingApi.createQuery.mockResolvedValue({ id: "q2" });
+
+      await handler({ parentPath: "Shared Queries/Release", name: "Active bugs", wiql: "SELECT [System.Id] FROM WorkItems", isFolder: false, project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.createQuery).toHaveBeenCalledWith(
+        { name: "Active bugs", wiql: "SELECT [System.Id] FROM WorkItems", isFolder: false },
+        "TestProject",
+        "Shared Queries/Release",
+        undefined
+      );
+    });
+
+    it("wit_update_query sends only the properties that were passed", async () => {
+      const handler = getHandler("wit_update_query");
+      mockWorkItemTrackingApi.updateQuery.mockResolvedValue({ id: "q3" });
+
+      await handler({ query: "Shared Queries/Active bugs", name: "Active bugs (P1)", project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.updateQuery).toHaveBeenCalledWith({ name: "Active bugs (P1)" }, "TestProject", "Shared Queries/Active bugs", undefined);
+    });
+
+    it("wit_delete_query deletes by path", async () => {
+      const handler = getHandler("wit_delete_query");
+      mockWorkItemTrackingApi.deleteQuery.mockResolvedValue(undefined);
+
+      const result = await handler({ query: "Shared Queries/Old", project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.deleteQuery).toHaveBeenCalledWith("TestProject", "Shared Queries/Old");
+      expect(result.content[0].text).toContain("deleted");
+    });
+
+    it("wit_delete_query surfaces errors", async () => {
+      const handler = getHandler("wit_delete_query");
+      mockWorkItemTrackingApi.deleteQuery.mockRejectedValue(new Error("VS402337: query is in use"));
+
+      const result = await handler({ query: "Shared Queries/Old", project: "TestProject" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error deleting query: VS402337: query is in use");
     });
   });
 });
