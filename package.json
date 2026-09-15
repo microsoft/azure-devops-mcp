@@ -72,6 +72,9 @@
   "lint-staged": {
     "**/*.(js|ts|jsx|tsx|json|css|md)": [
       "npm run format"
+    ],
+    "**/*.(js|ts)": [
+      "eslint --fix"
     ]
   }
 }

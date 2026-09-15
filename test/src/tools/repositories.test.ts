@@ -15,7 +15,11 @@ import {
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "../../../src/tools/auth";
 
-type GitChangeShape = { changeType?: VersionControlChangeType; item?: { path?: string }; newContent?: { content?: string; contentType?: ItemContentType } };
+interface GitChangeShape {
+  changeType?: VersionControlChangeType;
+  item?: { path?: string };
+  newContent?: { content?: string; contentType?: ItemContentType };
+}
 
 // Mock the auth module
 jest.mock("../../../src/tools/auth", () => ({
