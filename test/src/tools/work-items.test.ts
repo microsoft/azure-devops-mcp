@@ -50,6 +50,15 @@ interface WorkItemTrackingApiMock {
   queryByWiql: jest.Mock;
   getAttachmentContent: jest.Mock;
   createAttachment: jest.Mock;
+  deleteWorkItem: jest.Mock;
+  getDeletedWorkItems: jest.Mock;
+  getDeletedWorkItemShallowReferences: jest.Mock;
+  restoreWorkItem: jest.Mock;
+  destroyWorkItem: jest.Mock;
+  getTags: jest.Mock;
+  getTag: jest.Mock;
+  updateTag: jest.Mock;
+  deleteTag: jest.Mock;
 }
 
 interface MockConnection {
@@ -94,6 +103,15 @@ describe("configureWorkItemTools", () => {
       queryByWiql: jest.fn(),
       getAttachmentContent: jest.fn(),
       createAttachment: jest.fn(),
+      deleteWorkItem: jest.fn(),
+      getDeletedWorkItems: jest.fn(),
+      getDeletedWorkItemShallowReferences: jest.fn(),
+      restoreWorkItem: jest.fn(),
+      destroyWorkItem: jest.fn(),
+      getTags: jest.fn(),
+      getTag: jest.fn(),
+      updateTag: jest.fn(),
+      deleteTag: jest.fn(),
     };
 
     mockConnection = {
@@ -5177,6 +5195,125 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.getRevisions as jest.Mock).mockResolvedValue(revisionsWithNoFields);
       const result = await handler({ project: "P", workItemId: 1, top: 10 });
       expect(result.content[0].text).toBe(JSON.stringify(revisionsWithNoFields, null, 2));
+    });
+  });
+
+  describe("work item lifecycle and tags", () => {
+    function getHandler(toolName: string) {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === toolName);
+      if (!call) throw new Error(`${toolName} not registered`);
+      return call[3];
+    }
+
+    it("wit_delete_work_item soft-deletes into the recycle bin", async () => {
+      const handler = getHandler("wit_delete_work_item");
+      mockWorkItemTrackingApi.deleteWorkItem.mockResolvedValue({ id: 42, code: 200 });
+
+      const result = await handler({ id: 42, project: "TestProject" });
+
+      // destroy=false keeps the work item restorable.
+      expect(mockWorkItemTrackingApi.deleteWorkItem).toHaveBeenCalledWith(42, "TestProject", false);
+      expect(result.content[0].text).toContain("42");
+    });
+
+    it("wit_delete_work_item surfaces errors", async () => {
+      const handler = getHandler("wit_delete_work_item");
+      mockWorkItemTrackingApi.deleteWorkItem.mockRejectedValue(new Error("TF401232: not found"));
+
+      const result = await handler({ id: 7, project: "TestProject" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error deleting work item: TF401232: not found");
+    });
+
+    it("wit_list_deleted_work_items returns shallow references when no ids are given", async () => {
+      const handler = getHandler("wit_list_deleted_work_items");
+      mockWorkItemTrackingApi.getDeletedWorkItemShallowReferences.mockResolvedValue([{ id: 1 }]);
+
+      await handler({ project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.getDeletedWorkItemShallowReferences).toHaveBeenCalledWith("TestProject");
+      expect(mockWorkItemTrackingApi.getDeletedWorkItems).not.toHaveBeenCalled();
+    });
+
+    it("wit_list_deleted_work_items returns details when ids are given", async () => {
+      const handler = getHandler("wit_list_deleted_work_items");
+      mockWorkItemTrackingApi.getDeletedWorkItems.mockResolvedValue([{ id: 5, name: "Bug" }]);
+
+      const result = await handler({ project: "TestProject", ids: [5] });
+
+      expect(mockWorkItemTrackingApi.getDeletedWorkItems).toHaveBeenCalledWith([5], "TestProject");
+      expect(result.content[0].text).toContain("Bug");
+    });
+
+    it("wit_restore_work_item clears the deleted flag", async () => {
+      const handler = getHandler("wit_restore_work_item");
+      mockWorkItemTrackingApi.restoreWorkItem.mockResolvedValue({ id: 42 });
+
+      await handler({ id: 42, project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.restoreWorkItem).toHaveBeenCalledWith({ isDeleted: false }, 42, "TestProject");
+    });
+
+    it("wit_destroy_work_item erases permanently and says so", async () => {
+      const handler = getHandler("wit_destroy_work_item");
+      mockWorkItemTrackingApi.destroyWorkItem.mockResolvedValue(undefined);
+
+      const result = await handler({ id: 42, project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.destroyWorkItem).toHaveBeenCalledWith(42, "TestProject");
+      expect(result.content[0].text).toContain("permanently destroyed");
+    });
+
+    it("wit_list_tags lists the project tags", async () => {
+      const handler = getHandler("wit_list_tags");
+      mockWorkItemTrackingApi.getTags.mockResolvedValue([{ id: "t1", name: "regression" }]);
+
+      const result = await handler({ project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.getTags).toHaveBeenCalledWith("TestProject");
+      expect(result.content[0].text).toContain("regression");
+    });
+
+    it("wit_get_tag reports a missing tag as an error", async () => {
+      const handler = getHandler("wit_get_tag");
+      mockWorkItemTrackingApi.getTag.mockResolvedValue(undefined);
+
+      const result = await handler({ tag: "nope", project: "TestProject" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not found");
+    });
+
+    it("wit_update_tag renames the tag", async () => {
+      const handler = getHandler("wit_update_tag");
+      mockWorkItemTrackingApi.updateTag.mockResolvedValue({ id: "t1", name: "regression" });
+
+      await handler({ tag: "regresion", name: "regression", project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.updateTag).toHaveBeenCalledWith({ name: "regression" }, "TestProject", "regresion");
+    });
+
+    it("wit_delete_tag removes the tag", async () => {
+      const handler = getHandler("wit_delete_tag");
+      mockWorkItemTrackingApi.deleteTag.mockResolvedValue(undefined);
+
+      const result = await handler({ tag: "stale", project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.deleteTag).toHaveBeenCalledWith("TestProject", "stale");
+      expect(result.content[0].text).toContain("deleted");
+    });
+
+    it("elicits the project when it is not supplied", async () => {
+      const handler = getHandler("wit_list_tags");
+      (server.server.elicitInput as jest.Mock).mockResolvedValue({ action: "accept", content: { project: "Picked" } });
+      mockConnection.getCoreApi.mockResolvedValue({ getProjects: jest.fn().mockResolvedValue([{ name: "Picked" }]) });
+      mockWorkItemTrackingApi.getTags.mockResolvedValue([]);
+
+      await handler({});
+
+      expect(mockWorkItemTrackingApi.getTags).toHaveBeenCalledWith("Picked");
     });
   });
 });

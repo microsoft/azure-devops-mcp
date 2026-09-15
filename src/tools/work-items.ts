@@ -39,6 +39,14 @@ const WORKITEM_TOOLS = {
   get_work_item_attachment: "wit_get_work_item_attachment",
   create_attachment: "wit_create_attachment",
   query_by_wiql: "wit_query_by_wiql",
+  delete_work_item: "wit_delete_work_item",
+  list_deleted_work_items: "wit_list_deleted_work_items",
+  restore_work_item: "wit_restore_work_item",
+  destroy_work_item: "wit_destroy_work_item",
+  list_tags: "wit_list_tags",
+  get_tag: "wit_get_tag",
+  update_tag: "wit_update_tag",
+  delete_tag: "wit_delete_tag",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -1684,6 +1692,219 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           content: [{ type: "text", text: `Error retrieving work item attachment: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  // Resolves the project the same way every tool here does: an explicit value
+  // wins, otherwise the user is asked to pick one.
+  async function resolveProject(connection: WebApi, project: string | undefined, message: string) {
+    if (project) return { project };
+    const result = await elicitProject(server, connection, message);
+    if ("response" in result) return result;
+    return { project: result.resolved };
+  }
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.delete_work_item,
+    "Move a work item to the project's recycle bin. It stops appearing in queries and boards but can be restored with wit_restore_work_item. To erase it permanently instead, use wit_destroy_work_item.",
+    {
+      id: z.coerce.number().min(1).describe("The ID of the work item to delete."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ id, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the work item belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const deleted = await workItemTrackingApi.deleteWorkItem(id, ctx.project, false);
+
+        return { content: [{ type: "text", text: JSON.stringify(deleted, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error deleting work item: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_deleted_work_items,
+    "List the work items in the project's recycle bin. Without ids it returns every deleted work item as a shallow reference; with ids it returns the details (type, title, who deleted it and when) of those specific ones.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      ids: z.array(z.coerce.number().min(1)).optional().describe("Only return these work item IDs, with full recycle bin details."),
+    },
+    async ({ project, ids }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project whose recycle bin to list.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const deleted = ids?.length ? await workItemTrackingApi.getDeletedWorkItems(ids, ctx.project) : await workItemTrackingApi.getDeletedWorkItemShallowReferences(ctx.project);
+
+        return { content: [{ type: "text", text: JSON.stringify(deleted, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing deleted work items: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.restore_work_item,
+    "Restore a work item from the project's recycle bin, putting it back in queries and boards with its original ID.",
+    {
+      id: z.coerce.number().min(1).describe("The ID of the deleted work item to restore."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ id, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the work item belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const restored = await workItemTrackingApi.restoreWorkItem({ isDeleted: false }, id, ctx.project);
+
+        return { content: [{ type: "text", text: JSON.stringify(restored, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error restoring work item: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.destroy_work_item,
+    "Permanently erase a work item from the recycle bin. This cannot be undone and the work item cannot be restored afterwards — use wit_delete_work_item unless the caller explicitly asked for permanent removal.",
+    {
+      id: z.coerce.number().min(1).describe("The ID of the work item to destroy permanently."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ id, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the work item belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        await workItemTrackingApi.destroyWorkItem(id, ctx.project);
+
+        return { content: [{ type: "text", text: `Work item ${id} was permanently destroyed.` }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error destroying work item: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_tags,
+    "List the work item tags defined in a project, with their IDs. Use it to find the exact spelling of a tag before filtering by it, or to spot near-duplicate tags.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project whose tags to list.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const tags = await workItemTrackingApi.getTags(ctx.project);
+
+        return { content: [{ type: "text", text: JSON.stringify(tags, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing tags: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.get_tag,
+    "Get a single work item tag by its name or ID.",
+    {
+      tag: z.string().describe("The name or ID (GUID) of the tag."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ tag, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the tag belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const found = await workItemTrackingApi.getTag(ctx.project, tag);
+
+        if (!found) {
+          return { content: [{ type: "text", text: `Tag '${tag}' not found` }], isError: true };
+        }
+
+        return { content: [{ type: "text", text: JSON.stringify(found, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error fetching tag: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.update_tag,
+    "Rename a work item tag across the project. Every work item carrying the tag is updated, so this is the way to fix a typo or merge two spellings without touching work items one by one.",
+    {
+      tag: z.string().describe("The name or ID (GUID) of the tag to rename."),
+      name: z.string().describe("The new name of the tag."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ tag, name, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the tag belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const updated = await workItemTrackingApi.updateTag({ name }, ctx.project, tag);
+
+        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error updating tag: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.delete_tag,
+    "Delete a work item tag from the project. The tag is removed from every work item that carries it; the work items themselves are untouched.",
+    {
+      tag: z.string().describe("The name or ID (GUID) of the tag to delete."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ tag, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the tag belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        await workItemTrackingApi.deleteTag(ctx.project, tag);
+
+        return { content: [{ type: "text", text: `Tag '${tag}' was deleted.` }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error deleting tag: ${errorMessage}` }], isError: true };
       }
     }
   );
