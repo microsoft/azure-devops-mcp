@@ -137,6 +137,68 @@ describe("EntraOAuthProvider", () => {
       expect(init.body).toContain("grant_type=refresh_token");
       expect(init.body).toContain("old-refresh");
     });
+
+    // A stale grant must not look like a server outage: MCP clients re-run the
+    // authorization flow on invalid_grant, but report a 500 as "server not
+    // responding" and give up.
+    it.each([
+      ["invalid_grant", "invalid_grant", 400],
+      ["interaction_required", "invalid_grant", 400],
+      ["invalid_client", "unauthorized_client", 400],
+      ["invalid_scope", "invalid_scope", 400],
+      ["invalid_request", "invalid_request", 400],
+    ])("maps the Entra error '%s' to the OAuth error '%s'", async (entraError, expectedCode, expectedStatus) => {
+      (globalThis as { fetch: unknown }).fetch = jest.fn(async () => ({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: entraError, error_description: "AADSTS70008: expired" }),
+      }));
+
+      const error = await provider.exchangeRefreshToken(client, "stale-refresh").catch((e) => e);
+
+      expect(error.errorCode).toBe(expectedCode);
+      expect(error.toResponseObject().error).toBe(expectedCode);
+      expect(error).toMatchObject({ message: expect.stringContaining("AADSTS70008") });
+      expect(expectedStatus).toBe(400);
+    });
+
+    it("reports an Entra outage as temporarily_unavailable rather than a server fault", async () => {
+      (globalThis as { fetch: unknown }).fetch = jest.fn(async () => ({
+        ok: false,
+        status: 503,
+        json: async () => ({}),
+      }));
+
+      const error = await provider.exchangeRefreshToken(client, "any").catch((e) => e);
+
+      expect(error.errorCode).toBe("temporarily_unavailable");
+    });
+
+    it("falls back to server_error for an unrecognised 4xx", async () => {
+      (globalThis as { fetch: unknown }).fetch = jest.fn(async () => ({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "something_new" }),
+      }));
+
+      const error = await provider.exchangeRefreshToken(client, "any").catch((e) => e);
+
+      expect(error.errorCode).toBe("server_error");
+    });
+  });
+
+  describe("authorization code errors", () => {
+    it("reports an unknown code as invalid_grant", async () => {
+      const error = await provider.challengeForAuthorizationCode(client, "nope").catch((e) => e);
+
+      expect(error.errorCode).toBe("invalid_grant");
+    });
+
+    it("reports redeeming an unknown code as invalid_grant", async () => {
+      const error = await provider.exchangeAuthorizationCode(client, "nope").catch((e) => e);
+
+      expect(error.errorCode).toBe("invalid_grant");
+    });
   });
 
   describe("verifyAccessToken", () => {
@@ -158,7 +220,11 @@ describe("EntraOAuthProvider", () => {
       });
       const p = new EntraOAuthProvider(config, { verifyJwt: verifyJwt as never });
 
-      await expect(p.verifyAccessToken("header.payload.sig")).rejects.toThrow(/Invalid access token/);
+      // invalid_token → the 401 carries a WWW-Authenticate challenge, so the
+      // client refreshes instead of treating the server as down.
+      const error = await p.verifyAccessToken("header.payload.sig").catch((e) => e);
+      expect(error.errorCode).toBe("invalid_token");
+      expect(error.message).toMatch(/Invalid access token/);
     });
 
     it("accepts a non-JWT opaque token with a fallback expiry (validated downstream by ADO)", async () => {

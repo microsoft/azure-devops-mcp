@@ -19,9 +19,63 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
 import { AuthorizationParams, OAuthServerProvider } from "@modelcontextprotocol/sdk/server/auth/provider.js";
 import { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import {
+  InvalidGrantError,
+  InvalidRequestError,
+  InvalidScopeError,
+  InvalidTokenError,
+  ServerError,
+  TemporarilyUnavailableError,
+  UnauthorizedClientError,
+} from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import { OAuthClientInformationFull, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 
 import { logger } from "../../logger.js";
+
+/**
+ * Translates an Entra token-endpoint failure into the matching OAuth 2.1 error.
+ *
+ * Without this every upstream refusal surfaced as a generic `500 server_error`,
+ * which tells an MCP client that the server is broken. The usual case is the
+ * opposite: the client's grant is simply stale (this server keeps its OAuth
+ * state in memory, so a restart invalidates it) and the client should re-run
+ * the authorization flow. `invalid_grant` says exactly that, and clients act
+ * on it by re-authenticating instead of reporting an outage.
+ *
+ * The Entra error code and description are logged and passed through; neither
+ * contains the token or the client secret.
+ */
+function toOAuthError(status: number, data: Record<string, unknown>): Error {
+  const code = typeof data.error === "string" ? data.error : "";
+  const description = typeof data.error_description === "string" ? data.error_description : "";
+  const message = `Entra token endpoint error: ${code || status} ${description}`.trim();
+
+  logger.warn("Entra token request rejected", { status, error: code || undefined });
+
+  switch (code) {
+    // Expired, revoked, already-redeemed or otherwise unusable grant — the
+    // client must start a new authorization flow.
+    case "invalid_grant":
+    case "interaction_required":
+    case "consent_required":
+    case "login_required":
+      return new InvalidGrantError(message);
+    // Our confidential app is misconfigured (wrong secret, missing consent).
+    // Not the client's fault, but not a transient server fault either.
+    case "invalid_client":
+    case "unauthorized_client":
+      return new UnauthorizedClientError(message);
+    case "invalid_scope":
+      return new InvalidScopeError(message);
+    case "invalid_request":
+    case "unsupported_grant_type":
+      return new InvalidRequestError(message);
+    default:
+      // Entra itself is unavailable — retryable, so say so rather than
+      // claiming a permanent server fault.
+      return status >= 500 ? new TemporarilyUnavailableError(message) : new ServerError(message);
+  }
+}
 
 /** Verifies a JWT and returns its claims (at least `exp`). Throws on any failure. */
 export type JwtVerifier = (token: string) => Promise<{ exp?: number }>;
@@ -212,7 +266,9 @@ export class EntraOAuthProvider implements OAuthServerProvider {
   async challengeForAuthorizationCode(_client: OAuthClientInformationFull, authorizationCode: string): Promise<string> {
     const entry = this.issuedCodes.get(authorizationCode);
     if (!entry || entry.expiresAt < Date.now()) {
-      throw new Error("Invalid or expired authorization code.");
+      // Codes live in memory, so a server restart also loses them. Reported as
+      // invalid_grant, which tells the client to re-authorize rather than retry.
+      throw new InvalidGrantError("Invalid or expired authorization code.");
     }
     return entry.codeChallenge;
   }
@@ -220,10 +276,10 @@ export class EntraOAuthProvider implements OAuthServerProvider {
   async exchangeAuthorizationCode(client: OAuthClientInformationFull, authorizationCode: string): Promise<OAuthTokens> {
     const entry = this.issuedCodes.get(authorizationCode);
     if (!entry || entry.expiresAt < Date.now()) {
-      throw new Error("Invalid or expired authorization code.");
+      throw new InvalidGrantError("Invalid or expired authorization code.");
     }
     if (entry.clientId !== client.client_id) {
-      throw new Error("Authorization code was issued to a different client.");
+      throw new InvalidGrantError("Authorization code was issued to a different client.");
     }
     this.issuedCodes.delete(authorizationCode);
     return entry.tokens;
@@ -255,7 +311,9 @@ export class EntraOAuthProvider implements OAuthServerProvider {
       } catch (error) {
         // Never log the token itself.
         logger.warn("Access token verification failed", error instanceof Error ? error.message : String(error));
-        throw new Error("Invalid access token.");
+        // invalid_token makes the 401 carry a WWW-Authenticate challenge, so the
+        // client refreshes or re-authorizes instead of treating it as an outage.
+        throw new InvalidTokenError("Invalid access token.");
       }
     }
 
@@ -285,7 +343,7 @@ export class EntraOAuthProvider implements OAuthServerProvider {
 
     const data = (await response.json()) as Record<string, unknown>;
     if (!response.ok) {
-      throw new Error(`Entra token endpoint error: ${data.error ?? response.status} ${data.error_description ?? ""}`.trim());
+      throw toOAuthError(response.status, data);
     }
 
     return {
