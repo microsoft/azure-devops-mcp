@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTool } from "../shared/tool-registration.js";
 import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
-import { BuildQueryOrder, DefinitionQueryOrder, Build, BuildStatus } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
+import { BuildQueryOrder, DefinitionQueryOrder, Build, BuildStatus, TaskResult } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
@@ -32,6 +32,7 @@ const PIPELINE_TOOLS = {
   pipelines_get_build_definition: "pipelines_get_build_definition",
   pipelines_queue_build: "pipelines_queue_build",
   pipelines_cancel_build: "pipelines_cancel_build",
+  pipelines_get_build_timeline: "pipelines_get_build_timeline",
   pipelines_get_build_tags: "pipelines_get_build_tags",
   pipelines_add_build_tag: "pipelines_add_build_tag",
   pipelines_delete_build_tag: "pipelines_delete_build_tag",
@@ -358,6 +359,51 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       return {
         content: [{ type: "text", text: JSON.stringify(changes, null, 2) }],
       };
+    }
+  );
+
+  registerTool(
+    server,
+    PIPELINE_TOOLS.pipelines_get_build_timeline,
+    "Get the timeline of a build: the stage, phase, job and task records with their state, result, timings and issues (errors/warnings). Use this to find which stage or task of a run failed before fetching logs.",
+    {
+      project: z.string().describe("Project ID or name the build belongs to"),
+      buildId: z.coerce.number().min(1).describe("ID of the build to get the timeline for"),
+      timelineId: z.string().optional().describe("ID of a specific timeline. Omit to get the build's current timeline."),
+      changeId: z.coerce.number().optional().describe("Change ID to get an incremental update of the timeline."),
+      planId: z.string().optional().describe("ID of the plan the timeline belongs to."),
+      recordType: z
+        .enum(["Stage", "Phase", "Job", "Task", "Checkpoint"])
+        .optional()
+        .describe("Return only records of this type. Timelines are large, so narrowing to 'Stage' or 'Job' is usually enough to locate a failure."),
+      onlyFailed: z.boolean().optional().describe("If true, return only records whose result is 'failed' or 'canceled', or that carry issues."),
+    },
+    async ({ project, buildId, timelineId, changeId, planId, recordType, onlyFailed }) => {
+      try {
+        const connection = await connectionProvider();
+        const buildApi = await connection.getBuildApi();
+        const timeline = await buildApi.getBuildTimeline(project, buildId, timelineId, changeId, planId);
+
+        if (!timeline) {
+          return { content: [{ type: "text", text: `No timeline found for build ${buildId}` }], isError: true };
+        }
+
+        // Filtering is done here rather than by the caller because a timeline of
+        // a large pipeline is mostly task records the model does not need.
+        const records = (timeline.records ?? []).filter((record) => {
+          if (recordType && record.type !== recordType) return false;
+          if (onlyFailed) {
+            const failed = record.result === TaskResult.Failed || record.result === TaskResult.Canceled;
+            return failed || (record.issues?.length ?? 0) > 0;
+          }
+          return true;
+        });
+
+        return { content: [{ type: "text", text: JSON.stringify({ ...timeline, records }, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error fetching build timeline: ${errorMessage}` }], isError: true };
+      }
     }
   );
 

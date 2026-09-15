@@ -1913,4 +1913,75 @@ describe("configurePipelineTools", () => {
       expect(result.content[0].text).toBe("Error fetching build: boom");
     });
   });
+
+  describe("pipelines_get_build_timeline", () => {
+    function getHandler() {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "pipelines_get_build_timeline");
+      if (!call) throw new Error("pipelines_get_build_timeline not registered");
+      return call[3];
+    }
+
+    // TaskResult: 2 = Failed, 1 = SucceededWithIssues, 0 = Succeeded, 3 = Canceled.
+    const timeline = {
+      id: "timeline-1",
+      records: [
+        { id: "r1", type: "Stage", name: "Build", result: 0 },
+        { id: "r2", type: "Job", name: "Compile", result: 2 },
+        { id: "r3", type: "Task", name: "Restore", result: 0 },
+        { id: "r4", type: "Task", name: "Lint", result: 1, issues: [{ type: "Warning", message: "style" }] },
+      ],
+    };
+
+    it("returns the full timeline and passes the optional ids through", async () => {
+      const handler = getHandler();
+      const getBuildTimeline = jest.fn().mockResolvedValue(timeline);
+      mockConnection.getBuildApi.mockResolvedValue({ getBuildTimeline });
+
+      const result = await handler({ project: "proj", buildId: 42, timelineId: "t-1", changeId: 3, planId: "p-1" });
+
+      expect(getBuildTimeline).toHaveBeenCalledWith("proj", 42, "t-1", 3, "p-1");
+      expect(JSON.parse(result.content[0].text).records).toHaveLength(4);
+    });
+
+    it("filters by record type", async () => {
+      const handler = getHandler();
+      mockConnection.getBuildApi.mockResolvedValue({ getBuildTimeline: jest.fn().mockResolvedValue(timeline) });
+
+      const result = await handler({ project: "proj", buildId: 42, recordType: "Task" });
+
+      const records = JSON.parse(result.content[0].text).records;
+      expect(records.map((r: { name: string }) => r.name)).toEqual(["Restore", "Lint"]);
+    });
+
+    it("keeps only failed records and records carrying issues when onlyFailed is set", async () => {
+      const handler = getHandler();
+      mockConnection.getBuildApi.mockResolvedValue({ getBuildTimeline: jest.fn().mockResolvedValue(timeline) });
+
+      const result = await handler({ project: "proj", buildId: 42, onlyFailed: true });
+
+      const records = JSON.parse(result.content[0].text).records;
+      expect(records.map((r: { name: string }) => r.name)).toEqual(["Compile", "Lint"]);
+    });
+
+    it("reports a missing timeline as an error", async () => {
+      const handler = getHandler();
+      mockConnection.getBuildApi.mockResolvedValue({ getBuildTimeline: jest.fn().mockResolvedValue(null) });
+
+      const result = await handler({ project: "proj", buildId: 42 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("No timeline found for build 42");
+    });
+
+    it("surfaces API errors", async () => {
+      const handler = getHandler();
+      mockConnection.getBuildApi.mockResolvedValue({ getBuildTimeline: jest.fn().mockRejectedValue(new Error("boom")) });
+
+      const result = await handler({ project: "proj", buildId: 42 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error fetching build timeline: boom");
+    });
+  });
 });
