@@ -73,6 +73,20 @@ describe("buildServerInstructions", () => {
     expect(buildServerInstructions(new Set<string>([Domain.CORE, Domain.REPOSITORIES]))).not.toContain("affect the whole organization");
   });
 
+  // Clients do not fetch resources by themselves, so an unmentioned resource
+  // is an unused one.
+  it("points at the resources the endpoint serves, and only those", () => {
+    const withWorkItems = buildServerInstructions(new Set<string>([Domain.CORE, Domain.WORK_ITEMS]));
+    expect(withWorkItems).toContain("ado://wiql-reference");
+    expect(withWorkItems).toContain("ado://projects");
+
+    const withoutWorkItems = buildServerInstructions(new Set<string>([Domain.CORE]));
+    expect(withoutWorkItems).toContain("ado://projects");
+    expect(withoutWorkItems).not.toContain("ado://wiql-reference");
+
+    expect(buildServerInstructions(new Set<string>([Domain.REPOSITORIES]))).not.toContain("ado://");
+  });
+
   it("tells the model when it is talking to a preset endpoint", () => {
     expect(buildServerInstructions(preset("dev"), { preset: "dev" })).toContain('"dev" subset');
 

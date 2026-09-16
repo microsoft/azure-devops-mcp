@@ -50,6 +50,12 @@ Per-file convention in `src/tools/*.ts`:
 - Free-text content fetched from ADO (wiki pages, work item comments, pipeline logs) is returned through `createExternalContentResponse` ([src/shared/content-safety.ts](src/shared/content-safety.ts)), which wraps it in nonce-delimited spotlighting markers. Use it for any new tool that surfaces user-authored content.
 - Tool modules must not import from `src/index.ts`: it parses argv at import time, so anything that pulls it in becomes untestable. Derive hosts from `connection.serverUrl` (via `subdomainBaseUrl`) instead — `src/tools/search.ts` used to import `orgName` from there and was the one domain with no tests because of it.
 
+### Resources
+
+[src/resources.ts](src/resources.ts) registers MCP resources — reference material the model reads, as opposed to tools it calls. `ado://wiql-reference` is static markdown (WIQL has no metadata endpoint, and getting the syntax wrong is the most common way a work item query fails); the rest are `ResourceTemplate` views over metadata a tool already exposes (`ado://projects`, `ado://project/{project}/teams`, `.../work-item-types`, `.../fields`). Registration is domain-gated like tools, so a preset endpoint does not advertise what it cannot serve.
+
+**Clients do not load resources automatically** — a user attaches one, or the model reads it deliberately after seeing it named in `instructions`. So nothing here may be load-bearing: every fact a resource carries must also be reachable through a tool, and a new resource needs a line in `RESOURCE_GUIDE` ([src/shared/server-instructions.ts](src/shared/server-instructions.ts)) or the model will never know it exists.
+
 ### Name validation guardrails
 
 Claude's API requires `^[a-zA-Z0-9_.-]{1,64}$` for tool and parameter names. Validation logic lives once in [src/shared/tool-validation.ts](src/shared/tool-validation.ts) and is consumed by both [scripts/build-validate-tools.js](scripts/build-validate-tools.js) (`npm run validate-tools`, gate in CI) and [eslint-rules/tool-name-lint-rule.js](eslint-rules/tool-name-lint-rule.js) (applied to `src/tools/*.ts`). Details in [docs/TOOL-NAME-VALIDATION.md](docs/TOOL-NAME-VALIDATION.md).

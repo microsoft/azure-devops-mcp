@@ -13,6 +13,7 @@ import { createAuthenticator } from "./auth.js";
 import { logger } from "./logger.js";
 import { getOrgTenant } from "./org-tenants.js";
 //import { configurePrompts } from "./prompts.js";
+import { configureResources } from "./resources.js";
 import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
@@ -162,6 +163,7 @@ function createConfiguredServer(
   // configurePrompts(server);
 
   configureAllTools(server, authenticator, connectionProvider, () => userAgentComposer.userAgent, domains);
+  configureResources(server, connectionProvider, domains);
 
   return server;
 }

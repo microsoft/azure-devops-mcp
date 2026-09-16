@@ -79,6 +79,16 @@ const HINTS: readonly { readonly needs: readonly Domain[]; readonly text: string
   },
 ];
 
+/** The resources registered in resources.ts, and the domain each one needs. */
+const RESOURCE_GUIDE: readonly { readonly needs: Domain; readonly text: string }[] = [
+  { needs: Domain.WORK_ITEMS, text: "ado://wiql-reference — WIQL syntax, macros, operators and field reference names. Read it before writing a non-trivial query." },
+  { needs: Domain.CORE, text: "ado://projects and ado://project/{project}/teams — the organization's projects and a project's teams." },
+  {
+    needs: Domain.WORK_ITEMS,
+    text: "ado://project/{project}/work-item-types and ado://project/{project}/fields — the process's types and states, and the display-name-to-reference-name mapping for fields.",
+  },
+];
+
 /** Writes whose blast radius is the whole organization rather than one project. */
 const ORG_WIDE = [Domain.WIT_PROCESS, Domain.MEMBER_ENTITLEMENT, Domain.GRAPH, Domain.SECURITY_ROLES, Domain.FEATURE_MANAGEMENT, Domain.NOTIFICATION];
 
@@ -133,6 +143,16 @@ export function buildServerInstructions(enabledDomains: Set<string>, options: Se
     lines.push(
       `- Writes through ${orgWide.map((d) => DOMAIN_GUIDE.find(([domain]) => domain === d)?.[1].split(" ")[0]).join(", ")} affect the whole organization, not one project. Confirm with the user before making one.`
     );
+  }
+
+  // Clients do not load resources on their own, so the model has to be told
+  // they exist before it can decide to read one.
+  const resources = RESOURCE_GUIDE.filter((entry) => enabled(entry.needs));
+  if (resources.length > 0) {
+    lines.push("", "Reference material, readable as MCP resources:", "");
+    for (const resource of resources) {
+      lines.push(`- ${resource.text}`);
+    }
   }
 
   if (options.preset) {
