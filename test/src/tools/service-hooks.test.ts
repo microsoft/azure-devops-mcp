@@ -76,4 +76,57 @@ describe("configureServiceHooksTools", () => {
     expect(init.method).toBe("DELETE");
     expect(result.content[0].text).toContain("deleted");
   });
+
+  describe("error paths", () => {
+    it("list_subscriptions surfaces failures", async () => {
+      const handler = getHandler(SERVICE_HOOKS_TOOLS.list_subscriptions);
+      mockFetch.mockResolvedValue(ok("nope", 403));
+
+      const result = await handler({});
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("403");
+    });
+
+    it("get_subscription surfaces failures", async () => {
+      const handler = getHandler(SERVICE_HOOKS_TOOLS.get_subscription);
+      mockFetch.mockResolvedValue(ok("boom", 500));
+
+      const result = await handler({ subscriptionId: "sub-1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("500");
+    });
+
+    it("create_subscription posts the subscription definition through untouched", async () => {
+      const handler = getHandler(SERVICE_HOOKS_TOOLS.create_subscription);
+      mockFetch.mockResolvedValue(ok('{"id":"sub-2"}'));
+
+      const subscription = { publisherId: "tfs", eventType: "workitem.created", consumerId: "webHooks", consumerActionId: "httpRequest", consumerInputs: { url: "https://example.invalid/hook" } };
+      const result = await handler({ subscription });
+
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual(subscription);
+      expect(result.content[0].text).toContain("sub-2");
+    });
+
+    it("create_subscription surfaces failures", async () => {
+      const handler = getHandler(SERVICE_HOOKS_TOOLS.create_subscription);
+      mockFetch.mockResolvedValue(ok("bad request", 400));
+
+      const result = await handler({ subscription: {} });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("400");
+    });
+
+    it("delete_subscription surfaces failures", async () => {
+      const handler = getHandler(SERVICE_HOOKS_TOOLS.delete_subscription);
+      mockFetch.mockResolvedValue(ok("nope", 404));
+
+      const result = await handler({ subscriptionId: "sub-1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("404");
+    });
+  });
 });

@@ -72,4 +72,79 @@ describe("configureArtifactsTools", () => {
     expect(url).toContain("protocolType=npm");
     expect(url).toContain("%24top=10");
   });
+
+  describe("get_feed", () => {
+    it("fetches an org-scoped feed", async () => {
+      const handler = getHandler(ARTIFACTS_TOOLS.get_feed);
+      mockFetch.mockResolvedValue(ok('{"name":"tools"}'));
+
+      const result = await handler({ feedId: "tools" });
+
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toBe("https://feeds.dev.azure.com/contoso/_apis/packaging/feeds/tools?api-version=7.1-preview.1");
+      expect(init.method).toBe("GET");
+      expect(result.content[0].text).toContain("tools");
+    });
+
+    it("prefixes the project for a project-scoped feed", async () => {
+      const handler = getHandler(ARTIFACTS_TOOLS.get_feed);
+      mockFetch.mockResolvedValue(ok("{}"));
+
+      await handler({ feedId: "tools", project: "Contoso" });
+
+      expect(mockFetch.mock.calls[0][0]).toBe("https://feeds.dev.azure.com/contoso/Contoso/_apis/packaging/feeds/tools?api-version=7.1-preview.1");
+    });
+
+    it("reports a missing feed as an error", async () => {
+      const handler = getHandler(ARTIFACTS_TOOLS.get_feed);
+      mockFetch.mockResolvedValue(ok("", 404));
+
+      const result = await handler({ feedId: "nope" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not found");
+    });
+
+    it("surfaces a non-404 failure as an error result", async () => {
+      const handler = getHandler(ARTIFACTS_TOOLS.get_feed);
+      mockFetch.mockResolvedValue(ok("boom", 500));
+
+      const result = await handler({ feedId: "tools" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to get feed (500)");
+    });
+  });
+
+  describe("error paths of the remaining artifacts tools", () => {
+    it("list_feeds surfaces failures", async () => {
+      const handler = getHandler(ARTIFACTS_TOOLS.list_feeds);
+      mockFetch.mockResolvedValue(ok("nope", 403));
+
+      const result = await handler({});
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("403");
+    });
+
+    it("create_feed surfaces failures", async () => {
+      const handler = getHandler(ARTIFACTS_TOOLS.create_feed);
+      mockFetch.mockResolvedValue(ok("conflict", 409));
+
+      const result = await handler({ name: "tools" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("409");
+    });
+
+    it("list_packages surfaces failures", async () => {
+      const handler = getHandler(ARTIFACTS_TOOLS.list_packages);
+      mockFetch.mockResolvedValue(ok("nope", 404));
+
+      const result = await handler({ feedId: "tools" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("404");
+    });
+  });
 });

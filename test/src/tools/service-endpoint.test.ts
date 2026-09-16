@@ -76,4 +76,56 @@ describe("configureServiceEndpointTools", () => {
     expect(init.method).toBe("DELETE");
     expect(result.content[0].text).toContain("deleted");
   });
+
+  describe("error paths", () => {
+    it("list_service_endpoints surfaces failures", async () => {
+      const handler = getHandler(SERVICE_ENDPOINT_TOOLS.list_service_endpoints);
+      mockFetch.mockResolvedValue(ok("nope", 403));
+
+      const result = await handler({ project: "Contoso" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("403");
+    });
+
+    it("get_service_endpoint surfaces failures", async () => {
+      const handler = getHandler(SERVICE_ENDPOINT_TOOLS.get_service_endpoint);
+      mockFetch.mockResolvedValue(ok("boom", 500));
+
+      const result = await handler({ project: "Contoso", endpointId: "ep-1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("500");
+    });
+
+    it("create_service_endpoint surfaces failures", async () => {
+      const handler = getHandler(SERVICE_ENDPOINT_TOOLS.create_service_endpoint);
+      mockFetch.mockResolvedValue(ok("bad request", 400));
+
+      const result = await handler({ endpoint: { name: "svc" } });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("400");
+    });
+
+    it("delete_service_endpoint names the projects it removed the endpoint from", async () => {
+      const handler = getHandler(SERVICE_ENDPOINT_TOOLS.delete_service_endpoint);
+      mockFetch.mockResolvedValue(ok("", 204));
+
+      const result = await handler({ endpointId: "ep-1", projectIds: ["p1", "p2"] });
+
+      expect(mockFetch.mock.calls[0][0]).toContain("projectIds=p1%2Cp2");
+      expect(result.content[0].text).toContain("p1, p2");
+    });
+
+    it("delete_service_endpoint surfaces failures", async () => {
+      const handler = getHandler(SERVICE_ENDPOINT_TOOLS.delete_service_endpoint);
+      mockFetch.mockResolvedValue(ok("nope", 403));
+
+      const result = await handler({ endpointId: "ep-1", projectIds: ["p1"] });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("403");
+    });
+  });
 });

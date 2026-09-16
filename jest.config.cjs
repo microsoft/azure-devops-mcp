@@ -24,12 +24,14 @@ module.exports = {
   coverageReporters: ["text", "lcov", "json-summary"],
 
   // Coverage thresholds
+  // Set just below the level the suite actually reaches, so a regression fails
+  // CI instead of silently eroding coverage. Raise these as coverage improves.
   coverageThreshold: {
     global: {
-      branches: 40,
-      functions: 40,
-      lines: 40,
-      statements: 40,
+      branches: 65,
+      functions: 93,
+      lines: 84,
+      statements: 82,
     },
   },
 

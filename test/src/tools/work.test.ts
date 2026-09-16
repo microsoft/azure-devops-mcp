@@ -3944,4 +3944,46 @@ describe("configureWorkTools", () => {
       expect(result.content[0].text).toContain("Automation rules updated");
     });
   });
+
+  describe("board card rules and charts", () => {
+    it("get_board_card_rule_settings returns the rule settings", async () => {
+      const handler = getPlanHandler("work_get_board_card_rule_settings");
+      mockWorkApi.getBoardCardRuleSettings.mockResolvedValue({ rules: { fill: [] } });
+
+      const result = await handler({ project: "Proj", team: "Team", board: "Stories" });
+
+      expect(mockWorkApi.getBoardCardRuleSettings).toHaveBeenCalledWith({ project: "Proj", team: "Team" }, "Stories");
+      expect(result.content[0].text).toContain("rules");
+    });
+
+    it("get_board_card_rule_settings surfaces errors", async () => {
+      const handler = getPlanHandler("work_get_board_card_rule_settings");
+      mockWorkApi.getBoardCardRuleSettings.mockRejectedValue(new Error("board not found"));
+
+      const result = await handler({ project: "Proj", team: "Team", board: "Nope" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("board not found");
+    });
+
+    it("get_board_chart returns a chart by name", async () => {
+      const handler = getPlanHandler("work_get_board_chart");
+      mockWorkApi.getBoardChart.mockResolvedValue({ name: "CumulativeFlow" });
+
+      const result = await handler({ project: "Proj", team: "Team", board: "Stories", name: "CumulativeFlow" });
+
+      expect(mockWorkApi.getBoardChart).toHaveBeenCalledWith({ project: "Proj", team: "Team" }, "Stories", "CumulativeFlow");
+      expect(result.content[0].text).toContain("CumulativeFlow");
+    });
+
+    it("get_board_chart surfaces errors", async () => {
+      const handler = getPlanHandler("work_get_board_chart");
+      mockWorkApi.getBoardChart.mockRejectedValue(new Error("chart not found"));
+
+      const result = await handler({ project: "Proj", team: "Team", board: "Stories", name: "Nope" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("chart not found");
+    });
+  });
 });

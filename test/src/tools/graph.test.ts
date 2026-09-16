@@ -83,4 +83,113 @@ describe("configureGraphTools", () => {
     expect(init.method).toBe("DELETE");
     expect(result.content[0].text).toContain("Membership removed");
   });
+
+  describe("groups", () => {
+    it("lists groups and passes the scope and continuation token", async () => {
+      const handler = getHandler(GRAPH_TOOLS.list_groups);
+      mockFetch.mockResolvedValue(ok('{"value":[{"displayName":"Contributors"}]}'));
+
+      const result = await handler({ scopeDescriptor: "scp.abc", continuationToken: "tok" });
+
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toContain("https://vssps.dev.azure.com/contoso/_apis/graph/groups?");
+      expect(url).toContain("scopeDescriptor=scp.abc");
+      expect(url).toContain("continuationToken=tok");
+      expect(init.method).toBe("GET");
+      expect(result.content[0].text).toContain("Contributors");
+    });
+
+    it("omits the optional parameters when they are not given", async () => {
+      const handler = getHandler(GRAPH_TOOLS.list_groups);
+      mockFetch.mockResolvedValue(ok('{"value":[]}'));
+
+      await handler({});
+
+      const url = mockFetch.mock.calls[0][0] as string;
+      expect(url).not.toContain("scopeDescriptor");
+      expect(url).not.toContain("continuationToken");
+    });
+
+    it("surfaces a failed group listing as an error result", async () => {
+      const handler = getHandler(GRAPH_TOOLS.list_groups);
+      mockFetch.mockResolvedValue(ok("forbidden", 403));
+
+      const result = await handler({});
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to list groups (403)");
+    });
+
+    it("gets a single group by descriptor", async () => {
+      const handler = getHandler(GRAPH_TOOLS.get_group);
+      mockFetch.mockResolvedValue(ok('{"displayName":"Readers"}'));
+
+      const result = await handler({ groupDescriptor: "vssgp.xyz" });
+
+      expect(mockFetch.mock.calls[0][0]).toContain("/_apis/graph/groups/vssgp.xyz?api-version=");
+      expect(result.content[0].text).toContain("Readers");
+    });
+
+    it("reports a missing group as an error", async () => {
+      const handler = getHandler(GRAPH_TOOLS.get_group);
+      mockFetch.mockResolvedValue(ok("", 404));
+
+      const result = await handler({ groupDescriptor: "vssgp.nope" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not found");
+    });
+
+    it("surfaces a non-404 group failure as an error result", async () => {
+      const handler = getHandler(GRAPH_TOOLS.get_group);
+      mockFetch.mockResolvedValue(ok("boom", 500));
+
+      const result = await handler({ groupDescriptor: "vssgp.xyz" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to get group (500)");
+    });
+  });
+
+  describe("error paths of the remaining graph tools", () => {
+    it("list_users surfaces failures", async () => {
+      const handler = getHandler(GRAPH_TOOLS.list_users);
+      mockFetch.mockResolvedValue(ok("nope", 401));
+
+      const result = await handler({});
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Failed to list users (401)");
+    });
+
+    it("list_memberships surfaces failures", async () => {
+      const handler = getHandler(GRAPH_TOOLS.list_memberships);
+      mockFetch.mockResolvedValue(ok("nope", 400));
+
+      const result = await handler({ subjectDescriptor: "aad.abc" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("400");
+    });
+
+    it("add_membership surfaces failures", async () => {
+      const handler = getHandler(GRAPH_TOOLS.add_membership);
+      mockFetch.mockResolvedValue(ok("nope", 409));
+
+      const result = await handler({ subjectDescriptor: "aad.abc", containerDescriptor: "vssgp.xyz" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("409");
+    });
+
+    it("remove_membership surfaces failures", async () => {
+      const handler = getHandler(GRAPH_TOOLS.remove_membership);
+      mockFetch.mockResolvedValue(ok("nope", 403));
+
+      const result = await handler({ subjectDescriptor: "aad.abc", containerDescriptor: "vssgp.xyz" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("403");
+    });
+  });
 });
