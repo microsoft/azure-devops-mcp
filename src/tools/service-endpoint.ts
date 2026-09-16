@@ -6,6 +6,7 @@ import { registerTool } from "../shared/tool-registration.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { adoFetch } from "../shared/ado-rest.js";
+import { requiredProject } from "../shared/common-params.js";
 
 const SERVICE_ENDPOINT_TOOLS = {
   list_service_endpoints: "serviceendpoint_list_service_endpoints",
@@ -29,7 +30,7 @@ function configureServiceEndpointTools(server: McpServer, tokenProvider: () => P
     SERVICE_ENDPOINT_TOOLS.list_service_endpoints,
     "List service connections (service endpoints) in a project, e.g. connections to Azure, GitHub, Docker registries, or other services used by pipelines.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       type: z.string().optional().describe("Filter by endpoint type, e.g. 'azurerm', 'github', 'dockerregistry'."),
       includeFailed: z.boolean().optional().describe("Include endpoints that failed to be created/authorized."),
     },
@@ -57,7 +58,7 @@ function configureServiceEndpointTools(server: McpServer, tokenProvider: () => P
     SERVICE_ENDPOINT_TOOLS.get_service_endpoint,
     "Get a single service connection (service endpoint) by its ID within a project.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       endpointId: z.string().describe("The ID (GUID) of the service endpoint."),
     },
     async ({ project, endpointId }) => {

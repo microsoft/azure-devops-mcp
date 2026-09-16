@@ -32,6 +32,7 @@ import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { extractAdoStreamError, getEnumKeys, streamToString } from "../utils.js";
+import { requiredProject } from "../shared/common-params.js";
 
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
@@ -565,7 +566,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
     REPO_TOOLS.list_repos_by_project,
     "Retrieve a list of repositories for a given project",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       top: z.coerce.number().default(100).describe("The maximum number of repositories to return."),
       skip: z.coerce.number().default(0).describe("The number of repositories to skip. Defaults to 0."),
       repoNameFilter: z.string().optional().describe("Optional filter to search for repositories by name. If provided, only repositories with names containing this string will be returned."),

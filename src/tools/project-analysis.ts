@@ -7,6 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { AggregationType } from "azure-devops-node-api/interfaces/ProjectAnalysisInterfaces.js";
 import { elicitProject } from "../shared/elicitations.js";
+import { optionalProject } from "../shared/common-params.js";
 
 const PROJECT_ANALYSIS_TOOLS = {
   get_language_analytics: "projectanalysis_get_language_analytics",
@@ -29,7 +30,7 @@ function configureProjectAnalysisTools(server: McpServer, _: () => Promise<strin
     return { project: result.resolved };
   };
 
-  const projectField = z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown.");
+  const projectField = optionalProject;
   const aggregationField = z.enum(["daily", "hourly"]).default("daily").describe("The aggregation granularity for the metrics.");
 
   registerTool(

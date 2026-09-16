@@ -7,6 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { Dashboard, Widget, WidgetScope } from "azure-devops-node-api/interfaces/DashboardInterfaces.js";
 import { elicitProject } from "../shared/elicitations.js";
+import { optionalProject, optionalTeamWith } from "../shared/common-params.js";
 
 const DASHBOARD_TOOLS = {
   list_dashboards: "dashboard_list_dashboards",
@@ -34,8 +35,8 @@ function configureDashboardTools(server: McpServer, _: () => Promise<string>, co
     return { teamContext: { project: resolvedProject, team } };
   };
 
-  const projectField = z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown.");
-  const teamField = z.string().optional().describe("The name or ID of the Azure DevOps team. Optional; omit for project-scoped dashboards.");
+  const projectField = optionalProject;
+  const teamField = optionalTeamWith("Omit for project-scoped dashboards.");
 
   registerTool(
     server,

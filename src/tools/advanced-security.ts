@@ -7,6 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces.js";
 import { z } from "zod";
 import { getEnumKeys, mapStringArrayToEnum, mapStringToEnum } from "../utils.js";
+import { requiredProject } from "../shared/common-params.js";
 
 const ADVSEC_TOOLS = {
   get_alerts: "advsec_get_alerts",
@@ -19,7 +20,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
     ADVSEC_TOOLS.get_alerts,
     "Retrieve Advanced Security alerts for a repository.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       repository: z.string().describe("The name or ID of the repository to get alerts for."),
       alertType: z
         .enum(getEnumKeys(AlertType) as [string, ...string[]])
@@ -104,7 +105,7 @@ function configureAdvSecTools(server: McpServer, _: () => Promise<string>, conne
     ADVSEC_TOOLS.get_alert_details,
     "Get detailed information about a specific Advanced Security alert.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       repository: z.string().describe("The name or ID of the repository containing the alert."),
       alertId: z.coerce.number().min(1).describe("The ID of the alert to retrieve details for."),
       ref: z.string().optional().describe("Git reference (branch) to filter the alert."),

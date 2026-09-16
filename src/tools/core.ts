@@ -11,6 +11,7 @@ import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import type { ProjectInfo, TeamProject, WebApiTeam } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { ProjectVisibility } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
 import { IdentityBase } from "azure-devops-node-api/interfaces/IdentitiesInterfaces.js";
+import { optionalProject, optionalProjectWith, optionalTeam } from "../shared/common-params.js";
 
 const CORE_TOOLS = {
   list_project_teams: "core_list_project_teams",
@@ -45,7 +46,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.list_project_teams,
     "Retrieve a list of teams for an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       mine: z.boolean().optional().describe("If true, only return teams that the authenticated user is a member of."),
       top: z.coerce.number().optional().describe("The maximum number of teams to return. Defaults to 100."),
       skip: z.coerce.number().optional().describe("The number of teams to skip for pagination. Defaults to 0."),
@@ -219,7 +220,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.update_project,
     "Update an existing project in your Azure DevOps organization. This queues an asynchronous operation and returns an operation reference. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project to update. If not provided, a project selection prompt will be shown."),
+      project: optionalProjectWith("The project to update."),
       name: z.string().optional().describe("The new name of the project."),
       description: z.string().optional().describe("The new description of the project."),
       visibility: z.enum(["private", "public", "organization"]).optional().describe("The new visibility of the project."),
@@ -272,7 +273,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.delete_project,
     "Permanently delete a project from your Azure DevOps organization. This is a destructive operation that queues an asynchronous delete and returns an operation reference. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project to delete. If not provided, a project selection prompt will be shown."),
+      project: optionalProjectWith("The project to delete."),
     },
     async ({ project }) => {
       try {
@@ -312,7 +313,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.create_team,
     "Create a new team in an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       name: z.string().describe("The name of the team to create."),
       description: z.string().optional().describe("The description of the team."),
     },
@@ -350,7 +351,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.update_team,
     "Update an existing team in an Azure DevOps project. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       team: z.string().describe("The name or ID of the team to update."),
       name: z.string().optional().describe("The new name of the team."),
       description: z.string().optional().describe("The new description of the team."),
@@ -393,7 +394,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.delete_team,
     "Permanently delete a team from an Azure DevOps project. This is a destructive operation. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       team: z.string().describe("The name or ID of the team to delete."),
     },
     async ({ project, team }) => {
@@ -452,8 +453,8 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.list_team_members,
     "List the members of a team in an Azure DevOps project. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       top: z.coerce.number().optional().describe("The maximum number of members to return."),
       skip: z.coerce.number().optional().describe("The number of members to skip for pagination."),
     },
@@ -501,7 +502,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.get_project_properties,
     "Get the properties of an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       keys: z.array(z.string()).optional().describe("Optional list of property keys to retrieve. If omitted, all properties are returned. Supports wildcards (e.g. 'System.*')."),
     },
     async ({ project, keys }) => {
@@ -542,7 +543,7 @@ function configureCoreTools(server: McpServer, tokenProvider: () => Promise<stri
     CORE_TOOLS.set_project_properties,
     "Set (create or update) properties on an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       properties: z.record(z.string()).describe("Map of property name to value to set on the project."),
     },
     async ({ project, properties }) => {

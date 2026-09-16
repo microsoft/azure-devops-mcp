@@ -13,6 +13,7 @@ import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
+import { optionalProject, optionalTeam, optionalTeamWith } from "../shared/common-params.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -108,8 +109,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_backlogs,
     "Receive a list of backlogs for a given project and team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
     },
     async ({ project, team }) => {
       try {
@@ -151,8 +152,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_backlog_work_items,
     "Retrieve a list of backlogs of for a given project, team, and backlog category. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       backlogId: z.string().describe("The ID of the backlog category to retrieve work items from."),
     },
     async ({ project, team, backlogId }) => {
@@ -196,7 +197,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.my_work_items,
     "Retrieve a list of work items relevent to the authenticated user. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       type: z.enum(["assignedtome", "myactivity"]).default("assignedtome").describe("The type of work items to retrieve. Defaults to 'assignedtome'."),
       top: z.coerce.number().default(50).describe("The maximum number of work items to return. Defaults to 50."),
       includeCompleted: z.boolean().default(false).describe("Whether to include completed work items. Defaults to false."),
@@ -234,7 +235,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.get_work_items_batch_by_ids,
     "Retrieve list of work items by IDs in batch. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       ids: z.array(z.coerce.number().min(1)).describe("The IDs of the work items to retrieve."),
       fields: z.array(z.string()).optional().describe("Optional list of fields to include in the response. If not provided, a hardcoded default set of fields will be used."),
     },
@@ -304,7 +305,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Get a single work item by ID. If a project is not specified, you will be prompted to select one.",
     {
       id: z.coerce.number().min(1).describe("The ID of the work item to retrieve."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       fields: z
         .array(z.string())
         .optional()
@@ -359,7 +360,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_work_item_comments,
     "Retrieve list of comments for a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to retrieve comments for."),
       top: z.coerce.number().default(50).describe("Optional number of comments to retrieve. Defaults to all comments."),
     },
@@ -395,7 +396,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.add_work_item_comment,
     "Add comment to a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to add a comment to."),
       comment: z
         .string()
@@ -460,7 +461,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.update_work_item_comment,
     "Update an existing comment on a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       workItemId: z.coerce.number().min(1).describe("The ID of the work item."),
       commentId: z.coerce.number().min(1).describe("The ID of the comment to update."),
       text: z
@@ -523,7 +524,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_work_item_revisions,
     "Retrieve list of revisions for a work item by ID. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to retrieve revisions for."),
       top: z.coerce.number().default(50).describe("Optional number of revisions to retrieve. If not provided, all revisions will be returned."),
       skip: z.coerce.number().optional().describe("Optional number of revisions to skip for pagination. Defaults to 0."),
@@ -595,7 +596,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Create one or many child work items from a parent by work item type and parent id. If a project is not specified, you will be prompted to select one.",
     {
       parentId: z.coerce.number().min(1).describe("The ID of the parent work item to create a child work item under."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       workItemType: z.string().describe("The type of the child work item to create."),
       items: z.array(
         z.object({
@@ -808,8 +809,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.get_work_items_for_iteration,
     "Retrieve a list of work items for a specified iteration. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID of the iteration to retrieve work items for."),
     },
     async ({ project, team, iterationId }) => {
@@ -893,7 +894,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.get_work_item_type,
     "Get a specific work item type. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       workItemType: z.string().describe("The name of the work item type to retrieve."),
     },
     async ({ project, workItemType }) => {
@@ -929,7 +930,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.create_work_item,
     "Create a new work item in a specified project and work item type. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       workItemType: z.string().describe("The type of work item to create, e.g., 'Task', 'Bug', etc."),
       fields: z
         .array(
@@ -998,7 +999,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.get_query,
     "Get a query by its ID or path. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       query: z.string().describe("The ID or path of the query to retrieve."),
       expand: z
         .enum(getEnumKeys(QueryExpand) as [string, ...string[]])
@@ -1042,8 +1043,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Retrieve the results of a work item query given the query ID. Supports full or IDs-only response types.",
     {
       id: z.string().describe("The ID of the query to retrieve results for."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, the default project will be used."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team will be used."),
+      project: optionalProject,
+      team: optionalTeam,
       timePrecision: z.boolean().optional().describe("Whether to include time precision in the results. Defaults to false."),
       top: z.coerce.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
       responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete query results (default), 'ids' returns only work item IDs for reduced payload size."),
@@ -1169,7 +1170,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.work_items_link,
     "Link work items together in batch. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       updates: z
         .array(
           z.object({
@@ -1259,7 +1260,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.work_item_unlink,
     "Remove one or many links from a single work item. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       id: z.coerce.number().min(1).describe("The ID of the work item to remove the links from."),
       type: z
         .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
@@ -1349,7 +1350,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Add artifact links (repository, branch, commit, builds) to work items. You can either provide the full vstfs URI or the individual components to build it automatically. If a project is not specified, you will be prompted to select one.",
     {
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to add the artifact link to."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
 
       // Option 1: Provide full URI directly
       artifactUri: z.string().optional().describe("The complete VSTFS URI of the artifact to link. If provided, individual component parameters are ignored."),
@@ -1519,8 +1520,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             "IMPORTANT: always constrain the query to the intended project with an explicit [System.TeamProject] = @project clause in the WHERE block. " +
             "The team context passed alongside the query does NOT reliably scope results: flat (FROM WorkItems) queries can be silently filtered, and recursive (FROM WorkItemLinks ... MODE (Recursive)) queries ignore it entirely and return work items from the whole organization."
         ),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, the default team context will be used."),
+      project: optionalProject,
+      team: optionalTeam,
       timePrecision: z.boolean().optional().describe("Whether to include time precision in date fields. Defaults to false."),
       top: z.coerce.number().default(50).describe("The maximum number of results to return. Defaults to 50."),
     },
@@ -1570,7 +1571,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.create_attachment,
     "Upload a file as a work item attachment, optionally attaching it to a work item in the same call. Pass the file content inline: plain text as-is, or binary (images, archives, PDFs) base64-encoded with contentIsBase64 set. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       fileName: z.string().describe("The file name to store the attachment under, e.g. 'repro-steps.md' or 'screenshot.png'. The extension determines how Azure DevOps renders it."),
       content: z.string().describe("The file content. Plain text by default; base64-encoded when contentIsBase64 is true."),
       contentIsBase64: z.boolean().default(false).describe("Set to true when 'content' is base64-encoded, which is required for binary files."),
@@ -1630,7 +1631,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.get_work_item_attachment,
     "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If savePath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
       fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type or the saved file's name."),
       savePath: z
@@ -1735,7 +1736,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Move a work item to the project's recycle bin. It stops appearing in queries and boards but can be restored with wit_restore_work_item. To erase it permanently instead, use wit_destroy_work_item.",
     {
       id: z.coerce.number().min(1).describe("The ID of the work item to delete."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ id, project }) => {
       try {
@@ -1759,7 +1760,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_deleted_work_items,
     "List the work items in the project's recycle bin. Without ids it returns every deleted work item as a shallow reference; with ids it returns the details (type, title, who deleted it and when) of those specific ones.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       ids: z.array(z.coerce.number().min(1)).optional().describe("Only return these work item IDs, with full recycle bin details."),
     },
     async ({ project, ids }) => {
@@ -1785,7 +1786,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Restore a work item from the project's recycle bin, putting it back in queries and boards with its original ID.",
     {
       id: z.coerce.number().min(1).describe("The ID of the deleted work item to restore."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ id, project }) => {
       try {
@@ -1810,7 +1811,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Permanently erase a work item from the recycle bin. This cannot be undone and the work item cannot be restored afterwards — use wit_delete_work_item unless the caller explicitly asked for permanent removal.",
     {
       id: z.coerce.number().min(1).describe("The ID of the work item to destroy permanently."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ id, project }) => {
       try {
@@ -1834,7 +1835,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_tags,
     "List the work item tags defined in a project, with their IDs. Use it to find the exact spelling of a tag before filtering by it, or to spot near-duplicate tags.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ project }) => {
       try {
@@ -1859,7 +1860,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Get a single work item tag by its name or ID.",
     {
       tag: z.string().describe("The name or ID (GUID) of the tag."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ tag, project }) => {
       try {
@@ -1889,7 +1890,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     {
       tag: z.string().describe("The name or ID (GUID) of the tag to rename."),
       name: z.string().describe("The new name of the tag."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ tag, name, project }) => {
       try {
@@ -1914,7 +1915,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Delete a work item tag from the project. The tag is removed from every work item that carries it; the work items themselves are untouched.",
     {
       tag: z.string().describe("The name or ID (GUID) of the tag to delete."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ tag, project }) => {
       try {
@@ -1950,8 +1951,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_templates,
     "List a team's work item templates: the preset field values a team applies when creating recurring work. Returns shallow references without the field values; use wit_get_template for those.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the templates. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeamWith("The team that owns the templates."),
       workItemType: z.string().optional().describe("Only return templates for this work item type, e.g. 'Bug'."),
     },
     async ({ project, team, workItemType }) => {
@@ -1977,8 +1978,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Get a work item template with the field values it presets.",
     {
       templateId: z.string().describe("The ID (GUID) of the template."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeamWith("The team that owns the template."),
     },
     async ({ templateId, project, team }) => {
       try {
@@ -2014,8 +2015,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemTypeName: z.string().describe("The work item type the template applies to, e.g. 'Task'."),
       fields: templateFieldsSchema,
       description: z.string().optional().describe("What the template is for."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeamWith("The team that owns the template."),
     },
     async ({ name, workItemTypeName, fields, description, project, team }) => {
       try {
@@ -2044,8 +2045,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       workItemTypeName: z.string().describe("The work item type the template applies to, e.g. 'Task'."),
       fields: templateFieldsSchema,
       description: z.string().optional().describe("What the template is for."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeamWith("The team that owns the template."),
     },
     async ({ templateId, name, workItemTypeName, fields, description, project, team }) => {
       try {
@@ -2070,8 +2071,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Delete a team's work item template. Work items already created from it are untouched.",
     {
       templateId: z.string().describe("The ID (GUID) of the template to delete."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team that owns the template. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeamWith("The team that owns the template."),
     },
     async ({ templateId, project, team }) => {
       try {
@@ -2095,7 +2096,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_queries,
     "List the saved query tree of a project: the 'My Queries' and 'Shared Queries' folders and what is inside them. Use it to find a query's ID or path before running it with wit_get_query_results_by_id.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       depth: z.coerce.number().min(0).max(2).optional().describe("How many levels of the folder tree to return. 0 returns only the root folders."),
       expand: z
         .enum(getEnumKeys(QueryExpand) as [string, ...string[]])
@@ -2129,7 +2130,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       name: z.string().describe("Name of the query or folder."),
       wiql: z.string().optional().describe("The WIQL text of the query. Required for a query, omitted for a folder."),
       isFolder: z.boolean().default(false).describe("Create a folder instead of a query."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       validateWiqlOnly: z.boolean().optional().describe("Only validate the WIQL without saving anything."),
     },
     async ({ parentPath, name, wiql, isFolder, project, validateWiqlOnly }) => {
@@ -2161,7 +2162,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       query: z.string().describe("ID (GUID) or path of the query to update, e.g. 'Shared Queries/Active bugs'."),
       name: z.string().optional().describe("New name for the query."),
       wiql: z.string().optional().describe("New WIQL text for the query."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       undeleteDescendants: z.boolean().optional().describe("When restoring a folder from the query recycle bin, also restore what was inside it."),
     },
     async ({ query, name, wiql, project, undeleteDescendants }) => {
@@ -2191,7 +2192,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Delete a saved query or query folder. Deleting a folder deletes the queries inside it; both go to the query recycle bin and can be restored with wit_update_query.",
     {
       query: z.string().describe("ID (GUID) or path of the query or folder to delete, e.g. 'Shared Queries/Old'."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ query, project }) => {
       try {
@@ -2215,7 +2216,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_work_item_types,
     "List the work item types available in a project, as the project's process actually defines them. Use it before creating a work item to learn which types exist, including any custom ones.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       namesOnly: z.boolean().default(true).describe("Return just the type names. The full definitions include every field and state of every type and are large, so ask for them only when needed."),
     },
     async ({ project, namesOnly }) => {
@@ -2241,7 +2242,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.list_type_categories,
     "List the work item type categories of a project: which types play the role of requirement, bug, task, epic and so on. This is how to find out what a project calls its backlog items when the process is customized.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ project }) => {
       try {
@@ -2266,7 +2267,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Get one work item type category, e.g. 'Microsoft.RequirementCategory', with the types it contains and the default type used when creating work items in it.",
     {
       category: z.string().describe("Reference name of the category, e.g. 'Microsoft.BugCategory' or 'Microsoft.RequirementCategory'."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ category, project }) => {
       try {

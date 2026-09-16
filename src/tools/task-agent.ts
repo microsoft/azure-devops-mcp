@@ -7,6 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { VariableGroupParameters, VariableGroupProjectReference, EnvironmentCreateParameter, EnvironmentUpdateParameter } from "azure-devops-node-api/interfaces/TaskAgentInterfaces.js";
 import { elicitProject } from "../shared/elicitations.js";
+import { optionalProject } from "../shared/common-params.js";
 
 const TASKAGENT_TOOLS = {
   list_variable_groups: "taskagent_list_variable_groups",
@@ -33,7 +34,7 @@ function configureTaskAgentTools(server: McpServer, _: () => Promise<string>, co
     return { project: result.resolved };
   };
 
-  const projectField = z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown.");
+  const projectField = optionalProject;
 
   registerTool(
     server,

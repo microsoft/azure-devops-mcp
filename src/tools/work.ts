@@ -24,6 +24,7 @@ import {
   TeamAutomationRulesSettingsRequestModel,
 } from "azure-devops-node-api/interfaces/WorkInterfaces.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
+import { optionalProject, optionalTeam, requiredProject, requiredTeam } from "../shared/common-params.js";
 
 // Maps the TreeStructureGroup enum to the string segment used in the
 // classification-nodes REST route (.../wit/classificationNodes/{areas|iterations}/...).
@@ -124,8 +125,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_team_iterations,
     "Retrieve a list of iterations for a specific team in a project. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       timeframe: z.enum(["current"]).optional().describe("The timeframe for which to retrieve iterations. Currently, only 'current' is supported."),
     },
     async ({ project, team, timeframe }) => {
@@ -175,7 +176,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.create_iterations,
     "Create new iterations in a specified Azure DevOps project.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       iterations: z
         .array(
           z.object({
@@ -234,7 +235,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_iterations,
     "List all iterations in a specified Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       depth: z.coerce.number().default(2).describe("Depth of children to fetch."),
       excludedIds: z.array(z.coerce.number().min(1)).optional().describe("An optional array of iteration IDs, and thier children, that should not be returned."),
     },
@@ -308,8 +309,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.assign_iterations,
     "Assign existing iterations to a specific team in a project.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
-      team: z.string().describe("The name or ID of the Azure DevOps team."),
+      project: requiredProject,
+      team: requiredTeam,
       iterations: z
         .array(
           z.object({
@@ -544,8 +545,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_team_settings,
     "Get team settings including default iteration, backlog iteration, and default area path for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
     },
     async ({ project, team }) => {
       try {
@@ -610,7 +611,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_plans,
     "Retrieve a list of delivery plans for an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ project }) => {
       try {
@@ -649,7 +650,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_plan,
     "Retrieve a single delivery plan by ID for an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       id: z.string().describe("The ID of the delivery plan to retrieve."),
     },
     async ({ project, id }) => {
@@ -689,7 +690,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.create_plan,
     "Create a new delivery plan in an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       name: z.string().describe("The name of the delivery plan to create."),
       description: z.string().optional().describe("The description of the delivery plan."),
       properties: z.record(z.unknown()).optional().describe("Optional delivery plan properties (e.g., team backlog mappings, criteria). Provided as an object."),
@@ -734,7 +735,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_plan,
     "Update an existing delivery plan in an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       id: z.string().describe("The ID of the delivery plan to update."),
       revision: z.coerce.number().describe("The revision of the plan being updated. Must match the current revision returned by the server to avoid conflicts."),
       name: z.string().optional().describe("The new name of the delivery plan."),
@@ -790,7 +791,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.delete_plan,
     "Permanently delete a delivery plan from an Azure DevOps project. This is a destructive operation. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       id: z.string().describe("The ID of the delivery plan to delete."),
     },
     async ({ project, id }) => {
@@ -826,7 +827,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_areas,
     "List the area paths for an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       depth: z.coerce.number().default(2).describe("Depth of child area paths to fetch. Defaults to 2."),
     },
     async ({ project, depth }) => {
@@ -868,7 +869,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.create_area,
     "Create a new area path in an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       name: z.string().describe("The name of the area path to create."),
       parentPath: z.string().optional().describe("The path of the parent area under which to create the new area (e.g. 'ParentArea/Child'). If omitted, the area is created at the project root."),
     },
@@ -905,7 +906,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_area,
     "Rename an existing area path in an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       path: z.string().describe("The current path of the area to rename (e.g. 'ParentArea/Child')."),
       name: z.string().describe("The new name for the area path."),
     },
@@ -942,7 +943,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.delete_area,
     "Permanently delete an area path from an Azure DevOps project. This is a destructive operation: work items assigned to the deleted area are reclassified to the area identified by reclassifyId. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       path: z.string().describe("The path of the area to delete (e.g. 'ParentArea/Child')."),
       reclassifyId: z.coerce.number().describe("The ID of the area path to which work items (and child nodes) currently under the deleted area will be reclassified."),
     },
@@ -979,7 +980,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_iteration,
     "Update an existing iteration (rename and/or change its start/finish dates) in an Azure DevOps project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       path: z.string().describe("The current path of the iteration to update (e.g. 'ParentIteration/Sprint 1')."),
       name: z.string().optional().describe("The new name for the iteration."),
       startDate: z.string().optional().describe("The start date of the iteration in ISO format (e.g., '2023-01-01T00:00:00Z')."),
@@ -1030,7 +1031,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.delete_iteration,
     "Permanently delete an iteration from an Azure DevOps project. This is a destructive operation: work items assigned to the deleted iteration are reclassified to the iteration identified by reclassifyId. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       path: z.string().describe("The path of the iteration to delete (e.g. 'ParentIteration/Sprint 1')."),
       reclassifyId: z.coerce.number().describe("The ID of the iteration to which work items currently under the deleted iteration will be reclassified."),
     },
@@ -1067,8 +1068,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.set_team_area_paths,
     "Set the area paths owned by a team in an Azure DevOps project (the default area path and/or the full list of area paths). If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       defaultAreaPath: z.string().optional().describe("The team's default area path (new work items are assigned here). Must be one of the team's area paths."),
       areaPaths: z
         .array(
@@ -1132,8 +1133,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_boards,
     "List the boards for a team in an Azure DevOps project. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
     },
     async ({ project, team }) => {
       try {
@@ -1179,8 +1180,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board_columns,
     "Get the columns of a board for a team in an Azure DevOps project. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board (e.g. 'Stories', 'Features')."),
     },
     async ({ project, team, board }) => {
@@ -1227,8 +1228,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board_rows,
     "Get the rows (swimlanes) of a board for a team in an Azure DevOps project. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board (e.g. 'Stories', 'Features')."),
     },
     async ({ project, team, board }) => {
@@ -1275,8 +1276,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_backlog_configuration,
     "Get the backlog configuration (portfolio/requirement/task backlogs and their work item types) for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
     },
     async ({ project, team }) => {
       try {
@@ -1318,8 +1319,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_team_days_off,
     "Get a team's days off for a specific iteration. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID of the iteration to get days off for."),
     },
     async ({ project, team, iterationId }) => {
@@ -1362,8 +1363,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.set_team_days_off,
     "Set a team's days off for a specific iteration (replaces the existing set). If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. Reuse from prior context if already known. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID of the iteration to set days off for."),
       daysOff: z
         .array(
@@ -1435,8 +1436,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_board_columns,
     "Replace the columns of a board. Obtain the current columns via work_get_board_columns, modify them, and pass back the full set.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
       columns: z.array(z.record(z.unknown())).describe("The full ordered set of board columns (as returned by work_get_board_columns, with edits applied)."),
     },
@@ -1462,8 +1463,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_board_rows,
     "Replace the rows (swimlanes) of a board. Obtain the current rows via work_get_board_rows, modify them, and pass back the full set.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
       rows: z.array(z.record(z.unknown())).describe("The full ordered set of board rows (as returned by work_get_board_rows, with edits applied)."),
     },
@@ -1489,8 +1490,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board_card_settings,
     "Get the card field settings of a board. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
     },
     async ({ project, team, board }) => {
@@ -1515,8 +1516,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_board_card_settings,
     "Update the card field settings of a board. Obtain the current settings via work_get_board_card_settings, modify them, and pass back the full object.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
       cardSettings: z.record(z.unknown()).describe("The full card settings object (as returned by work_get_board_card_settings, with edits applied)."),
     },
@@ -1542,8 +1543,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board_card_rule_settings,
     "Get the card style/rule settings of a board. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
     },
     async ({ project, team, board }) => {
@@ -1568,8 +1569,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_board_card_rule_settings,
     "Update the card style/rule settings of a board. Obtain the current settings via work_get_board_card_rule_settings, modify them, and pass back the full object.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
       ruleSettings: z.record(z.unknown()).describe("The full card rule settings object (as returned by work_get_board_card_rule_settings, with edits applied)."),
     },
@@ -1595,8 +1596,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_board_charts,
     "List the charts available on a board. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
     },
     async ({ project, team, board }) => {
@@ -1624,8 +1625,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board_chart,
     "Get a specific chart of a board by name. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
       name: z.string().describe("The name of the chart (e.g. 'CumulativeFlow')."),
     },
@@ -1651,8 +1652,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_board_chart,
     "Update a board chart by name. Obtain the current chart via work_get_board_chart, modify it, and pass back the full object.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
       name: z.string().describe("The name of the chart to update."),
       chart: z.record(z.unknown()).describe("The full chart object (as returned by work_get_board_chart, with edits applied)."),
@@ -1679,8 +1680,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_backlogs,
     "List the backlog levels (e.g. Epics, Features, Stories) configured for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
     },
     async ({ project, team }) => {
       try {
@@ -1707,8 +1708,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_backlog,
     "Get the configuration of a specific backlog level for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       id: z.string().describe("The ID of the backlog level (e.g. 'Microsoft.EpicCategory'). Use work_list_backlogs to discover valid IDs."),
     },
     async ({ project, team, id }) => {
@@ -1733,8 +1734,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_backlog_work_items,
     "Get the work items belonging to a specific backlog level for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       backlogId: z.string().describe("The ID of the backlog level (e.g. 'Microsoft.RequirementCategory'). Use work_list_backlogs to discover valid IDs."),
     },
     async ({ project, team, backlogId }) => {
@@ -1759,8 +1760,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_iteration_work_items,
     "Get the work items assigned to a specific iteration for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID (GUID) of the iteration. Use work_list_team_iterations to discover iteration IDs."),
     },
     async ({ project, team, iterationId }) => {
@@ -1785,8 +1786,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.remove_team_iteration,
     "Remove (unassign) an iteration from a team. This does not delete the iteration from the project. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       id: z.string().describe("The ID (GUID) of the team iteration to remove."),
     },
     async ({ project, team, id }) => {
@@ -1819,8 +1820,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.reorder_backlog_work_items,
     "Reorder work items on a team's backlog. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       ...reorderOperationShape,
     },
     async ({ project, team, ids, previousId, nextId, parentId, iterationPath }) => {
@@ -1846,8 +1847,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.reorder_iteration_work_items,
     "Reorder work items within a team's iteration. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID (GUID) of the iteration whose work items are being reordered."),
       ...reorderOperationShape,
     },
@@ -1874,8 +1875,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board,
     "Get a board (including its columns, rows and allowed mappings) for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       id: z.string().describe("The name or ID of the board (e.g. 'Stories'). Use work_list_boards to discover valid boards."),
     },
     async ({ project, team, id }) => {
@@ -1900,8 +1901,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board_user_settings,
     "Get the current user's settings for a board (e.g. which swimlanes are collapsed). If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       board: z.string().describe("The name or ID of the board."),
     },
     async ({ project, team, board }) => {
@@ -1926,7 +1927,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_delivery_timeline,
     "Get the delivery timeline (delivery plan) data for a plan. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       id: z.string().describe("The ID (GUID) of the delivery plan. Use work_list_plans to discover plan IDs."),
       revision: z.coerce.number().optional().describe("Optional revision of the plan to retrieve."),
       startDate: z.string().optional().describe("Optional start date filter in ISO format (e.g. '2024-01-01T00:00:00Z')."),
@@ -1959,7 +1960,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_process_configuration,
     "Get the process configuration (backlog levels, fields and work item types) for a project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ project }) => {
       try {
@@ -1988,7 +1989,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.list_predefined_queries,
     "List the predefined queries (e.g. unparented work, work without target date) available for a project's portfolio backlogs. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ project }) => {
       try {
@@ -2020,7 +2021,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_predefined_query_results,
     "Get the results of a predefined query for a project's portfolio backlogs. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       id: z.string().describe("The ID of the predefined query. Use work_list_predefined_queries to discover valid IDs."),
       top: z.coerce.number().optional().describe("Optional maximum number of results to return."),
       includeCompleted: z.boolean().optional().describe("Whether to include completed work items in the results. Defaults to false."),
@@ -2052,8 +2053,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_taskboard_columns,
     "Get the taskboard (sprint board) columns for a team. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
     },
     async ({ project, team }) => {
       try {
@@ -2077,8 +2078,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_taskboard_columns,
     "Replace the taskboard (sprint board) columns for a team. Obtain the current columns via work_get_taskboard_columns, modify them, and pass back the full set.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       columns: z
         .array(
           z.object({
@@ -2120,8 +2121,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_taskboard_work_item_columns,
     "Get the taskboard column assignment for each work item in an iteration. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID (GUID) of the iteration. Use work_list_team_iterations to discover iteration IDs."),
     },
     async ({ project, team, iterationId }) => {
@@ -2146,8 +2147,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_taskboard_work_item_column,
     "Move a work item to a different taskboard column within an iteration. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID (GUID) of the iteration containing the work item."),
       workItemId: z.number().describe("The ID of the work item to move."),
       newColumn: z.string().describe("The name of the taskboard column to move the work item into."),
@@ -2175,8 +2176,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_taskboard_card_settings,
     "Update the taskboard card field settings for a team. Obtain a card settings shape via work_get_board_card_settings, modify it, and pass back the full object.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       cardSettings: z.record(z.unknown()).describe("The full card settings object."),
     },
     async ({ project, team, cardSettings }) => {
@@ -2201,8 +2202,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_taskboard_card_rule_settings,
     "Update the taskboard card style/rule settings for a team. Obtain a rule settings shape via work_get_board_card_rule_settings, modify it, and pass back the full object.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       ruleSettings: z.record(z.unknown()).describe("The full card rule settings object."),
     },
     async ({ project, team, ruleSettings }) => {
@@ -2227,7 +2228,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_column_suggested_values,
     "Get the suggested values that can be used for board columns in a project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ project }) => {
       try {
@@ -2256,7 +2257,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_row_suggested_values,
     "Get the suggested values that can be used for board rows (swimlanes) in a project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
     },
     async ({ project }) => {
       try {
@@ -2285,8 +2286,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_board_mapping_parent_items,
     "Get the parent work items mapped to a set of child work items for a board. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       childBacklogContextCategoryRefName: z.string().describe("The category reference name of the child backlog level (e.g. 'Microsoft.RequirementCategory')."),
       workItemIds: z.array(z.number()).describe("The IDs of the child work items to find parents for."),
     },
@@ -2312,8 +2313,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_team_member_capacity,
     "Get the capacity of a specific team member for an iteration. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID (GUID) of the iteration."),
       teamMemberId: z.string().describe("The ID of the team member whose capacity to retrieve."),
     },
@@ -2339,8 +2340,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.replace_team_capacities,
     "Replace the capacities of all team members for an iteration. This overwrites the entire capacity set for the iteration. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       iterationId: z.string().describe("The ID (GUID) of the iteration."),
       capacities: z
         .array(
@@ -2395,8 +2396,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_automation_rule,
     "Enable or disable a team's backlog automation rules (e.g. auto state updates) for a backlog level. If a project or team is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown."),
-      team: z.string().optional().describe("The name or ID of the Azure DevOps team. If not provided, a team selection prompt will be shown."),
+      project: optionalProject,
+      team: optionalTeam,
       backlogLevelName: z.string().optional().describe("The name of the backlog level the rules apply to (e.g. 'Stories')."),
       rulesStates: z.record(z.boolean()).describe("Map of automation rule name to enabled/disabled state."),
     },

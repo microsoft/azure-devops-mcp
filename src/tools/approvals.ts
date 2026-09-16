@@ -6,6 +6,7 @@ import { registerTool } from "../shared/tool-registration.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { adoFetch } from "../shared/ado-rest.js";
+import { requiredProject } from "../shared/common-params.js";
 
 const APPROVALS_TOOLS = {
   list: "approvals_list",
@@ -38,7 +39,7 @@ function configureApprovalsTools(server: McpServer, tokenProvider: () => Promise
     APPROVALS_TOOLS.list,
     "List approvals of YAML pipeline stages, e.g. the pending approvals waiting on a user or on a protected resource. These are the approvals of multi-stage YAML pipelines; classic release approvals are handled by the release tools instead.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       approvalIds: z.array(z.string()).optional().describe("Only return these approval IDs (GUIDs)."),
       assignedTo: z.array(z.string()).optional().describe("Only return approvals assigned to these users. Accepts user IDs, descriptors or emails."),
       state: z.enum(approvalStatuses).optional().describe("Only return approvals in this state. Returns approvals of any status when omitted."),
@@ -72,7 +73,7 @@ function configureApprovalsTools(server: McpServer, tokenProvider: () => Promise
     APPROVALS_TOOLS.get,
     "Get a single pipeline approval by its ID, including who it is assigned to and the instructions shown to the approvers.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       approvalId: z.string().describe("The ID (GUID) of the approval."),
       expand: z.enum(["none", "steps", "permissions"]).optional().describe("Include extra details: 'steps' adds the individual approval steps, 'permissions' adds the current user's permissions."),
     },
@@ -102,7 +103,7 @@ function configureApprovalsTools(server: McpServer, tokenProvider: () => Promise
     APPROVALS_TOOLS.update,
     "Act on a pipeline approval: approve, reject, defer or reassign it. The caller must be an assigned approver; the API answers with the updated approval, whose status stays 'pending' while other approvers are still required.",
     {
-      project: z.string().describe("The name or ID of the Azure DevOps project."),
+      project: requiredProject,
       approvalId: z.string().describe("The ID (GUID) of the approval to act on."),
       status: z.enum(["approved", "rejected", "deferred", "pending"]).describe("The new status of the approval."),
       comment: z.string().optional().describe("Comment recorded with the decision."),

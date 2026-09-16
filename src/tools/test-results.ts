@@ -7,6 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { ResultDetails, TestOutcome } from "azure-devops-node-api/interfaces/TestInterfaces.js";
 import { elicitProject } from "../shared/elicitations.js";
+import { optionalProject } from "../shared/common-params.js";
 
 const TEST_RESULTS_TOOLS = {
   list_test_runs: "testresults_list_test_runs",
@@ -46,7 +47,7 @@ function configureTestResultsTools(server: McpServer, _: () => Promise<string>, 
     return { project: result.resolved };
   };
 
-  const projectField = z.string().optional().describe("The name or ID of the Azure DevOps project. If not provided, a project selection prompt will be shown.");
+  const projectField = optionalProject;
 
   registerTool(
     server,

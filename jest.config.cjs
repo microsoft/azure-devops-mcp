@@ -60,6 +60,7 @@ module.exports = {
     "^(.+)/state-store\\.js$": "$1/state-store.ts",
     "^(.+)/table-state-store\\.js$": "$1/table-state-store.ts",
     "^(.+)/presets\\.js$": "$1/presets.ts",
+    "^(.+)/common-params\\.js$": "$1/common-params.ts",
     "^(.+)/server-instructions\\.js$": "$1/server-instructions.ts",
     "^(.+)/domains\\.js$": "$1/domains.ts",
   },
