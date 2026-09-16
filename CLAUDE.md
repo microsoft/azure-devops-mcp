@@ -20,7 +20,7 @@ CI (`.github/workflows/build.yml`) runs: `npm ci` → `build` → `validate-tool
 
 ## Architecture
 
-Fork of `microsoft/azure-devops-mcp` (origin: `DL-Solution/azure-devops-mcp`) — an MCP server exposing 337 Azure DevOps tools across 32 domains (the fork adds many beyond upstream). The core idea: tools are a **thin abstraction over the ADO REST API**; complex reasoning stays with the model. Do not add tools with heavy logic.
+Fork of `microsoft/azure-devops-mcp` (origin: `DL-Solution/azure-devops-mcp`) — an MCP server exposing 348 Azure DevOps tools across 32 domains (the fork adds many beyond upstream). The core idea: tools are a **thin abstraction over the ADO REST API**; complex reasoning stays with the model. Do not add tools with heavy logic.
 
 ### Startup flow
 

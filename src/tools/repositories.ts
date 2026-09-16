@@ -26,12 +26,13 @@ import {
   GitPush,
   GitChange,
   ItemContentType,
+  GitStatusState,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
 import { getCurrentUserDetails, getUserIdFromEmail } from "./auth.js";
 import { GitRepository } from "azure-devops-node-api/interfaces/TfvcInterfaces.js";
 import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterfaces.js";
-import { extractAdoStreamError, getEnumKeys, streamToString } from "../utils.js";
+import { extractAdoStreamError, getEnumKeys, safeEnumConvert, streamToString } from "../utils.js";
 import { requiredProject } from "../shared/common-params.js";
 
 const REPO_TOOLS = {
@@ -58,7 +59,26 @@ const REPO_TOOLS = {
   list_directory: "repo_list_directory",
   get_file_content: "repo_get_file_content",
   push_changes: "repo_push_changes",
+  list_tags: "repo_list_tags",
+  get_tag: "repo_get_tag",
+  create_tag: "repo_create_tag",
+  delete_tag: "repo_delete_tag",
+  list_commit_statuses: "repo_list_commit_statuses",
+  create_commit_status: "repo_create_commit_status",
+  create_repository: "repo_create_repository",
+  delete_repository: "repo_delete_repository",
+  list_pull_request_labels: "repo_list_pull_request_labels",
+  add_pull_request_label: "repo_add_pull_request_label",
+  remove_pull_request_label: "repo_remove_pull_request_label",
 };
+
+/** A ref update to the all-zero object id deletes the ref. */
+const DELETED_OBJECT_ID = "0".repeat(40);
+
+/** Strip the `refs/tags/` prefix that the refs API returns. */
+function tagNameFromRef(refName: string | undefined): string | undefined {
+  return refName?.replace(/^refs\/tags\//, "");
+}
 
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
   return branches
@@ -2286,6 +2306,305 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           content: [{ type: "text", text: `Error pushing changes: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  const repositoryIdParam = z.string().describe("The ID or name of the repository. When using a name instead of a GUID, pass 'project' too.");
+  const failed = (action: string, error: unknown) => ({
+    content: [{ type: "text" as const, text: `Error ${action}: ${error instanceof Error ? error.message : String(error)}` }],
+    isError: true,
+  });
+  const ok = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
+
+  registerTool(
+    server,
+    REPO_TOOLS.list_tags,
+    "List the tags of a repository.",
+    {
+      repositoryId: repositoryIdParam,
+      project: requiredProject,
+      nameFilter: z.string().optional().describe("Return only tags whose name contains this text."),
+      peelTags: z.boolean().default(false).describe("For annotated tags, also resolve the commit each one points at (peeledObjectId)."),
+    },
+    async ({ repositoryId, project, nameFilter, peelTags }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const refs = await gitApi.getRefs(repositoryId, project, "tags/", false, false, undefined, false, peelTags, nameFilter);
+        return ok(refs.map((ref) => ({ name: tagNameFromRef(ref.name), objectId: ref.objectId, peeledObjectId: ref.peeledObjectId })));
+      } catch (error) {
+        return failed("listing tags", error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.get_tag,
+    "Get one tag of a repository. Annotated tags also report their message and who created them; lightweight tags are just a ref and report only the commit they point at.",
+    {
+      repositoryId: repositoryIdParam,
+      project: requiredProject,
+      tagName: z.string().describe("The tag name, without the 'refs/tags/' prefix."),
+    },
+    async ({ repositoryId, project, tagName }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const refs = await gitApi.getRefs(repositoryId, project, "tags/", false, false, undefined, false, true, tagName);
+        const ref = refs.find((candidate) => tagNameFromRef(candidate.name) === tagName);
+        if (!ref?.objectId) {
+          return { content: [{ type: "text", text: `Tag '${tagName}' not found in repository ${repositoryId}` }], isError: true };
+        }
+
+        // A lightweight tag's objectId is the commit itself, so there is no tag
+        // object to read — the annotated lookup fails and the ref is the answer.
+        let annotation;
+        try {
+          annotation = await gitApi.getAnnotatedTag(project, repositoryId, ref.objectId);
+        } catch {
+          annotation = undefined;
+        }
+
+        return ok({
+          name: tagName,
+          objectId: ref.objectId,
+          commitId: ref.peeledObjectId ?? ref.objectId,
+          annotated: Boolean(annotation),
+          message: annotation?.message,
+          taggedBy: annotation?.taggedBy,
+        });
+      } catch (error) {
+        return failed(`getting tag '${tagName}'`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.create_tag,
+    "Create an annotated tag on a commit. Creates both the tag object and the 'refs/tags/<name>' ref.",
+    {
+      repositoryId: repositoryIdParam,
+      project: requiredProject,
+      tagName: z.string().describe("The tag name, without the 'refs/tags/' prefix, e.g. 'v1.4.0'."),
+      commitId: z.string().describe("The full SHA of the commit to tag."),
+      message: z.string().describe("The tag message."),
+    },
+    async ({ repositoryId, project, tagName, commitId, message }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const tag = await gitApi.createAnnotatedTag({ name: tagName, message, taggedObject: { objectId: commitId } }, project, repositoryId);
+        return ok(tag);
+      } catch (error) {
+        return failed(`creating tag '${tagName}'`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.delete_tag,
+    "Delete a tag from a repository. The tag object itself is left behind unreferenced; only the ref is removed.",
+    {
+      repositoryId: repositoryIdParam,
+      project: requiredProject,
+      tagName: z.string().describe("The tag name, without the 'refs/tags/' prefix."),
+    },
+    async ({ repositoryId, project, tagName }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const refs = await gitApi.getRefs(repositoryId, project, "tags/", false, false, undefined, false, false, tagName);
+        const ref = refs.find((candidate) => tagNameFromRef(candidate.name) === tagName);
+        if (!ref?.objectId) {
+          return { content: [{ type: "text", text: `Tag '${tagName}' not found in repository ${repositoryId}` }], isError: true };
+        }
+
+        const [result] = await gitApi.updateRefs([{ name: `refs/tags/${tagName}`, oldObjectId: ref.objectId, newObjectId: DELETED_OBJECT_ID }], repositoryId, project);
+        // updateRefs reports per-ref failures in the result rather than throwing.
+        if (!result?.success) {
+          return { content: [{ type: "text", text: `Failed to delete tag '${tagName}': ${JSON.stringify(result)}` }], isError: true };
+        }
+        return ok({ deleted: tagName, previousObjectId: ref.objectId });
+      } catch (error) {
+        return failed(`deleting tag '${tagName}'`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.list_commit_statuses,
+    "List the statuses posted against a commit — the build, scan and external check results that branch policies evaluate.",
+    {
+      repositoryId: repositoryIdParam,
+      project: requiredProject,
+      commitId: z.string().describe("The full SHA of the commit."),
+      top: z.number().optional().describe("Maximum number of statuses to return."),
+      skip: z.number().optional().describe("Number of statuses to skip."),
+      latestOnly: z.boolean().default(true).describe("Return only the most recent status per context, rather than the full history."),
+    },
+    async ({ repositoryId, project, commitId, top, skip, latestOnly }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const statuses = await gitApi.getStatuses(commitId, repositoryId, project, top, skip, latestOnly);
+        return ok(statuses);
+      } catch (error) {
+        return failed(`listing statuses for commit ${commitId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.create_commit_status,
+    "Post a status against a commit, e.g. to report an external check to a branch policy.",
+    {
+      repositoryId: repositoryIdParam,
+      project: requiredProject,
+      commitId: z.string().describe("The full SHA of the commit to post against."),
+      state: z.enum(getEnumKeys(GitStatusState) as [string, ...string[]]).describe("The outcome being reported."),
+      name: z.string().describe("Name identifying this check, e.g. 'license-scan'. Together with genre it is the status context that a policy matches on."),
+      genre: z.string().optional().describe("Namespace for the check, e.g. 'continuous-integration'. Omit for the default genre."),
+      description: z.string().optional().describe("Human-readable summary of the outcome."),
+      targetUrl: z.string().optional().describe("URL with the details behind the status."),
+    },
+    async ({ repositoryId, project, commitId, state, name, genre, description, targetUrl }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const status = await gitApi.createCommitStatus(
+          {
+            state: safeEnumConvert(GitStatusState, state),
+            description,
+            targetUrl,
+            context: { name, genre },
+          },
+          commitId,
+          repositoryId,
+          project
+        );
+        return ok(status);
+      } catch (error) {
+        return failed(`creating a status on commit ${commitId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.create_repository,
+    "Create an empty Git repository in a project.",
+    {
+      project: requiredProject,
+      name: z.string().describe("Name for the new repository."),
+      sourceRef: z.string().optional().describe("Ref to seed the repository from when forking, e.g. 'refs/heads/main'. Omit for an empty repository."),
+      parentRepositoryId: z.string().optional().describe("ID of the repository to fork. Omit for a standalone repository."),
+    },
+    async ({ project, name, sourceRef, parentRepositoryId }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const repository = await gitApi.createRepository(
+          {
+            name,
+            ...(parentRepositoryId ? { parentRepository: { id: parentRepositoryId, project: { name: project } } } : {}),
+          },
+          project,
+          sourceRef
+        );
+        return ok(repository);
+      } catch (error) {
+        return failed(`creating repository '${name}'`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.delete_repository,
+    "Delete a Git repository. Azure DevOps moves it to the project's recycle bin rather than erasing it, but every clone URL and pipeline pointing at it breaks immediately.",
+    {
+      repositoryId: z.string().describe("The GUID of the repository to delete. A name is not accepted here, to make an accidental deletion harder."),
+      project: requiredProject,
+    },
+    async ({ repositoryId, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        await gitApi.deleteRepository(repositoryId, project);
+        return ok({ deleted: repositoryId, note: "Moved to the project's recycle bin." });
+      } catch (error) {
+        return failed(`deleting repository ${repositoryId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.list_pull_request_labels,
+    "List the labels on a pull request.",
+    {
+      repositoryId: repositoryIdParam,
+      pullRequestId: z.number().describe("The ID of the pull request."),
+      project: requiredProject,
+    },
+    async ({ repositoryId, pullRequestId, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const labels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId, project);
+        return ok(labels.map((label) => ({ id: label.id, name: label.name, active: label.active })));
+      } catch (error) {
+        return failed(`listing labels on pull request ${pullRequestId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.add_pull_request_label,
+    "Add one label to a pull request, leaving its other labels alone. Use repo_update_pull_request when replacing the whole set.",
+    {
+      repositoryId: repositoryIdParam,
+      pullRequestId: z.number().describe("The ID of the pull request."),
+      project: requiredProject,
+      label: z.string().describe("The label to add. Created if the project does not have it yet."),
+    },
+    async ({ repositoryId, pullRequestId, project, label }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const created = await gitApi.createPullRequestLabel({ name: label }, repositoryId, pullRequestId, project);
+        return ok(created);
+      } catch (error) {
+        return failed(`adding label '${label}' to pull request ${pullRequestId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    REPO_TOOLS.remove_pull_request_label,
+    "Remove one label from a pull request. The label itself survives in the project.",
+    {
+      repositoryId: repositoryIdParam,
+      pullRequestId: z.number().describe("The ID of the pull request."),
+      project: requiredProject,
+      label: z.string().describe("The label name or ID to remove."),
+    },
+    async ({ repositoryId, pullRequestId, project, label }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        await gitApi.deletePullRequestLabels(repositoryId, pullRequestId, label, project);
+        return ok({ removed: label, pullRequestId });
+      } catch (error) {
+        return failed(`removing label '${label}' from pull request ${pullRequestId}`, error);
       }
     }
   );
