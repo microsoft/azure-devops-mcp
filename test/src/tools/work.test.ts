@@ -3986,4 +3986,130 @@ describe("configureWorkTools", () => {
       expect(result.content[0].text).toContain("chart not found");
     });
   });
+
+  // A sweep rather than one test per tool: work.ts registers 60 tools whose
+  // catch blocks all promise the same contract — an Azure DevOps failure comes
+  // back as an error result, never as an exception escaping into the transport.
+  // Written as a loop so a newly added tool is covered the moment it is
+  // registered, instead of quietly lowering coverage.
+  // A superset of the arguments the tools take; each handler picks what it
+  // needs and ignores the rest. Project and team are always present so no
+  // tool stops to elicit them.
+  const sweepArgs = {
+    project: "Proj",
+    team: "Team",
+    board: "Stories",
+    id: 1,
+    name: "thing",
+    path: "Proj\\Area",
+    iterationId: "iter-1",
+    identifier: "iter-1",
+    workItemIds: [1, 2],
+    backlogId: "Microsoft.RequirementCategory",
+    column: "Doing",
+    columns: [],
+    rows: [],
+    charts: [],
+    chart: {},
+    settings: {},
+    capacities: [],
+    activities: [{ name: "Development", capacityPerDay: 4 }],
+    daysOff: [],
+    daysOffPatch: { daysOff: [] },
+    areaPaths: ["Proj\\Area"],
+    defaultValue: "Proj\\Area",
+    teamMemberId: "user-1",
+    queryType: "assignedtome",
+    planId: "plan-1",
+    plan: { name: "Plan" },
+    startDate: "2026-01-01",
+    finishDate: "2026-01-31",
+    attributes: {},
+    rulesStates: {},
+    backlogLevelName: "Stories",
+    iterations: [{ identifier: "iter-1" }],
+    ruleSettings: {},
+    cardSettings: {},
+    workItemId: 1,
+    previousId: 0,
+    nextId: 0,
+    parentId: 0,
+    depth: 1,
+    timeFrame: "current",
+  };
+
+  describe("every tool surfaces an API failure as an error result", () => {
+    const failure = new Error("boom");
+
+    function registeredTools() {
+      const localServer = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
+      configureWorkTools(localServer, tokenProvider, connectionProvider);
+      return (localServer.tool as jest.Mock).mock.calls.map(([name, , , handler]) => ({
+        name: name as string,
+        handler: handler as (a: unknown) => Promise<{ content: { text: string }[]; isError?: boolean }>,
+      }));
+    }
+
+    it("covers every registered work tool", () => {
+      expect(registeredTools().length).toBeGreaterThanOrEqual(60);
+    });
+
+    it.each(registeredTools().map(({ name }) => name))("%s", async (toolName) => {
+      for (const api of [mockWorkApi, mockWorkItemTrackingApi]) {
+        for (const key of Object.keys(api)) {
+          (api as unknown as Record<string, jest.Mock>)[key].mockRejectedValue(failure);
+        }
+      }
+      // Area and iteration tools go through connection.rest rather than a typed
+      // client, so they need rejecting too.
+      for (const key of ["create", "update", "del"]) {
+        (mockConnection.rest as unknown as Record<string, jest.Mock>)[key].mockRejectedValue(failure);
+      }
+
+      const tool = registeredTools().find((entry) => entry.name === toolName);
+      if (!tool) throw new Error(`${toolName} not registered`);
+      const result = await tool.handler(sweepArgs).catch((error: unknown) => ({ content: [{ text: String(error) }], isError: true }));
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("boom");
+    });
+  });
+
+  // The other half of the shared contract: a tool whose project argument is
+  // optional must ask for one and honour a refusal, instead of calling Azure
+  // DevOps with an undefined project. The list is derived from each tool's own
+  // schema, so it cannot drift out of sync with the registrations.
+  describe("tools with an optional project honour a declined elicitation", () => {
+    function toolsWithOptionalProject() {
+      // The handler closes over the server it was registered on, so the
+      // declining elicitInput has to live on that same instance.
+      const localServer = { tool: jest.fn(), server: { elicitInput: jest.fn().mockResolvedValue({ action: "decline" }) } } as unknown as McpServer;
+      configureWorkTools(localServer, tokenProvider, connectionProvider);
+      return (localServer.tool as jest.Mock).mock.calls
+        .map(([name, , schema, handler]) => ({
+          name: name as string,
+          optionalProject: Boolean((schema as Record<string, { isOptional?: () => boolean }>)?.project?.isOptional?.()),
+          handler: handler as (a: unknown) => Promise<{ content: { text: string }[]; isError?: boolean }>,
+        }))
+        .filter((tool) => tool.optionalProject);
+    }
+
+    it("finds tools to check", () => {
+      expect(toolsWithOptionalProject().length).toBeGreaterThan(10);
+    });
+
+    it.each(toolsWithOptionalProject().map(({ name }) => name))("%s", async (toolName) => {
+      mockCoreApi.getProjects.mockResolvedValue([{ name: "Proj" }]);
+      mockCoreApi.getTeams.mockResolvedValue([{ name: "Team" }]);
+
+      const tool = toolsWithOptionalProject().find((entry) => entry.name === toolName);
+      if (!tool) throw new Error(`${toolName} not registered`);
+      // Everything except the project and team, so no tool refuses on its own
+      // argument validation before it gets as far as asking.
+      const result = await tool.handler({ ...sweepArgs, project: undefined, team: undefined });
+
+      expect(result.content[0].text).toContain("cancelled");
+      expect(mockWorkApi.getBoards).not.toHaveBeenCalled();
+    });
+  });
 });

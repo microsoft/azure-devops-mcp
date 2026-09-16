@@ -28,10 +28,10 @@ module.exports = {
   // CI instead of silently eroding coverage. Raise these as coverage improves.
   coverageThreshold: {
     global: {
-      branches: 65,
-      functions: 93,
-      lines: 84,
-      statements: 82,
+      branches: 70,
+      functions: 94,
+      lines: 88,
+      statements: 86,
     },
   },
 
