@@ -23,6 +23,18 @@ const TASKAGENT_TOOLS = {
   add_environment: "taskagent_add_environment",
   update_environment: "taskagent_update_environment",
   delete_environment: "taskagent_delete_environment",
+  list_agents: "taskagent_list_agents",
+  get_agent: "taskagent_get_agent",
+  delete_agent: "taskagent_delete_agent",
+  list_agent_requests: "taskagent_list_agent_requests",
+  list_task_groups: "taskagent_list_task_groups",
+  get_task_group: "taskagent_get_task_group",
+  delete_task_group: "taskagent_delete_task_group",
+  undelete_task_group: "taskagent_undelete_task_group",
+  list_secure_files: "taskagent_list_secure_files",
+  get_secure_file: "taskagent_get_secure_file",
+  update_secure_file: "taskagent_update_secure_file",
+  delete_secure_file: "taskagent_delete_secure_file",
 };
 
 function configureTaskAgentTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
@@ -363,6 +375,299 @@ function configureTaskAgentTools(server: McpServer, _: () => Promise<string>, co
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return { content: [{ type: "text", text: `Error deleting environment: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  const failed = (action: string, error: unknown) => ({
+    content: [{ type: "text" as const, text: `Error ${action}: ${error instanceof Error ? error.message : String(error)}` }],
+    isError: true,
+  });
+  const ok = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
+
+  // ---- Agents in a pool (organization-scoped, so no project) ----
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.list_agents,
+    "List the agents registered in an agent pool, with their status and version. Use taskagent_list_agent_pools to find the pool id.",
+    {
+      poolId: z.number().describe("The ID of the agent pool."),
+      agentName: z.string().optional().describe("Return only the agent with this name."),
+      includeCapabilities: z.boolean().default(false).describe("Include the agent's system and user capabilities. Verbose — ask for it only when matching demands."),
+      includeAssignedRequest: z.boolean().default(false).describe("Include the job each agent is running right now."),
+    },
+    async ({ poolId, agentName, includeCapabilities, includeAssignedRequest }) => {
+      try {
+        const connection = await connectionProvider();
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const agents = await taskAgentApi.getAgents(poolId, agentName, includeCapabilities, includeAssignedRequest);
+        return ok(agents);
+      } catch (error) {
+        return failed(`listing agents in pool ${poolId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.get_agent,
+    "Get one agent in a pool.",
+    {
+      poolId: z.number().describe("The ID of the agent pool."),
+      agentId: z.number().describe("The ID of the agent."),
+      includeCapabilities: z.boolean().default(false).describe("Include the agent's system and user capabilities."),
+      includeAssignedRequest: z.boolean().default(false).describe("Include the job the agent is running right now."),
+      includeLastCompletedRequest: z.boolean().default(false).describe("Include the last job the agent finished."),
+    },
+    async ({ poolId, agentId, includeCapabilities, includeAssignedRequest, includeLastCompletedRequest }) => {
+      try {
+        const connection = await connectionProvider();
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const agent = await taskAgentApi.getAgent(poolId, agentId, includeCapabilities, includeAssignedRequest, includeLastCompletedRequest);
+        return ok(agent);
+      } catch (error) {
+        return failed(`getting agent ${agentId} in pool ${poolId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.delete_agent,
+    "Remove an agent from a pool. The machine keeps running; it just stops being offered jobs until it re-registers.",
+    {
+      poolId: z.number().describe("The ID of the agent pool."),
+      agentId: z.number().describe("The ID of the agent to remove."),
+    },
+    async ({ poolId, agentId }) => {
+      try {
+        const connection = await connectionProvider();
+        const taskAgentApi = await connection.getTaskAgentApi();
+        await taskAgentApi.deleteAgent(poolId, agentId);
+        return ok({ removed: agentId, poolId });
+      } catch (error) {
+        return failed(`removing agent ${agentId} from pool ${poolId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.list_agent_requests,
+    "List the job requests an agent has served — what it is running now and what it ran before. Use this to see why an agent looks busy or idle.",
+    {
+      poolId: z.number().describe("The ID of the agent pool."),
+      agentId: z.number().describe("The ID of the agent."),
+      completedRequestCount: z.number().optional().describe("How many finished jobs to include alongside the in-flight one."),
+    },
+    async ({ poolId, agentId, completedRequestCount }) => {
+      try {
+        const connection = await connectionProvider();
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const requests = await taskAgentApi.getAgentRequestsForAgent(poolId, agentId, completedRequestCount);
+        return ok(requests);
+      } catch (error) {
+        return failed(`listing job requests for agent ${agentId}`, error);
+      }
+    }
+  );
+
+  // ---- Task groups ----
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.list_task_groups,
+    "List the task groups of a project — the reusable sequences of pipeline steps. If a project is not specified, you will be prompted to select one.",
+    {
+      project: projectField,
+      expanded: z.boolean().default(false).describe("Include the tasks inside each group. Verbose; omit when you only need names and ids."),
+      deleted: z.boolean().default(false).describe("List the deleted task groups in the recycle bin instead of the live ones."),
+      top: z.number().optional().describe("Maximum number of task groups to return."),
+    },
+    async ({ project, expanded, deleted, top }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const groups = await taskAgentApi.getTaskGroups(ctx.project, undefined, expanded, undefined, deleted, top);
+        return ok(groups);
+      } catch (error) {
+        return failed("listing task groups", error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.get_task_group,
+    "Get one task group, including the tasks it runs. If a project is not specified, you will be prompted to select one.",
+    {
+      project: projectField,
+      taskGroupId: z.string().describe("The GUID of the task group."),
+      versionSpec: z.string().optional().describe("Which version to read, e.g. '1' or '1.*'. Omit for the latest."),
+    },
+    async ({ project, taskGroupId, versionSpec }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        // The typed client requires a version spec; "*" means the latest.
+        const group = await taskAgentApi.getTaskGroup(ctx.project, taskGroupId, versionSpec ?? "*");
+        return ok(group);
+      } catch (error) {
+        return failed(`getting task group ${taskGroupId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.delete_task_group,
+    "Delete a task group. Every pipeline that still references it will fail to run until it is restored with taskagent_undelete_task_group or the reference is removed.",
+    {
+      project: projectField,
+      taskGroupId: z.string().describe("The GUID of the task group to delete."),
+      comment: z.string().optional().describe("Reason recorded against the deletion."),
+    },
+    async ({ project, taskGroupId, comment }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        await taskAgentApi.deleteTaskGroup(ctx.project, taskGroupId, comment);
+        return ok({ deleted: taskGroupId, note: "Recoverable with taskagent_undelete_task_group." });
+      } catch (error) {
+        return failed(`deleting task group ${taskGroupId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.undelete_task_group,
+    "Restore a deleted task group from the recycle bin. List candidates with taskagent_list_task_groups and deleted=true.",
+    {
+      project: projectField,
+      taskGroupId: z.string().describe("The GUID of the deleted task group to restore."),
+    },
+    async ({ project, taskGroupId }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const restored = await taskAgentApi.undeleteTaskGroup({ id: taskGroupId }, ctx.project);
+        return ok(restored);
+      } catch (error) {
+        return failed(`restoring task group ${taskGroupId}`, error);
+      }
+    }
+  );
+
+  // ---- Secure files ----
+  //
+  // Metadata only. The API can also hand out a download ticket and the file
+  // content, but secure files are certificates, signing keys and keystores:
+  // putting their bytes into the model's context would turn any prompt
+  // injection into a key exfiltration. includeDownloadTickets stays false.
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.list_secure_files,
+    "List the secure files of a project — their names, ids and properties. File contents are never returned: these are certificates and keys, so only metadata is exposed.",
+    {
+      project: projectField,
+      namePattern: z.string().optional().describe("Return only files whose name matches this pattern."),
+    },
+    async ({ project, namePattern }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const files = await taskAgentApi.getSecureFiles(ctx.project, namePattern, false);
+        return ok(files);
+      } catch (error) {
+        return failed("listing secure files", error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.get_secure_file,
+    "Get one secure file's metadata. The file content is never returned.",
+    {
+      project: projectField,
+      secureFileId: z.string().describe("The GUID of the secure file."),
+    },
+    async ({ project, secureFileId }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const file = await taskAgentApi.getSecureFile(ctx.project, secureFileId, false);
+        return ok(file);
+      } catch (error) {
+        return failed(`getting secure file ${secureFileId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.update_secure_file,
+    "Rename a secure file. The stored content is not touched.",
+    {
+      project: projectField,
+      secureFileId: z.string().describe("The GUID of the secure file."),
+      name: z.string().describe("The new name for the file."),
+    },
+    async ({ project, secureFileId, name }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        const updated = await taskAgentApi.updateSecureFile({ id: secureFileId, name }, ctx.project, secureFileId);
+        return ok(updated);
+      } catch (error) {
+        return failed(`renaming secure file ${secureFileId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    TASKAGENT_TOOLS.delete_secure_file,
+    "Delete a secure file permanently. There is no recycle bin for these, and any pipeline that consumes the file starts failing.",
+    {
+      project: projectField,
+      secureFileId: z.string().describe("The GUID of the secure file to delete."),
+    },
+    async ({ project, secureFileId }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project);
+        if ("response" in ctx) return ctx.response;
+
+        const taskAgentApi = await connection.getTaskAgentApi();
+        await taskAgentApi.deleteSecureFile(ctx.project, secureFileId);
+        return ok({ deleted: secureFileId, note: "Permanent — secure files have no recycle bin." });
+      } catch (error) {
+        return failed(`deleting secure file ${secureFileId}`, error);
       }
     }
   );

@@ -23,6 +23,18 @@ interface TaskAgentApiMock {
   addEnvironment: jest.Mock;
   updateEnvironment: jest.Mock;
   deleteEnvironment: jest.Mock;
+  getAgents: jest.Mock;
+  getAgent: jest.Mock;
+  deleteAgent: jest.Mock;
+  getAgentRequestsForAgent: jest.Mock;
+  getTaskGroups: jest.Mock;
+  getTaskGroup: jest.Mock;
+  deleteTaskGroup: jest.Mock;
+  undeleteTaskGroup: jest.Mock;
+  getSecureFiles: jest.Mock;
+  getSecureFile: jest.Mock;
+  updateSecureFile: jest.Mock;
+  deleteSecureFile: jest.Mock;
 }
 
 describe("configureTaskAgentTools", () => {
@@ -49,6 +61,18 @@ describe("configureTaskAgentTools", () => {
       addEnvironment: jest.fn(),
       updateEnvironment: jest.fn(),
       deleteEnvironment: jest.fn(),
+      getAgents: jest.fn(),
+      getAgent: jest.fn(),
+      deleteAgent: jest.fn(),
+      getAgentRequestsForAgent: jest.fn(),
+      getTaskGroups: jest.fn(),
+      getTaskGroup: jest.fn(),
+      deleteTaskGroup: jest.fn(),
+      undeleteTaskGroup: jest.fn(),
+      getSecureFiles: jest.fn(),
+      getSecureFile: jest.fn(),
+      updateSecureFile: jest.fn(),
+      deleteSecureFile: jest.fn(),
     };
     mockConnection = {
       getTaskAgentApi: jest.fn().mockResolvedValue(mockTaskAgentApi),
@@ -221,5 +245,165 @@ describe("configureTaskAgentTools", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Error fetching variable group: boom");
+  });
+  describe("agents in a pool", () => {
+    it("list_agents passes the name filter and the verbose flags", async () => {
+      const handler = getHandler("taskagent_list_agents");
+      mockTaskAgentApi.getAgents.mockResolvedValue([{ id: 7, name: "build-01", status: 2 }]);
+
+      const result = await handler({ poolId: 3, agentName: "build-01", includeCapabilities: true, includeAssignedRequest: false });
+
+      expect(mockTaskAgentApi.getAgents).toHaveBeenCalledWith(3, "build-01", true, false);
+      expect(result.content[0].text).toContain("build-01");
+    });
+
+    it("get_agent asks for the last completed request when requested", async () => {
+      const handler = getHandler("taskagent_get_agent");
+      mockTaskAgentApi.getAgent.mockResolvedValue({ id: 7 });
+
+      await handler({ poolId: 3, agentId: 7, includeCapabilities: false, includeAssignedRequest: true, includeLastCompletedRequest: true });
+
+      expect(mockTaskAgentApi.getAgent).toHaveBeenCalledWith(3, 7, false, true, true);
+    });
+
+    it("delete_agent removes the agent from the pool", async () => {
+      const handler = getHandler("taskagent_delete_agent");
+      mockTaskAgentApi.deleteAgent.mockResolvedValue(undefined);
+
+      const result = await handler({ poolId: 3, agentId: 7 });
+
+      expect(mockTaskAgentApi.deleteAgent).toHaveBeenCalledWith(3, 7);
+      expect(JSON.parse(result.content[0].text)).toEqual({ removed: 7, poolId: 3 });
+    });
+
+    it("list_agent_requests passes the completed count", async () => {
+      const handler = getHandler("taskagent_list_agent_requests");
+      mockTaskAgentApi.getAgentRequestsForAgent.mockResolvedValue([{ requestId: 99 }]);
+
+      await handler({ poolId: 3, agentId: 7, completedRequestCount: 5 });
+
+      expect(mockTaskAgentApi.getAgentRequestsForAgent).toHaveBeenCalledWith(3, 7, 5);
+    });
+
+    it("surfaces a pool that does not exist", async () => {
+      const handler = getHandler("taskagent_list_agents");
+      mockTaskAgentApi.getAgents.mockRejectedValue(new Error("pool not found"));
+
+      const result = await handler({ poolId: 999, includeCapabilities: false, includeAssignedRequest: false });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("pool not found");
+    });
+  });
+
+  describe("task groups", () => {
+    it("list_task_groups maps expanded and deleted onto the right positions", async () => {
+      const handler = getHandler("taskagent_list_task_groups");
+      mockTaskAgentApi.getTaskGroups.mockResolvedValue([{ id: "g1" }]);
+
+      await handler({ project: "Proj", expanded: true, deleted: false, top: 20 });
+
+      expect(mockTaskAgentApi.getTaskGroups).toHaveBeenCalledWith("Proj", undefined, true, undefined, false, 20);
+    });
+
+    it("list_task_groups can read the recycle bin", async () => {
+      const handler = getHandler("taskagent_list_task_groups");
+      mockTaskAgentApi.getTaskGroups.mockResolvedValue([]);
+
+      await handler({ project: "Proj", expanded: false, deleted: true });
+
+      expect(mockTaskAgentApi.getTaskGroups).toHaveBeenCalledWith("Proj", undefined, false, undefined, true, undefined);
+    });
+
+    // The typed client has no optional version spec; "*" is the latest.
+    it("get_task_group defaults the version spec to the latest", async () => {
+      const handler = getHandler("taskagent_get_task_group");
+      mockTaskAgentApi.getTaskGroup.mockResolvedValue({ id: "g1" });
+
+      await handler({ project: "Proj", taskGroupId: "g1" });
+
+      expect(mockTaskAgentApi.getTaskGroup).toHaveBeenCalledWith("Proj", "g1", "*");
+    });
+
+    it("get_task_group honours an explicit version spec", async () => {
+      const handler = getHandler("taskagent_get_task_group");
+      mockTaskAgentApi.getTaskGroup.mockResolvedValue({ id: "g1" });
+
+      await handler({ project: "Proj", taskGroupId: "g1", versionSpec: "2.*" });
+
+      expect(mockTaskAgentApi.getTaskGroup).toHaveBeenCalledWith("Proj", "g1", "2.*");
+    });
+
+    it("delete_task_group records the comment and says it is recoverable", async () => {
+      const handler = getHandler("taskagent_delete_task_group");
+      mockTaskAgentApi.deleteTaskGroup.mockResolvedValue(undefined);
+
+      const result = await handler({ project: "Proj", taskGroupId: "g1", comment: "unused" });
+
+      expect(mockTaskAgentApi.deleteTaskGroup).toHaveBeenCalledWith("Proj", "g1", "unused");
+      expect(result.content[0].text).toContain("undelete_task_group");
+    });
+
+    it("undelete_task_group restores by id", async () => {
+      const handler = getHandler("taskagent_undelete_task_group");
+      mockTaskAgentApi.undeleteTaskGroup.mockResolvedValue([{ id: "g1" }]);
+
+      const result = await handler({ project: "Proj", taskGroupId: "g1" });
+
+      expect(mockTaskAgentApi.undeleteTaskGroup).toHaveBeenCalledWith({ id: "g1" }, "Proj");
+      expect(result.content[0].text).toContain("g1");
+    });
+  });
+
+  describe("secure files", () => {
+    // These are certificates and signing keys: a download ticket is a
+    // credential, so the tools must never ask the API for one.
+    it("list_secure_files never requests download tickets", async () => {
+      const handler = getHandler("taskagent_list_secure_files");
+      mockTaskAgentApi.getSecureFiles.mockResolvedValue([{ id: "f1", name: "signing.p12" }]);
+
+      const result = await handler({ project: "Proj", namePattern: "signing" });
+
+      expect(mockTaskAgentApi.getSecureFiles).toHaveBeenCalledWith("Proj", "signing", false);
+      expect(result.content[0].text).not.toContain("ticket");
+    });
+
+    it("get_secure_file never requests a download ticket", async () => {
+      const handler = getHandler("taskagent_get_secure_file");
+      mockTaskAgentApi.getSecureFile.mockResolvedValue({ id: "f1" });
+
+      await handler({ project: "Proj", secureFileId: "f1" });
+
+      expect(mockTaskAgentApi.getSecureFile).toHaveBeenCalledWith("Proj", "f1", false);
+    });
+
+    it("update_secure_file renames without touching the content", async () => {
+      const handler = getHandler("taskagent_update_secure_file");
+      mockTaskAgentApi.updateSecureFile.mockResolvedValue({ id: "f1", name: "renamed.p12" });
+
+      await handler({ project: "Proj", secureFileId: "f1", name: "renamed.p12" });
+
+      expect(mockTaskAgentApi.updateSecureFile).toHaveBeenCalledWith({ id: "f1", name: "renamed.p12" }, "Proj", "f1");
+    });
+
+    it("delete_secure_file warns that there is no recycle bin", async () => {
+      const handler = getHandler("taskagent_delete_secure_file");
+      mockTaskAgentApi.deleteSecureFile.mockResolvedValue(undefined);
+
+      const result = await handler({ project: "Proj", secureFileId: "f1" });
+
+      expect(mockTaskAgentApi.deleteSecureFile).toHaveBeenCalledWith("Proj", "f1");
+      expect(result.content[0].text).toContain("no recycle bin");
+    });
+
+    it("surfaces a refused deletion", async () => {
+      const handler = getHandler("taskagent_delete_secure_file");
+      mockTaskAgentApi.deleteSecureFile.mockRejectedValue(new Error("in use by a pipeline"));
+
+      const result = await handler({ project: "Proj", secureFileId: "f1" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("in use by a pipeline");
+    });
   });
 });
