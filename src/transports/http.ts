@@ -9,6 +9,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
 import { logger } from "../logger.js";
+import { PRESET_NAMES, resolvePreset } from "../shared/presets.js";
 
 interface RequestAuthContext {
   token: string;
@@ -75,8 +76,11 @@ export interface HttpTransportOptions {
   allowedHosts: string[];
   /** Origins permitted in the Origin header. When omitted/empty, requests carrying any Origin header are rejected (non-browser clients send no Origin). */
   allowedOrigins?: string[];
-  /** Builds a fully configured MCP server. Called once per request (stateless). */
-  createServer: () => McpServer;
+  /**
+   * Builds a fully configured MCP server. Called once per request (stateless).
+   * `preset` is the trailing path segment of the MCP URL, when one was given.
+   */
+  createServer: (preset?: string) => McpServer;
   /** Test seam: override transport construction. */
   createTransport?: () => TransportLike;
 }
@@ -110,6 +114,28 @@ export function isOriginAllowed(origin: string | undefined, allowedOrigins?: str
   return Boolean(allowedOrigins?.includes(origin));
 }
 
+/**
+ * Match a request path against the MCP endpoint, optionally followed by a
+ * preset name (`/mcp` or `/mcp/dev`).
+ *
+ * Returns `{ preset }` for a match — `preset` undefined on the bare path — and
+ * `undefined` when the path is not ours or names a preset that does not exist,
+ * both of which the caller answers with 404.
+ */
+export function matchMcpPath(pathname: string, mcpPath: string): { preset?: string } | undefined {
+  if (pathname === mcpPath) {
+    return {};
+  }
+  if (!pathname.startsWith(`${mcpPath}/`)) {
+    return undefined;
+  }
+  const preset = pathname.slice(mcpPath.length + 1);
+  if (!preset || preset.includes("/") || !resolvePreset(preset)) {
+    return undefined;
+  }
+  return { preset };
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   res.writeHead(status, { "Content-Type": "application/json", ...headers });
   res.end(JSON.stringify(body));
@@ -125,7 +151,8 @@ export function createMcpRequestListener(opts: HttpTransportOptions): (req: Inco
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-      if (url.pathname !== opts.mcpPath) {
+      const route = matchMcpPath(url.pathname, opts.mcpPath);
+      if (!route) {
         sendJson(res, 404, { error: "Not found" });
         return;
       }
@@ -142,7 +169,7 @@ export function createMcpRequestListener(opts: HttpTransportOptions): (req: Inco
         return;
       }
 
-      const server = opts.createServer();
+      const server = opts.createServer(route.preset);
       const transport = createTransport();
       res.on("close", () => {
         void transport.close();
@@ -180,6 +207,7 @@ export async function startHttpServer(opts: HttpTransportOptions): Promise<Serve
     host: opts.host,
     port: opts.port,
     path: opts.mcpPath,
+    presetPaths: PRESET_NAMES.map((name) => `${opts.mcpPath}/${name}`),
     allowedHosts: opts.allowedHosts,
   });
 

@@ -20,7 +20,7 @@ CI (`.github/workflows/build.yml`) runs: `npm ci` → `build` → `validate-tool
 
 ## Architecture
 
-Fork of `microsoft/azure-devops-mcp` (origin: `DL-Solution/azure-devops-mcp`) — an MCP server exposing ~276 Azure DevOps tools across 30 domains (the fork adds many beyond upstream). The core idea: tools are a **thin abstraction over the ADO REST API**; complex reasoning stays with the model. Do not add tools with heavy logic.
+Fork of `microsoft/azure-devops-mcp` (origin: `DL-Solution/azure-devops-mcp`) — an MCP server exposing 337 Azure DevOps tools across 32 domains (the fork adds many beyond upstream). The core idea: tools are a **thin abstraction over the ADO REST API**; complex reasoning stays with the model. Do not add tools with heavy logic.
 
 ### Startup flow
 
@@ -31,11 +31,15 @@ Fork of `microsoft/azure-devops-mcp` (origin: `DL-Solution/azure-devops-mcp`) �
   - `passthrough` — caller supplies `Authorization: Bearer <ADO token>`.
   - `oauth` — [src/transports/http-oauth.ts](src/transports/http-oauth.ts) fronts the endpoint with an OAuth 2.1 AS (express + `mcpAuthRouter`) that bridges sign-in to Entra ID, because Entra lacks Dynamic Client Registration which MCP clients require. Needs `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `MCP_PUBLIC_URL`. `app.set("trust proxy", 1)` is required behind ACA ingress — without it `express-rate-limit` inside the SDK auth router throws on every request.
 
+Both HTTP modes also serve **tool presets**: `/mcp/<preset>` registers only the domains in that preset ([src/shared/presets.ts](src/shared/presets.ts)), so a client can ask for a smaller tool list (the full set costs ~83k tokens of schema per request; `dev` costs 34k). This works precisely because the transport is stateless — the preset is a path segment, not session state. An unknown preset name is a 404, and `resolvePreset` looks the name up with `Object.hasOwn` because it comes straight from a URL.
+
+`createConfiguredServer` passes an `instructions` string to `McpServer` ([src/shared/server-instructions.ts](src/shared/server-instructions.ts)), built from the _enabled_ domains only. MCP has no way to group tools, so this text — handed to the model next to the flat tool list — is where the server explains its own shape: what each name prefix covers, which tool answers which kind of question, and which writes are organization-wide. It costs ~1.1k tokens against ~83k for the tool schemas. **Adding a domain means adding its line to `DOMAIN_GUIDE`.**
+
 `createConfiguredServer` wraps `server.tool` with `instrumentToolErrors` so every thrown exception **and** every `isError` result is logged to stderr with the tool name — per-tool catch blocks only return errors, they never log. Tool modules call `registerTool` (below), which delegates to `server.tool`, so they stay inside that instrumentation.
 
 ### Tools and domains
 
-[src/tools.ts](src/tools.ts) registers each `configureXTools(server, tokenProvider, connectionProvider, userAgentProvider?)` only if its `Domain` ([src/shared/domains.ts](src/shared/domains.ts)) is enabled by `--domains`. `mcp-apps` is excluded from `all` and must be requested explicitly. Adding a domain means: enum entry in `Domain`, module in `src/tools/`, wiring in `configureAllTools`.
+[src/tools.ts](src/tools.ts) registers each `configureXTools(server, tokenProvider, connectionProvider, userAgentProvider?)` only if its `Domain` ([src/shared/domains.ts](src/shared/domains.ts)) is enabled by `--domains`. `mcp-apps` is excluded from `all` and must be requested explicitly. Adding a domain means: enum entry in `Domain`, module in `src/tools/`, wiring in `configureAllTools`, a line in `DOMAIN_GUIDE` ([src/shared/server-instructions.ts](src/shared/server-instructions.ts)), and membership in at least one preset ([src/shared/presets.ts](src/shared/presets.ts)) — a test asserts every domain but `mcp-apps` is reachable from some preset.
 
 Per-file convention in `src/tools/*.ts`:
 

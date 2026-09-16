@@ -9,7 +9,7 @@ jest.mock("../../../src/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
-import { createMcpRequestListener, extractBearerToken, getRequestToken, HttpTransportOptions, isOriginAllowed } from "../../../src/transports/http";
+import { createMcpRequestListener, extractBearerToken, getRequestToken, HttpTransportOptions, isOriginAllowed, matchMcpPath } from "../../../src/transports/http";
 
 function mockReq(opts: { url?: string; host?: string; authorization?: string; origin?: string } = {}): IncomingMessage {
   const headers: Record<string, string> = { host: opts.host ?? "127.0.0.1:3000" };
@@ -219,5 +219,59 @@ describe("createMcpRequestListener", () => {
     await listener(mockReq({ authorization: "Bearer my-ado-token" }), res);
 
     expect(res._status).toBe(500);
+  });
+
+  it("builds the server with no preset on the bare MCP path", async () => {
+    const { options } = makeOptions();
+    const createServer = jest.fn(options.createServer);
+    const listener = createMcpRequestListener({ ...options, createServer: createServer as HttpTransportOptions["createServer"] });
+
+    await listener(mockReq({ authorization: "Bearer my-ado-token" }), mockRes());
+
+    expect(createServer).toHaveBeenCalledWith(undefined);
+  });
+
+  it("passes the preset named in the path to the server factory", async () => {
+    const { options, transport } = makeOptions();
+    const createServer = jest.fn(options.createServer);
+    const listener = createMcpRequestListener({ ...options, createServer: createServer as HttpTransportOptions["createServer"] });
+
+    await listener(mockReq({ url: "/mcp/dev", authorization: "Bearer my-ado-token" }), mockRes());
+
+    expect(createServer).toHaveBeenCalledWith("dev");
+    expect(transport.handleRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 404 for a preset that does not exist, without building a server", async () => {
+    const { options, server } = makeOptions();
+    const listener = createMcpRequestListener(options);
+    const res = mockRes();
+
+    await listener(mockReq({ url: "/mcp/not-a-preset", authorization: "Bearer my-ado-token" }), res);
+
+    expect(res._status).toBe(404);
+    expect(server.connect).not.toHaveBeenCalled();
+  });
+});
+
+describe("matchMcpPath", () => {
+  it("matches the bare endpoint with no preset", () => {
+    expect(matchMcpPath("/mcp", "/mcp")).toEqual({});
+  });
+
+  it("matches a known preset under the endpoint", () => {
+    expect(matchMcpPath("/mcp/admin", "/mcp")).toEqual({ preset: "admin" });
+  });
+
+  it.each([
+    ["an unrelated path", "/other"],
+    ["a path that merely shares the prefix", "/mcpx"],
+    ["an unknown preset", "/mcp/nope"],
+    ["a trailing slash with no preset", "/mcp/"],
+    ["anything nested below a preset", "/mcp/dev/extra"],
+    // Would otherwise resolve off Object.prototype.
+    ["an inherited property name", "/mcp/constructor"],
+  ])("does not match %s", (_case, pathname) => {
+    expect(matchMcpPath(pathname, "/mcp")).toBeUndefined();
   });
 });

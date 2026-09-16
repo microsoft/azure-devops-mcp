@@ -59,5 +59,8 @@ module.exports = {
     "^(.+)/ado-rest\\.js$": "$1/ado-rest.ts",
     "^(.+)/state-store\\.js$": "$1/state-store.ts",
     "^(.+)/table-state-store\\.js$": "$1/table-state-store.ts",
+    "^(.+)/presets\\.js$": "$1/presets.ts",
+    "^(.+)/server-instructions\\.js$": "$1/server-instructions.ts",
+    "^(.+)/domains\\.js$": "$1/domains.ts",
   },
 };

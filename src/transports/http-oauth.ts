@@ -18,6 +18,7 @@ import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middlew
 import { logger } from "../logger.js";
 import { isOriginAllowed, runWithRequestToken } from "./http.js";
 import { EntraOAuthProvider } from "../shared/oauth/entra-oauth-provider.js";
+import { PRESET_NAMES, resolvePreset } from "../shared/presets.js";
 
 export interface OAuthHttpTransportOptions {
   host: string;
@@ -28,8 +29,11 @@ export interface OAuthHttpTransportOptions {
   allowedHosts: string[];
   allowedOrigins?: string[];
   provider: EntraOAuthProvider;
-  /** Builds a fully configured MCP server (called once per request, stateless). */
-  createServer: () => McpServer;
+  /**
+   * Builds a fully configured MCP server (called once per request, stateless).
+   * `preset` is the trailing path segment of the MCP URL, when one was given.
+   */
+  createServer: (preset?: string) => McpServer;
 }
 
 /** Start the OAuth-fronted HTTP MCP server and resolve once it is listening. */
@@ -60,7 +64,16 @@ export async function startOAuthHttpServer(opts: OAuthHttpTransportOptions): Pro
   });
 
   // The MCP endpoint, gated by a valid bearer token (validated by the provider).
-  app.post(opts.mcpPath, requireBearerAuth({ verifier: opts.provider, resourceMetadataUrl }), async (req, res) => {
+  // Served both bare and under a preset name ("/mcp" and "/mcp/dev"), which is
+  // how a client asks for a narrower tool list — see shared/presets.ts. The
+  // OAuth metadata stays at the issuer root, so all paths share one sign-in.
+  const handleMcpPost = async (req: express.Request, res: express.Response) => {
+    const preset = typeof req.params.preset === "string" ? req.params.preset : undefined;
+    if (preset && !resolvePreset(preset)) {
+      res.status(404).json({ error: `Unknown tool preset '${preset}'. Available presets: ${PRESET_NAMES.join(", ")}.` });
+      return;
+    }
+
     // Access log: record the caller's source IP. Behind the ACA ingress the real
     // client address is the first hop in X-Forwarded-For. Lets you verify the
     // connector's egress IPs (e.g. against Anthropic's published ranges) and
@@ -77,7 +90,7 @@ export async function startOAuthHttpServer(opts: OAuthHttpTransportOptions): Pro
       return;
     }
 
-    const server = opts.createServer();
+    const server = opts.createServer(preset);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableDnsRebindingProtection: true,
@@ -104,7 +117,11 @@ export async function startOAuthHttpServer(opts: OAuthHttpTransportOptions): Pro
         res.status(500).json({ error: "Internal server error" });
       }
     }
-  });
+  };
+
+  const bearerAuth = requireBearerAuth({ verifier: opts.provider, resourceMetadataUrl });
+  app.post(opts.mcpPath, bearerAuth, handleMcpPost);
+  app.post(`${opts.mcpPath}/:preset`, bearerAuth, handleMcpPost);
 
   const httpServer = createHttpServer(app);
   await new Promise<void>((resolve, reject) => {
@@ -119,6 +136,7 @@ export async function startOAuthHttpServer(opts: OAuthHttpTransportOptions): Pro
     host: opts.host,
     port: opts.port,
     path: opts.mcpPath,
+    presetPaths: PRESET_NAMES.map((name) => `${opts.mcpPath}/${name}`),
     issuer: opts.publicBaseUrl,
     callback: opts.provider.redirectUri,
   });

@@ -17,6 +17,8 @@ import { configureAllTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { packageVersion } from "./version.js";
 import { DomainsManager } from "./shared/domains.js";
+import { PRESET_NAMES, resolvePreset } from "./shared/presets.js";
+import { buildServerInstructions } from "./shared/server-instructions.js";
 import { getRequestToken, startHttpServer } from "./transports/http.js";
 import { startOAuthHttpServer } from "./transports/http-oauth.js";
 import { EntraOAuthProvider } from "./shared/oauth/entra-oauth-provider.js";
@@ -125,16 +127,30 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
   };
 }
 
-function createConfiguredServer(authenticator: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentComposer: UserAgentComposer): McpServer {
-  const server = new McpServer({
-    name: "Azure DevOps MCP Server",
-    version: packageVersion,
-    icons: [
-      {
-        src: "https://cdn.vsassets.io/content/icons/favicon.ico",
-      },
-    ],
-  });
+function createConfiguredServer(
+  authenticator: () => Promise<string>,
+  connectionProvider: () => Promise<WebApi>,
+  userAgentComposer: UserAgentComposer,
+  domains: Set<string> = enabledDomains,
+  presetName?: string
+): McpServer {
+  const server = new McpServer(
+    {
+      name: "Azure DevOps MCP Server",
+      version: packageVersion,
+      icons: [
+        {
+          src: "https://cdn.vsassets.io/content/icons/favicon.ico",
+        },
+      ],
+    },
+    {
+      // Clients hand this to the model together with the tool list. It is the
+      // only place the server can explain its own shape, and it costs a
+      // fraction of what the tool schemas do — see server-instructions.ts.
+      instructions: buildServerInstructions(domains, { organization: orgName, preset: presetName }),
+    }
+  );
 
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
@@ -145,7 +161,7 @@ function createConfiguredServer(authenticator: () => Promise<string>, connection
   // removing prompts untill further notice
   // configurePrompts(server);
 
-  configureAllTools(server, authenticator, connectionProvider, () => userAgentComposer.userAgent, enabledDomains);
+  configureAllTools(server, authenticator, connectionProvider, () => userAgentComposer.userAgent, domains);
 
   return server;
 }
@@ -223,7 +239,20 @@ async function runHttpTransport(userAgentComposer: UserAgentComposer) {
   // from the in-flight context (token pass-through), so no credential is stored.
   const authenticator = () => Promise.resolve(getRequestToken());
   const connectionProvider = getAzureDevOpsClient(authenticator, userAgentComposer, "bearer");
-  const createServer = () => createConfiguredServer(authenticator, connectionProvider, userAgentComposer);
+
+  // A preset narrows the tool list for this one request. The transport is
+  // stateless, so the choice can live in the URL path and nothing is shared
+  // between callers; `undefined` means the endpoint's configured --domains.
+  const createServer = (preset?: string) => {
+    if (!preset) {
+      return createConfiguredServer(authenticator, connectionProvider, userAgentComposer);
+    }
+    const domains = resolvePreset(preset);
+    if (!domains) {
+      throw new Error(`Unknown tool preset '${preset}'. Available presets: ${PRESET_NAMES.join(", ")}.`);
+    }
+    return createConfiguredServer(authenticator, connectionProvider, userAgentComposer, domains, preset);
+  };
 
   const allowedHosts = argv.allowedHosts && argv.allowedHosts.length > 0 ? argv.allowedHosts : [`${argv.host}:${argv.port}`, `localhost:${argv.port}`, `127.0.0.1:${argv.port}`];
 
