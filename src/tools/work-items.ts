@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTool } from "../shared/tool-registration.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
-import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
+import { GetFieldsExpand, QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
@@ -56,6 +56,12 @@ const WORKITEM_TOOLS = {
   create_query: "wit_create_query",
   update_query: "wit_update_query",
   delete_query: "wit_delete_query",
+  list_work_item_types: "wit_list_work_item_types",
+  list_type_categories: "wit_list_type_categories",
+  get_type_category: "wit_get_type_category",
+  list_relation_types: "wit_list_relation_types",
+  list_fields: "wit_list_fields",
+  get_field: "wit_get_field",
 };
 
 function getLinkTypeFromName(name: string) {
@@ -85,6 +91,13 @@ function getLinkTypeFromName(name: string) {
     case "artifact":
       return "ArtifactLink";
     default:
+      // Anything dotted is treated as a link type reference name, e.g.
+      // "System.LinkTypes.Hierarchy-Forward" or a custom type from
+      // wit_list_relation_types. The friendly names above only cover the
+      // standard set, so without this custom link types are unusable.
+      if (name.includes(".")) {
+        return name;
+      }
       throw new Error(`Unknown link type: ${name}`);
   }
 }
@@ -1164,9 +1177,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             linkToId: z.coerce.number().min(1).describe("The ID of the work item to link to."),
             type: z
               .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by"])
+              .or(z.string())
               .default("related")
               .describe(
-                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. Defaults to 'related'."
+                "Type of link to create between the work items. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', and 'affected by'. A link type reference name such as 'System.LinkTypes.Hierarchy-Forward' is also accepted — use wit_list_relation_types to find custom ones. Defaults to 'related'."
               ),
             comment: z.string().optional().describe("Optional comment to include with the link. This can be used to provide additional context for the link being created."),
           })
@@ -1249,9 +1263,10 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       id: z.coerce.number().min(1).describe("The ID of the work item to remove the links from."),
       type: z
         .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact"])
+        .or(z.string())
         .default("related")
         .describe(
-          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. Defaults to 'related'."
+          "Type of link to remove. Options include 'parent', 'child', 'duplicate', 'duplicate of', 'related', 'successor', 'predecessor', 'tested by', 'tests', 'affects', 'affected by', and 'artifact'. A link type reference name such as 'System.LinkTypes.Hierarchy-Reverse' is also accepted — use wit_list_relation_types to find custom ones. Defaults to 'related'."
         ),
       url: z.string().optional().describe("Optional URL to match for the link to remove. If not provided, all links of the specified type will be removed."),
     },
@@ -2191,6 +2206,162 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return { content: [{ type: "text", text: `Error deleting query: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_work_item_types,
+    "List the work item types available in a project, as the project's process actually defines them. Use it before creating a work item to learn which types exist, including any custom ones.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      namesOnly: z.boolean().default(true).describe("Return just the type names. The full definitions include every field and state of every type and are large, so ask for them only when needed."),
+    },
+    async ({ project, namesOnly }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project whose work item types to list.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const types = await workItemTrackingApi.getWorkItemTypes(ctx.project);
+        const result = namesOnly ? (types ?? []).map((type) => ({ name: type.name, referenceName: type.referenceName, description: type.description })) : types;
+
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing work item types: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_type_categories,
+    "List the work item type categories of a project: which types play the role of requirement, bug, task, epic and so on. This is how to find out what a project calls its backlog items when the process is customized.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project whose type categories to list.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const categories = await workItemTrackingApi.getWorkItemTypeCategories(ctx.project);
+
+        return { content: [{ type: "text", text: JSON.stringify(categories, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing work item type categories: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.get_type_category,
+    "Get one work item type category, e.g. 'Microsoft.RequirementCategory', with the types it contains and the default type used when creating work items in it.",
+    {
+      category: z.string().describe("Reference name of the category, e.g. 'Microsoft.BugCategory' or 'Microsoft.RequirementCategory'."),
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+    },
+    async ({ category, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const ctx = await resolveProject(connection, project, "Select the Azure DevOps project the category belongs to.");
+        if ("response" in ctx) return ctx.response;
+
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const found = await workItemTrackingApi.getWorkItemTypeCategory(ctx.project, category);
+
+        if (!found) {
+          return { content: [{ type: "text", text: `Work item type category '${category}' not found` }], isError: true };
+        }
+
+        return { content: [{ type: "text", text: JSON.stringify(found, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error fetching work item type category: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_relation_types,
+    "List the work item link types the organization supports, with their reference names. The friendly names accepted by wit_work_items_link ('parent', 'related', ...) cover the standard types only; use this to discover custom ones, then pass the reference name directly.",
+    {},
+    async () => {
+      try {
+        const connection = await connectionProvider();
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const relationTypes = await workItemTrackingApi.getRelationTypes();
+
+        return { content: [{ type: "text", text: JSON.stringify(relationTypes, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing work item relation types: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.list_fields,
+    "List work item fields with their reference names and types. Pass a project to get the fields available there, or omit it for every field in the organization. Use it to find the exact reference name of a field before querying or updating it.",
+    {
+      project: z.string().optional().describe("Limit the list to fields available in this project. Omit to list every field in the organization."),
+      expand: z
+        .enum(getEnumKeys(GetFieldsExpand) as [string, ...string[]])
+        .optional()
+        .describe("'ExtensionFields' also returns fields added by extensions; 'IncludeDeleted' also returns deleted fields."),
+      nameFilter: z
+        .string()
+        .optional()
+        .describe("Case-insensitive substring matched against the field name and reference name. Organizations have hundreds of fields, so filtering is usually what you want."),
+    },
+    async ({ project, expand, nameFilter }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const fields = await workItemTrackingApi.getFields(project, safeEnumConvert(GetFieldsExpand, expand));
+
+        const filter = nameFilter?.toLowerCase();
+        const result = filter ? (fields ?? []).filter((field) => field.name?.toLowerCase().includes(filter) || field.referenceName?.toLowerCase().includes(filter)) : fields;
+
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error listing work item fields: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    WORKITEM_TOOLS.get_field,
+    "Get a single work item field by name or reference name, e.g. 'System.Title' or 'Story Points', with its type, whether it is read-only and where it is picked from.",
+    {
+      field: z.string().describe("Name or reference name of the field, e.g. 'System.Tags'."),
+      project: z.string().optional().describe("Resolve the field in this project's context. Omit for the organization-wide definition."),
+    },
+    async ({ field, project }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+        const found = await workItemTrackingApi.getField(field, project);
+
+        if (!found) {
+          return { content: [{ type: "text", text: `Field '${field}' not found` }], isError: true };
+        }
+
+        return { content: [{ type: "text", text: JSON.stringify(found, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error fetching work item field: ${errorMessage}` }], isError: true };
       }
     }
   );

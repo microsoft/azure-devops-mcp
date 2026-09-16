@@ -68,6 +68,12 @@ interface WorkItemTrackingApiMock {
   createQuery: jest.Mock;
   updateQuery: jest.Mock;
   deleteQuery: jest.Mock;
+  getWorkItemTypes: jest.Mock;
+  getWorkItemTypeCategories: jest.Mock;
+  getWorkItemTypeCategory: jest.Mock;
+  getRelationTypes: jest.Mock;
+  getFields: jest.Mock;
+  getField: jest.Mock;
 }
 
 interface MockConnection {
@@ -130,6 +136,12 @@ describe("configureWorkItemTools", () => {
       createQuery: jest.fn(),
       updateQuery: jest.fn(),
       deleteQuery: jest.fn(),
+      getWorkItemTypes: jest.fn(),
+      getWorkItemTypeCategories: jest.fn(),
+      getWorkItemTypeCategory: jest.fn(),
+      getRelationTypes: jest.fn(),
+      getFields: jest.fn(),
+      getField: jest.fn(),
     };
 
     mockConnection = {
@@ -5476,6 +5488,140 @@ describe("configureWorkItemTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error deleting query: VS402337: query is in use");
+    });
+  });
+
+  describe("work item metadata", () => {
+    function getHandler(toolName: string) {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === toolName);
+      if (!call) throw new Error(`${toolName} not registered`);
+      return call[3];
+    }
+
+    it("wit_list_work_item_types trims to names by default", async () => {
+      const handler = getHandler("wit_list_work_item_types");
+      mockWorkItemTrackingApi.getWorkItemTypes.mockResolvedValue([{ name: "Bug", referenceName: "Microsoft.VSTS.WorkItemTypes.Bug", description: "A bug", fields: [{ name: "huge" }], states: [] }]);
+
+      const result = await handler({ project: "TestProject", namesOnly: true });
+
+      expect(mockWorkItemTrackingApi.getWorkItemTypes).toHaveBeenCalledWith("TestProject");
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload).toEqual([{ name: "Bug", referenceName: "Microsoft.VSTS.WorkItemTypes.Bug", description: "A bug" }]);
+    });
+
+    it("wit_list_work_item_types returns the full definitions when asked", async () => {
+      const handler = getHandler("wit_list_work_item_types");
+      mockWorkItemTrackingApi.getWorkItemTypes.mockResolvedValue([{ name: "Bug", fields: [{ name: "System.Title" }] }]);
+
+      const result = await handler({ project: "TestProject", namesOnly: false });
+
+      expect(result.content[0].text).toContain("System.Title");
+    });
+
+    it("wit_list_type_categories lists categories", async () => {
+      const handler = getHandler("wit_list_type_categories");
+      mockWorkItemTrackingApi.getWorkItemTypeCategories.mockResolvedValue([{ referenceName: "Microsoft.RequirementCategory" }]);
+
+      const result = await handler({ project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.getWorkItemTypeCategories).toHaveBeenCalledWith("TestProject");
+      expect(result.content[0].text).toContain("Microsoft.RequirementCategory");
+    });
+
+    it("wit_get_type_category reports a missing category as an error", async () => {
+      const handler = getHandler("wit_get_type_category");
+      mockWorkItemTrackingApi.getWorkItemTypeCategory.mockResolvedValue(undefined);
+
+      const result = await handler({ category: "Nope", project: "TestProject" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not found");
+    });
+
+    it("wit_list_relation_types needs no project", async () => {
+      const handler = getHandler("wit_list_relation_types");
+      mockWorkItemTrackingApi.getRelationTypes.mockResolvedValue([{ referenceName: "System.LinkTypes.Hierarchy-Forward" }]);
+
+      const result = await handler({});
+
+      expect(mockWorkItemTrackingApi.getRelationTypes).toHaveBeenCalledWith();
+      expect(result.content[0].text).toContain("Hierarchy-Forward");
+    });
+
+    it("wit_list_fields filters by name or reference name", async () => {
+      const handler = getHandler("wit_list_fields");
+      mockWorkItemTrackingApi.getFields.mockResolvedValue([
+        { name: "Story Points", referenceName: "Microsoft.VSTS.Scheduling.StoryPoints" },
+        { name: "Title", referenceName: "System.Title" },
+        { name: "Remaining Work", referenceName: "Microsoft.VSTS.Scheduling.RemainingWork" },
+      ]);
+
+      const result = await handler({ project: "TestProject", nameFilter: "scheduling" });
+
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.map((f: { name: string }) => f.name)).toEqual(["Story Points", "Remaining Work"]);
+    });
+
+    it("wit_list_fields maps the expand keyword to the SDK enum", async () => {
+      const handler = getHandler("wit_list_fields");
+      mockWorkItemTrackingApi.getFields.mockResolvedValue([]);
+
+      await handler({ expand: "IncludeDeleted" });
+
+      // GetFieldsExpand.IncludeDeleted === 2
+      expect(mockWorkItemTrackingApi.getFields).toHaveBeenCalledWith(undefined, 2);
+    });
+
+    it("wit_get_field fetches by reference name", async () => {
+      const handler = getHandler("wit_get_field");
+      mockWorkItemTrackingApi.getField.mockResolvedValue({ name: "Tags", referenceName: "System.Tags" });
+
+      const result = await handler({ field: "System.Tags", project: "TestProject" });
+
+      expect(mockWorkItemTrackingApi.getField).toHaveBeenCalledWith("System.Tags", "TestProject");
+      expect(result.content[0].text).toContain("System.Tags");
+    });
+
+    it("wit_get_field surfaces errors", async () => {
+      const handler = getHandler("wit_get_field");
+      mockWorkItemTrackingApi.getField.mockRejectedValue(new Error("TF51535: field does not exist"));
+
+      const result = await handler({ field: "Nope" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error fetching work item field: TF51535: field does not exist");
+    });
+  });
+
+  describe("custom link type reference names", () => {
+    it("wit_work_items_link passes a dotted reference name through untouched", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_items_link");
+      if (!call) throw new Error("wit_work_items_link tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      // The tool links through the $batch endpoint, not the typed client.
+      const fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ count: 1, value: [] }) });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      await handler({ project: "TestProject", updates: [{ id: 1, linkToId: 2, type: "Custom.LinkTypes.Blocks-Forward" }] });
+
+      const batchBody = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body);
+      expect(batchBody[0].body[0].value.rel).toBe("Custom.LinkTypes.Blocks-Forward");
+    });
+
+    it("still rejects a name that is neither a friendly name nor a reference name", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_items_link");
+      if (!call) throw new Error("wit_work_items_link tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ project: "TestProject", updates: [{ id: 1, linkToId: 2, type: "nonsense" }] });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown link type: nonsense");
     });
   });
 });
