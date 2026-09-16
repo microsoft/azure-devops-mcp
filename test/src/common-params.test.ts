@@ -41,11 +41,16 @@ describe("common project and team params", () => {
 describe("tool modules", () => {
   const toolsDir = path.join(__dirname, "../../src/tools");
 
+  // Matches any hand-written describe() whose text names the project or team
+  // as such — the first sweep only caught one wording and left eleven sites
+  // spelled "The unique identifier (ID or name) of the Azure DevOps project".
+  const INLINE_DESCRIPTION = /\.describe\(\s*"[^"]*\bAzure DevOps (project|team)\b[^"]*"/;
+
   it("do not re-describe project or team inline", () => {
     const offenders = fs
       .readdirSync(toolsDir)
       .filter((file) => file.endsWith(".ts"))
-      .filter((file) => /The name or ID of the Azure DevOps (project|team)/.test(fs.readFileSync(path.join(toolsDir, file), "utf8")));
+      .filter((file) => INLINE_DESCRIPTION.test(fs.readFileSync(path.join(toolsDir, file), "utf8")));
 
     expect(offenders).toEqual([]);
   });

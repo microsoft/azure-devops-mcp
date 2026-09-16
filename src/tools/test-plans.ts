@@ -4,9 +4,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTool } from "../shared/tool-registration.js";
 import { WebApi } from "azure-devops-node-api";
-import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { Outcome, TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { z } from "zod";
-import { apiVersion } from "../utils.js";
+import { apiVersion, safeEnumConvert } from "../utils.js";
+import { requiredProject, requiredProjectWith } from "../shared/common-params.js";
 
 const Test_Plan_Tools = {
   create_test_plan: "testplan_create_test_plan",
@@ -18,7 +19,31 @@ const Test_Plan_Tools = {
   list_test_plans: "testplan_list_test_plans",
   list_test_suites: "testplan_list_test_suites",
   create_test_suite: "testplan_create_test_suite",
+  list_test_points: "testplan_list_test_points",
+  get_test_point: "testplan_get_test_point",
+  update_test_points: "testplan_update_test_points",
 };
+
+// A test point is one test case as scheduled in one suite with one
+// configuration — it is what carries the tester assignment and the manual
+// outcome, which the test case itself does not.
+const TEST_POINT_OUTCOMES = [
+  "Unspecified",
+  "None",
+  "Passed",
+  "Failed",
+  "Inconclusive",
+  "Timeout",
+  "Aborted",
+  "Blocked",
+  "NotExecuted",
+  "Warning",
+  "Error",
+  "NotApplicable",
+  "Paused",
+  "InProgress",
+  "NotImpacted",
+] as const;
 
 function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider?: () => string) {
   registerTool(
@@ -26,7 +51,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.list_test_plans,
     "Retrieve a paginated list of test plans from an Azure DevOps project. Allows filtering for active plans and toggling detailed information.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: requiredProject,
       filterActivePlans: z.boolean().default(true).describe("Filter to include only active test plans. Defaults to true."),
       includePlanDetails: z.boolean().default(false).describe("Include detailed information about each test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
@@ -88,7 +113,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.create_test_plan,
     "Creates a new test plan in the project.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project where the test plan will be created."),
+      project: requiredProjectWith("The project the test plan is created in."),
       name: z.string().describe("The name of the test plan to be created."),
       iteration: z.string().describe("The iteration path for the test plan"),
       description: z.string().optional().describe("The description of the test plan"),
@@ -192,7 +217,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.add_test_cases_to_suite,
     "Adds existing test cases to a test suite.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: requiredProject,
       planId: z.coerce.number().min(1).describe("The ID of the test plan."),
       suiteId: z.coerce.number().min(1).describe("The ID of the test suite."),
       testCaseIds: z.string().or(z.array(z.string())).describe("The ID(s) of the test case(s) to add. "),
@@ -225,7 +250,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.create_test_case,
     "Creates a new test case work item.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: requiredProject,
       title: z.string().describe("The title of the test case."),
       steps: z
         .string()
@@ -368,7 +393,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.list_test_cases,
     "Gets a list of test cases in the test plan.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: requiredProject,
       planid: z.coerce.number().min(1).describe("The ID of the test plan."),
       suiteid: z.coerce.number().min(1).describe("The ID of the test suite."),
       continuationToken: z.string().optional().describe("Token to continue fetching test cases from a previous request."),
@@ -428,7 +453,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.test_results_from_build_id,
     "Gets a list of test results for a given project and build ID. Can filter by test outcome (e.g. Failed, Passed, Aborted). Returns test case titles, error messages, stack traces, and outcomes. Efficiently handles builds with large numbers of test runs.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: requiredProject,
       buildid: z.coerce.number().min(1).describe("The ID of the build."),
       outcomes: z.array(z.string()).optional().describe("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
     },
@@ -497,7 +522,7 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     Test_Plan_Tools.list_test_suites,
     "Retrieve a paginated list of test suites from an Azure DevOps project and Test Plan Id.",
     {
-      project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
+      project: requiredProject,
       planId: z.coerce.number().min(1).describe("The ID of the test plan."),
       continuationToken: z.string().optional().describe("Token to continue fetching test plans from a previous request."),
     },
@@ -588,6 +613,99 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           content: [{ type: "text", text: `Error listing test suites: ${errorMessage}` }],
           isError: true,
         };
+      }
+    }
+  );
+
+  const failed = (action: string, error: unknown) => ({
+    content: [{ type: "text" as const, text: `Error ${action}: ${error instanceof Error ? error.message : String(error)}` }],
+    isError: true,
+  });
+  const ok = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
+
+  registerTool(
+    server,
+    Test_Plan_Tools.list_test_points,
+    "List the test points of a suite — each test case as scheduled against a configuration, with its assigned tester and last outcome. This is where a manual test plan's progress lives.",
+    {
+      project: requiredProject,
+      planId: z.coerce.number().describe("The ID of the test plan."),
+      suiteId: z.coerce.number().describe("The ID of the test suite within the plan."),
+      testCaseId: z.string().optional().describe("Return only the points for this test case ID."),
+      includePointDetails: z.boolean().default(true).describe("Include the outcome, tester and configuration of each point."),
+      isRecursive: z.boolean().default(false).describe("Include the points of child suites."),
+      continuationToken: z.string().optional().describe("Token from a previous response, to fetch the next page."),
+    },
+    async ({ project, planId, suiteId, testCaseId, includePointDetails, isRecursive, continuationToken }) => {
+      try {
+        const connection = await connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
+        const points = await testPlanApi.getPointsList(project, planId, suiteId, undefined, testCaseId, continuationToken, true, includePointDetails, isRecursive);
+        return ok(points);
+      } catch (error) {
+        return failed(`listing test points of suite ${suiteId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    Test_Plan_Tools.get_test_point,
+    "Get one test point of a suite by its ID.",
+    {
+      project: requiredProject,
+      planId: z.coerce.number().describe("The ID of the test plan."),
+      suiteId: z.coerce.number().describe("The ID of the test suite within the plan."),
+      pointId: z.coerce.number().describe("The ID of the test point."),
+      includePointDetails: z.boolean().default(true).describe("Include the outcome, tester and configuration of the point."),
+    },
+    async ({ project, planId, suiteId, pointId, includePointDetails }) => {
+      try {
+        const connection = await connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
+        const points = await testPlanApi.getPoints(project, planId, suiteId, String(pointId), true, includePointDetails);
+        if (!points || points.length === 0) {
+          return { content: [{ type: "text", text: `Test point ${pointId} not found in suite ${suiteId}` }], isError: true };
+        }
+        return ok(points[0]);
+      } catch (error) {
+        return failed(`getting test point ${pointId}`, error);
+      }
+    }
+  );
+
+  registerTool(
+    server,
+    Test_Plan_Tools.update_test_points,
+    "Assign a tester to test points, or record a manual outcome on them. Updates several points in one call.",
+    {
+      project: requiredProject,
+      planId: z.coerce.number().describe("The ID of the test plan."),
+      suiteId: z.coerce.number().describe("The ID of the test suite within the plan."),
+      pointIds: z.array(z.coerce.number()).min(1).describe("The test points to update."),
+      testerId: z.string().optional().describe("Identity ID of the tester to assign. Resolve a name to an ID with core_get_identity_ids."),
+      outcome: z.enum(TEST_POINT_OUTCOMES).optional().describe("Outcome to record against each point."),
+      isActive: z.boolean().optional().describe("Whether the points are active in the suite."),
+    },
+    async ({ project, planId, suiteId, pointIds, testerId, outcome, isActive }) => {
+      try {
+        if (testerId === undefined && outcome === undefined && isActive === undefined) {
+          return { content: [{ type: "text", text: "Nothing to update: pass testerId, outcome or isActive." }], isError: true };
+        }
+
+        const connection = await connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
+        const updates = pointIds.map((id) => ({
+          id,
+          ...(isActive === undefined ? {} : { isActive }),
+          ...(testerId ? { tester: { id: testerId } } : {}),
+          ...(outcome ? { results: { outcome: safeEnumConvert(Outcome, outcome) } } : {}),
+        }));
+
+        const updated = await testPlanApi.updateTestPoints(updates, project, planId, suiteId, true, true);
+        return ok(updated);
+      } catch (error) {
+        return failed(`updating test points of suite ${suiteId}`, error);
       }
     }
   );

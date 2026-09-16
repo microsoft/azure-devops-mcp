@@ -13,7 +13,7 @@ import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
-import { optionalProject, optionalTeam, optionalTeamWith } from "../shared/common-params.js";
+import { optionalProject, optionalTeam, optionalTeamWith, requiredProjectWith } from "../shared/common-params.js";
 
 const WORKITEM_TOOLS = {
   my_work_items: "wit_my_work_items",
@@ -738,7 +738,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     WORKITEM_TOOLS.link_work_item_to_pull_request,
     "Link a single work item to an existing pull request.",
     {
-      projectId: z.string().describe("The project ID of the Azure DevOps project (note: project name is not valid)."),
+      projectId: requiredProjectWith("Must be the project ID; a name is not accepted here."),
       repositoryId: z.string().describe("The ID of the repository containing the pull request. Do not use the repository name here, use the ID instead."),
       pullRequestId: z.coerce.number().min(1).describe("The ID of the pull request to link to."),
       workItemId: z.coerce.number().min(1).describe("The ID of the work item to link to the pull request."),

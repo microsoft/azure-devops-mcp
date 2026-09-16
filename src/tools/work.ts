@@ -358,8 +358,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_team_capacity,
     "Get the team capacity of a specific team and iteration in a project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or Id of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      team: z.string().describe("The name or Id of the Azure DevOps team. Reuse from prior context if already known."),
+      project: optionalProject,
+      team: requiredTeam,
       iterationId: z.string().describe("The Iteration Id to get capacity for."),
     },
     async ({ project, team, iterationId }) => {
@@ -420,8 +420,8 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.update_team_capacity,
     "Update the team capacity of a team member for a specific iteration in a project.",
     {
-      project: z.string().describe("The name or Id of the Azure DevOps project."),
-      team: z.string().describe("The name or Id of the Azure DevOps team."),
+      project: requiredProject,
+      team: requiredTeam,
       teamMemberId: z.string().describe("The team member Id for the specific team member."),
       iterationId: z.string().describe("The Iteration Id to update the capacity for."),
       activities: z
@@ -504,7 +504,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     WORK_TOOLS.get_iteration_capacities,
     "Get an iteration's capacity for all teams in iteration and project. If a project is not specified, you will be prompted to select one.",
     {
-      project: z.string().optional().describe("The name or Id of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      project: optionalProject,
       iterationId: z.string().describe("The Iteration Id to get capacity for."),
     },
     async ({ project, iterationId }) => {

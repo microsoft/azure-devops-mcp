@@ -41,6 +41,9 @@ describe("configureTestPlanTools", () => {
       createTestSuite: jest.fn(),
       addTestCasesToSuite: jest.fn(),
       getTestCaseList: jest.fn(),
+      getPointsList: jest.fn(),
+      getPoints: jest.fn(),
+      updateTestPoints: jest.fn(),
     } as unknown as ITestPlanApi;
     mockTestResultsApi = {
       getTestResultDetailsForBuild: jest.fn(),
@@ -2400,6 +2403,93 @@ describe("configureTestPlanTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Error adding test cases to suite");
       expect(result.content[0].text).toContain("API Error");
+    });
+  });
+
+  describe("test points", () => {
+    function pointHandler(toolName: string) {
+      configureTestPlanTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === toolName);
+      if (!call) throw new Error(`${toolName} not registered`);
+      return call[3] as (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
+    }
+
+    it("list_test_points asks for identity refs and point details", async () => {
+      (mockTestPlanApi.getPointsList as jest.Mock).mockResolvedValue([{ id: 1 }]);
+
+      const result = await pointHandler("testplan_list_test_points")({ project: "Proj", planId: 3, suiteId: 4, includePointDetails: true, isRecursive: false });
+
+      expect(mockTestPlanApi.getPointsList).toHaveBeenCalledWith("Proj", 3, 4, undefined, undefined, undefined, true, true, false);
+      expect(result.content[0].text).toContain('"id": 1');
+    });
+
+    it("list_test_points can recurse into child suites and filter by test case", async () => {
+      (mockTestPlanApi.getPointsList as jest.Mock).mockResolvedValue([]);
+
+      await pointHandler("testplan_list_test_points")({ project: "Proj", planId: 3, suiteId: 4, testCaseId: "99", includePointDetails: false, isRecursive: true, continuationToken: "tok" });
+
+      expect(mockTestPlanApi.getPointsList).toHaveBeenCalledWith("Proj", 3, 4, undefined, "99", "tok", true, false, true);
+    });
+
+    it("get_test_point returns the single point", async () => {
+      (mockTestPlanApi.getPoints as jest.Mock).mockResolvedValue([{ id: 7, testCaseReference: { id: 12 } }]);
+
+      const result = await pointHandler("testplan_get_test_point")({ project: "Proj", planId: 3, suiteId: 4, pointId: 7, includePointDetails: true });
+
+      expect(mockTestPlanApi.getPoints).toHaveBeenCalledWith("Proj", 3, 4, "7", true, true);
+      expect(result.content[0].text).toContain('"id": 7');
+    });
+
+    it("get_test_point errors when the point does not exist", async () => {
+      (mockTestPlanApi.getPoints as jest.Mock).mockResolvedValue([]);
+
+      const result = await pointHandler("testplan_get_test_point")({ project: "Proj", planId: 3, suiteId: 4, pointId: 7, includePointDetails: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not found");
+    });
+
+    it("update_test_points assigns a tester to several points", async () => {
+      (mockTestPlanApi.updateTestPoints as jest.Mock).mockResolvedValue([{ id: 1 }, { id: 2 }]);
+
+      await pointHandler("testplan_update_test_points")({ project: "Proj", planId: 3, suiteId: 4, pointIds: [1, 2], testerId: "user-guid" });
+
+      expect(mockTestPlanApi.updateTestPoints).toHaveBeenCalledWith(
+        [
+          { id: 1, tester: { id: "user-guid" } },
+          { id: 2, tester: { id: "user-guid" } },
+        ],
+        "Proj",
+        3,
+        4,
+        true,
+        true
+      );
+    });
+
+    it("update_test_points records an outcome as the SDK enum value", async () => {
+      (mockTestPlanApi.updateTestPoints as jest.Mock).mockResolvedValue([]);
+
+      await pointHandler("testplan_update_test_points")({ project: "Proj", planId: 3, suiteId: 4, pointIds: [1], outcome: "Passed" });
+
+      expect(mockTestPlanApi.updateTestPoints).toHaveBeenCalledWith([{ id: 1, results: { outcome: 2 } }], "Proj", 3, 4, true, true);
+    });
+
+    // An empty update would silently succeed and change nothing.
+    it("update_test_points refuses a call with nothing to change", async () => {
+      const result = await pointHandler("testplan_update_test_points")({ project: "Proj", planId: 3, suiteId: 4, pointIds: [1] });
+
+      expect(result.isError).toBe(true);
+      expect(mockTestPlanApi.updateTestPoints).not.toHaveBeenCalled();
+    });
+
+    it("surfaces an API failure", async () => {
+      (mockTestPlanApi.getPointsList as jest.Mock).mockRejectedValue(new Error("suite not found"));
+
+      const result = await pointHandler("testplan_list_test_points")({ project: "Proj", planId: 3, suiteId: 404, includePointDetails: true, isRecursive: false });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("suite not found");
     });
   });
 });

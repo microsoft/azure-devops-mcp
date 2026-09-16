@@ -35,4 +35,5 @@ export const requiredTeam = z.string().describe(TEAM_DESCRIPTION);
  * ownership rule, or what happens in this particular tool when it is omitted.
  */
 export const optionalProjectWith = (note: string) => z.string().optional().describe(`${PROJECT_DESCRIPTION} ${note}`);
+export const requiredProjectWith = (note: string) => z.string().describe(`${PROJECT_DESCRIPTION} ${note}`);
 export const optionalTeamWith = (note: string) => z.string().optional().describe(`${TEAM_DESCRIPTION} ${note}`);
