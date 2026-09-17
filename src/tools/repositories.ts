@@ -692,7 +692,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       targetRefName: z.string().optional().describe("The target branch name (e.g., 'refs/heads/main'). Required for create. Optional for update."),
       title: z.string().optional().describe("The title of the pull request. Required for create. Optional for update."),
       description: z.string().max(4000).optional().describe("The description of the pull request. Max 4000 characters. Used for create and update."),
-      isDraft: z.boolean().optional().default(false).describe("Whether the pull request is a draft. Used for create and update."),
+      isDraft: z.boolean().optional().describe("Whether the pull request is a draft. Used for create (default false) and update (unchanged when omitted)."),
       workItems: z.string().optional().describe("Work item IDs to associate, space-separated. Used for create."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository. Used for create."),
       labels: z.array(z.string()).optional().describe("Array of label names. Used for create and update."),
@@ -701,11 +701,11 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       mergeStrategy: z
         .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
         .optional()
-        .describe("The merge strategy for autocomplete. Used for update."),
-      mergeCommitMessage: z.string().optional().describe("Commit message for autocomplete. Used for update."),
-      deleteSourceBranch: z.boolean().optional().default(false).describe("Delete source branch on autocomplete. Used for update."),
-      transitionWorkItems: z.boolean().optional().default(true).describe("Transition work items on autocomplete. Used for update."),
-      bypassPolicy: z.boolean().optional().default(false).describe("Explicitly bypass branch policies on autocomplete. Used for update and requires bypassReason when true."),
+        .describe("The merge strategy for autocomplete. Used for update with autoComplete true; keeps the current value when omitted."),
+      mergeCommitMessage: z.string().optional().describe("Commit message for autocomplete. Used for update with autoComplete true; keeps the current value when omitted."),
+      deleteSourceBranch: z.boolean().optional().describe("Delete source branch on autocomplete. Used for update with autoComplete true; keeps the current value when omitted (default false)."),
+      transitionWorkItems: z.boolean().optional().describe("Transition work items on autocomplete. Used for update with autoComplete true; keeps the current value when omitted (default true)."),
+      bypassPolicy: z.boolean().optional().describe("Explicitly bypass branch policies on autocomplete. Used for update and requires bypassReason when true."),
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. Used for update only when bypassPolicy is true."),
       reviewerIds: z.array(z.string()).optional().describe("List of reviewer IDs. Required for update_reviewers."),
       reviewerAction: z.enum(["add", "remove"]).optional().describe("Whether to add or remove reviewers. Required for update_reviewers."),
@@ -777,12 +777,24 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           if (!repositoryId) return { content: [{ type: "text", text: "repositoryId is required for update" }], isError: true };
           if (!pullRequestId) return { content: [{ type: "text", text: "pullRequestId is required for update" }], isError: true };
 
+          const completionOptionsProvided = [mergeStrategy, mergeCommitMessage, deleteSourceBranch, transitionWorkItems, bypassPolicy, bypassReason].some((value) => value !== undefined);
+          if (completionOptionsProvided && autoComplete !== true) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "mergeStrategy, mergeCommitMessage, deleteSourceBranch, transitionWorkItems, bypassPolicy and bypassReason are only applied together with autoComplete: true.",
+                },
+              ],
+              isError: true,
+            };
+          }
+
           const updateRequest: Record<string, unknown> = {};
 
           if (title !== undefined) updateRequest.title = title;
           if (description !== undefined) updateRequest.description = description;
           if (isDraft !== undefined) updateRequest.isDraft = isDraft;
-          if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
           if (status !== undefined) {
             updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
           }
@@ -796,24 +808,29 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
               updateRequest.autoCompleteSetBy = { id: data.authenticatedUser.id };
 
+              // The service replaces completionOptions as a whole, so unspecified options keep their current values.
+              const existingPullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project);
+              const existingOptions = existingPullRequest?.completionOptions ?? {};
               const completionOptions: GitPullRequestCompletionOptions = {
-                deleteSourceBranch: deleteSourceBranch || false,
-                transitionWorkItems: transitionWorkItems !== false,
+                deleteSourceBranch: deleteSourceBranch ?? existingOptions.deleteSourceBranch ?? false,
+                transitionWorkItems: transitionWorkItems ?? existingOptions.transitionWorkItems ?? true,
                 bypassPolicy: bypassPolicy === true,
               };
 
-              if (mergeStrategy) completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
-              if (mergeCommitMessage) completionOptions.mergeCommitMessage = mergeCommitMessage;
+              const strategy = mergeStrategy ? GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy] : existingOptions.mergeStrategy;
+              if (strategy !== undefined) completionOptions.mergeStrategy = strategy;
+              const commitMessage = mergeCommitMessage ?? existingOptions.mergeCommitMessage;
+              if (commitMessage) completionOptions.mergeCommitMessage = commitMessage;
               if (bypassPolicy && bypassReason) completionOptions.bypassReason = bypassReason;
 
               updateRequest.completionOptions = completionOptions;
             } else {
-              updateRequest.autoCompleteSetBy = null;
-              updateRequest.completionOptions = null;
+              // The service ignores a null autoCompleteSetBy; the empty identity cancels auto-complete.
+              updateRequest.autoCompleteSetBy = { id: "00000000-0000-0000-0000-000000000000" };
             }
           }
 
-          if (Object.keys(updateRequest).length === 0 && !labels) {
+          if (Object.keys(updateRequest).length === 0 && targetRefName === undefined && !labels) {
             return {
               content: [{ type: "text", text: "Error: At least one field (title, description, isDraft, targetRefName, status, autoComplete options, or labels) must be provided for update." }],
               isError: true,
@@ -831,9 +848,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           }
 
           let updatedPullRequest;
+          // A retarget request applies only targetRefName and silently drops every other field, so send it on its own.
+          if (targetRefName !== undefined) {
+            updatedPullRequest = await gitApi.updatePullRequest({ targetRefName }, repositoryId, pullRequestId, project);
+          }
           if (Object.keys(updateRequest).length > 0) {
             updatedPullRequest = await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId, project);
-          } else {
+          } else if (targetRefName === undefined) {
             updatedPullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project);
           }
 

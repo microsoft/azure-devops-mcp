@@ -3,6 +3,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { z } from "zod";
 import { configureRepoTools, REPO_TOOLS } from "../../../src/tools/repositories";
 import { PullRequestStatus, GitVersionType, GitPullRequestQueryType, CommentThreadStatus, VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "../../../src/tools/auth";
@@ -149,12 +150,14 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledTimes(2);
+      expect(mockGitApi.updatePullRequest).toHaveBeenNthCalledWith(1, { targetRefName: "refs/heads/main" }, "repo123", 123, "test-project");
+      expect(mockGitApi.updatePullRequest).toHaveBeenNthCalledWith(
+        2,
         {
           title: "Updated Title",
           description: "Updated Description",
           isDraft: true,
-          targetRefName: "refs/heads/main",
         },
         "repo123",
         123,
@@ -606,16 +609,104 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith({ autoCompleteSetBy: { id: "00000000-0000-0000-0000-000000000000" } }, "test-repo-id", 123, "test-project");
+      expect(result.isError).toBeFalsy();
+    });
+
+    it("should not send isDraft on update when it is omitted", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , schema, handler] = call;
+
+      mockGitApi.updatePullRequest.mockResolvedValue({ pullRequestId: 123 });
+
+      const params = z.object(schema).parse({
+        action: "update",
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        project: "test-project",
+        title: "New Title",
+      });
+      await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith({ title: "New Title" }, "test-repo-id", 123, "test-project");
+    });
+
+    it("should reject completion options without autoComplete true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "update",
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        project: "test-project",
+        mergeCommitMessage: "feat: something",
+        autoComplete: false,
+      });
+
+      expect(mockGitApi.updatePullRequest).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("only applied together with autoComplete: true");
+    });
+
+    it("should keep existing completion options that are not provided when arming autocomplete", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.getPullRequest.mockResolvedValue({
+        pullRequestId: 123,
+        completionOptions: { mergeStrategy: 2, deleteSourceBranch: true, transitionWorkItems: false, mergeCommitMessage: "feat: old message", bypassPolicy: true },
+      });
+      mockGitApi.updatePullRequest.mockResolvedValue({ pullRequestId: 123 });
+
+      await handler({
+        action: "update",
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        project: "test-project",
+        autoComplete: true,
+        mergeCommitMessage: "feat: new message",
+      });
+
       expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          autoCompleteSetBy: null,
-          completionOptions: null,
-        }),
+        {
+          autoCompleteSetBy: { id: "user123" },
+          completionOptions: { mergeStrategy: 2, deleteSourceBranch: true, transitionWorkItems: false, mergeCommitMessage: "feat: new message", bypassPolicy: false },
+        },
         "test-repo-id",
         123,
         "test-project"
       );
-      expect(result.isError).toBeFalsy();
+    });
+
+    it("should send a retarget alone, then the remaining fields", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.updatePullRequest.mockResolvedValue({ pullRequestId: 123 });
+
+      await handler({
+        action: "update",
+        repositoryId: "test-repo-id",
+        pullRequestId: 123,
+        project: "test-project",
+        targetRefName: "refs/heads/release",
+      });
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledTimes(1);
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith({ targetRefName: "refs/heads/release" }, "test-repo-id", 123, "test-project");
     });
 
     it("should not bypass policies when bypassReason is not provided", async () => {
