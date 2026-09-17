@@ -12,12 +12,12 @@ npm test -- -t "list_projects"           # single test by name
 npm run validate-tools  # tsc --noEmit + scripts/build-validate-tools.js (tool/param name guardrails)
 npm run eslint          # eslint (also: eslint-fix)
 npm run format          # prettier --write . (format-check in CI; husky + lint-staged run it pre-commit)
-npm run toolset         # regenerate docs/TOOLSET.md from the built server (needs npm run build; -- --check to verify)
+npm run toolset         # regenerate docs/TOOLSET.md from the built server (needs npm run build; npm run toolset-check verifies)
 npm run inspect         # MCP Inspector against dist/index.js
 npm run watch           # tsc --watch
 ```
 
-CI (`.github/workflows/build.yml`) runs: `npm ci` → `build` → `validate-tools` → `test` → `eslint` → `format-check` → `git diff --exit-code src/version.ts package-lock.json`. Commit the regenerated `src/version.ts` whenever `package.json` version changes.
+CI (`.github/workflows/build.yml`) runs: `npm ci` → `build` → `validate-tools` → `test` → `toolset-check` → `eslint` → `format-check` → `git diff --exit-code src/version.ts package-lock.json`. Commit the regenerated `src/version.ts` whenever `package.json` version changes.
 
 ## Architecture
 
@@ -76,4 +76,4 @@ Claude's API requires `^[a-zA-Z0-9_.-]{1,64}$` for tool and parameter names. Val
   ```
 - **ESM with `.js` import specifiers** (`module: Node16`). Jest runs tests as CommonJS, and `jest.config.cjs` has a `moduleNameMapper` listing specific `.js` → `.ts` rewrites (version, utils, auth, logger, elicitations, content-safety, tool-registration, ado-rest). **A new shared module imported as `../shared/foo.js` from a tested file needs its own entry there**, or the suite fails to resolve it.
 - Tests live in `test/` mirroring `src/`, and typically assert on a `server = { tool: jest.fn(), server: { elicitInput: jest.fn() } }` double plus mocked ADO API objects — they verify registration and handler behaviour, not the real SDK. That bare mock works with `registerTool` only because it applies annotations via `registered?.update?.()`; keep the optional chaining when touching it.
-- Regenerate [docs/TOOLSET.md](docs/TOOLSET.md) when tools change: `npm run build && npm run toolset` ([scripts/generate-toolset.mjs](scripts/generate-toolset.mjs)). Parameter lists come from the served input schemas and are rewritten every run; the one-line summaries and purpose paragraphs are hand-written and preserved, so edit those in the document itself. A new tool name prefix needs an entry in the script's `AREAS`. `npm run toolset -- --check` exits non-zero when the document is stale.
+- Regenerate [docs/TOOLSET.md](docs/TOOLSET.md) when tools change: `npm run build && npm run toolset` ([scripts/generate-toolset.mjs](scripts/generate-toolset.mjs)). Parameter lists come from the served input schemas and are rewritten every run; the one-line summaries and purpose paragraphs are hand-written and preserved, so edit those in the document itself. A new tool name prefix needs an entry in the script's `AREAS`. CI runs `npm run toolset-check` after the build, so a PR that changes a tool without regenerating the document fails.

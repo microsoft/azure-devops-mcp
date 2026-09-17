@@ -16,7 +16,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const docPath = path.join(root, "docs", "TOOLSET.md");
@@ -70,7 +70,8 @@ async function listTools() {
   const dist = path.join(root, "dist", "index.js");
   if (!fs.existsSync(dist)) throw new Error("dist/index.js not found — run `npm run build` first.");
 
-  const domains = await import(path.join(root, "dist", "shared", "domains.js"));
+  // A bare absolute path is not a valid import specifier on Windows (the CI runner), so go through a file URL.
+  const domains = await import(pathToFileURL(path.join(root, "dist", "shared", "domains.js")).href);
   const allDomains = Object.values(domains.Domain);
 
   return new Promise((resolve, reject) => {

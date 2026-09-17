@@ -54,6 +54,13 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # docs/TOOLSET.md is generated from the tools the built server registers.
+      # A PR that adds, removes or changes a tool must regenerate it.
+      - name: Verify docs/TOOLSET.md is up to date
+        # A dedicated script rather than `npm run toolset -- --check`: PowerShell on the
+        # Windows runner can swallow the `--` when npm resolves to npm.ps1.
+        run: npm run toolset-check
+
       - name: Display coverage summary
         run: |
           Write-Host "=== Code Coverage Summary ==="

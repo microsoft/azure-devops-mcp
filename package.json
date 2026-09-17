@@ -35,6 +35,7 @@
     "format": "prettier --write .",
     "format-check": "prettier --check .",
     "toolset": "node scripts/generate-toolset.mjs",
+    "toolset-check": "node scripts/generate-toolset.mjs --check",
     "clean": "shx rm -rf dist",
     "test": "jest"
   },
