@@ -32,7 +32,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe(
           "The full URL of the wiki page. Used for get_page_content. If provided, wikiIdentifier, project, and path are ignored. Supported patterns: https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiIdentifier}?pagePath=%2FMy%20Page and https://dev.azure.com/{org}/{project}/_wiki/wikis/{wikiIdentifier}/{pageId}/Page-Title"
         ),
-      top: z.coerce.number().default(20).describe("The maximum number of pages to return. Used for list_pages. Defaults to 20."),
+      top: z.coerce.number().default(20).describe("Maximum number of pages to return for list_pages (up to 100; defaults to 20)."),
       continuationToken: z.string().optional().describe("Token for pagination to retrieve the next set of pages. Used for list_pages."),
       pageViewsForDays: z.coerce.number().optional().describe("Number of days to retrieve page views for. Used for list_pages. If not specified, page views are not included."),
       recursionLevel: z
