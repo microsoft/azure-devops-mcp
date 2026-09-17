@@ -39,6 +39,7 @@ export enum Domain {
   GALLERY = "gallery",
   PROFILE = "profile",
   APPROVALS = "approvals",
+  ANALYTICS = "analytics",
 }
 
 export const ALL_DOMAINS = "all";

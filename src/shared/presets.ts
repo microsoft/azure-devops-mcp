@@ -28,7 +28,7 @@ export const TOOL_PRESETS: Readonly<Record<string, readonly Domain[]>> = {
   dev: [...BASE, Domain.REPOSITORIES, Domain.WORK_ITEMS, Domain.WIKI, Domain.PIPELINES, Domain.APPROVALS],
 
   /** Running the board: backlogs, sprints, capacity, plans, reporting. */
-  plan: [...BASE, Domain.WORK, Domain.WORK_ITEMS, Domain.DASHBOARDS, Domain.PROJECT_ANALYSIS, Domain.TEST_PLANS, Domain.WIKI, Domain.APPROVALS],
+  plan: [...BASE, Domain.WORK, Domain.WORK_ITEMS, Domain.DASHBOARDS, Domain.ANALYTICS, Domain.PROJECT_ANALYSIS, Domain.TEST_PLANS, Domain.WIKI, Domain.APPROVALS],
 
   /** Delivery: pipelines, releases, agents, service connections, packages, alerts. */
   ops: [
@@ -42,6 +42,7 @@ export const TOOL_PRESETS: Readonly<Record<string, readonly Domain[]>> = {
     Domain.ADVANCED_SECURITY,
     Domain.POLICY,
     Domain.TEST_RESULTS,
+    Domain.ANALYTICS,
     Domain.APPROVALS,
     Domain.OPERATIONS,
   ],

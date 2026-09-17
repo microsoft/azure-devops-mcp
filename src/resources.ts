@@ -52,7 +52,8 @@ Work Item Query Language is SQL-shaped but not SQL. Pass a query to
   needs \`MODE (Recursive)\` or \`MODE (MustContain)\`; its SELECT addresses
   \`[Source]\`, \`[Target]\` and \`[System.Links.LinkType]\`.
 - There is no JOIN, no GROUP BY, no aggregate function, and no sub-select.
-  Aggregate in your own code after fetching the items.
+  For counts and groupings use \`analytics_query\` when the server exposes it;
+  otherwise aggregate in your own code after fetching the items.
 
 ## Macros
 

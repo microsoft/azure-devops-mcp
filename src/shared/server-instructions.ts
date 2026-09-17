@@ -35,6 +35,7 @@ const DOMAIN_GUIDE: readonly (readonly [Domain, string])[] = [
   [Domain.ARTIFACTS, "artifacts_ — package feeds and their packages."],
   [Domain.ADVANCED_SECURITY, "advsec_ — Advanced Security alerts (secrets, dependencies, code scanning)."],
   [Domain.APPROVALS, "approvals_ — pipeline approval checks awaiting a decision."],
+  [Domain.ANALYTICS, "analytics_ — OData reporting: counts, sums and groupings over work items, history snapshots and trends, pipeline and test pass rates."],
   [Domain.PROJECT_ANALYSIS, "projectanalysis_ — language breakdown and repository/project activity."],
   [Domain.WIT_PROCESS, "witprocess_ — process customization: inherited processes, work item types, fields, states, behaviors, rules, picklists."],
   [Domain.MEMBER_ENTITLEMENT, "memberentitlement_ — user licenses, group entitlements, organization membership."],
@@ -68,6 +69,10 @@ const HINTS: readonly { readonly needs: readonly Domain[]; readonly text: string
   {
     needs: [Domain.WORK_ITEMS],
     text: 'Fields are addressed by reference name ("System.Title", "System.AssignedTo", "Microsoft.VSTS.Scheduling.StoryPoints"), not by the label shown in the UI. wit_list_fields resolves one from the other. WIQL supports the macros @Me, @Today and @CurrentIteration.',
+  },
+  {
+    needs: [Domain.ANALYTICS],
+    text: "Numbers rather than items — how many, how much, per state, over time — come from analytics_query with $apply=groupby/aggregate. WIQL cannot aggregate, so never page through work items to count them.",
   },
   {
     needs: [Domain.REPOSITORIES],
