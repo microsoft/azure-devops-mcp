@@ -36,7 +36,7 @@ describe("tool annotations", () => {
       .flatMap((fileName) => extractToolNames(readFileSync(join(toolsDirectory, fileName), "utf8")))
       .sort();
 
-    expect(declaredNames).toHaveLength(41);
+    expect(declaredNames).toHaveLength(42);
     expect(declaredNames).toEqual(Object.keys(TOOL_ANNOTATIONS).sort());
   });
 
@@ -54,8 +54,8 @@ describe("tool annotations", () => {
     const registeredNames = registrations.map(([name]) => name).sort();
     const annotatedNames = Object.keys(TOOL_ANNOTATIONS).sort();
 
-    expect(registrations).toHaveLength(41);
-    expect(new Set(registeredNames).size).toBe(41);
+    expect(registrations).toHaveLength(42);
+    expect(new Set(registeredNames).size).toBe(42);
     expect(registeredNames).toEqual(annotatedNames);
 
     for (const [name, annotations] of registrations) {
