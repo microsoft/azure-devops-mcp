@@ -24,6 +24,7 @@ import {
   _mockWorkItemsForIteration,
   _mockWorkItemType,
 } from "../../mocks/work-items";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -93,7 +94,7 @@ describe("configureWorkItemTools", () => {
   let mockWorkItemTrackingApi: WorkItemTrackingApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
+    server = createToolServer({ server: { elicitInput: jest.fn() } }) as unknown as McpServer;
     tokenProvider = jest.fn();
 
     mockWorkApi = {

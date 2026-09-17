@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach, jest } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureArtifactsTools, ARTIFACTS_TOOLS } from "../../../src/tools/artifacts";
+import { createToolServer } from "../../mocks/tool-server";
 
 describe("configureArtifactsTools", () => {
   let server: McpServer;
@@ -13,7 +14,7 @@ describe("configureArtifactsTools", () => {
   let mockFetch: jest.Mock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn(() => Promise.resolve("fake-token")) as () => Promise<string>;
     connectionProvider = jest.fn().mockResolvedValue({ serverUrl: "https://dev.azure.com/contoso" } as unknown as WebApi);
     mockFetch = jest.fn();

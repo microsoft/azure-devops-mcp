@@ -47,14 +47,11 @@ export function categorizeTool(name: string): ToolCategory {
   return "write";
 }
 
-// Registers a tool and attaches the MCP annotations for its inferred category.
+// Registers a tool with the MCP annotations for its inferred category.
 //
-// This is a drop-in replacement for `server.tool(name, description, schema, cb)`:
-// the underlying registration call is unchanged (handler stays the last
-// argument), and the annotations are applied afterwards via RegisteredTool.update.
-// update() is a no-op on a disconnected server, so it is safe to call during setup.
+// Goes through `server.registerTool`, which takes the annotations as part of
+// the registration. The positional `server.tool(name, description, schema, cb)`
+// overloads this used to call are deprecated in the SDK.
 export function registerTool<Args extends ZodRawShape>(server: McpServer, name: string, description: string, paramsSchema: Args, cb: ToolCallback<Args>): RegisteredTool {
-  const registered = server.tool(name, description, paramsSchema, cb);
-  registered?.update?.({ annotations: CATEGORY_ANNOTATIONS[categorizeTool(name)] });
-  return registered;
+  return server.registerTool(name, { description, inputSchema: paramsSchema, annotations: CATEGORY_ANNOTATIONS[categorizeTool(name)] }, cb);
 }

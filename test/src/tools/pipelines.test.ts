@@ -11,6 +11,7 @@ import { mockUpdateBuildStageResponse, mockMultipleArtifacts, mockArtifact } fro
 import { Readable } from "stream";
 import { resolve } from "path";
 import { mkdirSync, createWriteStream } from "fs";
+import { createToolServer } from "../../mocks/tool-server";
 
 // Mock fetch globally
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
@@ -28,7 +29,7 @@ describe("configurePipelineTools", () => {
   let mockConnection: { getBuildApi: jest.Mock; getPipelinesApi: jest.Mock; getGitApi: jest.Mock; serverUrl: string };
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
     userAgentProvider = () => "Jest";
     mockConnection = {

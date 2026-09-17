@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureWitProcessTools } from "../../../src/tools/wit-process";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -57,7 +58,7 @@ describe("configureWitProcessTools", () => {
   let mockProcessApi: ProcessApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
     mockProcessApi = {
       getListOfProcesses: jest.fn(),

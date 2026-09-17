@@ -44,41 +44,33 @@ describe("categorizeTool", () => {
 
 describe("registerTool", () => {
   function makeServer() {
-    const update = jest.fn();
-    const tool = jest.fn(() => ({ update }));
-    return { server: { tool } as unknown as McpServer, tool, update };
+    const registered = { update: jest.fn() };
+    const registerTool = jest.fn(() => registered);
+    return { server: { registerTool } as unknown as McpServer, registerTool, registered };
   }
 
-  it("registers via server.tool with the handler as the last argument", () => {
-    const { server, tool } = makeServer();
+  // server.tool(name, description, schema, cb) is deprecated in the SDK.
+  it("registers through server.registerTool with the description, schema and handler", () => {
+    const { server, registerTool: register, registered } = makeServer();
     const handler = jest.fn();
+    const schema = {};
 
-    registerTool(server, "core_list_projects", "desc", {}, handler as never);
+    const result = registerTool(server, "core_list_projects", "desc", schema, handler as never);
 
-    expect(tool).toHaveBeenCalledWith("core_list_projects", "desc", {}, handler);
+    expect(register).toHaveBeenCalledWith("core_list_projects", expect.objectContaining({ description: "desc", inputSchema: schema }), handler);
+    expect(result).toBe(registered);
   });
 
-  it("applies read-only annotations for a read tool", () => {
-    const { server, update } = makeServer();
-    registerTool(server, "wit_get_work_item", "desc", {}, jest.fn() as never);
-    expect(update).toHaveBeenCalledWith({ annotations: { readOnlyHint: true, destructiveHint: false } });
-  });
+  it.each([
+    ["wit_get_work_item", { readOnlyHint: true, destructiveHint: false }],
+    ["core_delete_project", { readOnlyHint: false, destructiveHint: true }],
+    ["wit_create_work_item", { readOnlyHint: false, destructiveHint: false }],
+    ["permissions_set_access_control_entries", { readOnlyHint: false, destructiveHint: true }],
+  ])("passes the annotations for %s in the registration itself", (name, annotations) => {
+    const { server, registerTool: register } = makeServer();
 
-  it("applies destructive annotations for a delete tool", () => {
-    const { server, update } = makeServer();
-    registerTool(server, "core_delete_project", "desc", {}, jest.fn() as never);
-    expect(update).toHaveBeenCalledWith({ annotations: { readOnlyHint: false, destructiveHint: true } });
-  });
+    registerTool(server, name, "desc", {}, jest.fn() as never);
 
-  it("applies non-destructive write annotations for a create tool", () => {
-    const { server, update } = makeServer();
-    registerTool(server, "wit_create_work_item", "desc", {}, jest.fn() as never);
-    expect(update).toHaveBeenCalledWith({ annotations: { readOnlyHint: false, destructiveHint: false } });
-  });
-
-  it("does not throw when server.tool returns nothing (annotations are best-effort)", () => {
-    const tool = jest.fn(() => undefined);
-    const server = { tool } as unknown as McpServer;
-    expect(() => registerTool(server, "wit_get_work_item", "desc", {}, jest.fn() as never)).not.toThrow();
+    expect(register).toHaveBeenCalledWith(name, expect.objectContaining({ annotations }), expect.any(Function));
   });
 });

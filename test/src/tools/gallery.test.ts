@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach, jest } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureGalleryTools, GALLERY_TOOLS } from "../../../src/tools/gallery";
+import { createToolServer } from "../../mocks/tool-server";
 
 describe("configureGalleryTools", () => {
   let server: McpServer;
@@ -13,7 +14,7 @@ describe("configureGalleryTools", () => {
   let mockGalleryApi: { queryExtensions: jest.Mock; getExtension: jest.Mock };
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
     mockGalleryApi = { queryExtensions: jest.fn(), getExtension: jest.fn() };
     connectionProvider = jest.fn().mockResolvedValue({ getGalleryApi: jest.fn().mockResolvedValue(mockGalleryApi) } as unknown as WebApi);

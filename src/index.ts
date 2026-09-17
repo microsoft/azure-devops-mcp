@@ -176,7 +176,9 @@ function createConfiguredServer(
 // (with the tool name) to stderr -> Log Analytics for tracing. No tokens or
 // request bodies are touched.
 function instrumentToolErrors(server: McpServer): void {
-  const originalTool = server.tool.bind(server) as (...args: unknown[]) => unknown;
+  // Tool modules register through registerTool() (shared/tool-registration.ts),
+  // which calls server.registerTool — so that is the method wrapped here.
+  const originalRegisterTool = server.registerTool.bind(server) as (...args: unknown[]) => unknown;
 
   const wrapped = (...args: unknown[]): unknown => {
     const toolName = typeof args[0] === "string" ? (args[0] as string) : "unknown";
@@ -204,10 +206,10 @@ function instrumentToolErrors(server: McpServer): void {
       };
     }
 
-    return originalTool(...args);
+    return originalRegisterTool(...args);
   };
 
-  (server as unknown as { tool: (...args: unknown[]) => unknown }).tool = wrapped;
+  (server as unknown as { registerTool: (...args: unknown[]) => unknown }).registerTool = wrapped;
 }
 
 /**

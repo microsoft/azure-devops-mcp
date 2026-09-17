@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 
 import { configureSearchTools, SEARCH_TOOLS } from "../../../src/tools/search";
+import { createToolServer } from "../../mocks/tool-server";
 
 describe("configureSearchTools", () => {
   let server: McpServer;
@@ -15,7 +16,7 @@ describe("configureSearchTools", () => {
   let mockGitApi: { getItem: jest.Mock; getItems: jest.Mock };
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn(() => Promise.resolve("fake-token")) as () => Promise<string>;
     mockGitApi = { getItem: jest.fn(), getItems: jest.fn() };
     connectionProvider = jest.fn().mockResolvedValue({

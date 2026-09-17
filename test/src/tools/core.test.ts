@@ -5,6 +5,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureCoreTools } from "../../../src/tools/core";
 import { WebApi } from "azure-devops-node-api";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -34,7 +35,7 @@ describe("configureCoreTools", () => {
   let mockCoreApi: CoreApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
+    server = createToolServer({ server: { elicitInput: jest.fn() } }) as unknown as McpServer;
     tokenProvider = jest.fn();
     userAgentProvider = () => "Jest";
 

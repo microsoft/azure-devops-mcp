@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureProjectAnalysisTools } from "../../../src/tools/project-analysis";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -24,7 +25,7 @@ describe("configureProjectAnalysisTools", () => {
   let mockProjectAnalysisApi: ProjectAnalysisApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
     mockProjectAnalysisApi = {
       getProjectLanguageAnalytics: jest.fn(),

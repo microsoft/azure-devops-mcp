@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkTools } from "../../../src/tools/work";
 import { WebApi } from "azure-devops-node-api";
 import { TreeStructureGroup, TreeNodeStructureType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -94,7 +95,7 @@ describe("configureWorkTools", () => {
   let mockCoreApi: CoreApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
+    server = createToolServer({ server: { elicitInput: jest.fn() } }) as unknown as McpServer;
     tokenProvider = jest.fn();
 
     mockWorkApi = {
@@ -4042,7 +4043,7 @@ describe("configureWorkTools", () => {
     const failure = new Error("boom");
 
     function registeredTools() {
-      const localServer = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
+      const localServer = createToolServer({ server: { elicitInput: jest.fn() } }) as unknown as McpServer;
       configureWorkTools(localServer, tokenProvider, connectionProvider);
       return (localServer.tool as jest.Mock).mock.calls.map(([name, , , handler]) => ({
         name: name as string,
@@ -4083,7 +4084,7 @@ describe("configureWorkTools", () => {
     function toolsWithOptionalProject() {
       // The handler closes over the server it was registered on, so the
       // declining elicitInput has to live on that same instance.
-      const localServer = { tool: jest.fn(), server: { elicitInput: jest.fn().mockResolvedValue({ action: "decline" }) } } as unknown as McpServer;
+      const localServer = createToolServer({ server: { elicitInput: jest.fn().mockResolvedValue({ action: "decline" }) } }) as unknown as McpServer;
       configureWorkTools(localServer, tokenProvider, connectionProvider);
       return (localServer.tool as jest.Mock).mock.calls
         .map(([name, , schema, handler]) => ({

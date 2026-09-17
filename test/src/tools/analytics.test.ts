@@ -7,6 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 
 import { ANALYTICS_TOOLS, configureAnalyticsTools } from "../../../src/tools/analytics";
+import { createToolServer } from "../../mocks/tool-server";
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
 
@@ -15,7 +16,7 @@ describe("configureAnalyticsTools", () => {
   let mockFetch: jest.Mock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     mockFetch = jest.fn();
     global.fetch = mockFetch as unknown as typeof fetch;
   });

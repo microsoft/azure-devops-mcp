@@ -9,6 +9,7 @@ import { ITestPlanApi } from "azure-devops-node-api/TestPlanApi";
 import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { ITestApi } from "azure-devops-node-api/TestApi";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -32,7 +33,7 @@ describe("configureTestPlanTools", () => {
   let mockTestApi: ITestApi;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn().mockResolvedValue("test-token");
     userAgentProvider = jest.fn().mockReturnValue("test-agent");
     mockTestPlanApi = {

@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach, jest } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureProfileTools, PROFILE_TOOLS } from "../../../src/tools/profile";
+import { createToolServer } from "../../mocks/tool-server";
 
 describe("configureProfileTools", () => {
   let server: McpServer;
@@ -13,7 +14,7 @@ describe("configureProfileTools", () => {
   let mockConnect: jest.Mock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn(() => Promise.resolve("fake-token")) as () => Promise<string>;
     mockConnect = jest.fn();
     connectionProvider = jest.fn().mockResolvedValue({

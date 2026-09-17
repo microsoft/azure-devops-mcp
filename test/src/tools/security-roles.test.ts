@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureSecurityRolesTools } from "../../../src/tools/security-roles";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -26,7 +27,7 @@ describe("configureSecurityRolesTools", () => {
   let mockSecurityRolesApi: SecurityRolesApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
     mockSecurityRolesApi = {
       getRoleDefinitions: jest.fn(),

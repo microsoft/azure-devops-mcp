@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureTaskAgentTools } from "../../../src/tools/task-agent";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -45,7 +46,7 @@ describe("configureTaskAgentTools", () => {
   let mockTaskAgentApi: TaskAgentApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
     mockTaskAgentApi = {
       getVariableGroups: jest.fn(),

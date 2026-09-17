@@ -7,6 +7,7 @@ import { WebApi } from "azure-devops-node-api";
 import { Alert, AlertType, AlertValidityStatus, Confidence, Severity, State } from "azure-devops-node-api/interfaces/AlertInterfaces";
 import { PagedList } from "azure-devops-node-api/interfaces/common/VSSInterfaces";
 import { configureAdvSecTools } from "../../../src/tools/advanced-security";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -24,7 +25,7 @@ describe("configureAdvSecTools", () => {
   let mockAlertApi: AlertApiMock;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
 
     mockAlertApi = {

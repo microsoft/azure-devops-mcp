@@ -14,6 +14,7 @@ import {
   ItemContentType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "../../../src/tools/auth";
+import { createToolServer } from "../../mocks/tool-server";
 
 interface GitChangeShape {
   changeType?: VersionControlChangeType;
@@ -65,9 +66,7 @@ describe("repos tools", () => {
   };
 
   beforeEach(() => {
-    server = {
-      tool: jest.fn(),
-    } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
 
     tokenProvider = jest.fn();
     mockGitApi = {

@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureTestResultsTools, TEST_RESULTS_TOOLS } from "../../../src/tools/test-results";
 import { ResultDetails, TestOutcome } from "azure-devops-node-api/interfaces/TestInterfaces.js";
+import { createToolServer } from "../../mocks/tool-server";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -29,7 +30,7 @@ describe("configureTestResultsTools", () => {
   };
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     tokenProvider = jest.fn();
     mockTestApi = {
       getTestRuns: jest.fn(),

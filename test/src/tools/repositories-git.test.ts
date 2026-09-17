@@ -16,6 +16,7 @@ jest.mock("../../../src/tools/auth", () => ({
 }));
 
 import { configureRepoTools, REPO_TOOLS } from "../../../src/tools/repositories";
+import { createToolServer } from "../../mocks/tool-server";
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
 
@@ -27,7 +28,7 @@ describe("repo git tools", () => {
   let connectionProvider: () => Promise<WebApi>;
 
   beforeEach(() => {
-    server = { tool: jest.fn() } as unknown as McpServer;
+    server = createToolServer() as unknown as McpServer;
     gitApi = {
       getRefs: jest.fn(),
       updateRefs: jest.fn(),

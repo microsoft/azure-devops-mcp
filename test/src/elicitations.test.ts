@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { elicitProject, elicitTeam } from "../../src/shared/elicitations";
+import { createToolServer } from "../mocks/tool-server";
 
 describe("elicitations", () => {
   let server: McpServer;
@@ -12,7 +13,7 @@ describe("elicitations", () => {
   let mockConnection: { getCoreApi: jest.Mock };
 
   beforeEach(() => {
-    server = { tool: jest.fn(), server: { elicitInput: jest.fn() } } as unknown as McpServer;
+    server = createToolServer({ server: { elicitInput: jest.fn() } }) as unknown as McpServer;
 
     mockCoreApi = {
       getProjects: jest.fn(),
