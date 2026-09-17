@@ -3,6 +3,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
@@ -459,31 +460,108 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
   // --- wit_work_item_attachment -----------------------------------------------
   server.tool(
     WORKITEM_TOOLS.wit_work_item_attachment,
-    "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If savePath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
+    "Download or upload a work item attachment. Use the action parameter to specify the operation. If a project is not specified, you will be prompted to select one.",
     {
+      action: z
+        .enum(["download", "upload"])
+        .default("download")
+        .describe("The action to perform. Options: download (download an attachment by its ID), upload (upload a file as a new work item attachment, optionally linking it to a work item)."),
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
-      fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type or the saved file's name."),
+      // download
+      attachmentId: z
+        .string()
+        .optional()
+        .describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}. Required for: download."),
       savePath: z
         .string()
         .optional()
         .describe(
-          "Optional local directory path where the file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
+          "Optional local directory path where the downloaded file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource. Used for: download."
         ),
+      // upload
+      content: z.string().optional().describe("Base64-encoded file content to upload. Required for: upload, unless loadPath is provided."),
+      loadPath: z
+        .string()
+        .optional()
+        .describe(
+          "Local relative file path to read the upload content from, as an alternative to content. Must be a relative path; absolute paths and path traversals are not allowed. Used for: upload."
+        ),
+      workItemId: z.coerce
+        .number()
+        .min(1)
+        .optional()
+        .describe("Work item ID to link the uploaded attachment to. Optional for: upload. If omitted, the attachment is uploaded but not linked to a work item."),
+      comment: z.string().optional().describe("Optional comment to include with the attachment link. Used for: upload, when workItemId is provided."),
+      // download and upload
+      fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. For download, used to determine the MIME type or the saved file's name. Required for: upload."),
     },
-    async ({ project, attachmentId, fileName, savePath }) => {
+    async ({ action, project, attachmentId, fileName, savePath, content, loadPath, workItemId, comment }) => {
       const isAbsolutePath = (value: string) => path.posix.isAbsolute(value) || path.win32.isAbsolute(value);
       const hasDriveLetter = (value: string) => /^[a-zA-Z]:/.test(value);
+      const isUnsafeRelativePath = (value: string) => value.includes("..") || isAbsolutePath(value) || hasDriveLetter(value);
 
-      if (savePath !== undefined && (savePath.includes("..") || isAbsolutePath(savePath) || hasDriveLetter(savePath))) {
+      if (savePath !== undefined && isUnsafeRelativePath(savePath)) {
         throw new Error("Invalid savePath: absolute paths and path traversals are not allowed.");
+      }
+
+      if (loadPath !== undefined && isUnsafeRelativePath(loadPath)) {
+        throw new Error("Invalid loadPath: absolute paths and path traversals are not allowed.");
       }
 
       if (fileName !== undefined && fileName.includes("..")) {
         throw new Error("Invalid fileName: path traversal is not allowed.");
       }
 
+      if (action === "upload") {
+        try {
+          if (!fileName) return { content: [{ type: "text", text: "fileName is required for upload" }], isError: true };
+          if (!content && !loadPath) return { content: [{ type: "text", text: "content or loadPath is required for upload" }], isError: true };
+          if (content && loadPath) return { content: [{ type: "text", text: "provide either content or loadPath for upload, not both" }], isError: true };
+
+          const buffer = loadPath ? fs.readFileSync(loadPath) : Buffer.from(content as string, "base64");
+
+          const connection = await connectionProvider();
+
+          let resolvedProject = project;
+          if (!resolvedProject) {
+            const result = await elicitProject(server, connection, "Select the Azure DevOps project to upload the work item attachment to.");
+            if ("response" in result) return result.response;
+            resolvedProject = result.resolved;
+          }
+
+          const workItemApi = await connection.getWorkItemTrackingApi();
+          const attachmentReference = await workItemApi.createAttachment({}, Readable.from(buffer), fileName, undefined, resolvedProject);
+
+          if (!workItemId) {
+            return { content: [{ type: "text", text: JSON.stringify(attachmentReference, null, 2) }] };
+          }
+
+          const patchDocument = [
+            {
+              op: "add",
+              path: "/relations/-",
+              value: {
+                rel: "AttachedFile",
+                url: attachmentReference.url,
+                attributes: { comment: comment || "" },
+              },
+            },
+          ];
+          const updatedWorkItem = await workItemApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+
+          return { content: [{ type: "text", text: JSON.stringify({ attachment: attachmentReference, workItem: updatedWorkItem }, null, 2) }] };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+          return {
+            content: [{ type: "text", text: `Error uploading work item attachment: ${errorMessage}` }],
+            isError: true,
+          };
+        }
+      }
+
       try {
+        if (!attachmentId) return { content: [{ type: "text", text: "attachmentId is required for download" }], isError: true };
+
         const connection = await connectionProvider();
 
         let resolvedProject = project;

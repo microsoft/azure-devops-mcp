@@ -52,6 +52,7 @@ interface WorkItemTrackingApiMock {
   queryById: jest.Mock;
   queryByWiql: jest.Mock;
   getAttachmentContent: jest.Mock;
+  createAttachment: jest.Mock;
 }
 
 interface MockConnection {
@@ -97,6 +98,7 @@ describe("configureWorkItemTools", () => {
       queryById: jest.fn(),
       queryByWiql: jest.fn(),
       getAttachmentContent: jest.fn(),
+      createAttachment: jest.fn(),
     };
 
     mockConnection = {
@@ -5033,6 +5035,150 @@ describe("configureWorkItemTools", () => {
 
       await expect(handler({ ...params })).rejects.toThrow("Invalid fileName: path traversal is not allowed.");
       expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should upload a file from base64 content and return the attachment reference", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const attachmentReference = { id: "att-1", url: "https://dev.azure.com/org/_apis/wit/attachments/att-1" };
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue(attachmentReference);
+
+      const result = await handler({
+        action: "upload",
+        project: "TestProject",
+        fileName: "screenshot.png",
+        content: Buffer.from("fake-png-bytes").toString("base64"),
+      });
+
+      expect(mockWorkItemTrackingApi.createAttachment).toHaveBeenCalledWith({}, expect.any(Readable), "screenshot.png", undefined, "TestProject");
+      expect(mockWorkItemTrackingApi.updateWorkItem).not.toHaveBeenCalled();
+      expect(result.content[0].text).toBe(JSON.stringify(attachmentReference, null, 2));
+    });
+
+    it("should upload a file and link it to a work item when workItemId is provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const attachmentReference = { id: "att-1", url: "https://dev.azure.com/org/_apis/wit/attachments/att-1" };
+      const updatedWorkItem = { id: 42 };
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue(attachmentReference);
+      mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(updatedWorkItem);
+
+      const result = await handler({
+        action: "upload",
+        project: "TestProject",
+        fileName: "screenshot.png",
+        content: Buffer.from("fake-png-bytes").toString("base64"),
+        workItemId: 42,
+        comment: "Attaching screenshot",
+      });
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        [{ op: "add", path: "/relations/-", value: { rel: "AttachedFile", url: attachmentReference.url, attributes: { comment: "Attaching screenshot" } } }],
+        42,
+        "TestProject"
+      );
+      expect(result.content[0].text).toBe(JSON.stringify({ attachment: attachmentReference, workItem: updatedWorkItem }, null, 2));
+    });
+
+    it("should read upload content from loadPath when content is not provided", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const fileBuffer = Buffer.from("local-file-bytes");
+      (fs.readFileSync as jest.Mock).mockReturnValue(fileBuffer);
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue({ id: "att-1", url: "https://dev.azure.com/org/_apis/wit/attachments/att-1" });
+
+      await handler({
+        action: "upload",
+        project: "TestProject",
+        fileName: "notes.txt",
+        loadPath: "local/notes.txt",
+      });
+
+      expect(fs.readFileSync).toHaveBeenCalledWith("local/notes.txt");
+      const uploadedStream = mockWorkItemTrackingApi.createAttachment.mock.calls[0][1] as Readable;
+      const chunks: Buffer[] = [];
+      for await (const chunk of uploadedStream) chunks.push(Buffer.from(chunk));
+      expect(Buffer.concat(chunks)).toEqual(fileBuffer);
+    });
+
+    it("should reject loadPath with path traversal segments", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      await expect(handler({ action: "upload", project: "TestProject", fileName: "notes.txt", loadPath: "../../etc/passwd" })).rejects.toThrow(
+        "Invalid loadPath: absolute paths and path traversals are not allowed."
+      );
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should return an error when neither content nor loadPath is provided for upload", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "upload", project: "TestProject", fileName: "notes.txt" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("content or loadPath is required for upload");
+    });
+
+    it("should return an error when both content and loadPath are provided for upload", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "upload", project: "TestProject", fileName: "notes.txt", content: "Zm9v", loadPath: "local/notes.txt" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("provide either content or loadPath for upload, not both");
+    });
+
+    it("should return an error when fileName is missing for upload", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "upload", project: "TestProject", content: "Zm9v" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("fileName is required for upload");
+    });
+
+    it("should return an error when createAttachment rejects", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.createAttachment.mockRejectedValue(new Error("Upload failed"));
+
+      const result = await handler({ action: "upload", project: "TestProject", fileName: "notes.txt", content: "Zm9v" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error uploading work item attachment: Upload failed");
     });
   });
 
