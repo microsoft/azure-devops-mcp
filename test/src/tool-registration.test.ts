@@ -35,6 +35,11 @@ describe("categorizeTool", () => {
   it("honors explicit overrides (mcp_apps_ping is read)", () => {
     expect(categorizeTool("mcp_apps_ping")).toBe("read");
   });
+
+  // Granting a deny bit can lock everyone out, so clients must confirm it.
+  it("treats setting ACL entries as destructive despite the 'set' verb", () => {
+    expect(categorizeTool("permissions_set_access_control_entries")).toBe("destructive");
+  });
 });
 
 describe("registerTool", () => {

@@ -20,16 +20,16 @@ const DOMAIN_GUIDE: readonly (readonly [Domain, string])[] = [
   [Domain.CORE, "core_ — projects, teams, processes, identity lookup. Start here when the project or team is not known."],
   [Domain.WORK_ITEMS, "wit_ — work items: read, create, update, link, query (WIQL), comments, attachments, tags, templates, saved queries, field and type metadata."],
   [Domain.WORK, "work_ — the board: backlogs, sprints/iterations, area paths, capacity, delivery plans, taskboards, board columns and rules."],
-  [Domain.REPOSITORIES, "repo_ — Git: repositories, branches, file contents, commits, pull requests, reviewers, comment threads."],
+  [Domain.REPOSITORIES, "repo_ — Git: repositories, branches, tags, file contents, commits and their statuses, pull requests, reviewers, labels, comment threads."],
   [Domain.PIPELINES, "pipelines_ — builds and YAML pipelines: definitions, runs, logs, timelines, artifacts, tags."],
   [Domain.RELEASE, "release_ — classic release pipelines: definitions, releases, environments, approvals."],
   [Domain.SEARCH, "search_ — full-text search across code, wikis and work items."],
   [Domain.WIKI, "wiki_ — wikis and their pages."],
-  [Domain.TEST_PLANS, "testplan_ — test plans, suites and test cases."],
-  [Domain.TEST_RESULTS, "testresults_ — test runs and their results."],
+  [Domain.TEST_PLANS, "testplan_ — test plans, suites, test cases, and test points (tester assignment and manual outcomes)."],
+  [Domain.TEST_RESULTS, "testresults_ — test runs, their results and attachments, and code coverage."],
   [Domain.DASHBOARDS, "dashboard_ — dashboards and widgets."],
   [Domain.POLICY, "policy_ — branch policies: configurations, types, evaluations on a pull request."],
-  [Domain.TASK_AGENT, "taskagent_ — variable groups, agent pools and queues, environments."],
+  [Domain.TASK_AGENT, "taskagent_ — variable groups, agent pools, queues and agents, environments, task groups, secure file metadata."],
   [Domain.SERVICE_ENDPOINT, "serviceendpoint_ — service connections."],
   [Domain.SERVICE_HOOKS, "servicehook_ — service hook subscriptions (outgoing webhooks)."],
   [Domain.ARTIFACTS, "artifacts_ — package feeds and their packages."],
@@ -39,7 +39,7 @@ const DOMAIN_GUIDE: readonly (readonly [Domain, string])[] = [
   [Domain.WIT_PROCESS, "witprocess_ — process customization: inherited processes, work item types, fields, states, behaviors, rules, picklists."],
   [Domain.MEMBER_ENTITLEMENT, "memberentitlement_ — user licenses, group entitlements, organization membership."],
   [Domain.GRAPH, "graph_ — identities: users, groups, memberships."],
-  [Domain.PERMISSIONS, "permissions_ — security namespaces and access control lists (read-only)."],
+  [Domain.PERMISSIONS, "permissions_ — security namespaces and access control lists: read, check your own rights, grant, deny and remove."],
   [Domain.SECURITY_ROLES, "securityrole_ — role assignments on resources such as pools and environments."],
   [Domain.AUDIT, "audit_ — the organization audit log."],
   [Domain.NOTIFICATION, "notification_ — notification subscriptions and event types."],
@@ -90,7 +90,7 @@ const RESOURCE_GUIDE: readonly { readonly needs: Domain; readonly text: string }
 ];
 
 /** Writes whose blast radius is the whole organization rather than one project. */
-const ORG_WIDE = [Domain.WIT_PROCESS, Domain.MEMBER_ENTITLEMENT, Domain.GRAPH, Domain.SECURITY_ROLES, Domain.FEATURE_MANAGEMENT, Domain.NOTIFICATION];
+const ORG_WIDE = [Domain.WIT_PROCESS, Domain.MEMBER_ENTITLEMENT, Domain.GRAPH, Domain.PERMISSIONS, Domain.SECURITY_ROLES, Domain.FEATURE_MANAGEMENT, Domain.NOTIFICATION];
 
 export interface ServerInstructionsOptions {
   /** The Azure DevOps organization this server is bound to. */
