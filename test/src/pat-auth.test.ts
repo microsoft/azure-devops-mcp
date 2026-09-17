@@ -7,6 +7,8 @@ import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential } fr
 import { PublicClientApplication } from "@azure/msal-node";
 import open from "open";
 
+const mockNativeBrokerPlugin = jest.fn();
+
 jest.mock("../../src/logger.js", () => ({
   logger: {
     info: jest.fn(),
@@ -26,6 +28,10 @@ jest.mock("@azure/msal-node", () => ({
   PublicClientApplication: jest.fn(),
 }));
 
+jest.mock("@azure/msal-node-extensions", () => ({
+  NativeBrokerPlugin: mockNativeBrokerPlugin,
+}));
+
 jest.mock("open", () => jest.fn());
 
 import { createAuthenticator, installPatFetchInterceptor } from "../../src/auth";
@@ -40,6 +46,7 @@ describe("PAT authentication", () => {
     (ChainedTokenCredential as unknown as jest.Mock).mockReset();
     (DefaultAzureCredential as unknown as jest.Mock).mockReset();
     (PublicClientApplication as unknown as jest.Mock).mockReset();
+    mockNativeBrokerPlugin.mockReset();
     (open as jest.Mock).mockReset();
   });
 
@@ -204,13 +211,42 @@ describe("PAT authentication", () => {
   });
 
   describe("OAuth authentication", () => {
-    it("forwards MSAL log messages to the application logger", () => {
-      (PublicClientApplication as unknown as jest.Mock).mockImplementation(() => ({ acquireTokenInteractive: jest.fn() }));
+    it("forwards MSAL log messages to the application logger", async () => {
+      const acquireTokenInteractive = jest.fn().mockResolvedValue({ accessToken: "token", account: null });
+      (PublicClientApplication as unknown as jest.Mock).mockImplementation(() => ({ acquireTokenInteractive }));
 
-      createAuthenticator("oauth");
+      await expect(createAuthenticator("oauth")()).resolves.toBe("token");
 
-      const config = (PublicClientApplication as unknown as jest.Mock).mock.calls[0][0];
+      expect(PublicClientApplication).toHaveBeenCalledTimes(2);
+      const config = (PublicClientApplication as unknown as jest.Mock).mock.calls[1][0];
       expect(() => config.system.loggerOptions.loggerCallback(2, "MSAL message")).not.toThrow();
+    });
+
+    it("initializes the native broker only when OAuth token acquisition starts", async () => {
+      const acquireTokenInteractive = jest.fn().mockResolvedValue({ accessToken: "token", account: null });
+      (PublicClientApplication as unknown as jest.Mock).mockImplementation(() => ({ acquireTokenInteractive }));
+
+      const authenticator = createAuthenticator("oauth");
+
+      expect(mockNativeBrokerPlugin).not.toHaveBeenCalled();
+      await expect(authenticator()).resolves.toBe("token");
+      expect(mockNativeBrokerPlugin).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses browser authentication when native broker initialization fails", async () => {
+      mockNativeBrokerPlugin.mockImplementationOnce(() => {
+        throw new Error("native broker unavailable");
+      });
+      const acquireTokenInteractive = jest.fn().mockImplementation(async ({ openBrowser }) => {
+        await openBrowser("https://login.example.com/no-broker");
+        return { accessToken: "fallback-token", account: null };
+      });
+      (PublicClientApplication as unknown as jest.Mock).mockImplementation(() => ({ acquireTokenInteractive }));
+
+      await expect(createAuthenticator("oauth")()).resolves.toBe("fallback-token");
+
+      expect(PublicClientApplication).toHaveBeenCalledTimes(1);
+      expect(open).toHaveBeenCalledWith("https://login.example.com/no-broker");
     });
 
     it.each([new Error("broker failure"), { platformBrokerError: { code: "broker_failure" } }])(
@@ -222,6 +258,7 @@ describe("PAT authentication", () => {
           return { accessToken: "fallback-token", account: null };
         });
         (PublicClientApplication as unknown as jest.Mock)
+          .mockImplementationOnce(() => ({ acquireTokenInteractive: jest.fn() }))
           .mockImplementationOnce(() => ({ acquireTokenInteractive: brokerAcquireTokenInteractive }))
           .mockImplementationOnce(() => ({ acquireTokenInteractive: fallbackAcquireTokenInteractive }));
 
