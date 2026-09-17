@@ -4332,12 +4332,13 @@ describe("repos tools", () => {
         repositoryId: "repo123",
         pullRequestId: 123,
         includeChangedFiles: true,
+        skip: 0,
       };
 
       const result = await handler(params);
 
       expect(mockGitApi.getPullRequestIterations).toHaveBeenCalledWith("repo123", 123, undefined);
-      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 2000, 0);
 
       const resultData = parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>;
       expect(resultData.changedFilesSummary).toEqual({
@@ -4475,6 +4476,64 @@ describe("repos tools", () => {
         firstComparingIteration: 0,
         secondComparingIteration: 1,
       });
+    });
+    const changePage = (offset: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({ changeTrackingId: offset + i + 1, item: { path: `/src/file${offset + i + 1}.ts` }, changeType: 2 }));
+
+    const getPullRequestHandler = () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request);
+      if (!call) throw new Error("repo_pull_request tool not registered");
+      return call[3] as (params: unknown) => Promise<{ content: [{ text: string }] }>;
+    };
+
+    it("should ask for the largest page of changed files and say when there is more", async () => {
+      const handler = getPullRequestHandler();
+      mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 123, title: "Test PR" });
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      // what the endpoint returns for a 150-file iteration when asked for the default page
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 100), nextSkip: 100, nextTop: 50 });
+
+      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true, skip: 0 });
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledTimes(1);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 2000, 0);
+      const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
+      expect(summary.fileCount).toBe(100);
+      expect(summary.hasMore).toBe(true);
+      expect(summary.nextSkip).toBe(100);
+    });
+
+    it("should pass skip through so the caller can fetch the next page of changed files", async () => {
+      const handler = getPullRequestHandler();
+      mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 123, title: "Test PR" });
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      // the real endpoint omits nextSkip / nextTop on the last page
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(100, 50) });
+
+      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true, skip: 100 });
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 2000, 100);
+      const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
+      expect(summary.fileCount).toBe(50);
+      expect((summary.changeEntries as { item: { path: string } }[])[49].item.path).toBe("/src/file150.ts");
+      expect(summary.hasMore).toBeUndefined();
+      expect(summary.nextSkip).toBeUndefined();
+    });
+
+    it("should treat an explicit nextSkip of 0 as the last page of changed files", async () => {
+      const handler = getPullRequestHandler();
+      mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 123, title: "Test PR" });
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 50), nextSkip: 0, nextTop: 0 });
+
+      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 1, undefined, 2000, undefined);
+      const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
+      expect(summary.fileCount).toBe(50);
+      expect(summary.nextSkip).toBe(0);
+      expect(summary.hasMore).toBeUndefined();
     });
   });
 
