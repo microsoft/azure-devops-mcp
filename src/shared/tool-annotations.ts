@@ -39,6 +39,7 @@ const TOOL_ANNOTATIONS: Readonly<Record<string, ToolAnnotations>> = {
   repo_branch: READ_ONLY_ANNOTATIONS,
   repo_create_branch: ADDITIVE_ANNOTATIONS,
   repo_file: READ_ONLY_ANNOTATIONS,
+  repo_file_write: MUTATING_ANNOTATIONS,
   repo_pull_request: READ_ONLY_ANNOTATIONS,
   repo_pull_request_org: READ_ONLY_ANNOTATIONS,
   repo_pull_request_thread: READ_ONLY_ANNOTATIONS,
