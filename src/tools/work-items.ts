@@ -315,7 +315,12 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       team: z.string().optional().describe("Team name or ID. Used for: get_results, wiql."),
       timePrecision: z.boolean().optional().describe("Include time precision in date fields. Used for: get_results, wiql."),
       top: z.coerce.number().default(50).describe("Maximum number of results to return. Used for: get_results, wiql. Defaults to 50."),
-      responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete results (default), 'ids' returns only work item IDs. Used for: get_results."),
+      responseType: z
+        .enum(["full", "ids"])
+        .default("full")
+        .describe(
+          "Response type: 'full' returns complete results (default). 'ids' returns only work item IDs and supports flat queries only; any other query type is not supported. Used for: get_results."
+        ),
       wiql: z.string().max(32768).optional().describe('The WIQL query string to execute. Required for: wiql. Example: "SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project".'),
     },
     async ({ action, project, query, expand, depth, includeDeleted, useIsoDateFormat, id, team, timePrecision, top, responseType, wiql }) => {
