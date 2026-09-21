@@ -221,7 +221,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
             }
           }
 
-          if (!pageContent) {
+          if (pageContent === undefined) {
             if (!resolvedPath) {
               resolvedPath = "/";
             }
