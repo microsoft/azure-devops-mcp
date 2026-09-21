@@ -130,6 +130,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .optional()
         .describe("Expand options (None, Fields, Relations, Links, All). Used for: get, list_revisions. For get, cannot be combined with fields."),
       top: z.coerce.number().optional().describe("Maximum number of results to return. Used for: list_comments, my, list_revisions. Defaults vary by action."),
+      continuationToken: z.string().optional().describe("Token for continuing paged results. Used for: list_comments."),
       includeCompleted: z.boolean().optional().default(false).describe("Include completed work items. Used for: my. Defaults to false."),
       type: z.enum(["assignedtome", "myactivity"]).optional().describe("Type of work items to retrieve. Used for: my. Defaults to 'assignedtome'."),
       skip: z.coerce.number().optional().describe("Number of results to skip for pagination. Used for: list_revisions."),
@@ -137,7 +138,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       iterationId: z.string().optional().describe("Iteration ID. Required for: list_for_iteration."),
       workItemType: z.string().optional().describe("Work item type name. Required for: get_type."),
     },
-    async ({ action, project, id, ids, workItemId, fields, asOf, expand, top, includeCompleted, type, skip, team, iterationId, workItemType }) => {
+    async ({ action, project, id, ids, workItemId, fields, asOf, expand, top, continuationToken, includeCompleted, type, skip, team, iterationId, workItemType }) => {
       try {
         const connection = await connectionProvider();
 
@@ -201,7 +202,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             resolvedProject = result.resolved;
           }
           const workItemApi = await connection.getWorkItemTrackingApi();
-          const comments = await workItemApi.getComments(resolvedProject, workItemId, top ?? 50);
+          const comments = await workItemApi.getComments(resolvedProject, workItemId, top ?? 50, continuationToken);
           return { content: [{ type: "text", text: JSON.stringify(comments, null, 2) }] };
         }
 
