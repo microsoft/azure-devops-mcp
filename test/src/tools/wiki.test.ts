@@ -840,6 +840,28 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("Page Title");
     });
 
+    it("should return empty content via URL with pageId without falling back to getPageText", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+      (tokenProvider as jest.Mock).mockResolvedValueOnce("abc");
+
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch as typeof fetch;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ path: "/Some/Page", content: "" }),
+      });
+
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/999/Some-Page";
+      const result = await handler({ action: "get_page_content" as const, url });
+
+      expect(result.isError).toBeUndefined();
+      expect(mockWikiApi.getPageText).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain("UNTRUSTED WIKI PAGE CONTENT");
+    });
+
     it("should fallback to getPageText when REST call lacks content but returns path (root path fallback)", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
