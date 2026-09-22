@@ -924,9 +924,33 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler({ action: "list_comments", ...params });
 
-      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith(params.project, params.workItemId, params.top);
+      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith(params.project, params.workItemId, params.top, undefined);
 
       expect(result.content[0].text).toBe(JSON.stringify([_mockWorkItemComments], null, 2));
+    });
+
+    it("should pass the continuation token to workItemApi.getComments", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item");
+
+      if (!call) throw new Error("wit_work_item tool not registered");
+      const [, , , handler] = call;
+
+      const comments = { comments: [], count: 0, totalCount: 0 };
+      (mockWorkItemTrackingApi.getComments as jest.Mock).mockResolvedValue(comments);
+
+      const params = {
+        project: "Contoso",
+        workItemId: 299,
+        top: 10,
+        continuationToken: "next-page-token",
+      };
+
+      const result = await handler({ action: "list_comments", ...params });
+
+      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith(params.project, params.workItemId, params.top, params.continuationToken);
+      expect(result.content[0].text).toBe(JSON.stringify(comments, null, 2));
     });
   });
 
@@ -5500,7 +5524,7 @@ describe("configureWorkItemTools", () => {
       (mockWorkItemTrackingApi.getComments as jest.Mock).mockResolvedValue([]);
 
       await handler({ action: "list_comments", workItemId: 1, top: 10 });
-      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith("Contoso", 1, 10);
+      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith("Contoso", 1, 10, undefined);
     });
 
     it("add_work_item_comment: should use elicited project when project is not provided", async () => {
@@ -6048,7 +6072,7 @@ describe("configureWorkItemTools", () => {
       const handler = getHandler("wit_work_item");
       (mockWorkItemTrackingApi.getComments as jest.Mock).mockResolvedValue([]);
       await handler({ action: "list_comments", project: "P", workItemId: 1 });
-      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith("P", 1, 50);
+      expect(mockWorkItemTrackingApi.getComments).toHaveBeenCalledWith("P", 1, 50, undefined);
     });
 
     it("wit_work_item.my: should use defaults when type, top and includeCompleted are not provided", async () => {
