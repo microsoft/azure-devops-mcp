@@ -460,7 +460,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
   // --- wit_work_item_attachment -----------------------------------------------
   server.tool(
     WORKITEM_TOOLS.wit_work_item_attachment,
-    "Download or upload a work item attachment. Use the action parameter to specify the operation. If a project is not specified, you will be prompted to select one.",
+    "Download or upload a work item attachment. Use the action parameter to specify the operation. download returns the content as a base64-encoded resource by default, or saves it locally if savePath is provided; useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. upload takes base64-encoded content and can optionally link the new attachment to a work item. If a project is not specified, you will be prompted to select one.",
     {
       action: z
         .enum(["download", "upload"])
@@ -479,13 +479,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           "Optional local directory path where the downloaded file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource. Used for: download."
         ),
       // upload
-      content: z.string().optional().describe("Base64-encoded file content to upload. Required for: upload, unless loadPath is provided."),
-      loadPath: z
-        .string()
-        .optional()
-        .describe(
-          "Local relative file path to read the upload content from, as an alternative to content. Must be a relative path; absolute paths and path traversals are not allowed. Used for: upload."
-        ),
+      content: z.string().optional().describe("Base64-encoded file content to upload. Required for: upload."),
       workItemId: z.coerce
         .number()
         .min(1)
@@ -495,17 +489,12 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       // download and upload
       fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. For download, used to determine the MIME type or the saved file's name. Required for: upload."),
     },
-    async ({ action, project, attachmentId, fileName, savePath, content, loadPath, workItemId, comment }) => {
+    async ({ action, project, attachmentId, fileName, savePath, content, workItemId, comment }) => {
       const isAbsolutePath = (value: string) => path.posix.isAbsolute(value) || path.win32.isAbsolute(value);
       const hasDriveLetter = (value: string) => /^[a-zA-Z]:/.test(value);
-      const isUnsafeRelativePath = (value: string) => value.includes("..") || isAbsolutePath(value) || hasDriveLetter(value);
 
-      if (savePath !== undefined && isUnsafeRelativePath(savePath)) {
+      if (savePath !== undefined && (savePath.includes("..") || isAbsolutePath(savePath) || hasDriveLetter(savePath))) {
         throw new Error("Invalid savePath: absolute paths and path traversals are not allowed.");
-      }
-
-      if (loadPath !== undefined && isUnsafeRelativePath(loadPath)) {
-        throw new Error("Invalid loadPath: absolute paths and path traversals are not allowed.");
       }
 
       if (fileName !== undefined && fileName.includes("..")) {
@@ -515,10 +504,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       if (action === "upload") {
         try {
           if (!fileName) return { content: [{ type: "text", text: "fileName is required for upload" }], isError: true };
-          if (!content && !loadPath) return { content: [{ type: "text", text: "content or loadPath is required for upload" }], isError: true };
-          if (content && loadPath) return { content: [{ type: "text", text: "provide either content or loadPath for upload, not both" }], isError: true };
-
-          const buffer = loadPath ? fs.readFileSync(loadPath) : Buffer.from(content as string, "base64");
+          if (!content) return { content: [{ type: "text", text: "content is required for upload" }], isError: true };
+          if (!/^[A-Za-z0-9+/]+={0,2}$/.test(content)) return { content: [{ type: "text", text: "content must be valid base64-encoded data" }], isError: true };
 
           const connection = await connectionProvider();
 
@@ -530,7 +517,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           }
 
           const workItemApi = await connection.getWorkItemTrackingApi();
-          const attachmentReference = await workItemApi.createAttachment({}, Readable.from(buffer), fileName, undefined, resolvedProject);
+          const attachmentReference = await workItemApi.createAttachment({}, Readable.from(Buffer.from(content, "base64")), fileName, undefined, resolvedProject);
 
           if (!workItemId) {
             return { content: [{ type: "text", text: JSON.stringify(attachmentReference, null, 2) }] };
@@ -547,9 +534,17 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               },
             },
           ];
-          const updatedWorkItem = await workItemApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+          try {
+            await workItemApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return {
+              content: [{ type: "text", text: `Attachment uploaded but linking to work item ${workItemId} failed: ${errorMessage}\nAttachment: ${JSON.stringify(attachmentReference)}` }],
+              isError: true,
+            };
+          }
 
-          return { content: [{ type: "text", text: JSON.stringify({ attachment: attachmentReference, workItem: updatedWorkItem }, null, 2) }] };
+          return { content: [{ type: "text", text: JSON.stringify({ attachment: attachmentReference, workItemId }, null, 2) }] };
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
           return {
