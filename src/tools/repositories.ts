@@ -42,10 +42,6 @@ const REPO_TOOLS = {
   repo_create_branch: "repo_create_branch",
 };
 
-// The pull request iteration changes endpoint pages: $top defaults to 100 and is capped at
-// 2000. Ask for the largest page the API allows; the response says when there is more.
-const CHANGED_FILES_PAGE_SIZE = 2000;
-
 function branchesFilterOutIrrelevantProperties(branches: GitRef[], top: number) {
   return branches
     ?.flatMap((branch) => (branch.name ? [branch.name] : []))
@@ -257,9 +253,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .optional()
         .default(false)
         .describe(
-          `Whether to include the list of changed files, up to ${CHANGED_FILES_PAGE_SIZE} per call. When the summary has hasMore: true, call again with skip set to nextSkip for the next page. Used for get.`
+          "Whether to include the list of changed files. When changedFilesSummary returns a nextSkip greater than 0, pass nextSkip and nextTop back as skip and top for the next page. Used for get."
         ),
-      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Used for list. Defaults to 100."),
+      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return (list), or of changed files to return (get with includeChangedFiles). Defaults to 100."),
       skip: z.coerce.number().default(0).describe("The number of pull requests to skip (list), or of changed files to skip (get with includeChangedFiles). Defaults to 0."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user. Used for list."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user email. Used for list."),
@@ -330,9 +326,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               if (iterations?.length) {
                 const latestIteration = iterations[iterations.length - 1];
                 if (latestIteration.id != null) {
-                  const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, latestIteration.id, project, CHANGED_FILES_PAGE_SIZE, skip);
-                  // On the last page nextSkip is 0 or missing; otherwise it is the skip for the next page.
-                  const hasMore = (changes?.nextSkip ?? 0) > 0;
+                  const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, latestIteration.id, project, top, skip);
                   enhancedResponse = {
                     ...enhancedResponse,
                     changedFilesSummary: {
@@ -340,7 +334,6 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                       fileCount: changes?.changeEntries?.length ?? 0,
                       firstComparingIteration: Math.max(0, latestIteration.id - 1),
                       secondComparingIteration: latestIteration.id,
-                      ...(hasMore ? { hasMore } : {}),
                       nextSkip: changes?.nextSkip,
                       nextTop: changes?.nextTop,
                     },
