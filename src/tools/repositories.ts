@@ -626,8 +626,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       versionType: z
         .enum(fileVersionTypeStrings as [string, ...string[]])
         .optional()
-        .default("Commit")
-        .describe("How to interpret the version parameter. Used for get_content. Defaults to 'Commit'."),
+        .describe("How to interpret the version parameter. Defaults to 'Commit' for get_content and 'Branch' for list_directory."),
       recursive: z.boolean().optional().default(false).describe("Whether to list items recursively. Used for list_directory. Defaults to false."),
       recursionDepth: z.coerce.number().min(1).optional().default(1).describe("Maximum depth for recursive listing. Used for list_directory when recursive is true. Defaults to 1."),
     },
@@ -639,7 +638,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         if (action === "get_content") {
           if (!path) return { content: [{ type: "text", text: "path is required for get_content" }], isError: true };
 
-          const versionDescriptor: GitVersionDescriptor | undefined = version ? { version, versionType: GitVersionType[versionType as keyof typeof GitVersionType] } : undefined;
+          const versionDescriptor = buildVersionDescriptor(version, versionType ?? "Commit");
 
           const stream = await gitApi.getItemText(repositoryId, path, project, undefined, undefined, undefined, undefined, false, versionDescriptor, true);
           const content = await streamToString(stream);
@@ -653,7 +652,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         if (action === "list_directory") {
-          const versionDescriptor = buildVersionDescriptor(version, versionType === "Commit" ? "Branch" : versionType);
+          const versionDescriptor = buildVersionDescriptor(version, versionType);
           const clampedDepth = Math.min(Math.max(recursionDepth || 1, 1), 10);
           const recursionType = recursive ? VersionControlRecursionType.Full : VersionControlRecursionType.OneLevel;
 

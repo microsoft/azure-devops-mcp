@@ -8831,6 +8831,10 @@ describe("repos tools", () => {
       const r = await handler({ action: "list_directory", repositoryId: "r", path: "/", version: "main" });
       const data = JSON.parse(r.content[0].text);
       expect(data.count).toBe(1);
+      expect(mockGitApi.getItems).toHaveBeenCalledWith("r", undefined, "/", VersionControlRecursionType.OneLevel, true, false, false, false, {
+        version: "main",
+        versionType: GitVersionType.Branch,
+      });
     });
 
     // line 136: ?? GitVersionType.Branch fallback when versionType not in map
@@ -8874,16 +8878,44 @@ describe("repos tools", () => {
       );
     });
 
-    // line 579: versionType === "Commit" TRUE branch in list_directory
-    it("repo_file list_directory: versionType Commit is remapped to Branch for buildVersionDescriptor", async () => {
+    it("repo_file get_content: versionType undefined falls back to Commit", async () => {
+      const { Readable } = await import("stream");
+      const stream = new Readable();
+      stream.push("content");
+      stream.push(null);
+      mockGitApi.getItemText.mockResolvedValue(stream);
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === REPO_TOOLS.repo_file);
+      if (!call) throw new Error("not registered");
+      const handler = call[3] as (p: unknown) => Promise<{ content: [{ text: string }] }>;
+      await handler({ action: "get_content", repositoryId: "r", path: "/file.ts", version: "abc123" });
+      expect(mockGitApi.getItemText).toHaveBeenCalledWith(
+        "r",
+        "/file.ts",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        { version: "abc123", versionType: GitVersionType.Commit },
+        true
+      );
+    });
+
+    it("repo_file list_directory: preserves explicit Commit versionType", async () => {
       mockGitApi.getItems.mockResolvedValue([{ path: "/src", isFolder: true }]);
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === REPO_TOOLS.repo_file);
       if (!call) throw new Error("not registered");
       const handler = call[3] as (p: unknown) => Promise<{ content: [{ text: string }] }>;
-      const r = await handler({ action: "list_directory", repositoryId: "r", path: "/", version: "main", versionType: "Commit" });
+      const r = await handler({ action: "list_directory", repositoryId: "r", path: "/", version: "abc123", versionType: "Commit" });
       const data = JSON.parse(r.content[0].text);
       expect(data.count).toBe(1);
+      expect(mockGitApi.getItems).toHaveBeenCalledWith("r", undefined, "/", VersionControlRecursionType.OneLevel, true, false, false, false, {
+        version: "abc123",
+        versionType: GitVersionType.Commit,
+      });
     });
 
     // line 593: path !== "/" branch in recursive filter (non-root path)
