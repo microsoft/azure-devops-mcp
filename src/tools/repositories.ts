@@ -248,9 +248,15 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       project: z.string().optional().describe("Project ID or project name. Required for list_by_commits. Optional for get and list."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to include work item references. Used for get."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include labels. Used for get."),
-      includeChangedFiles: z.boolean().optional().default(false).describe("Whether to include the list of changed files. Used for get."),
-      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Used for list. Defaults to 100."),
-      skip: z.coerce.number().default(0).describe("The number of pull requests to skip. Used for list. Defaults to 0."),
+      includeChangedFiles: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Whether to include the list of changed files. When changedFilesSummary returns a nextSkip greater than 0, pass nextSkip and nextTop back as skip and top for the next page. Used for get."
+        ),
+      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return (list), or of changed files to return (get with includeChangedFiles). Defaults to 100."),
+      skip: z.coerce.number().default(0).describe("The number of pull requests to skip (list), or of changed files to skip (get with includeChangedFiles). Defaults to 0."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user. Used for list."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user email. Used for list."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer. Used for list."),
@@ -320,7 +326,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               if (iterations?.length) {
                 const latestIteration = iterations[iterations.length - 1];
                 if (latestIteration.id != null) {
-                  const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, latestIteration.id, project);
+                  const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, latestIteration.id, project, top, skip);
                   enhancedResponse = {
                     ...enhancedResponse,
                     changedFilesSummary: {
