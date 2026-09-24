@@ -13,6 +13,7 @@ const MUTATING_TOOL_NAMES = [
   "pipelines_artifact",
   "pipelines_write",
   "repo_create_branch",
+  "repo_file_write",
   "repo_pull_request_thread_write",
   "repo_pull_request_write",
   "testplan_test_case_write",
@@ -36,7 +37,7 @@ describe("tool annotations", () => {
       .flatMap((fileName) => extractToolNames(readFileSync(join(toolsDirectory, fileName), "utf8")))
       .sort();
 
-    expect(declaredNames).toHaveLength(42);
+    expect(declaredNames).toHaveLength(43);
     expect(declaredNames).toEqual(Object.keys(TOOL_ANNOTATIONS).sort());
   });
 
@@ -54,8 +55,8 @@ describe("tool annotations", () => {
     const registeredNames = registrations.map(([name]) => name).sort();
     const annotatedNames = Object.keys(TOOL_ANNOTATIONS).sort();
 
-    expect(registrations).toHaveLength(42);
-    expect(new Set(registeredNames).size).toBe(42);
+    expect(registrations).toHaveLength(43);
+    expect(new Set(registeredNames).size).toBe(43);
     expect(registeredNames).toEqual(annotatedNames);
 
     for (const [name, annotations] of registrations) {
