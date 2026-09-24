@@ -725,17 +725,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
         const refName = `refs/heads/${branchName}`;
-        let oldObjectId = expectedOldObjectId;
+        const refs = await gitApi.getRefs(repositoryId, project, "heads/", false, false, undefined, false, undefined, branchName);
+        const branch = refs.find((ref) => ref.name === refName);
 
-        if (!oldObjectId) {
-          const refs = await gitApi.getRefs(repositoryId, project, "heads/", false, false, undefined, false, undefined, branchName);
-          const branch = refs.find((ref) => ref.name === refName);
-          if (!branch?.objectId) {
-            return { content: [{ type: "text", text: `Error: Branch '${branchName}' not found in repository ${repositoryId}` }], isError: true };
-          }
-          oldObjectId = branch.objectId;
+        if (!branch?.objectId) {
+          return { content: [{ type: "text", text: `Error: Branch '${branchName}' not found in repository ${repositoryId}` }], isError: true };
         }
 
+        if (expectedOldObjectId && expectedOldObjectId !== branch.objectId) {
+          return { content: [{ type: "text", text: `Error: Branch '${branchName}' has moved from expected commit ${expectedOldObjectId}` }], isError: true };
+        }
+
+        const oldObjectId = branch.objectId;
         const filePath = path.startsWith("/") ? path : `/${path}`;
         const push = await gitApi.createPush(
           {

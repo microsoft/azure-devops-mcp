@@ -8255,6 +8255,7 @@ describe("repos tools", () => {
         if (!call) throw new Error("repo_file_write tool not registered");
         const [, , , handler] = call;
 
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/feature", objectId: "expected-commit" }]);
         mockGitApi.createPush.mockResolvedValue({ pushId: 13, commits: [{ commitId: "updated-commit" }] });
 
         await handler({
@@ -8267,7 +8268,7 @@ describe("repos tools", () => {
           expectedOldObjectId: "expected-commit",
         });
 
-        expect(mockGitApi.getRefs).not.toHaveBeenCalled();
+        expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "feature");
         expect(mockGitApi.createPush).toHaveBeenCalledWith(
           expect.objectContaining({
             refUpdates: [{ name: "refs/heads/feature", oldObjectId: "expected-commit" }],
@@ -8302,12 +8303,63 @@ describe("repos tools", () => {
         expect(mockGitApi.createPush).not.toHaveBeenCalled();
       });
 
+      it("returns an error when the expected commit does not match the branch head", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "current-commit" }]);
+
+        const result = await handler({
+          action: "update",
+          repositoryId: "repo123",
+          branchName: "main",
+          path: "/file.txt",
+          content: "content",
+          commitMessage: "Update file",
+          expectedOldObjectId: "stale-commit",
+        });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error: Branch 'main' has moved from expected commit stale-commit" }],
+          isError: true,
+        });
+        expect(mockGitApi.createPush).not.toHaveBeenCalled();
+      });
+
+      it("returns an error when the expected branch does not exist", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([]);
+
+        const result = await handler({
+          action: "update",
+          repositoryId: "repo123",
+          branchName: "missing",
+          path: "/file.txt",
+          content: "content",
+          commitMessage: "Update file",
+          expectedOldObjectId: "expected-commit",
+        });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error: Branch 'missing' not found in repository repo123" }],
+          isError: true,
+        });
+        expect(mockGitApi.createPush).not.toHaveBeenCalled();
+      });
+
       it("returns an error when the push fails", async () => {
         configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
         const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
         if (!call) throw new Error("repo_file_write tool not registered");
         const [, , , handler] = call;
 
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "stale-commit" }]);
         mockGitApi.createPush.mockRejectedValue(new Error("Branch moved"));
 
         const result = await handler({
@@ -8332,6 +8384,7 @@ describe("repos tools", () => {
         if (!call) throw new Error("repo_file_write tool not registered");
         const [, , , handler] = call;
 
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "old-commit" }]);
         mockGitApi.createPush.mockRejectedValue("Push failed");
 
         const result = await handler({
