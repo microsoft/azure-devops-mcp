@@ -14,6 +14,7 @@ import {
   ItemContentType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "../../../src/tools/auth";
+import { z } from "zod";
 
 // Mock the auth module
 jest.mock("../../../src/tools/auth", () => ({
@@ -4488,7 +4489,7 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGitApi.getPullRequestIterations).toHaveBeenCalledWith("repo123", 123, undefined);
-      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, undefined, undefined);
 
       const resultData = parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>;
       expect(resultData.changedFilesSummary).toEqual({
@@ -4626,6 +4627,87 @@ describe("repos tools", () => {
         firstComparingIteration: 0,
         secondComparingIteration: 1,
       });
+    });
+    const changePage = (offset: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({ changeTrackingId: offset + i + 1, item: { path: `/src/file${offset + i + 1}.ts` }, changeType: 2 }));
+
+    const getPullRequestHandler = () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request);
+      if (!call) throw new Error("repo_pull_request tool not registered");
+      return call[3] as (params: unknown) => Promise<{ content: [{ text: string }] }>;
+    };
+
+    it("should default top to 100 and skip to 0 for the changed files call", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request);
+      if (!call) throw new Error("repo_pull_request tool not registered");
+      const [, , schema, handler] = call;
+
+      mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 123, title: "Test PR" });
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 100), nextSkip: 100, nextTop: 50 });
+
+      // the handler is called directly elsewhere in this file, which skips the schema, so parse here
+      const parsed = z.object(schema).parse({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+      expect(parsed.top).toBe(100);
+      expect(parsed.skip).toBe(0);
+
+      await handler(parsed);
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 100, 0);
+    });
+
+    it("should pass top and skip to the changed files call and return the next page markers", async () => {
+      const handler = getPullRequestHandler();
+      mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 123, title: "Test PR" });
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      // what the endpoint returns for a 150-file iteration when asked for the first 100
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 100), nextSkip: 100, nextTop: 50 });
+
+      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true, top: 100, skip: 0 });
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledTimes(1);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 100, 0);
+      const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
+      expect(summary.fileCount).toBe(100);
+      expect((summary.changeEntries as { item: { path: string } }[])[0].item.path).toBe("/src/file1.ts");
+      expect(summary.nextSkip).toBe(100);
+      expect(summary.nextTop).toBe(50);
+      expect(summary).not.toHaveProperty("hasMore");
+    });
+
+    it("should pass skip through so the caller can fetch the next page of changed files", async () => {
+      const handler = getPullRequestHandler();
+      mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 123, title: "Test PR" });
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      // Final page without continuation markers.
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(100, 50) });
+
+      // the caller pages with the nextSkip and nextTop the first page returned
+      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true, top: 50, skip: 100 });
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 50, 100);
+      const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
+      expect(summary.fileCount).toBe(50);
+      expect((summary.changeEntries as { item: { path: string } }[])[49].item.path).toBe("/src/file150.ts");
+      expect(summary.nextSkip).toBeUndefined();
+      expect(summary.nextTop).toBeUndefined();
+    });
+
+    it("should surface an explicit nextSkip of 0 for the last page of changed files", async () => {
+      const handler = getPullRequestHandler();
+      mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 123, title: "Test PR" });
+      mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
+      mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 50), nextSkip: 0, nextTop: 0 });
+
+      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 1, undefined, undefined, undefined);
+      const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
+      expect(summary.fileCount).toBe(50);
+      expect(summary.nextSkip).toBe(0);
+      expect(summary.nextTop).toBe(0);
     });
   });
 
