@@ -19,6 +19,8 @@ import {
   GitPullRequest,
   GitPullRequestCommentThread,
   Comment,
+  ItemContentType,
+  VersionControlChangeType,
   VersionControlRecursionType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
@@ -36,6 +38,7 @@ const REPO_TOOLS = {
   repo_pull_request_thread: "repo_pull_request_thread",
   repo_branch: "repo_branch",
   repo_file: "repo_file",
+  repo_file_write: "repo_file_write",
   repo_search_commits: "repo_search_commits",
   repo_pull_request_write: "repo_pull_request_write",
   repo_pull_request_thread_write: "repo_pull_request_thread_write",
@@ -696,6 +699,76 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return { content: [{ type: "text", text: `Error with file operation: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  // --- repo_file_write -------------------------------------------------------
+  server.tool(
+    REPO_TOOLS.repo_file_write,
+    "Create or update a text file in an existing repository branch and commit the change.",
+    {
+      action: z.enum(["create", "update"]).describe("Whether to create a new file or update an existing file."),
+      repositoryId: z.string().describe("The ID or name of the repository."),
+      project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name."),
+      branchName: z.string().min(1).describe("The name of the existing branch to update, without the 'refs/heads/' prefix."),
+      path: z.string().min(1).describe("The absolute repository path of the file, for example '/src/example.ts'."),
+      content: z.string().describe("The complete UTF-8 text content to write to the file."),
+      commitMessage: z.string().min(1).describe("The commit message for the file change."),
+      expectedOldObjectId: z
+        .string()
+        .optional()
+        .describe("The expected current commit ID of the branch. When provided, the push fails if the branch has moved. If omitted, the current branch head is retrieved before pushing."),
+    },
+    async ({ action, repositoryId, project, branchName, path, content, commitMessage, expectedOldObjectId }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const refName = `refs/heads/${branchName}`;
+        const refs = await gitApi.getRefs(repositoryId, project, "heads/", false, false, undefined, false, undefined, branchName);
+        const branch = refs.find((ref) => ref.name === refName);
+
+        if (!branch?.objectId) {
+          return { content: [{ type: "text", text: `Error: Branch '${branchName}' not found in repository ${repositoryId}` }], isError: true };
+        }
+
+        if (expectedOldObjectId && expectedOldObjectId !== branch.objectId) {
+          return { content: [{ type: "text", text: `Error: Branch '${branchName}' has moved from expected commit ${expectedOldObjectId}` }], isError: true };
+        }
+
+        const oldObjectId = branch.objectId;
+        const filePath = path.startsWith("/") ? path : `/${path}`;
+        const push = await gitApi.createPush(
+          {
+            refUpdates: [{ name: refName, oldObjectId }],
+            commits: [
+              {
+                comment: commitMessage,
+                changes: [
+                  {
+                    changeType: action === "create" ? VersionControlChangeType.Add : VersionControlChangeType.Edit,
+                    item: { path: filePath },
+                    newContent: { content, contentType: ItemContentType.RawText },
+                  },
+                ],
+              },
+            ],
+          },
+          repositoryId,
+          project
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ pushId: push.pushId, commitId: push.commits?.[0]?.commitId, branchName, path: filePath }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error writing repository file: ${errorMessage}` }], isError: true };
       }
     }
   );

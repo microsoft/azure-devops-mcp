@@ -4,7 +4,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureRepoTools, REPO_TOOLS } from "../../../src/tools/repositories";
-import { PullRequestStatus, GitVersionType, GitPullRequestQueryType, CommentThreadStatus, VersionControlRecursionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
+import {
+  PullRequestStatus,
+  GitVersionType,
+  GitPullRequestQueryType,
+  CommentThreadStatus,
+  VersionControlRecursionType,
+  VersionControlChangeType,
+  ItemContentType,
+} from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "../../../src/tools/auth";
 import { z } from "zod";
 
@@ -59,6 +67,7 @@ describe("repos tools", () => {
     getPullRequestIterationChanges: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestIterations: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getItems: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    createPush: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
   };
 
   beforeEach(() => {
@@ -97,6 +106,7 @@ describe("repos tools", () => {
       getFileDiffs: jest.fn(),
       getItemText: jest.fn(),
       getItems: jest.fn(),
+      createPush: jest.fn(),
     };
     mockRestGet = jest.fn();
 
@@ -8191,6 +8201,204 @@ describe("repos tools", () => {
 
         expect(result).toEqual({
           content: [{ type: "text", text: "Error with file operation: Repository access denied" }],
+          isError: true,
+        });
+      });
+    });
+
+    describe("repo_file_write", () => {
+      it("creates a file using the current branch head", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "old-commit" }]);
+        mockGitApi.createPush.mockResolvedValue({ pushId: 12, commits: [{ commitId: "new-commit" }] });
+
+        const result = await handler({
+          action: "create",
+          repositoryId: "repo123",
+          project: "test-project",
+          branchName: "main",
+          path: "docs/new.md",
+          content: "new content",
+          commitMessage: "Add documentation",
+        });
+
+        expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", "test-project", "heads/", false, false, undefined, false, undefined, "main");
+        expect(mockGitApi.createPush).toHaveBeenCalledWith(
+          {
+            refUpdates: [{ name: "refs/heads/main", oldObjectId: "old-commit" }],
+            commits: [
+              {
+                comment: "Add documentation",
+                changes: [
+                  {
+                    changeType: VersionControlChangeType.Add,
+                    item: { path: "/docs/new.md" },
+                    newContent: { content: "new content", contentType: ItemContentType.RawText },
+                  },
+                ],
+              },
+            ],
+          },
+          "repo123",
+          "test-project"
+        );
+        expect(JSON.parse(result.content[0].text)).toEqual({ pushId: 12, commitId: "new-commit", branchName: "main", path: "/docs/new.md" });
+      });
+
+      it("updates a file using the supplied expected commit", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/feature", objectId: "expected-commit" }]);
+        mockGitApi.createPush.mockResolvedValue({ pushId: 13, commits: [{ commitId: "updated-commit" }] });
+
+        await handler({
+          action: "update",
+          repositoryId: "repo123",
+          branchName: "feature",
+          path: "/src/file.ts",
+          content: "updated content",
+          commitMessage: "Update file",
+          expectedOldObjectId: "expected-commit",
+        });
+
+        expect(mockGitApi.getRefs).toHaveBeenCalledWith("repo123", undefined, "heads/", false, false, undefined, false, undefined, "feature");
+        expect(mockGitApi.createPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            refUpdates: [{ name: "refs/heads/feature", oldObjectId: "expected-commit" }],
+            commits: [expect.objectContaining({ changes: [expect.objectContaining({ changeType: VersionControlChangeType.Edit })] })],
+          }),
+          "repo123",
+          undefined
+        );
+      });
+
+      it("returns an error when the branch does not exist", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/other", objectId: "old-commit" }]);
+
+        const result = await handler({
+          action: "create",
+          repositoryId: "repo123",
+          branchName: "missing",
+          path: "/file.txt",
+          content: "content",
+          commitMessage: "Add file",
+        });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error: Branch 'missing' not found in repository repo123" }],
+          isError: true,
+        });
+        expect(mockGitApi.createPush).not.toHaveBeenCalled();
+      });
+
+      it("returns an error when the expected commit does not match the branch head", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "current-commit" }]);
+
+        const result = await handler({
+          action: "update",
+          repositoryId: "repo123",
+          branchName: "main",
+          path: "/file.txt",
+          content: "content",
+          commitMessage: "Update file",
+          expectedOldObjectId: "stale-commit",
+        });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error: Branch 'main' has moved from expected commit stale-commit" }],
+          isError: true,
+        });
+        expect(mockGitApi.createPush).not.toHaveBeenCalled();
+      });
+
+      it("returns an error when the expected branch does not exist", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([]);
+
+        const result = await handler({
+          action: "update",
+          repositoryId: "repo123",
+          branchName: "missing",
+          path: "/file.txt",
+          content: "content",
+          commitMessage: "Update file",
+          expectedOldObjectId: "expected-commit",
+        });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error: Branch 'missing' not found in repository repo123" }],
+          isError: true,
+        });
+        expect(mockGitApi.createPush).not.toHaveBeenCalled();
+      });
+
+      it("returns an error when the push fails", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "stale-commit" }]);
+        mockGitApi.createPush.mockRejectedValue(new Error("Branch moved"));
+
+        const result = await handler({
+          action: "update",
+          repositoryId: "repo123",
+          branchName: "main",
+          path: "/file.txt",
+          content: "content",
+          commitMessage: "Update file",
+          expectedOldObjectId: "stale-commit",
+        });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error writing repository file: Branch moved" }],
+          isError: true,
+        });
+      });
+
+      it("handles a non-Error push failure", async () => {
+        configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+        const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_file_write);
+        if (!call) throw new Error("repo_file_write tool not registered");
+        const [, , , handler] = call;
+
+        mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "old-commit" }]);
+        mockGitApi.createPush.mockRejectedValue("Push failed");
+
+        const result = await handler({
+          action: "update",
+          repositoryId: "repo123",
+          branchName: "main",
+          path: "/file.txt",
+          content: "content",
+          commitMessage: "Update file",
+          expectedOldObjectId: "old-commit",
+        });
+
+        expect(result).toEqual({
+          content: [{ type: "text", text: "Error writing repository file: Unknown error occurred" }],
           isError: true,
         });
       });
