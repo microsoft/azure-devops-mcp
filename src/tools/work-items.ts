@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import * as fs from "fs";
+import { constants, open, realpath } from "fs/promises";
 import * as path from "path";
 import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -476,7 +476,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .string()
         .optional()
         .describe(
-          "Optional local directory path where the downloaded file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource. Used for: download."
+          "Optional local directory path where the downloaded file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments') to an existing directory that resolves (including symlinks) inside the server's working directory; absolute paths are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource. Used for: download."
         ),
       // upload
       content: z.string().optional().describe("Base64-encoded file content to upload. Required for: upload."),
@@ -499,6 +499,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
       if (fileName !== undefined && fileName.includes("..")) {
         throw new Error("Invalid fileName: path traversal is not allowed.");
+      }
+
+      if (savePath) {
+        const localFileName = fileName ?? attachmentId ?? "";
+        if (localFileName.includes("\0") || path.posix.basename(localFileName) !== localFileName || path.win32.basename(localFileName) !== localFileName) {
+          throw new Error("Invalid fileName: path components are not allowed.");
+        }
       }
 
       if (action === "upload") {
@@ -580,14 +587,22 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const buffer = Buffer.concat(chunks);
 
         if (savePath) {
-          const resolvedFileName = fileName ?? attachmentId;
-          const localFilePath = path.join(savePath, resolvedFileName);
+          const workspaceRoot = await realpath(process.cwd());
+          const resolvedDirectory = await realpath(path.resolve(workspaceRoot, savePath));
+          const relativeDirectory = path.relative(workspaceRoot, resolvedDirectory);
 
-          if (fs.existsSync(localFilePath)) {
-            throw new Error(`File already exists: ${localFilePath}`);
+          if (relativeDirectory === ".." || relativeDirectory.startsWith(`..${path.sep}`) || path.isAbsolute(relativeDirectory)) {
+            throw new Error("Invalid savePath: destination must remain inside the workspace.");
           }
 
-          fs.writeFileSync(localFilePath, buffer);
+          const localFilePath = path.join(resolvedDirectory, fileName ?? attachmentId);
+          // O_EXCL fails if the file (or a symlink) already exists, so there is no check-then-write race.
+          const file = await open(localFilePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0), 0o600);
+          try {
+            await file.writeFile(buffer);
+          } finally {
+            await file.close();
+          }
 
           return {
             content: [{ type: "text", text: `Attachment saved to: ${localFilePath}` }],

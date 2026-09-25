@@ -6,12 +6,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
 import { Readable } from "stream";
-import * as fs from "fs";
+import { constants, open, realpath } from "fs/promises";
 import * as path from "path";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 
-jest.mock("fs");
+jest.mock("fs/promises");
 import {
   _mockBacklogs,
   _mockQuery,
@@ -4812,7 +4812,9 @@ describe("configureWorkItemTools", () => {
 
       const fakeData = Buffer.from("fake-png-bytes");
       mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
-      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+      (realpath as jest.Mock).mockImplementation(async (p) => p);
+      const fileHandle = { writeFile: jest.fn().mockResolvedValue(undefined), close: jest.fn().mockResolvedValue(undefined) };
+      (open as jest.Mock).mockResolvedValue(fileHandle);
 
       const params = {
         project: "TestProject",
@@ -4823,12 +4825,16 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler({ action: "add_artifact_link", ...params });
 
-      const expectedPath = path.join("downloads/attachments", "screenshot.png");
-      expect(writeFileSyncMock).toHaveBeenCalledWith(expectedPath, fakeData);
+      const expectedPath = path.join(path.resolve(process.cwd(), "downloads/attachments"), "screenshot.png");
+      const [openedPath, flags, mode] = (open as jest.Mock).mock.calls[0];
+      expect(openedPath).toBe(expectedPath);
+      expect(flags & constants.O_CREAT).toBeTruthy();
+      expect(flags & constants.O_EXCL).toBeTruthy();
+      expect(mode).toBe(0o600);
+      expect(fileHandle.writeFile).toHaveBeenCalledWith(fakeData);
+      expect(fileHandle.close).toHaveBeenCalled();
       expect(result.content[0].type).toBe("text");
       expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
-
-      writeFileSyncMock.mockRestore();
     });
 
     it("should use attachmentId as filename when savePath is provided but fileName is omitted", async () => {
@@ -4840,7 +4846,8 @@ describe("configureWorkItemTools", () => {
 
       const fakeData = Buffer.from("binary-data");
       mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
-      const writeFileSyncMock = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
+      (realpath as jest.Mock).mockImplementation(async (p) => p);
+      (open as jest.Mock).mockResolvedValue({ writeFile: jest.fn().mockResolvedValue(undefined), close: jest.fn().mockResolvedValue(undefined) });
 
       const attachmentId = "12341234-1234-1234-1234-123412341234";
       const params = {
@@ -4851,23 +4858,21 @@ describe("configureWorkItemTools", () => {
 
       const result = await handler({ action: "add_artifact_link", ...params });
 
-      const expectedPath = path.join("downloads/attachments", attachmentId);
-      expect(writeFileSyncMock).toHaveBeenCalledWith(expectedPath, fakeData);
+      const expectedPath = path.join(path.resolve(process.cwd(), "downloads/attachments"), attachmentId);
+      expect(open).toHaveBeenCalledWith(expectedPath, expect.any(Number), 0o600);
       expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
-
-      writeFileSyncMock.mockRestore();
     });
 
-    it("should throw an error if the file already exists at the savePath", async () => {
+    it("should return an error if the file already exists at the savePath", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
       if (!call) throw new Error("wit_work_item_attachment tool not registered");
       const [, , , handler] = call;
 
-      const fakeData = Buffer.from("fake-png-bytes");
-      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(fakeData));
-      jest.spyOn(fs, "existsSync").mockReturnValue(true);
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(Buffer.from("fake-png-bytes")));
+      (realpath as jest.Mock).mockImplementation(async (p) => p);
+      (open as jest.Mock).mockRejectedValue(new Error("EEXIST: file already exists"));
 
       const params = {
         project: "TestProject",
@@ -4876,13 +4881,84 @@ describe("configureWorkItemTools", () => {
         savePath: "downloads/attachments",
       };
 
-      const expectedPath = path.join("downloads/attachments", "screenshot.png");
       const result = await handler({ action: "add_artifact_link", ...params });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe(`Error retrieving work item attachment: File already exists: ${expectedPath}`);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: EEXIST: file already exists");
+    });
 
-      jest.restoreAllMocks();
+    it("should close the file handle and return an error when writing fails", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(Buffer.from("fake-png-bytes")));
+      (realpath as jest.Mock).mockImplementation(async (p) => p);
+      const fileHandle = { writeFile: jest.fn().mockRejectedValue(new Error("ENOSPC: no space left on device")), close: jest.fn().mockResolvedValue(undefined) };
+      (open as jest.Mock).mockResolvedValue(fileHandle);
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "downloads/attachments",
+      };
+
+      const result = await handler({ action: "add_artifact_link", ...params });
+
+      expect(fileHandle.close).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: ENOSPC: no space left on device");
+    });
+
+    it("should create the file exclusively when O_NOFOLLOW is unavailable (e.g. on Windows)", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(Buffer.from("fake-png-bytes")));
+      (realpath as jest.Mock).mockImplementation(async (p) => p);
+      (open as jest.Mock).mockResolvedValue({ writeFile: jest.fn().mockResolvedValue(undefined), close: jest.fn().mockResolvedValue(undefined) });
+      const mutableConstants = constants as { O_NOFOLLOW?: number };
+      const originalNoFollow = mutableConstants.O_NOFOLLOW;
+      delete mutableConstants.O_NOFOLLOW;
+
+      try {
+        await handler({ project: "TestProject", attachmentId: "12341234-1234-1234-1234-123412341234", fileName: "screenshot.png", savePath: "downloads" });
+      } finally {
+        mutableConstants.O_NOFOLLOW = originalNoFollow;
+      }
+
+      expect((open as jest.Mock).mock.calls[0][1]).toBe(constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+    });
+
+    it("should reject savePath that resolves through a symlink outside the workspace", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(makeReadableStream(Buffer.from("fake-png-bytes")));
+      const workspaceRoot = process.cwd();
+      (realpath as jest.Mock).mockImplementation(async (p) => (p === workspaceRoot ? workspaceRoot : path.resolve(workspaceRoot, "..", "outside")));
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "screenshot.png",
+        savePath: "link-to-outside",
+      };
+
+      const result = await handler({ action: "add_artifact_link", ...params });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: Invalid savePath: destination must remain inside the workspace.");
+      expect(open).not.toHaveBeenCalled();
     });
 
     it("should return text content for markdown files when savePath is not provided", async () => {
@@ -5035,6 +5111,41 @@ describe("configureWorkItemTools", () => {
 
       await expect(handler({ ...params })).rejects.toThrow("Invalid fileName: path traversal is not allowed.");
       expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["POSIX separator", "sub/screenshot.png"],
+      ["Windows separator", "sub\\screenshot.png"],
+      ["NUL byte", "screenshot\0.png"],
+    ])("should reject fileName with a %s when savePath is provided", async (_, fileName) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const params = {
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName,
+        savePath: "downloads",
+      };
+
+      await expect(handler({ ...params })).rejects.toThrow("Invalid fileName: path components are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("should return an error when attachmentId is missing for download with savePath", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ project: "TestProject", savePath: "downloads" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("attachmentId is required for download");
     });
 
     it("should return an error when attachmentId is missing for download", async () => {
