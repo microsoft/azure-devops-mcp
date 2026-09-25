@@ -54,7 +54,8 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [wit_backlog](#wit_backlog)                                 | `list`                 | List backlog levels for a team                                          |
 | [wit_backlog](#wit_backlog)                                 | `list_work_items`      | Get work items in a specific backlog level                              |
 | [wit_backlog](#wit_backlog)                                 | `reorder`              | Reorder work items in a backlog or iteration                            |
-| [wit_work_item_attachment](#wit_work_item_attachment)       |                        | Download a work item attachment; save locally or return as base64       |
+| [wit_work_item_attachment](#wit_work_item_attachment)       | `download`             | Download a work item attachment; save locally or return as base64       |
+| [wit_work_item_attachment](#wit_work_item_attachment)       | `upload`               | Upload a file as a new work item attachment, optionally linking it      |
 
 ### Repositories
 
