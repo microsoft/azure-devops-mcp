@@ -535,7 +535,8 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             },
           ];
           try {
-            await workItemApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+            const workItem = await workItemApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+            if (!workItem) throw new Error("Work item not found");
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             return {

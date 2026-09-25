@@ -5178,6 +5178,23 @@ describe("configureWorkItemTools", () => {
       expect(result.content[0].text).toBe(`Attachment uploaded but linking to work item 42 failed: Work item 42 does not exist\nAttachment: ${JSON.stringify(attachmentReference)}`);
     });
 
+    it("should report a link failure when the work item is not found", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const attachmentReference = { id: "att-1", url: "https://dev.azure.com/org/_apis/wit/attachments/att-1" };
+      mockWorkItemTrackingApi.createAttachment.mockResolvedValue(attachmentReference);
+      mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue(null);
+
+      const result = await handler({ action: "upload", project: "TestProject", fileName: "notes.txt", content: "Zm9v", workItemId: 999 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(`Attachment uploaded but linking to work item 999 failed: Work item not found\nAttachment: ${JSON.stringify(attachmentReference)}`);
+    });
+
     it("should report unknown errors for non-Error rejections during upload and linking", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
