@@ -77,7 +77,7 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => entities[character]);
 }
 
-async function resolveCommentMentions(
+async function prepareCommentText(
   text: string,
   format: "Markdown" | "Html" | undefined,
   tokenProvider: () => Promise<string>,
@@ -85,7 +85,6 @@ async function resolveCommentMentions(
   userAgentProvider: () => string
 ): Promise<string> {
   const emailMatches = [...text.matchAll(/@<([^<>\s]+@[^<>\s]+)>/g)];
-  if (emailMatches.length === 0) return text;
 
   const identities = new Map<string, { id: string; displayName: string }>();
   for (const email of new Set(emailMatches.map((match) => match[1]))) {
@@ -96,10 +95,15 @@ async function resolveCommentMentions(
     }
   }
 
-  return text.replace(/@<([^<>\s]+@[^<>\s]+)>/g, (mention, email: string) => {
+  // Encode Markdown transport text once, preserving mention tokens for Azure DevOps.
+  // Encoding ampersands also preserves intentional entity text after one decode.
+  const markdown = format === "Markdown" || format === undefined;
+  return text.replace(/@<([^<>\s]+@[^<>\s]+)>|@<([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>|[&<>]/gi, (mention, email: string | undefined, id: string | undefined) => {
+    if (id) return mention;
+    if (!email) return markdown ? escapeHtml(mention) : mention;
     const identity = identities.get(email);
     if (!identity) return escapeHtml(mention);
-    return format === "Markdown" || format === undefined ? `@<${identity.id}>` : `<a href="#" data-vss-mention="version:2.0,${identity.id}">@${escapeHtml(identity.displayName)}</a>`;
+    return markdown ? `@<${identity.id}>` : `<a href="#" data-vss-mention="version:2.0,${identity.id}">@${escapeHtml(identity.displayName)}</a>`;
   });
 }
 
@@ -856,7 +860,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
         const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
-        const resolvedText = await resolveCommentMentions(text, format, tokenProvider, connectionProvider, userAgentProvider);
+        const resolvedText = await prepareCommentText(text, format, tokenProvider, connectionProvider, userAgentProvider);
 
         if (action === "add") {
           const response = await fetch(

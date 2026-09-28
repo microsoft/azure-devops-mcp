@@ -954,6 +954,103 @@ describe("configureWorkItemTools", () => {
     });
   });
 
+  describe.each(["add", "update"])("Markdown comment transport: %s", (action) => {
+    const cases = [
+      {
+        name: "JSX",
+        text: "Render `<LeftNav />` beside `<Routes>`.",
+        encoded: "Render `&lt;LeftNav /&gt;` beside `&lt;Routes&gt;`.",
+      },
+      {
+        name: "generics and operators",
+        text: "Use `List<Model>` when `a < b && c > d`.",
+        encoded: "Use `List&lt;Model&gt;` when `a &lt; b &amp;&amp; c &gt; d`.",
+      },
+      {
+        name: "intentional entities",
+        text: "Spell `&lt;`, `&#60;`, and `&amp;` literally.",
+        encoded: "Spell `&amp;lt;`, `&amp;#60;`, and `&amp;amp;` literally.",
+      },
+      {
+        name: "code blocks and quoted attributes",
+        text: '```tsx\n<LeftNav label="R&D" />\n```',
+        encoded: '```tsx\n&lt;LeftNav label="R&amp;D" /&gt;\n```',
+      },
+      {
+        name: "resolved mention IDs beside code",
+        text: "@<12345678-1234-1234-1234-123456789abc> review `<LeftNav />`",
+        encoded: "@<12345678-1234-1234-1234-123456789abc> review `&lt;LeftNav /&gt;`",
+      },
+    ];
+
+    it.each(cases)("encodes $name in the outgoing Markdown body", async ({ text, encoded }) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const registration = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "wit_work_item_comment_write");
+      if (!registration) throw new Error("comment tool not registered");
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true, text: async () => "{}" });
+      const previousFetch = global.fetch;
+      global.fetch = mockFetch;
+      try {
+        await registration[3]({ action, project: "Contoso", workItemId: 299, commentId: 1, text, format: "Markdown" });
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ text: encoded });
+        expect(mockFetch.mock.calls[0][1].method).toBe(action === "add" ? "POST" : "PATCH");
+      } finally {
+        global.fetch = previousFetch;
+      }
+    });
+
+    it("encodes the default format and preserves explicit HTML", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const registration = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "wit_work_item_comment_write");
+      if (!registration) throw new Error("comment tool not registered");
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true, text: async () => "{}" });
+      const previousFetch = global.fetch;
+      global.fetch = mockFetch;
+      try {
+        await registration[3]({ action, project: "Contoso", workItemId: 299, commentId: 1, text: "`<LeftNav />`" });
+        expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ text: "`&lt;LeftNav /&gt;`" });
+        const html = "<p>R&amp;D <code>&lt;LeftNav /&gt;</code></p>";
+        await registration[3]({ action, project: "Contoso", workItemId: 299, commentId: 1, text: html, format: "Html" });
+        expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({ text: html });
+      } finally {
+        global.fetch = previousFetch;
+      }
+    });
+
+    it("encodes text without double-encoding unresolved mentions or escaping resolved mentions", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const registration = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "wit_work_item_comment_write");
+      if (!registration) throw new Error("comment tool not registered");
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ value: [{ id: "guid-one" }] }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ value: [] }) })
+        .mockResolvedValueOnce({ ok: true, text: async () => "{}" });
+      const previousFetch = global.fetch;
+      global.fetch = mockFetch;
+      try {
+        await registration[3]({
+          action,
+          project: "Contoso",
+          workItemId: 299,
+          commentId: 1,
+          format: "Markdown",
+          text: "@<one@example.com> and @<missing@example.com>: `<LeftNav />` & `&lt;`",
+        });
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+        expect(JSON.parse(mockFetch.mock.calls[2][1].body)).toEqual({
+          text: "@<guid-one> and @&lt;missing@example.com&gt;: `&lt;LeftNav /&gt;` &amp; `&amp;lt;`",
+        });
+      } finally {
+        global.fetch = previousFetch;
+      }
+    });
+  });
+
   describe("add_work_item_comment tool", () => {
     it("should call Add Work Item Comments API with the correct parameters and return the expected result with no format specified", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
