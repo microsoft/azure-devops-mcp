@@ -11,10 +11,26 @@ import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfa
 import { mkdirSync, createWriteStream } from "fs";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 import { join, posix, resolve, win32 } from "path";
+import { Readable, Transform } from "stream";
+import { pipeline } from "stream/promises";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { pipelinesWriteShape, RunPipelineArgs, CreatePipelineArgs, RenamePipelineArgs, UpdateBuildStageArgs, PipelinesWriteArgs } from "./pipelines.dto.js";
 
 const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
+const MAX_ARTIFACT_FILE_BYTES = 1024 * 1024 * 1024;
+const MAX_ARTIFACT_BASE64_BYTES = 10 * 1024 * 1024;
+
+function getArtifactResponseStream(response: Response): Readable {
+  if (!response.body) throw new Error("Artifact download returned an empty response body.");
+  return Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]);
+}
+
+function validateArtifactContentLength(response: Response, maxBytes: number, limitDescription: string): void {
+  const contentLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error(`Artifact download exceeds the ${limitDescription} limit.`);
+  }
+}
 
 async function runPipeline(args: RunPipelineArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
   if (!args.pipelineId) return errorResult("pipelineId is required for run_pipeline");
@@ -477,30 +493,52 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
             return { content: [{ type: "text", text: `Artifact ${resolvedArtifactName} not found in build ${buildId}.` }], isError: true };
           }
 
-          const fileStream = await buildApi.getArtifactContentZip(project, buildId, resolvedArtifactName);
+          if (!artifact.resource?.downloadUrl) {
+            throw new Error(`Artifact ${resolvedArtifactName} does not have a download URL.`);
+          }
+
+          const accessToken = await tokenProvider();
+          const response = await fetch(artifact.resource.downloadUrl, {
+            headers: { "Authorization": `Bearer ${accessToken}`, "User-Agent": userAgentProvider() },
+          });
+          if (!response.ok) {
+            throw new Error(`Artifact download failed: ${response.status} ${response.statusText}`);
+          }
 
           if (destinationPath) {
+            validateArtifactContentLength(response, MAX_ARTIFACT_FILE_BYTES, "1 GB file size");
             const fullDestinationPath = resolve(destinationPath);
             mkdirSync(fullDestinationPath, { recursive: true });
             const fileDestinationPath = join(fullDestinationPath, `${resolvedArtifactName}.zip`);
             const writeStream = createWriteStream(fileDestinationPath);
-
-            await new Promise<void>((resolve, reject) => {
-              fileStream.pipe(writeStream);
-              fileStream.on("end", () => resolve());
-              fileStream.on("error", (err) => reject(err));
+            let downloadedBytes = 0;
+            const sizeLimitStream = new Transform({
+              transform(chunk, _encoding, callback) {
+                downloadedBytes += chunk.length;
+                if (downloadedBytes > MAX_ARTIFACT_FILE_BYTES) {
+                  callback(new Error("Artifact download exceeds the 1 GB file size limit."));
+                  return;
+                }
+                callback(null, chunk);
+              },
             });
+
+            await pipeline(getArtifactResponseStream(response), sizeLimitStream, writeStream);
 
             return { content: [{ type: "text", text: `Artifact ${resolvedArtifactName} downloaded to ${destinationPath}.` }] };
           }
 
+          validateArtifactContentLength(response, MAX_ARTIFACT_BASE64_BYTES, "10 MB base64 response size");
           const chunks: Buffer[] = [];
-          await new Promise<void>((resolve, reject) => {
-            fileStream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-            fileStream.on("end", () => resolve());
-            fileStream.on("error", (err) => reject(err));
-          });
-
+          let downloadedBytes = 0;
+          for await (const chunk of getArtifactResponseStream(response)) {
+            const bufferChunk = Buffer.from(chunk);
+            downloadedBytes += bufferChunk.length;
+            if (downloadedBytes > MAX_ARTIFACT_BASE64_BYTES) {
+              throw new Error("Artifact download exceeds the 10 MB base64 response size limit.");
+            }
+            chunks.push(bufferChunk);
+          }
           const buffer = Buffer.concat(chunks);
           const base64Data = buffer.toString("base64");
 
