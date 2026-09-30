@@ -410,18 +410,19 @@ function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; p
     if (idx < 1 || segments[idx + 1] !== "wikis") {
       return { error: "URL does not match expected wiki pattern (missing /_wiki/wikis/ segment)." };
     }
-    const project = segments[idx - 1];
-    const wikiIdentifier = segments[idx + 2];
-    if (!project || !wikiIdentifier) {
+    const encodedProject = segments[idx - 1];
+    const encodedWikiIdentifier = segments[idx + 2];
+    if (!encodedProject || !encodedWikiIdentifier) {
       return { error: "Could not extract project or wikiIdentifier from URL." };
     }
+    const project = decodeURIComponent(encodedProject);
+    const wikiIdentifier = decodeURIComponent(encodedWikiIdentifier);
 
     // Query form with pagePath
     const pagePathParam = u.searchParams.get("pagePath");
     if (pagePathParam) {
-      let decoded = decodeURIComponent(pagePathParam);
-      if (!decoded.startsWith("/")) decoded = "/" + decoded;
-      return { project, wikiIdentifier, pagePath: decoded };
+      const pagePath = pagePathParam.startsWith("/") ? pagePathParam : `/${pagePathParam}`;
+      return { project, wikiIdentifier, pagePath };
     }
 
     // Path ID form: .../wikis/{wikiIdentifier}/{pageId}/...
