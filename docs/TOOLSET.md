@@ -29,32 +29,34 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 > **Note:** The work item tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#work-items) tool structure.
 
-| Tool                                                        | Action                 | Description                                                             |
-| ----------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
-| [wit_work_item](#wit_work_item)                             | `get`                  | Get a single work item by ID                                            |
-| [wit_work_item](#wit_work_item)                             | `get_batch`            | Retrieve multiple work items by IDs                                     |
-| [wit_work_item](#wit_work_item)                             | `list_comments`        | List comments on a work item                                            |
-| [wit_work_item](#wit_work_item)                             | `my`                   | List work items relevant to the authenticated user                      |
-| [wit_work_item](#wit_work_item)                             | `list_revisions`       | Get revision history of a work item                                     |
-| [wit_work_item](#wit_work_item)                             | `list_for_iteration`   | Get work items in a specific team iteration                             |
-| [wit_work_item](#wit_work_item)                             | `get_type`             | Get metadata for a work item type                                       |
-| [wit_work_item_write](#wit_work_item_write)                 | `create`               | Create a new work item                                                  |
-| [wit_work_item_write](#wit_work_item_write)                 | `update`               | Update fields on a single work item; supports `test /rev` concurrency   |
-| [wit_work_item_write](#wit_work_item_write)                 | `update_batch`         | Update multiple work items in one call                                  |
-| [wit_work_item_write](#wit_work_item_write)                 | `add_child`            | Create child work items under a parent                                  |
-| [wit_work_item_comment_write](#wit_work_item_comment_write) | `add`                  | Add a comment to a work item                                            |
-| [wit_work_item_comment_write](#wit_work_item_comment_write) | `update`               | Update an existing comment on a work item                               |
-| [wit_work_item_link_write](#wit_work_item_link_write)       | `link`                 | Link two work items together                                            |
-| [wit_work_item_link_write](#wit_work_item_link_write)       | `unlink`               | Remove links from a work item                                           |
-| [wit_work_item_link_write](#wit_work_item_link_write)       | `link_to_pull_request` | Link a work item to a pull request                                      |
-| [wit_work_item_link_write](#wit_work_item_link_write)       | `add_artifact_link`    | Add a repository, branch, commit, or build artifact link to a work item |
-| [wit_query](#wit_query)                                     | `get`                  | Get a work item query by ID or path                                     |
-| [wit_query](#wit_query)                                     | `get_results`          | Execute a saved query and return results                                |
-| [wit_query](#wit_query)                                     | `wiql`                 | Execute an ad-hoc WIQL query                                            |
-| [wit_backlog](#wit_backlog)                                 | `list`                 | List backlog levels for a team                                          |
-| [wit_backlog](#wit_backlog)                                 | `list_work_items`      | Get work items in a specific backlog level                              |
-| [wit_backlog](#wit_backlog)                                 | `reorder`              | Reorder work items in a backlog or iteration                            |
-| [wit_work_item_attachment](#wit_work_item_attachment)       |                        | Download a work item attachment; save locally or return as base64       |
+| Tool                                                                | Action                 | Description                                                             |
+| ------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
+| [wit_work_item](#wit_work_item)                                     | `get`                  | Get a single work item by ID                                            |
+| [wit_work_item](#wit_work_item)                                     | `get_batch`            | Retrieve multiple work items by IDs                                     |
+| [wit_work_item](#wit_work_item)                                     | `list_comments`        | List comments on a work item                                            |
+| [wit_work_item](#wit_work_item)                                     | `my`                   | List work items relevant to the authenticated user                      |
+| [wit_work_item](#wit_work_item)                                     | `list_revisions`       | Get revision history of a work item                                     |
+| [wit_work_item](#wit_work_item)                                     | `list_for_iteration`   | Get work items in a specific team iteration                             |
+| [wit_work_item](#wit_work_item)                                     | `get_type`             | Get metadata for a work item type                                       |
+| [wit_work_item_write](#wit_work_item_write)                         | `create`               | Create a new work item                                                  |
+| [wit_work_item_write](#wit_work_item_write)                         | `update`               | Update fields on a single work item; supports `test /rev` concurrency   |
+| [wit_work_item_write](#wit_work_item_write)                         | `update_batch`         | Update multiple work items in one call                                  |
+| [wit_work_item_write](#wit_work_item_write)                         | `add_child`            | Create child work items under a parent                                  |
+| [wit_work_item_comment_write](#wit_work_item_comment_write)         | `add`                  | Add a comment to a work item                                            |
+| [wit_work_item_comment_write](#wit_work_item_comment_write)         | `update`               | Update an existing comment on a work item                               |
+| [wit_work_item_link_write](#wit_work_item_link_write)               | `link`                 | Link two work items together                                            |
+| [wit_work_item_link_write](#wit_work_item_link_write)               | `unlink`               | Remove links from a work item                                           |
+| [wit_work_item_link_write](#wit_work_item_link_write)               | `link_to_pull_request` | Link a work item to a pull request                                      |
+| [wit_work_item_link_write](#wit_work_item_link_write)               | `add_artifact_link`    | Add a repository, branch, commit, or build artifact link to a work item |
+| [wit_query](#wit_query)                                             | `get`                  | Get a work item query by ID or path                                     |
+| [wit_query](#wit_query)                                             | `get_results`          | Execute a saved query and return results                                |
+| [wit_query](#wit_query)                                             | `wiql`                 | Execute an ad-hoc WIQL query                                            |
+| [wit_backlog](#wit_backlog)                                         | `list`                 | List backlog levels for a team                                          |
+| [wit_backlog](#wit_backlog)                                         | `list_work_items`      | Get work items in a specific backlog level                              |
+| [wit_backlog](#wit_backlog)                                         | `reorder`              | Reorder work items in a backlog or iteration                            |
+| [wit_work_item_attachment](#wit_work_item_attachment)               |                        | Download a work item attachment; save locally or return as base64       |
+| [wit_work_item_attachment_upload](#wit_work_item_attachment_upload) |                        | Upload a file as a new work item attachment without linking it          |
+| [wit_work_item_attachment_link](#wit_work_item_attachment_link)     |                        | Link an uploaded attachment to a work item                              |
 
 ### Repositories
 

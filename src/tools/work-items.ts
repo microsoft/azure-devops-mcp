@@ -1,8 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import * as fs from "fs";
+import { constants, open, realpath } from "fs/promises";
 import * as path from "path";
+import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
@@ -18,6 +19,8 @@ const WORKITEM_TOOLS = {
   wit_query: "wit_query",
   wit_backlog: "wit_backlog",
   wit_work_item_attachment: "wit_work_item_attachment",
+  wit_work_item_attachment_upload: "wit_work_item_attachment_upload",
+  wit_work_item_attachment_link: "wit_work_item_attachment_link",
   wit_work_item_write: "wit_work_item_write",
   wit_work_item_comment_write: "wit_work_item_comment_write",
   wit_work_item_link_write: "wit_work_item_link_write",
@@ -466,13 +469,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If savePath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
+      attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}."),
       fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type or the saved file's name."),
       savePath: z
         .string()
         .optional()
         .describe(
-          "Optional local directory path where the file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
+          "Optional local directory path where the downloaded file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments') to an existing directory that resolves (including symlinks) inside the server's working directory; absolute paths are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
         ),
     },
     async ({ project, attachmentId, fileName, savePath }) => {
@@ -485,6 +488,15 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
       if (fileName !== undefined && fileName.includes("..")) {
         throw new Error("Invalid fileName: path traversal is not allowed.");
+      }
+
+      if (!attachmentId) return { content: [{ type: "text", text: "attachmentId is required for download" }], isError: true };
+
+      if (savePath) {
+        const localFileName = fileName ?? attachmentId;
+        if (localFileName.includes("\0") || path.posix.basename(localFileName) !== localFileName || path.win32.basename(localFileName) !== localFileName) {
+          throw new Error("Invalid fileName: path components are not allowed.");
+        }
       }
 
       try {
@@ -510,14 +522,22 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const buffer = Buffer.concat(chunks);
 
         if (savePath) {
-          const resolvedFileName = fileName ?? attachmentId;
-          const localFilePath = path.join(savePath, resolvedFileName);
+          const workspaceRoot = await realpath(process.cwd());
+          const resolvedDirectory = await realpath(path.resolve(workspaceRoot, savePath));
+          const relativeDirectory = path.relative(workspaceRoot, resolvedDirectory);
 
-          if (fs.existsSync(localFilePath)) {
-            throw new Error(`File already exists: ${localFilePath}`);
+          if (relativeDirectory === ".." || relativeDirectory.startsWith(`..${path.sep}`) || path.isAbsolute(relativeDirectory)) {
+            throw new Error("Invalid savePath: destination must remain inside the workspace.");
           }
 
-          fs.writeFileSync(localFilePath, buffer);
+          const localFilePath = path.join(resolvedDirectory, fileName ?? attachmentId);
+          // O_EXCL fails if the file (or a symlink) already exists, so there is no check-then-write race.
+          const file = await open(localFilePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0), 0o600);
+          try {
+            await file.writeFile(buffer);
+          } finally {
+            await file.close();
+          }
 
           return {
             content: [{ type: "text", text: `Attachment saved to: ${localFilePath}` }],
@@ -547,6 +567,89 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [{ type: "text", text: `Error retrieving work item attachment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // --- wit_work_item_attachment_upload ----------------------------------------
+  server.tool(
+    WORKITEM_TOOLS.wit_work_item_attachment_upload,
+    "Upload base64-encoded content as a new work item attachment. This tool only uploads the attachment; use wit_work_item_attachment_link separately to link the returned attachment URL to a work item.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      fileName: z.string().describe("The name of the file to upload, e.g. 'screenshot.png'."),
+      content: z.string().describe("Base64-encoded file content to upload."),
+    },
+    async ({ project, fileName, content }) => {
+      try {
+        if (fileName.includes("..")) return { content: [{ type: "text", text: "Invalid fileName: path traversal is not allowed." }], isError: true };
+        if (!content) return { content: [{ type: "text", text: "content is required for upload" }], isError: true };
+        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(content)) return { content: [{ type: "text", text: "content must be valid base64-encoded data" }], isError: true };
+
+        const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to upload the work item attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const attachmentReference = await workItemApi.createAttachment({}, Readable.from(Buffer.from(content, "base64")), fileName, undefined, resolvedProject);
+
+        return { content: [{ type: "text", text: JSON.stringify(attachmentReference, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error uploading work item attachment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // --- wit_work_item_attachment_link ------------------------------------------
+  server.tool(
+    WORKITEM_TOOLS.wit_work_item_attachment_link,
+    "Link an uploaded attachment to a work item using the attachment URL returned by wit_work_item_attachment_upload.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      workItemId: z.coerce.number().min(1).describe("The ID of the work item to link the uploaded attachment to."),
+      attachmentUrl: z.string().url().describe("The attachment URL returned by wit_work_item_attachment_upload."),
+      comment: z.string().optional().describe("Optional comment to include with the attachment link."),
+    },
+    async ({ project, workItemId, attachmentUrl, comment }) => {
+      try {
+        const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project containing the work item to link the attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const patchDocument = [
+          {
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "AttachedFile",
+              url: attachmentUrl,
+              attributes: { comment: comment || "" },
+            },
+          },
+        ];
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const workItem = await workItemApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+        if (!workItem) throw new Error("Work item not found");
+
+        return { content: [{ type: "text", text: JSON.stringify({ attachmentUrl, workItemId }, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error linking work item attachment: ${errorMessage}` }],
           isError: true,
         };
       }
