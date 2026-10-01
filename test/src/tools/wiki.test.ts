@@ -806,6 +806,29 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("UNTRUSTED");
     });
 
+    it("should decode project, wiki, and page path URL components once", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("encoded URL content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/testorg/My%20Project/_wiki/wikis/Team%20Docs?pagePath=%2FSome%20Page";
+      const result = await handler({ action: "get_page_content" as const, url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("My Project", "Team Docs", "/Some Page", undefined, undefined, true);
+      expect(result.content[0].text).toContain("encoded URL content");
+    });
+
     it("should retrieve content via URL with pageId (may fallback to root path)", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
@@ -838,6 +861,28 @@ describe("configureWikiTools", () => {
       expect(mockWikiApi.getPageText).not.toHaveBeenCalled();
       // Content either direct or from stream JSON string wrapping
       expect(result.content[0].text).toContain("Page Title");
+    });
+
+    it("should encode project and wiki names once when retrieving a page by ID URL", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+      (tokenProvider as jest.Mock).mockResolvedValueOnce("abc");
+
+      const mockFetch = jest.fn();
+      global.fetch = mockFetch as typeof fetch;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ content: "encoded page content" }),
+      });
+
+      const url = "https://dev.azure.com/testorg/My%20Project/_wiki/wikis/Team%20Docs/127/Some-Page";
+      const result = await handler({ action: "get_page_content" as const, url });
+
+      expect(mockFetch).toHaveBeenCalledWith("https://dev.azure.com/testorg/My%20Project/_apis/wiki/wikis/Team%20Docs/pages/127?includeContent=true&api-version=7.1", expect.any(Object));
+      expect(mockFetch.mock.calls[0][0]).not.toContain("%2520");
+      expect(result.content[0].text).toContain("encoded page content");
     });
 
     it("should return empty content via URL with pageId without falling back to getPageText", async () => {
