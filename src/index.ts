@@ -12,11 +12,14 @@ import { createAuthenticator, installPatFetchInterceptor } from "./auth.js";
 import { logger } from "./logger.js";
 import { getOrgTenant } from "./org-tenants.js";
 //import { configurePrompts } from "./prompts.js";
-import { configureAllTools } from "./tools.js";
+import { configureAllTools, configureOnPremTools } from "./tools.js";
 import { UserAgentComposer } from "./useragent.js";
 import { getCliArgs } from "./utils.js";
 import { packageVersion } from "./version.js";
-import { DomainsManager } from "./shared/domains.js";
+import { Domain, DomainsManager } from "./shared/domains.js";
+import { DEFAULT_ONPREM_API_VERSION, resolveOnPremConfig } from "./onprem/config.js";
+import { AzureDevOpsServerClient } from "./onprem/client.js";
+import { createPatTransport, createWindowsIntegratedTransport } from "./onprem/transport.js";
 
 function isGitHubCodespaceEnv(): boolean {
   return process.env.CODESPACES === "true" && !!process.env.CODESPACE_NAME;
@@ -45,14 +48,22 @@ const argv = yargs(getCliArgs())
   })
   .option("authentication", {
     alias: "a",
-    describe: "Type of authentication to use",
+    describe: `Type of authentication to use. Defaults to '${defaultAuthenticationType}', or 'windows' when --server-url is set. 'windows' (Windows integrated authentication) is only valid with --server-url.`,
     type: "string",
-    choices: ["interactive", "azcli", "env", "envvar", "pat"],
-    default: defaultAuthenticationType,
+    choices: ["interactive", "azcli", "env", "envvar", "pat", "windows"],
   })
   .option("tenant", {
     alias: "t",
     describe: "Azure tenant ID (optional, applied when using 'interactive' and 'azcli' type of authentication)",
+    type: "string",
+  })
+  .option("server-url", {
+    describe:
+      "Azure DevOps Server (on-premises) base URL, e.g. https://server or https://server/tfs. Enables the read-only on-premises pull request review mode; the <organization> argument is then the project collection name.",
+    type: "string",
+  })
+  .option("api-version", {
+    describe: `REST API version for Azure DevOps Server requests (only with --server-url). Defaults to ${DEFAULT_ONPREM_API_VERSION} (Azure DevOps Server 2019).`,
     type: "string",
   })
   .help()
@@ -60,6 +71,8 @@ const argv = yargs(getCliArgs())
 
 export const orgName = argv.organization as string;
 const orgUrl = "https://dev.azure.com/" + orgName;
+const serverUrl = argv["server-url"] as string | undefined;
+const authenticationType = (argv.authentication as string | undefined) ?? (serverUrl ? "windows" : defaultAuthenticationType);
 
 const domainsManager = new DomainsManager(argv.domains);
 export const enabledDomains = domainsManager.getEnabledDomains();
@@ -79,18 +92,7 @@ function getAzureDevOpsClient(getAzureDevOpsToken: () => Promise<string>, userAg
   };
 }
 
-async function main() {
-  logger.info("Starting Azure DevOps MCP Server", {
-    organization: orgName,
-    organizationUrl: orgUrl,
-    authentication: argv.authentication,
-    tenant: argv.tenant,
-    domains: argv.domains,
-    enabledDomains: Array.from(enabledDomains),
-    version: packageVersion,
-    isCodespace: isGitHubCodespaceEnv(),
-  });
-
+function createMcpServer() {
   const server = new McpServer({
     name: "Azure DevOps MCP Server",
     version: packageVersion,
@@ -105,10 +107,69 @@ async function main() {
   server.server.oninitialized = () => {
     userAgentComposer.appendMcpClientInfo(server.server.getClientVersion());
   };
-  const tenantId = argv.tenant ?? (await getOrgTenant(orgName));
-  const authenticator = createAuthenticator(argv.authentication, tenantId);
+  return { server, userAgentComposer };
+}
 
-  if (argv.authentication === "pat") {
+/**
+ * Gated Azure DevOps Server (on-premises) mode: read-only pull request review tools only.
+ * Skips all Azure DevOps Services discovery (tenant lookup, Entra ID authentication).
+ */
+async function startOnPrem(serverUrlValue: string) {
+  const config = resolveOnPremConfig({ serverUrl: serverUrlValue, collection: orgName, authentication: authenticationType, apiVersion: argv["api-version"] as string | undefined });
+
+  logger.info("Starting Azure DevOps MCP Server (Azure DevOps Server on-premises, read-only pull request review mode)", {
+    collectionUrl: config.collectionUrl,
+    authentication: config.authentication,
+    apiVersion: config.apiVersion,
+    version: packageVersion,
+  });
+  if (!enabledDomains.has(Domain.REPOSITORIES)) {
+    throw new Error("On-premises mode only provides the 'repositories' domain (read-only pull request review tools). Remove -d or include 'repositories'.");
+  }
+  const requestedDomains = DomainsManager.parseDomainsInput(argv.domains as string | string[]);
+  if (!requestedDomains.includes("all") && requestedDomains.some((domain) => domain !== Domain.REPOSITORIES)) {
+    logger.warn("On-premises mode only provides read-only pull request review tools; other requested domains are ignored.");
+  }
+  if (config.collectionUrl.startsWith("http:")) {
+    logger.warn("--server-url uses http; credentials and source code are sent without TLS. Prefer https.");
+  }
+
+  const { server, userAgentComposer } = createMcpServer();
+  const transport = config.authentication === "windows" ? createWindowsIntegratedTransport() : createPatTransport();
+  const client = new AzureDevOpsServerClient(config, transport, () => userAgentComposer.userAgent);
+  configureOnPremTools(server, client, config.collectionUrl);
+
+  await server.connect(new StdioServerTransport());
+}
+
+async function main() {
+  if (serverUrl) {
+    await startOnPrem(serverUrl);
+    return;
+  }
+  if (authenticationType === "windows") {
+    throw new Error("Authentication type 'windows' requires --server-url (Azure DevOps Server on-premises).");
+  }
+  if (argv["api-version"]) {
+    logger.warn("--api-version is only used with --server-url and will be ignored.");
+  }
+
+  logger.info("Starting Azure DevOps MCP Server", {
+    organization: orgName,
+    organizationUrl: orgUrl,
+    authentication: authenticationType,
+    tenant: argv.tenant,
+    domains: argv.domains,
+    enabledDomains: Array.from(enabledDomains),
+    version: packageVersion,
+    isCodespace: isGitHubCodespaceEnv(),
+  });
+
+  const { server, userAgentComposer } = createMcpServer();
+  const tenantId = argv.tenant ?? (await getOrgTenant(orgName));
+  const authenticator = createAuthenticator(authenticationType, tenantId);
+
+  if (authenticationType === "pat") {
     const basicValue = await authenticator();
     installPatFetchInterceptor(basicValue);
     logger.debug("PAT mode: global fetch interceptor installed to rewrite Bearer -> Basic auth headers");
@@ -117,7 +178,7 @@ async function main() {
   // removing prompts until further notice
   // configurePrompts(server);
 
-  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer, argv.authentication), () => userAgentComposer.userAgent, enabledDomains);
+  configureAllTools(server, authenticator, getAzureDevOpsClient(authenticator, userAgentComposer, authenticationType), () => userAgentComposer.userAgent, enabledDomains);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

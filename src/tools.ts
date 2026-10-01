@@ -18,6 +18,8 @@ import { configureTestPlanTools } from "./tools/test-plans.js";
 import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
 import { configureWorkItemTools } from "./tools/work-items.js";
+import { configureOnPremPullRequestTools } from "./tools/onprem-pull-requests.js";
+import { AzureDevOpsServerClient } from "./onprem/client.js";
 
 function configureAllTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string, enabledDomains: Set<string>) {
   configureToolsWithAnnotations(server, () => {
@@ -38,6 +40,17 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<strin
     configureIfDomainEnabled(Domain.TEST_PLANS, () => configureTestPlanTools(server, tokenProvider, connectionProvider, userAgentProvider));
     configureIfDomainEnabled(Domain.SEARCH, () => configureSearchTools(server, tokenProvider, connectionProvider, userAgentProvider));
     configureIfDomainEnabled(Domain.ADVANCED_SECURITY, () => configureAdvSecTools(server, tokenProvider, connectionProvider));
+  });
+}
+
+/**
+ * Registers the read-only Azure DevOps Server (on-premises) pull request review tools.
+ * Cloud tools are intentionally not registered in this mode because they depend on
+ * Azure DevOps Services-only endpoints and newer REST API versions.
+ */
+function configureOnPremTools(server: McpServer, client: AzureDevOpsServerClient, collectionUrl: string) {
+  configureToolsWithAnnotations(server, () => {
+    configureToolsWithContentSafety(server, "Server repositories", () => configureOnPremPullRequestTools(server, client, collectionUrl));
   });
 }
 
@@ -77,4 +90,4 @@ function configureToolsWithContentSafety(server: McpServer, domain: string, conf
   }
 }
 
-export { configureAllTools };
+export { configureAllTools, configureOnPremTools };

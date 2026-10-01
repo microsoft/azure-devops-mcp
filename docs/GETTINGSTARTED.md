@@ -188,6 +188,8 @@ Alternatively, create or edit the configuration file `~/.copilot/mcp-config.json
 
 Replace `{Contoso}` with your Azure DevOps organization name.
 
+For read-only pull request review on Azure DevOps Server (on-premises) with Windows integrated authentication, see [Azure DevOps Server (On-Premises)](./ONPREM.md#github-copilot-cli).
+
 For more information, see the [Copilot CLI documentation](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli).
 
 ## Codex

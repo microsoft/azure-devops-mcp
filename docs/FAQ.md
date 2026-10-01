@@ -4,7 +4,9 @@ Before you get started, ensure you follow the steps in the `README.md` file. Thi
 
 ## Does the MCP Server support both Azure DevOps Services and on-premises deployments?
 
-This MCP Server supports only Azure DevOps Services. Several required API endpoints are not yet available for on-premises deployments. We currently do not have plans to support Azure DevOps on-prem.
+This MCP Server's full toolset supports only Azure DevOps Services. Several required API endpoints are not yet available for on-premises deployments. We currently do not have plans to support the full toolset on Azure DevOps on-prem.
+
+The local server has a limited, read-only mode for reviewing pull requests on Azure DevOps Server 2019 and later. It supports Windows integrated authentication. See [Azure DevOps Server (On-Premises)](./ONPREM.md).
 
 ## Can I connect to more than one organization at a time?
 
