@@ -4,7 +4,7 @@
 import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
+import { BuildQueryOrder, DefinitionQueryOrder, StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { configurePipelineTools, runPipeline as runPipelineAction, createPipeline as createPipelineAction, updateBuildStage as updateBuildStageAction } from "../../../src/tools/pipelines";
 import { apiVersion } from "../../../src/utils.js";
 import { mockUpdateBuildStageResponse, mockMultipleArtifacts, mockArtifact } from "../../mocks/pipelines";
@@ -45,6 +45,21 @@ describe("configurePipelineTools", () => {
     it("registers build tools on the server", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
+    });
+
+    it("registers queryOrder parameters as SDK enum keys", () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const buildCall = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_build");
+      const definitionCall = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_definition");
+      if (!buildCall || !definitionCall) throw new Error("pipeline tools not registered");
+
+      const buildQueryOrder = buildCall[2].queryOrder;
+      expect(buildQueryOrder.safeParse("FinishTimeAscending").success).toBe(true);
+      expect(buildQueryOrder.safeParse("finishTimeAscending").success).toBe(false);
+
+      const definitionQueryOrder = definitionCall[2].queryOrder;
+      expect(definitionQueryOrder.safeParse("LastModifiedDescending").success).toBe(true);
+      expect(definitionQueryOrder.safeParse("lastModifiedDescending").success).toBe(false);
     });
   });
 
@@ -406,6 +421,7 @@ describe("configurePipelineTools", () => {
         repositoryId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         repositoryType: "TfsGit" as const,
         name: "test-build",
+        queryOrder: "LastModifiedDescending",
         top: 10,
       };
 
@@ -416,7 +432,7 @@ describe("configurePipelineTools", () => {
         "test-build",
         "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         "TfsGit",
-        undefined, // queryOrder
+        DefinitionQueryOrder.LastModifiedDescending,
         10, // top
         undefined, // continuationToken
         undefined, // minMetricsTime
@@ -760,6 +776,7 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         definitions: [1, 2],
         top: 5,
+        queryOrder: "FinishTimeAscending",
         branchName: "refs/heads/main",
       };
 
@@ -782,7 +799,7 @@ describe("configurePipelineTools", () => {
         undefined, // continuationToken
         undefined, // maxBuildsPerDefinition
         undefined, // deletedFilter
-        undefined, // queryOrder (default BuildQueryOrder.QueueTimeDescending)
+        BuildQueryOrder.FinishTimeAscending,
         "refs/heads/main", // branchName
         undefined, // buildIds
         undefined, // repositoryId

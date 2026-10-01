@@ -6,6 +6,9 @@ import { apiVersion, getEnumKeys, safeEnumConvert } from "../utils.js";
 import { WebApi } from "azure-devops-node-api";
 import { BuildQueryOrder, DefinitionQueryOrder } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { z } from "zod";
+
+const buildQueryOrderKeys = getEnumKeys(BuildQueryOrder) as [string, ...string[]];
+const definitionQueryOrderKeys = getEnumKeys(DefinitionQueryOrder) as [string, ...string[]];
 import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 import { mkdirSync, createWriteStream } from "fs";
@@ -169,7 +172,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       continuationToken: z.string().optional().describe("Token for continuing paged results. Used for: list, get_changes."),
       maxBuildsPerDefinition: z.number().optional().describe("Maximum number of builds per definition. Used for: list."),
       deletedFilter: z.number().optional().describe("Filter for deleted builds (see QueryDeletedOption enum). Used for: list."),
-      queryOrder: z.string().optional().describe("Order in which builds are returned (BuildQueryOrder values). Used for: list."),
+      queryOrder: z.enum(buildQueryOrderKeys).optional().describe("Order in which builds are returned. Used for: list."),
       branchName: z.string().optional().describe("Branch name to filter builds. Used for: list."),
       buildIds: z.array(z.coerce.number().min(1)).optional().describe("Array of specific build IDs to retrieve. Used for: list."),
       repositoryId: z.string().optional().describe("Repository ID to filter builds. Used for: list."),
@@ -314,7 +317,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       repositoryType: z.enum(["TfsGit", "GitHub", "BitbucketCloud"]).optional().describe("Repository type to filter definitions. Used for: list."),
       name: z.string().optional().describe("Name filter for build definitions. Used for: list."),
       path: z.string().optional().describe("Path filter for build definitions. Used for: list."),
-      queryOrder: z.string().optional().describe("Order in which definitions are returned (DefinitionQueryOrder values). Used for: list."),
+      queryOrder: z.enum(definitionQueryOrderKeys).optional().describe("Order in which definitions are returned. Used for: list."),
       top: z.number().optional().describe("Maximum number of definitions to return. Used for: list."),
       continuationToken: z.string().optional().describe("Token for continuing paged results. Used for: list."),
       minMetricsTime: z.coerce.date().optional().describe("Minimum metrics time to filter definitions. Used for: list."),
