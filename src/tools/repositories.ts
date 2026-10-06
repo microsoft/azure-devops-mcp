@@ -849,7 +849,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       targetRefName: z.string().optional().describe("The target branch name (e.g., 'refs/heads/main'). Required for create. Optional for update."),
       title: z.string().optional().describe("The title of the pull request. Required for create. Optional for update."),
       description: z.string().max(4000).optional().describe("The description of the pull request. Max 4000 characters. Used for create and update."),
-      isDraft: z.boolean().optional().default(false).describe("Whether the pull request is a draft. Used for create and update."),
+      isDraft: z.boolean().optional().describe("Whether the pull request is a draft. Defaults to false for create. When omitted during update, the existing draft state is preserved."),
       workItems: z.string().optional().describe("Work item IDs to associate, space-separated. Used for create."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository. Used for create."),
       labels: z.array(z.string()).optional().describe("Array of label names. Used for create and update."),
@@ -912,7 +912,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
           let pullRequest = await gitApi.createPullRequest(
-            { sourceRefName, targetRefName, title, description, isDraft, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
+            { sourceRefName, targetRefName, title, description, isDraft: isDraft ?? false, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
             repositoryId,
             project
           );
