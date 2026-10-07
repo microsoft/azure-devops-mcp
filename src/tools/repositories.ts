@@ -248,7 +248,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         ),
       repositoryId: z.string().optional().describe("The ID or name of the repository. Required for get. Optional for list. When using a name instead of a GUID, project must also be provided."),
       pullRequestId: z.coerce.number().min(1).optional().describe("The ID of the pull request. Required for get."),
-      project: z.string().optional().describe("Project ID or project name. Required for list_by_commits. Optional for get and list."),
+      project: z.string().optional().describe("Project ID or name. Required for list_by_commits and when repositoryId is a name. Optional when repositoryId is a GUID."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to include work item references. Used for get."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include labels. Used for get."),
       includeChangedFiles: z
@@ -300,13 +300,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       queryType,
     }) => {
       try {
-        const connection = await connectionProvider();
-        const gitApi = await connection.getGitApi();
-
         if (action === "get") {
           if (!repositoryId) return { content: [{ type: "text", text: "repositoryId is required for get" }], isError: true };
           if (!pullRequestId) return { content: [{ type: "text", text: "pullRequestId is required for get" }], isError: true };
+          if (!project && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repositoryId)) {
+            return {
+              content: [{ type: "text", text: "When repositoryId is a repository name, project is required. Provide the project name or ID, or use the repository GUID." }],
+              isError: true,
+            };
+          }
 
+          const connection = await connectionProvider();
+          const gitApi = await connection.getGitApi();
           const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project, undefined, undefined, undefined, undefined, includeWorkItemRefs);
           let enhancedResponse: Record<string, unknown> = { ...pullRequest };
 
@@ -355,6 +360,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           return createExternalContentResponse(enhancedResponse, "pull request");
         }
+
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
         if (action === "list") {
           if (!repositoryId && !project) {
