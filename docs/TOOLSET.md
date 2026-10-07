@@ -1,14 +1,14 @@
 # Toolset
 
-This page lists all available tools provided by the local Azure DevOps MCP server. Use it as a reference to understand what each tool does, what parameters it requires, and how tools are organized by functional area.
+This page lists all available tools provided by the local Azure DevOps MCP server. Use it as a reference to understand what each tool does, what parameters it requires, and how tools are organized by functional area. The names below are the tool names registered by the server; MCP clients may display them with an additional server-specific prefix.
 
 ### Core
 
-| Tool                                                                | Description                            |
-| ------------------------------------------------------------------- | -------------------------------------- |
-| [mcp_ado_core_list_projects](#mcp_ado_core_list_projects)           | List all projects in the organization  |
-| [mcp_ado_core_list_project_teams](#mcp_ado_core_list_project_teams) | List teams within a project            |
-| [mcp_ado_core_get_identity_ids](#mcp_ado_core_get_identity_ids)     | Retrieve identity IDs by search filter |
+| Tool                                                | Description                            |
+| --------------------------------------------------- | -------------------------------------- |
+| [core_list_projects](#core_list_projects)           | List all projects in the organization  |
+| [core_list_project_teams](#core_list_project_teams) | List teams within a project            |
+| [core_get_identity_ids](#core_get_identity_ids)     | Retrieve identity IDs by search filter |
 
 ### Work
 
@@ -77,6 +77,8 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [repo_branch](#repo_branch)                                       | `list_mine`        | List branches the current user has pushed to                         |
 | [repo_file](#repo_file)                                           | `get_content`      | Get the text content of a file at a specific branch, tag, or commit  |
 | [repo_file](#repo_file)                                           | `list_directory`   | List files and folders in a directory                                |
+| [repo_file_write](#repo_file_write)                               | `create`           | Create a text file on an existing branch and commit the change       |
+| [repo_file_write](#repo_file_write)                               | `update`           | Update a text file on an existing branch and commit the change       |
 | [repo_search_commits](#repo_search_commits)                       |                    | Search commits with filtering by text, author, date range, and more  |
 | [repo_pull_request_write](#repo_pull_request_write)               | `create`           | Create a pull request                                                |
 | [repo_pull_request_write](#repo_pull_request_write)               | `update`           | Update a pull request, including setting autocomplete                |
@@ -141,15 +143,15 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 ### Search
 
-| Tool                                                | Description                           |
-| --------------------------------------------------- | ------------------------------------- |
-| [mcp_ado_search_code](#mcp_ado_search_code)         | Search for code across repositories   |
-| [mcp_ado_search_wiki](#mcp_ado_search_wiki)         | Search wiki pages by keywords         |
-| [mcp_ado_search_workitem](#mcp_ado_search_workitem) | Search work items by text and filters |
+| Tool                                | Description                           |
+| ----------------------------------- | ------------------------------------- |
+| [search_code](#search_code)         | Search for code across repositories   |
+| [search_wiki](#search_wiki)         | Search wiki pages by keywords         |
+| [search_workitem](#search_workitem) | Search work items by text and filters |
 
 ### Advanced Security
 
-| Tool                                                                  | Description                                              |
-| --------------------------------------------------------------------- | -------------------------------------------------------- |
-| [mcp_ado_advsec_get_alerts](#mcp_ado_advsec_get_alerts)               | Retrieve Advanced Security alerts for a repository       |
-| [mcp_ado_advsec_get_alert_details](#mcp_ado_advsec_get_alert_details) | Get detailed information about a specific security alert |
+| Tool                                                  | Description                                              |
+| ----------------------------------------------------- | -------------------------------------------------------- |
+| [advsec_get_alerts](#advsec_get_alerts)               | Retrieve Advanced Security alerts for a repository       |
+| [advsec_get_alert_details](#advsec_get_alert_details) | Get detailed information about a specific security alert |
