@@ -9,6 +9,7 @@ import { ITestPlanApi } from "azure-devops-node-api/TestPlanApi";
 import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
 import { ITestApi } from "azure-devops-node-api/TestApi";
+import { TestOutcome } from "azure-devops-node-api/interfaces/TestInterfaces";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -1001,301 +1002,163 @@ describe("configureTestPlanTools", () => {
   });
 
   describe("test_results_from_build_id tool", () => {
-    it("should fetch test result details for build and return formatted output", async () => {
+    function getHandler() {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
+      return call[3];
+    }
 
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [
+    it("fetches detailed results for every test run and returns formatted output", async () => {
+      const handler = getHandler();
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValue([{ id: 100 }, { id: 200 }]);
+      (mockTestResultsApi.getTestResults as jest.Mock)
+        .mockResolvedValueOnce([
           {
-            results: [
-              {
-                id: 1,
-                testCaseTitle: "TestHello",
-                outcome: "Failed",
-                errorMessage: "Assert.Equal() failed",
-                stackTrace: "at TestClass.TestHello() line 42",
-                automatedTestName: "Namespace.TestClass.TestHello",
-                automatedTestStorage: "test.dll",
-                durationInMs: 1500,
-                testRun: { id: "100" },
-              },
-              {
-                id: 2,
-                testCaseTitle: "TestWorld",
-                outcome: "Passed",
-                automatedTestName: "Namespace.TestClass.TestWorld",
-                automatedTestStorage: "test.dll",
-                durationInMs: 200,
-                testRun: { id: "200" },
-              },
-            ],
+            id: 1,
+            testCaseTitle: "TestHello",
+            outcome: "Failed",
+            errorMessage: "Assert.Equal() failed",
+            stackTrace: "at TestClass.TestHello() line 42",
+            automatedTestName: "Namespace.TestClass.TestHello",
+            automatedTestStorage: "test.dll",
+            durationInMs: 1500,
           },
-        ],
-      });
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 2,
+            testCaseTitle: "TestWorld",
+            outcome: "Passed",
+            automatedTestName: "Namespace.TestClass.TestWorld",
+            automatedTestStorage: "test.dll",
+            durationInMs: 200,
+          },
+        ]);
 
       const result = await handler({ project: "proj1", buildid: 123 });
 
-      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith("proj1", 123, undefined, undefined, undefined, undefined, true);
+      expect(mockTestResultsApi.getTestRuns).toHaveBeenCalledWith("proj1", "vstfs:///Build/Build/123", undefined, undefined, undefined, undefined, undefined, 0, 1000);
+      expect(mockTestResultsApi.getTestResults).toHaveBeenNthCalledWith(1, "proj1", 100, undefined, 0, 1000, undefined);
+      expect(mockTestResultsApi.getTestResults).toHaveBeenNthCalledWith(2, "proj1", 200, undefined, 0, 1000, undefined);
+      expect(mockTestResultsApi.getTestResultDetailsForBuild).not.toHaveBeenCalled();
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed).toHaveLength(2);
-      expect(parsed[0].testCaseTitle).toBe("TestHello");
-      expect(parsed[0].errorMessage).toBe("Assert.Equal() failed");
-      expect(parsed[0].stackTrace).toBe("at TestClass.TestHello() line 42");
-      expect(parsed[0].outcome).toBe("Failed");
-      expect(parsed[1].testCaseTitle).toBe("TestWorld");
-      expect(parsed[1].outcome).toBe("Passed");
+      expect(parsed).toEqual([
+        {
+          id: 1,
+          testCaseTitle: "TestHello",
+          outcome: "Failed",
+          errorMessage: "Assert.Equal() failed",
+          stackTrace: "at TestClass.TestHello() line 42",
+          automatedTestName: "Namespace.TestClass.TestHello",
+          automatedTestStorage: "test.dll",
+          durationInMs: 1500,
+          runId: 100,
+        },
+        {
+          id: 2,
+          testCaseTitle: "TestWorld",
+          outcome: "Passed",
+          automatedTestName: "Namespace.TestClass.TestWorld",
+          automatedTestStorage: "test.dll",
+          durationInMs: 200,
+          runId: 200,
+        },
+      ]);
     });
 
-    it("should pass outcome filter expression for server-side filtering", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [],
-      });
+    it("passes validated outcome values for server-side filtering", async () => {
+      const handler = getHandler();
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValue([{ id: 100 }]);
+      (mockTestResultsApi.getTestResults as jest.Mock).mockResolvedValue([]);
 
       await handler({ project: "proj1", buildid: 123, outcomes: ["Failed", "Aborted"] });
 
-      expect(mockTestResultsApi.getTestResultDetailsForBuild).toHaveBeenCalledWith(
-        "proj1",
-        123,
-        undefined, // publishContext
-        undefined, // groupBy
-        "Outcome eq Failed,Aborted", // filter expression
-        undefined, // orderby
-        true // shouldIncludeResults
-      );
+      expect(mockTestResultsApi.getTestResults).toHaveBeenCalledWith("proj1", 100, undefined, 0, 1000, [TestOutcome.Failed, TestOutcome.Aborted]);
     });
 
-    it("should handle API errors when fetching test results", async () => {
+    it("rejects unsupported outcomes in the registered schema", () => {
       configureTestPlanTools(server, tokenProvider, connectionProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
       if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockRejectedValue(new Error("API Error"));
-
-      const result = await handler({ project: "proj1", buildid: 123 });
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Error fetching test results");
-      expect(result.content[0].text).toContain("API Error");
+      const schema = call[2];
+      expect(schema.outcomes.safeParse(["Failed", "Unsupported"]).success).toBe(false);
     });
 
-    it("should return test case titles for all results across multiple groups", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      // Simulate multiple groups (e.g., grouped by configuration or test suite)
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [
-          {
-            groupByValue: "Configuration1",
-            results: [
-              {
-                id: 1,
-                testCaseTitle: "Test Case Alpha",
-                outcome: "Passed",
-                durationInMs: 100,
-              },
-              {
-                id: 2,
-                testCaseTitle: "Test Case Beta",
-                outcome: "Failed",
-                errorMessage: "Assertion failed",
-              },
-            ],
-          },
-          {
-            groupByValue: "Configuration2",
-            results: [
-              {
-                id: 3,
-                testCaseTitle: "Test Case Gamma",
-                outcome: "Passed",
-                durationInMs: 150,
-              },
-            ],
-          },
-        ],
-      });
-
-      const result = await handler({ project: "proj1", buildid: 456 });
-
-      const parsed = JSON.parse(result.content[0].text);
-
-      // Verify all 3 results are present
-      expect(parsed).toHaveLength(3);
-
-      // Explicitly verify each test case title is present and correct
-      expect(parsed[0].testCaseTitle).toBe("Test Case Alpha");
-      expect(parsed[0].id).toBe(1);
-      expect(parsed[1].testCaseTitle).toBe("Test Case Beta");
-      expect(parsed[1].id).toBe(2);
-      expect(parsed[2].testCaseTitle).toBe("Test Case Gamma");
-      expect(parsed[2].id).toBe(3);
-
-      // Verify testCaseTitle field exists in all results
-      parsed.forEach((result: any) => {
-        expect(result).toHaveProperty("testCaseTitle");
-        expect(result.testCaseTitle).toBeTruthy();
-      });
-    });
-
-    it("should handle large result groups without spreading them onto the stack", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      const largeResults = Array.from({ length: 150_000 }, (_, id) => ({
+    it("pages through all results in a run", async () => {
+      const handler = getHandler();
+      const firstPage = Array.from({ length: 1000 }, (_, id) => ({
         id,
         testCaseTitle: `Test ${id}`,
         outcome: "Passed",
       }));
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValue([{ id: 100 }]);
+      (mockTestResultsApi.getTestResults as jest.Mock).mockResolvedValueOnce(firstPage).mockResolvedValueOnce([{ id: 1000, testCaseTitle: "Test 1000", outcome: "Failed" }]);
 
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [{ results: largeResults }],
-      });
-
-      const result = await handler({ project: "proj1", buildid: 456 });
-
+      const result = await handler({ project: "proj1", buildid: 123 });
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed).toHaveLength(largeResults.length);
+      expect(parsed).toHaveLength(1001);
       expect(parsed[0].testCaseTitle).toBe("Test 0");
-      expect(parsed[largeResults.length - 1].testCaseTitle).toBe("Test 149999");
+      expect(parsed[1000]).toMatchObject({ id: 1000, testCaseTitle: "Test 1000", runId: 100 });
+      expect(mockTestResultsApi.getTestResults).toHaveBeenNthCalledWith(2, "proj1", 100, undefined, 1000, 1000, undefined);
     });
 
-    it("should handle empty results groups without errors", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
+    it("pages through all test runs for the build", async () => {
+      const handler = getHandler();
+      const firstPage = Array.from({ length: 1000 }, () => ({}));
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValueOnce(firstPage).mockResolvedValueOnce([{ id: 100 }]);
+      (mockTestResultsApi.getTestResults as jest.Mock).mockResolvedValue([]);
 
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [
-          {
-            groupByValue: "EmptyGroup",
-            results: [],
-          },
-          {
-            groupByValue: "GroupWithResults",
-            results: [
-              {
-                id: 1,
-                testCaseTitle: "Only Test",
-                outcome: "Passed",
-              },
-            ],
-          },
-        ],
+      await handler({ project: "proj1", buildid: 123 });
+
+      expect(mockTestResultsApi.getTestRuns).toHaveBeenNthCalledWith(2, "proj1", "vstfs:///Build/Build/123", undefined, undefined, undefined, undefined, undefined, 1000, 1000);
+      expect(mockTestResultsApi.getTestResults).toHaveBeenCalledTimes(1);
+    });
+
+    it("limits detailed result requests to five concurrent runs", async () => {
+      const handler = getHandler();
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValue(Array.from({ length: 12 }, (_, index) => ({ id: index + 1 })));
+      let activeRequests = 0;
+      let maxActiveRequests = 0;
+      (mockTestResultsApi.getTestResults as jest.Mock).mockImplementation(async () => {
+        activeRequests++;
+        maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        activeRequests--;
+        return [];
       });
 
-      const result = await handler({ project: "proj1", buildid: 789 });
+      await handler({ project: "proj1", buildid: 123 });
 
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed).toHaveLength(1);
-      expect(parsed[0].testCaseTitle).toBe("Only Test");
+      expect(mockTestResultsApi.getTestResults).toHaveBeenCalledTimes(12);
+      expect(maxActiveRequests).toBe(5);
     });
 
-    it("should return test case titles when present and handle missing titles gracefully", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [
-          {
-            results: [
-              {
-                id: 1,
-                testCaseTitle: "Manual Test Case Title",
-                automatedTestName: "Namespace.TestClass.TestMethod",
-                outcome: "Passed",
-              },
-              {
-                id: 2,
-                testCaseTitle: undefined, // Missing testCaseTitle
-                automatedTestName: "Namespace.TestClass.AnotherTest",
-                outcome: "Failed",
-              },
-              {
-                id: 3,
-                testCaseTitle: "Another Manual Test Case",
-                automatedTestName: "Namespace.TestClass.ThirdTest",
-                outcome: "Passed",
-              },
-            ],
-          },
-        ],
-      });
-
-      const result = await handler({ project: "proj1", buildid: 999 });
-
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed).toHaveLength(3);
-
-      // Verify testCaseTitle is present when provided by the API
-      expect(parsed[0]).toHaveProperty("testCaseTitle");
-      expect(parsed[0].testCaseTitle).toBe("Manual Test Case Title");
-
-      // When testCaseTitle is undefined, JSON.stringify omits it (expected behavior)
-      // but automatedTestName should still be available
-      expect(parsed[1].id).toBe(2);
-      expect(parsed[1].automatedTestName).toBe("Namespace.TestClass.AnotherTest");
-
-      // Third result also has testCaseTitle
-      expect(parsed[2]).toHaveProperty("testCaseTitle");
-      expect(parsed[2].testCaseTitle).toBe("Another Manual Test Case");
-    });
-
-    it("should return empty array when resultsForGroup is null", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({ resultsForGroup: null });
-
+    it("returns an empty array when the build has no test runs", async () => {
+      const handler = getHandler();
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockResolvedValue([]);
       const result = await handler({ project: "proj1", buildid: 123 });
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed).toEqual([]);
+
+      expect(JSON.parse(result.content[0].text)).toEqual([]);
+      expect(mockTestResultsApi.getTestResults).not.toHaveBeenCalled();
     });
 
-    it("should skip groups that have no results property", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockResolvedValue({
-        resultsForGroup: [{ groupByValue: "NoResults" }, { results: [{ id: 1, testCaseTitle: "Test", outcome: "Passed" }] }],
-      });
-
-      const result = await handler({ project: "proj1", buildid: 123 });
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed).toHaveLength(1);
-      expect(parsed[0].testCaseTitle).toBe("Test");
-    });
-
-    it("should handle non-Error throws and return fallback message", async () => {
-      configureTestPlanTools(server, tokenProvider, connectionProvider);
-      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "testplan_show_test_results_from_build_id");
-      if (!call) throw new Error("testplan_show_test_results_from_build_id tool not registered");
-      const [, , , handler] = call;
-
-      (mockTestResultsApi.getTestResultDetailsForBuild as jest.Mock).mockRejectedValue("plain string error");
+    it("returns an error when fetching test runs fails", async () => {
+      const handler = getHandler();
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockRejectedValue(new Error("API Error"));
 
       const result = await handler({ project: "proj1", buildid: 123 });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Unknown error occurred");
+      expect(result.content[0].text).toContain("Error fetching test results: API Error");
+    });
+
+    it("returns a fallback error when the API rejects with a non-Error value", async () => {
+      const handler = getHandler();
+      (mockTestResultsApi.getTestRuns as jest.Mock).mockRejectedValue("API Error");
+
+      const result = await handler({ project: "proj1", buildid: 123 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error fetching test results: Unknown error occurred");
     });
   });
 
