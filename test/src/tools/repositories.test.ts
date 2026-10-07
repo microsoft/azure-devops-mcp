@@ -4055,6 +4055,8 @@ describe("repos tools", () => {
   });
 
   describe("repo_get_pull_request_by_id", () => {
+    const repositoryId = "00000000-0000-0000-0000-000000000123";
+
     it("should get pull request by ID", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -4071,16 +4073,33 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeWorkItemRefs: false,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith(repositoryId, 123, undefined, undefined, undefined, undefined, undefined, false);
       expect(parseSpotlightedPullRequest(result.content[0].text)).toEqual(mockPR);
       expect(result.isError).toBeUndefined();
+    });
+
+    it("should require project when repositoryId is a repository name", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request);
+      if (!call) throw new Error("repo_pull_request tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "get", repositoryId: "repo-name", pullRequestId: 123 });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: "When repositoryId is a repository name, project is required. Provide the project name or ID, or use the repository GUID." }],
+        isError: true,
+      });
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(mockGitApi.getPullRequest).not.toHaveBeenCalled();
     });
 
     it("should spotlight prompt injection instructions in a pull request description", async () => {
@@ -4094,7 +4113,7 @@ describe("repos tools", () => {
       const mockPR = { pullRequestId: 123, title: "Test PR", description, status: 1 };
       mockGitApi.getPullRequest.mockResolvedValue(mockPR);
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123 });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123 });
 
       expect(result.content[0].text).not.toBe(JSON.stringify(mockPR, null, 2));
       expect(result.content[0].text).toContain("UNTRUSTED PULL REQUEST CONTENT");
@@ -4142,14 +4161,14 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeWorkItemRefs: true,
       };
 
       await handler(params);
 
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, true);
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith(repositoryId, 123, undefined, undefined, undefined, undefined, undefined, true);
     });
 
     it("should include labels when includeLabels is true", async () => {
@@ -4180,7 +4199,7 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: true,
         includeWorkItemRefs: false,
@@ -4188,8 +4207,8 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith(repositoryId, 123, undefined, undefined, undefined, undefined, undefined, false);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith(repositoryId, 123, "testproject", "project123");
 
       const expectedResponse = {
         ...mockPR,
@@ -4219,7 +4238,7 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         // includeLabels not specified, in test environment doesn't get default
         // includeWorkItemRefs not specified, doesn't get default
@@ -4227,7 +4246,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, undefined);
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith(repositoryId, 123, undefined, undefined, undefined, undefined, undefined, undefined);
       expect(mockGitApi.getPullRequestLabels).not.toHaveBeenCalled();
       expect(parseSpotlightedPullRequest(result.content[0].text)).toEqual(mockPR);
     });
@@ -4257,7 +4276,7 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: true, // explicitly set to default value
         includeWorkItemRefs: false, // explicitly set to default value
@@ -4265,8 +4284,8 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith(repositoryId, 123, undefined, undefined, undefined, undefined, undefined, false);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith(repositoryId, 123, "testproject", "project123");
 
       const expectedResponse = {
         ...mockPR,
@@ -4296,7 +4315,7 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: false,
         includeWorkItemRefs: false,
@@ -4304,7 +4323,7 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, false);
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith(repositoryId, 123, undefined, undefined, undefined, undefined, undefined, false);
       expect(mockGitApi.getPullRequestLabels).not.toHaveBeenCalled();
       expect(parseSpotlightedPullRequest(result.content[0].text)).toEqual(mockPR);
     });
@@ -4334,14 +4353,14 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: true,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith(repositoryId, 123, "testproject", "project123");
 
       const expectedResponse = {
         ...mockPR,
@@ -4383,7 +4402,7 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: true,
       };
@@ -4428,14 +4447,14 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: true,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith(repositoryId, 123, "testproject", "project123");
       expect(consoleSpy).toHaveBeenCalledWith("Error fetching PR labels: API Error: Labels not accessible");
 
       // Should fall back to empty labelSummary
@@ -4474,7 +4493,7 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: true,
         includeWorkItemRefs: true,
@@ -4482,8 +4501,8 @@ describe("repos tools", () => {
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith("repo123", 123, undefined, undefined, undefined, undefined, undefined, true);
-      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith("repo123", 123, "testproject", "project123");
+      expect(mockGitApi.getPullRequest).toHaveBeenCalledWith(repositoryId, 123, undefined, undefined, undefined, undefined, undefined, true);
+      expect(mockGitApi.getPullRequestLabels).toHaveBeenCalledWith(repositoryId, 123, "testproject", "project123");
 
       const expectedResponse = {
         ...mockPR,
@@ -4519,15 +4538,15 @@ describe("repos tools", () => {
 
       const params = {
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeChangedFiles: true,
       };
 
       const result = await handler(params);
 
-      expect(mockGitApi.getPullRequestIterations).toHaveBeenCalledWith("repo123", 123, undefined);
-      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, undefined, undefined);
+      expect(mockGitApi.getPullRequestIterations).toHaveBeenCalledWith(repositoryId, 123, undefined);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith(repositoryId, 123, 2, undefined, undefined, undefined);
 
       const resultData = parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>;
       expect(resultData.changedFilesSummary).toEqual({
@@ -4547,7 +4566,7 @@ describe("repos tools", () => {
       const mockPR = { pullRequestId: 123, title: "Test PR" };
       mockGitApi.getPullRequest.mockResolvedValue(mockPR);
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: false });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: false });
 
       expect(mockGitApi.getPullRequestIterations).not.toHaveBeenCalled();
       expect(parseSpotlightedPullRequest(result.content[0].text)).toEqual(mockPR);
@@ -4562,7 +4581,7 @@ describe("repos tools", () => {
       const mockPR = { pullRequestId: 123, title: "Test PR" };
       mockGitApi.getPullRequest.mockResolvedValue(mockPR);
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123 });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123 });
 
       expect(mockGitApi.getPullRequestIterations).not.toHaveBeenCalled();
       expect(parseSpotlightedPullRequest(result.content[0].text)).toEqual(mockPR);
@@ -4578,7 +4597,7 @@ describe("repos tools", () => {
       mockGitApi.getPullRequest.mockResolvedValue(mockPR);
       mockGitApi.getPullRequestIterations.mockResolvedValue([]);
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: true });
 
       const resultData = parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>;
       expect(resultData.changedFilesSummary).toEqual({ changeEntries: [], fileCount: 0 });
@@ -4598,7 +4617,7 @@ describe("repos tools", () => {
 
       const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: true });
 
       expect(consoleSpy).toHaveBeenCalledWith("Error fetching PR changed files: API Error: Changes not accessible");
 
@@ -4619,7 +4638,7 @@ describe("repos tools", () => {
       mockGitApi.getPullRequest.mockResolvedValue(mockPR);
       mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: null }]);
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: true });
 
       const resultData = parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>;
       expect(resultData.changedFilesSummary).toEqual({ changeEntries: [], fileCount: 0 });
@@ -4648,7 +4667,7 @@ describe("repos tools", () => {
 
       const result = await handler({
         action: "get",
-        repositoryId: "repo123",
+        repositoryId,
         pullRequestId: 123,
         includeLabels: true,
         includeChangedFiles: true,
@@ -4687,13 +4706,13 @@ describe("repos tools", () => {
       mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 100), nextSkip: 100, nextTop: 50 });
 
       // the handler is called directly elsewhere in this file, which skips the schema, so parse here
-      const parsed = z.object(schema).parse({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+      const parsed = z.object(schema).parse({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: true });
       expect(parsed.top).toBe(100);
       expect(parsed.skip).toBe(0);
 
       await handler(parsed);
 
-      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 100, 0);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith(repositoryId, 123, 2, undefined, 100, 0);
     });
 
     it("should pass top and skip to the changed files call and return the next page markers", async () => {
@@ -4703,10 +4722,10 @@ describe("repos tools", () => {
       // what the endpoint returns for a 150-file iteration when asked for the first 100
       mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 100), nextSkip: 100, nextTop: 50 });
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true, top: 100, skip: 0 });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: true, top: 100, skip: 0 });
 
       expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledTimes(1);
-      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 100, 0);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith(repositoryId, 123, 2, undefined, 100, 0);
       const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
       expect(summary.fileCount).toBe(100);
       expect((summary.changeEntries as { item: { path: string } }[])[0].item.path).toBe("/src/file1.ts");
@@ -4723,9 +4742,9 @@ describe("repos tools", () => {
       mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(100, 50) });
 
       // the caller pages with the nextSkip and nextTop the first page returned
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true, top: 50, skip: 100 });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: true, top: 50, skip: 100 });
 
-      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 2, undefined, 50, 100);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith(repositoryId, 123, 2, undefined, 50, 100);
       const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
       expect(summary.fileCount).toBe(50);
       expect((summary.changeEntries as { item: { path: string } }[])[49].item.path).toBe("/src/file150.ts");
@@ -4739,9 +4758,9 @@ describe("repos tools", () => {
       mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: 1 }]);
       mockGitApi.getPullRequestIterationChanges.mockResolvedValue({ changeEntries: changePage(0, 50), nextSkip: 0, nextTop: 0 });
 
-      const result = await handler({ action: "get", repositoryId: "repo123", pullRequestId: 123, includeChangedFiles: true });
+      const result = await handler({ action: "get", repositoryId, pullRequestId: 123, includeChangedFiles: true });
 
-      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith("repo123", 123, 1, undefined, undefined, undefined);
+      expect(mockGitApi.getPullRequestIterationChanges).toHaveBeenCalledWith(repositoryId, 123, 1, undefined, undefined, undefined);
       const summary = (parseSpotlightedPullRequest(result.content[0].text) as Record<string, unknown>).changedFilesSummary as Record<string, unknown>;
       expect(summary.fileCount).toBe(50);
       expect(summary.nextSkip).toBe(0);
@@ -7873,7 +7892,7 @@ describe("repos tools", () => {
 
         const params = {
           action: "get",
-          repositoryId: "repo123",
+          repositoryId: "00000000-0000-0000-0000-000000000123",
           pullRequestId: 456,
         };
 
@@ -8921,7 +8940,7 @@ describe("repos tools", () => {
         mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 1 });
         mockGitApi.getPullRequestIterations.mockResolvedValue([]);
         const h = getHandler();
-        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, includeChangedFiles: true });
+        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, project: "p", includeChangedFiles: true });
         const data = parseSpotlightedPullRequest(r.content[0].text) as Record<string, unknown>;
         expect(data.changedFilesSummary).toEqual({ changeEntries: [], fileCount: 0 });
       });
@@ -8930,7 +8949,7 @@ describe("repos tools", () => {
         mockGitApi.getPullRequest.mockResolvedValue({ pullRequestId: 1 });
         mockGitApi.getPullRequestIterations.mockResolvedValue([{ id: null }]);
         const h = getHandler();
-        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, includeChangedFiles: true });
+        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, project: "p", includeChangedFiles: true });
         const data = parseSpotlightedPullRequest(r.content[0].text) as Record<string, unknown>;
         expect(data.changedFilesSummary).toEqual({ changeEntries: [], fileCount: 0 });
       });
@@ -8940,7 +8959,7 @@ describe("repos tools", () => {
         mockGitApi.getPullRequestIterations.mockRejectedValue(new Error("iterations failed"));
         const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
         const h = getHandler();
-        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, includeChangedFiles: true });
+        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, project: "p", includeChangedFiles: true });
         const data = parseSpotlightedPullRequest(r.content[0].text) as Record<string, unknown>;
         expect(data.changedFilesSummary).toEqual({});
         consoleSpy.mockRestore();
@@ -8951,7 +8970,7 @@ describe("repos tools", () => {
         mockGitApi.getPullRequestLabels.mockRejectedValue("label fetch failed");
         const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
         const h = getHandler();
-        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, includeLabels: true });
+        const r = await h({ action: "get", repositoryId: "r", pullRequestId: 1, project: "p", includeLabels: true });
         const data = parseSpotlightedPullRequest(r.content[0].text) as Record<string, unknown>;
         expect(data.labelSummary).toEqual({});
         consoleSpy.mockRestore();
@@ -9191,7 +9210,7 @@ describe("repos tools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === REPO_TOOLS.repo_pull_request);
       if (!call) throw new Error("not registered");
       const handler = call[3] as (p: unknown) => Promise<{ content: [{ text: string }] }>;
-      const r = await handler({ action: "get", repositoryId: "r", pullRequestId: 1, includeChangedFiles: true });
+      const r = await handler({ action: "get", repositoryId: "r", pullRequestId: 1, project: "p", includeChangedFiles: true });
       const data = parseSpotlightedPullRequest(r.content[0].text) as Record<string, unknown>;
       expect(data.changedFilesSummary.changeEntries).toEqual([]);
       expect(data.changedFilesSummary.fileCount).toBe(0);
@@ -9206,7 +9225,7 @@ describe("repos tools", () => {
       const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === REPO_TOOLS.repo_pull_request);
       if (!call) throw new Error("not registered");
       const handler = call[3] as (p: unknown) => Promise<{ content: [{ text: string }] }>;
-      await handler({ action: "get", repositoryId: "r", pullRequestId: 1, includeChangedFiles: true });
+      await handler({ action: "get", repositoryId: "r", pullRequestId: 1, project: "p", includeChangedFiles: true });
       expect(consoleSpy).toHaveBeenCalledWith("Error fetching PR changed files: Unknown error");
       consoleSpy.mockRestore();
     });
