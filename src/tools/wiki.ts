@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { z } from "zod";
 import { WikiPagesBatchRequest } from "azure-devops-node-api/interfaces/WikiInterfaces.js";
+import { GitVersionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { apiVersion, extractAdoStreamError, getOrgFromUrl } from "../utils.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 
@@ -164,6 +165,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
           let resolvedWiki = wikiIdentifier;
           let resolvedPath: string | undefined = path;
           let pageContent: string | undefined;
+          let resolvedVersion: string | undefined;
 
           if (url) {
             const parsed = parseWikiUrl(url);
@@ -191,6 +193,7 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
 
             resolvedProject = parsed.project;
             resolvedWiki = parsed.wikiIdentifier;
+            resolvedVersion = parsed.version;
 
             if (parsed.pagePath) {
               resolvedPath = parsed.pagePath;
@@ -225,11 +228,12 @@ function configureWikiTools(server: McpServer, tokenProvider: () => Promise<stri
             if (!resolvedPath) {
               resolvedPath = "/";
             }
+            const versionDescriptor = resolvedVersion ? { version: resolvedVersion, versionType: GitVersionType.Branch } : undefined;
             // resolvedProject and resolvedWiki are guaranteed to be defined here:
             // - the url branch errors out in parseWikiUrl when project/wikiIdentifier are missing
             // - the pair branch enforces both via the hasPair check above
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const stream = await wikiApi.getPageText(resolvedProject!, resolvedWiki!, resolvedPath, undefined, undefined, true);
+            const stream = await wikiApi.getPageText(resolvedProject!, resolvedWiki!, resolvedPath, undefined, versionDescriptor, true);
             if (!stream) {
               return { content: [{ type: "text", text: "No wiki page content found" }], isError: true };
             }
@@ -400,7 +404,7 @@ function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
 //  - https://dev.azure.com/org/project/_wiki/wikis/wikiIdentifier?wikiVersion=GBmain&pagePath=%2FHome
 //  - https://dev.azure.com/org/project/_wiki/wikis/wikiIdentifier/123/Title-Of-Page
 // Returns either a structured object OR an error message inside { error }.
-function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; pagePath?: string; pageId?: number; error?: undefined } | { error: string } {
+function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; pagePath?: string; pageId?: number; version?: string; error?: undefined } | { error: string } {
   try {
     const u = new URL(url);
     // Path segments after host
@@ -418,11 +422,15 @@ function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; p
     const project = decodeURIComponent(encodedProject);
     const wikiIdentifier = decodeURIComponent(encodedWikiIdentifier);
 
+    // wikiVersion=GB<branch> names a branch. The wiki pages API rejects tag and commit versions, so other prefixes are ignored.
+    const wikiVersion = u.searchParams.get("wikiVersion");
+    const version = wikiVersion?.startsWith("GB") ? wikiVersion.slice(2) : undefined;
+
     // Query form with pagePath
     const pagePathParam = u.searchParams.get("pagePath");
     if (pagePathParam) {
       const pagePath = pagePathParam.startsWith("/") ? pagePathParam : `/${pagePathParam}`;
-      return { project, wikiIdentifier, pagePath };
+      return { project, wikiIdentifier, pagePath, version };
     }
 
     // Path ID form: .../wikis/{wikiIdentifier}/{pageId}/...
@@ -430,12 +438,12 @@ function parseWikiUrl(url: string): { project: string; wikiIdentifier: string; p
     if (afterWiki.length >= 1) {
       const maybeId = parseInt(afterWiki[0], 10);
       if (!isNaN(maybeId)) {
-        return { project, wikiIdentifier, pageId: maybeId };
+        return { project, wikiIdentifier, pageId: maybeId, version };
       }
     }
 
     // If nothing else specified, treat as root page
-    return { project, wikiIdentifier, pagePath: "/" };
+    return { project, wikiIdentifier, pagePath: "/", version };
   } catch {
     return { error: "Invalid URL format." };
   }
