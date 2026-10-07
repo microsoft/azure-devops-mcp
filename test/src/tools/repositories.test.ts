@@ -261,6 +261,44 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(expectedTrimmedPR, null, 2));
     });
 
+    it("should preserve draft status when isDraft is omitted from a schema-parsed update", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , schema, handler] = call;
+
+      mockGitApi.updatePullRequest.mockResolvedValue({
+        pullRequestId: 123,
+        repository: { name: "test-repo" },
+        title: "Draft PR",
+        description: "Updated description",
+        isDraft: true,
+      });
+
+      const params = z.object(schema).parse({
+        action: "update",
+        repositoryId: "repo123",
+        pullRequestId: 123,
+        project: "test-project",
+        description: "Updated description",
+      });
+
+      expect(params.isDraft).toBeUndefined();
+
+      await handler(params);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith(
+        {
+          description: "Updated description",
+        },
+        "repo123",
+        123,
+        "test-project"
+      );
+    });
+
     it("should update pull request status to Active", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 
@@ -1106,7 +1144,7 @@ describe("repos tools", () => {
           targetRefName: "refs/heads/main",
           title: "New Feature",
           description: undefined,
-          isDraft: undefined,
+          isDraft: false,
           workItemRefs: [],
           forkSource: undefined,
           labels: undefined,
@@ -6375,7 +6413,7 @@ describe("repos tools", () => {
           targetRefName: "refs/heads/main",
           title: "Test PR",
           description: undefined,
-          isDraft: undefined, // This is what actually gets passed when isDraft is not provided
+          isDraft: false,
           workItemRefs: [],
           forkSource: undefined, // This should be undefined when forkSourceRepositoryId is not provided
           labels: undefined,
