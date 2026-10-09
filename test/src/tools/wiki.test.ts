@@ -5,6 +5,7 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { configureWikiTools } from "../../../src/tools/wiki";
+import { GitVersionType } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
 type TokenProviderMock = () => Promise<string>;
 type ConnectionProviderMock = () => Promise<WebApi>;
@@ -782,7 +783,7 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("Error fetching wiki page content: Unknown error occurred");
     });
 
-    it("should retrieve content via URL with pagePath", async () => {
+    it("should retrieve content via URL with pagePath from its wikiVersion branch", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
       if (!call) throw new Error("wiki tool not registered");
@@ -801,9 +802,53 @@ describe("configureWikiTools", () => {
       const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki?wikiVersion=GBmain&pagePath=%2FDocs%2FIntro";
       const result = await handler({ action: "get_page_content" as const, url });
 
-      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Docs/Intro", undefined, undefined, true);
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Docs/Intro", undefined, { version: "main", versionType: GitVersionType.Branch }, true);
       expect(result.content[0].text).toContain("url path content");
       expect(result.content[0].text).toContain("UNTRUSTED");
+    });
+
+    it("should not pass a version descriptor when wikiVersion is not a branch", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("tag content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki?wikiVersion=GTv1.0&pagePath=%2FDocs%2FIntro";
+      await handler({ action: "get_page_content" as const, url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Docs/Intro", undefined, undefined, true);
+    });
+
+    it("should read the root page from a wikiVersion branch that contains a slash", async () => {
+      configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
+      if (!call) throw new Error("wiki tool not registered");
+      const [, , , handler] = call;
+
+      const mockStream = {
+        setEncoding: jest.fn(),
+        on: function (event: string, cb: (chunk?: unknown) => void) {
+          if (event === "data") setImmediate(() => cb("release root content"));
+          if (event === "end") setImmediate(() => cb());
+          return this;
+        },
+      };
+      mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
+
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki?wikiVersion=GBrelease%2Fv2";
+      await handler({ action: "get_page_content" as const, url });
+
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/", undefined, { version: "release/v2", versionType: GitVersionType.Branch }, true);
     });
 
     it("should decode project, wiki, and page path URL components once", async () => {
@@ -907,7 +952,7 @@ describe("configureWikiTools", () => {
       expect(result.content[0].text).toContain("UNTRUSTED WIKI PAGE CONTENT");
     });
 
-    it("should fallback to getPageText when REST call lacks content but returns path (root path fallback)", async () => {
+    it("should fallback to getPageText when REST call lacks content but returns path, keeping the wikiVersion branch", async () => {
       configureWikiTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wiki");
       if (!call) throw new Error("wiki tool not registered");
@@ -931,11 +976,10 @@ describe("configureWikiTools", () => {
       };
       mockWikiApi.getPageText.mockResolvedValue(mockStream as unknown);
 
-      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/999/Some-Page";
+      const url = "https://dev.azure.com/testorg/project/_wiki/wikis/myWiki/999/Some-Page?wikiVersion=GBrelease%2Fv2";
       const result = await handler({ action: "get_page_content" as const, url });
 
-      // Implementation currently falls back to root path if path not resolved prior to fallback
-      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Some/Page", undefined, undefined, true);
+      expect(mockWikiApi.getPageText).toHaveBeenCalledWith("project", "myWiki", "/Some/Page", undefined, { version: "release/v2", versionType: GitVersionType.Branch }, true);
       expect(result.content[0].text).toContain("fallback content");
       expect(result.content[0].text).toContain("UNTRUSTED");
     });
