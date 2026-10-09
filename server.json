@@ -1,34 +1,18 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.microsoft/azure-devops",
   "description": "The MCP server for Azure DevOps, bringing the power of Azure DevOps directly to your agents.",
-  "version": "2.4.0",
+  "version": "2.10.0",
   "title": "Azure DevOps",
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcp.dev.azure.com/{organization}",
-      "variables": {
-        "organization": {
-          "description": "Your Azure DevOps organization identifier (e.g., 'contoso', 'fabrikam')",
-          "isRequired": false
-        }
-      }
-    }
-  ],
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "@microsoft/azure-devops",
-      "version": "2.4.0",
-      "transport": {
-        "type": "stdio"
-      }
+      "url": "https://mcp.dev.azure.com"
     }
   ],
   "repository": {
     "url": "https://github.com/microsoft/azure-devops-mcp",
     "source": "github"
   },
-  "websiteUrl": "https://learn.microsoft.com/en-us/azure/devops/mcp-server/mcp-server-overview"
+  "websiteUrl": "https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server"
 }

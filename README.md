@@ -52,19 +52,21 @@ If you encounter issues with tools, need support, or have a feature request, you
 
 ### Quick Start
 
-Create `.vscode/mcp.json` in your project and add this configuration. Replace `{organization}` with your Azure DevOps organization name.
+Create `.vscode/mcp.json` in your project and add this configuration:
 
 ```json
 {
   "servers": {
     "ado-remote-mcp": {
-      "url": "https://mcp.dev.azure.com/{organization}",
+      "url": "https://mcp.dev.azure.com",
       "type": "http"
     }
   },
   "inputs": []
 }
 ```
+
+The organization-neutral endpoint is recommended because it lets users and agents work across Azure DevOps organizations without reconnecting. To restrict the connection to one organization, use the optional organization-specific URL `https://mcp.dev.azure.com/{organization}` and replace `{organization}` with your Azure DevOps organization name.
 
 See the [remote server configuration documentation](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#mcpjson-configuration) for more options.
 
