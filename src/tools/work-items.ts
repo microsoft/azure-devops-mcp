@@ -494,7 +494,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
       if (savePath) {
         const localFileName = fileName ?? attachmentId;
-        if (localFileName.includes("\0") || path.posix.basename(localFileName) !== localFileName || path.win32.basename(localFileName) !== localFileName) {
+        if (!localFileName || localFileName.includes("\0") || path.posix.basename(localFileName) !== localFileName || path.win32.basename(localFileName) !== localFileName) {
           throw new Error("Invalid fileName: path components are not allowed.");
         }
       }
@@ -511,6 +511,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         const workItemApi = await connection.getWorkItemTrackingApi();
         const stream = await workItemApi.getAttachmentContent(attachmentId, fileName, resolvedProject);
+        const responseStream = stream as NodeJS.ReadableStream & { statusCode?: number; statusMessage?: string };
+
+        if (responseStream.statusCode !== undefined && (responseStream.statusCode < 200 || responseStream.statusCode >= 300)) {
+          responseStream.resume();
+          const statusMessage = responseStream.statusMessage ? ` ${responseStream.statusMessage}` : "";
+          throw new Error(`Attachment download failed: HTTP ${responseStream.statusCode}${statusMessage}`);
+        }
 
         const chunks: Buffer[] = [];
         await new Promise<void>((resolve, reject) => {
@@ -530,7 +537,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             throw new Error("Invalid savePath: destination must remain inside the workspace.");
           }
 
-          const localFilePath = path.join(resolvedDirectory, fileName ?? attachmentId);
+          const localFilePath = path.resolve(resolvedDirectory, fileName ?? attachmentId);
           // O_EXCL fails if the file (or a symlink) already exists, so there is no check-then-write race.
           const file = await open(localFilePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0), 0o600);
           try {

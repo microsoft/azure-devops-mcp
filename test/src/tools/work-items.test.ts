@@ -4821,8 +4821,9 @@ describe("configureWorkItemTools", () => {
   });
 
   describe("wit_get_work_item_attachment tool", () => {
-    function makeReadableStream(data: Buffer): NodeJS.ReadableStream {
+    function makeReadableStream(data: Buffer, statusCode = 200, statusMessage?: string): NodeJS.ReadableStream {
       const stream = new Readable();
+      Object.assign(stream, { statusCode, statusMessage });
       stream.push(data);
       stream.push(null);
       return stream;
@@ -4958,6 +4959,87 @@ describe("configureWorkItemTools", () => {
       const expectedPath = path.join(path.resolve(process.cwd(), "downloads/attachments"), attachmentId);
       expect(open).toHaveBeenCalledWith(expectedPath, expect.any(Number), 0o600);
       expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
+    });
+
+    it.each(["../../escaped.txt", "..\\..\\escaped.txt"])("should reject path components in attachmentId before downloading or writing: %s", async (attachmentId) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      await expect(handler({ project: "TestProject", attachmentId, savePath: "downloads" })).rejects.toThrow("Invalid fileName: path components are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(mockWorkItemTrackingApi.getAttachmentContent).not.toHaveBeenCalled();
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it("should not write a non-success attachment response body to disk", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const responseStream = makeReadableStream(Buffer.from("not found"), 404, "Not Found");
+      const resume = jest.spyOn(responseStream, "resume");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(responseStream);
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "missing.txt",
+        savePath: "downloads",
+      });
+
+      expect(resume).toHaveBeenCalled();
+      expect(open).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: Attachment download failed: HTTP 404 Not Found");
+    });
+
+    it("should reject an attachment response below the successful HTTP range", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const responseStream = makeReadableStream(Buffer.from("informational response"), 199);
+      const resume = jest.spyOn(responseStream, "resume");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(responseStream);
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "attachment.txt",
+      });
+
+      expect(resume).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: Attachment download failed: HTTP 199");
+    });
+
+    it("should support attachment streams without HTTP response metadata", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const responseStream = new Readable();
+      responseStream.push(Buffer.from("attachment-data"));
+      responseStream.push(null);
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(responseStream);
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "attachment.bin",
+      });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].type).toBe("resource");
     });
 
     it("should return an error if the file already exists at the savePath", async () => {
