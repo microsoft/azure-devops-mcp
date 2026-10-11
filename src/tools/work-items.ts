@@ -26,6 +26,10 @@ const WORKITEM_TOOLS = {
   wit_work_item_link_write: "wit_work_item_link_write",
 };
 
+type JsonPatchValue = string | number | boolean | null | JsonPatchValue[] | { [key: string]: JsonPatchValue };
+
+const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() => z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(jsonPatchValueSchema)]));
+
 function getLinkTypeFromName(name: string) {
   switch (name.toLowerCase()) {
     case "parent":
@@ -696,15 +700,16 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               .default("add")
               .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
             path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
-            value: z
-              .union([z.string(), z.number(), z.boolean(), z.null()])
+            value: jsonPatchValueSchema
               .optional()
-              .describe("The operation value. Required for add, replace, and test; omit for remove. For a test on '/rev', pass the numeric revision previously read."),
+              .describe(
+                "The JSON operation value, including objects and arrays. Required for add, replace, and test; omit for remove. Pass relation objects directly, not as JSON strings. For a test on '/rev', pass the numeric revision previously read."
+              ),
           })
         )
         .optional()
         .describe(
-          'Field updates for a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
+          'JSON Patch operations for fields and relations on a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
         ),
       batchUpdates: z
         .array(

@@ -3,6 +3,8 @@
 
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
 import { WebApi } from "azure-devops-node-api";
 import { Readable } from "stream";
@@ -6268,6 +6270,106 @@ describe("configureWorkItemTools", () => {
   });
 
   describe("update_work_item schema transform coverage", () => {
+    it("should preserve a structured hyperlink and numeric revision through schema parsing and the SDK call", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape, handler] = call;
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const updates = [
+        { op: "test", path: "/rev", value: 9 },
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "Hyperlink",
+            url: "https://example.invalid/evidence",
+            attributes: { comment: "Supporting evidence" },
+          },
+        },
+        { op: "remove", path: "/relations/0" },
+      ];
+      mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 10 });
+
+      const result = await handler(fullSchema.parse({ action: "update", id: 1, updates }));
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
+      expect(result.isError).not.toBe(true);
+      expect(JSON.parse(result.content[0].text)).toEqual({ id: 1, rev: 10 });
+    });
+
+    it.each([
+      ["string", "/fields/System.Title", '{"literal":"not an object"}'],
+      ["number", "/fields/Microsoft.VSTS.Common.Priority", 2],
+      ["boolean", "/fields/Custom.Flag", false],
+      ["null", "/fields/Custom.Optional", null],
+      ["array", "/relations", [{ rel: "Hyperlink", url: "https://example.invalid/evidence", attributes: { comment: "Evidence" } }]],
+      ["nested JSON", "/fields/Custom.Data", { values: [1, false, null, { text: "unchanged" }] }],
+    ])("should preserve a %s value without stringification or coercion", async (_name, fieldPath, value) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape, handler] = call;
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const updates = [{ op: "replace", path: fieldPath, value }];
+
+      await handler(fullSchema.parse({ action: "update", id: 1, updates }));
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
+    });
+
+    it.each([{ nested: undefined }, { nested: () => "not JSON" }, [Infinity]])("should reject non-JSON nested values: %p", (value) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape] = call;
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+
+      expect(fullSchema.safeParse({ action: "update", id: 1, updates: [{ op: "add", path: "/relations/-", value }] }).success).toBe(false);
+    });
+
+    it("should advertise and accept structured patch values over MCP", async () => {
+      const provider = new McpServer({ name: "ado-patch-test", version: "1.0.0" });
+      const client = new Client({ name: "ado-patch-client", version: "1.0.0" });
+      configureWorkItemTools(provider, tokenProvider, connectionProvider, userAgentProvider);
+      const [clientTransport, providerTransport] = InMemoryTransport.createLinkedPair();
+      await Promise.all([provider.connect(providerTransport), client.connect(clientTransport)]);
+      try {
+        const catalog = await client.listTools();
+        const tool = catalog.tools.find(({ name }) => name === "wit_work_item_write");
+        if (!tool) throw new Error("wit_work_item_write not advertised");
+        expect(tool.inputSchema).toMatchObject({
+          properties: {
+            updates: {
+              items: {
+                properties: {
+                  value: {
+                    anyOf: expect.arrayContaining([
+                      expect.objectContaining({ type: "object", additionalProperties: expect.anything() }),
+                      expect.objectContaining({ type: "array", items: expect.anything() }),
+                    ]),
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const updates = [
+          { op: "test", path: "/rev", value: 9 },
+          { op: "add", path: "/relations/-", value: { rel: "Hyperlink", url: "https://example.invalid/evidence", attributes: { comment: "Evidence" } } },
+        ];
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 10 });
+        const result = await client.callTool({ name: "wit_work_item_write", arguments: { action: "update", id: 1, updates } });
+
+        expect(result.isError).not.toBe(true);
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
+      } finally {
+        await client.close();
+        await provider.close();
+      }
+    });
+
     it("should apply lowercase transform to the op field via Zod schema", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
