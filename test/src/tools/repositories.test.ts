@@ -1717,6 +1717,44 @@ describe("repos tools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(mockReviewers, null, 2));
     });
 
+    it("should add required reviewers to pull request when isRequired is true", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_write);
+      if (!call) throw new Error("repo_pull_request_write tool not registered");
+      const [, , , handler] = call;
+
+      const mockReviewers = [
+        { id: "reviewer1", isRequired: true },
+        { id: "reviewer2", isRequired: true },
+      ];
+      mockGitApi.createPullRequestReviewers.mockResolvedValue(mockReviewers);
+
+      const params = {
+        action: "update_reviewers",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        project: "test-project",
+        reviewerIds: ["reviewer1", "reviewer2"],
+        reviewerAction: "add" as const,
+        isRequired: true,
+      };
+
+      const result = await handler(params);
+
+      expect(mockGitApi.createPullRequestReviewers).toHaveBeenCalledWith(
+        [
+          { id: "reviewer1", isRequired: true },
+          { id: "reviewer2", isRequired: true },
+        ],
+        "repo123",
+        456,
+        "test-project"
+      );
+
+      expect(result.content[0].text).toBe(JSON.stringify(mockReviewers, null, 2));
+    });
+
     it("should remove reviewers from pull request", async () => {
       configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
 

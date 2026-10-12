@@ -874,6 +874,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       bypassReason: z.string().optional().describe("Reason for bypassing branch policies. Used for update only when bypassPolicy is true."),
       reviewerIds: z.array(z.string()).optional().describe("List of reviewer IDs. Required for update_reviewers."),
       reviewerAction: z.enum(["add", "remove"]).optional().describe("Whether to add or remove reviewers. Required for update_reviewers."),
+      isRequired: z.boolean().optional().describe("Whether the added reviewers are required. Used for update_reviewers when reviewerAction is add. When omitted, reviewers are added as optional."),
       vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).optional().describe("The vote to cast. Required for vote."),
     },
     async ({
@@ -899,6 +900,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       bypassReason,
       reviewerIds,
       reviewerAction,
+      isRequired,
       vote,
     }) => {
       try {
@@ -1018,7 +1020,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           if (reviewerAction === "add") {
             const updatedReviewers = await gitApi.createPullRequestReviewers(
-              reviewerIds.map((id) => ({ id })),
+              reviewerIds.map((id) => ({ id, ...(isRequired !== undefined ? { isRequired } : {}) })),
               repositoryId,
               pullRequestId,
               project
@@ -1029,6 +1031,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               id: item.id,
               uniqueName: item.uniqueName,
               vote: item.vote,
+              isRequired: item.isRequired,
               hasDeclined: item.hasDeclined,
               isFlagged: item.isFlagged,
             }));
