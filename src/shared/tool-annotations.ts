@@ -60,6 +60,7 @@ const TOOL_ANNOTATIONS: Readonly<Record<string, ToolAnnotations>> = {
   wit_backlog: MUTATING_ANNOTATIONS,
   wit_query: READ_ONLY_ANNOTATIONS,
   wit_work_item: READ_ONLY_ANNOTATIONS,
+  wit_work_item_template: READ_ONLY_ANNOTATIONS,
   wit_work_item_attachment: READ_ONLY_ANNOTATIONS,
   wit_work_item_attachment_link: ADDITIVE_ANNOTATIONS,
   wit_work_item_attachment_upload: ADDITIVE_ANNOTATIONS,

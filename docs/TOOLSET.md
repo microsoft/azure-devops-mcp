@@ -1,4 +1,9 @@
-# Toolset
+---
+title: Azure DevOps MCP toolset
+description: Available tools and actions provided by the local Azure DevOps MCP server
+ms.date: 2026-10-12
+ms.topic: reference
+---
 
 This page lists all available tools provided by the local Azure DevOps MCP server. Use it as a reference to understand what each tool does, what parameters it requires, and how tools are organized by functional area. The names below are the tool names registered by the server; MCP clients may display them with an additional server-specific prefix.
 
@@ -38,6 +43,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [wit_work_item](#wit_work_item)                                     | `list_revisions`       | Get revision history of a work item                                     |
 | [wit_work_item](#wit_work_item)                                     | `list_for_iteration`   | Get work items in a specific team iteration                             |
 | [wit_work_item](#wit_work_item)                                     | `get_type`             | Get metadata for a work item type                                       |
+| [wit_work_item_template](#wit_work_item_template)                   | `get`                  | Get the canonical definition of a team work item template               |
 | [wit_work_item_write](#wit_work_item_write)                         | `create`               | Create a new work item                                                  |
 | [wit_work_item_write](#wit_work_item_write)                         | `update`               | Patch fields and relations; supports `test /rev` concurrency            |
 | [wit_work_item_write](#wit_work_item_write)                         | `update_batch`         | Update multiple work items in one call                                  |

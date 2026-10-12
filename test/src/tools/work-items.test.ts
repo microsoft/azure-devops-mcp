@@ -55,6 +55,7 @@ interface WorkItemTrackingApiMock {
   queryByWiql: jest.Mock;
   getAttachmentContent: jest.Mock;
   createAttachment: jest.Mock;
+  getTemplate: jest.Mock;
 }
 
 interface MockConnection {
@@ -101,12 +102,14 @@ describe("configureWorkItemTools", () => {
       queryByWiql: jest.fn(),
       getAttachmentContent: jest.fn(),
       createAttachment: jest.fn(),
+      getTemplate: jest.fn(),
     };
 
     mockConnection = {
       getWorkApi: jest.fn().mockResolvedValue(mockWorkApi),
       getWorkItemTrackingApi: jest.fn().mockResolvedValue(mockWorkItemTrackingApi),
       getCoreApi: jest.fn().mockResolvedValue({ getProjects: jest.fn() }),
+      serverUrl: "https://dev.azure.com/fabrikam",
     };
 
     connectionProvider = jest.fn().mockResolvedValue(mockConnection);
@@ -118,6 +121,59 @@ describe("configureWorkItemTools", () => {
     it("registers core tools on the server", () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
+    });
+  });
+
+  describe("wit_work_item_template tool", () => {
+    const templateId = "390f785c-dd59-484a-ad7e-987f8a6932f8";
+    const template = {
+      id: templateId,
+      name: "Product backlog item",
+      workItemTypeName: "Product Backlog Item",
+      description: "Canonical product backlog item template",
+      fields: {
+        "System.Title": "Customer outcome",
+        "System.Description": "## Context\n\nPreserve this heading.\n\n* First detail\n* Second detail",
+      },
+    };
+
+    function getRegisteredTool() {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_template");
+      if (!call) throw new Error("wit_work_item_template tool not registered");
+      return call;
+    }
+
+    it("registers a get action with required project, team, and GUID inputs", () => {
+      const [, , schema] = getRegisteredTool();
+
+      expect(schema.action.safeParse("get").success).toBe(true);
+      expect(schema.project.safeParse("").success).toBe(false);
+      expect(schema.team.safeParse("").success).toBe(false);
+      expect(schema.templateId.safeParse("not-a-guid").success).toBe(false);
+      expect(schema.templateId.safeParse(templateId).success).toBe(true);
+    });
+
+    it.each(["Fabrikam Team", "e4a0ea44-ee28-441c-af7a-34aef461faf5"])("retrieves a template for team name or ID %s", async (team) => {
+      const [, , , handler] = getRegisteredTool();
+      mockWorkItemTrackingApi.getTemplate.mockResolvedValue(template);
+
+      const result = await handler({ action: "get", project: "Contoso Project", team, templateId });
+
+      expect(mockWorkItemTrackingApi.getTemplate).toHaveBeenCalledWith({ project: "Contoso Project", team }, templateId);
+      expect(JSON.parse(result.content[0].text)).toEqual(template);
+      expect(JSON.parse(result.content[0].text).fields["System.Description"]).toBe(template.fields["System.Description"]);
+      expect(result.isError).not.toBe(true);
+    });
+
+    it("returns the Azure DevOps error message", async () => {
+      const [, , , handler] = getRegisteredTool();
+      mockWorkItemTrackingApi.getTemplate.mockRejectedValue(new Error("TF401232: The work item template does not exist."));
+
+      const result = await handler({ action: "get", project: "Contoso", team: "Fabrikam", templateId });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item template: TF401232: The work item template does not exist.");
     });
   });
 

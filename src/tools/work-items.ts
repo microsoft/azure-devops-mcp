@@ -16,6 +16,7 @@ import { getUserIdentityFromEmail } from "./auth.js";
 
 const WORKITEM_TOOLS = {
   wit_work_item: "wit_work_item",
+  wit_work_item_template: "wit_work_item_template",
   wit_query: "wit_query",
   wit_backlog: "wit_backlog",
   wit_work_item_attachment: "wit_work_item_attachment",
@@ -302,6 +303,29 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           get_type: `Error retrieving work item type: ${errorMessage}`,
         };
         return { content: [{ type: "text", text: msgs[action] ?? `Error: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  // --- wit_work_item_template -------------------------------------------------
+  server.tool(
+    WORKITEM_TOOLS.wit_work_item_template,
+    "Retrieve the canonical definition of an Azure DevOps work item template.",
+    {
+      action: z.enum(["get"]).describe("The action to perform. Options: get (get a work item template by ID)."),
+      project: z.string().min(1).describe("The name or ID of the Azure DevOps project."),
+      team: z.string().min(1).describe("The name or ID of the Azure DevOps team."),
+      templateId: z.string().uuid().describe("The GUID of the work item template."),
+    },
+    async ({ project, team, templateId }) => {
+      try {
+        const connection = await connectionProvider();
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const template = await workItemApi.getTemplate({ project, team }, templateId);
+        return { content: [{ type: "text", text: JSON.stringify(template, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error retrieving work item template: ${errorMessage}` }], isError: true };
       }
     }
   );
