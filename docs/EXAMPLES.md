@@ -142,6 +142,43 @@ Markdown formatting is configured on individual values rather than as a top-leve
 Update work item 12345 with the following description. Use Markdown format and a batch update: [description]
 ```
 
+### Add a Hyperlink with a Revision-Guarded Update
+
+**Tool:** `wit_work_item_write` with `update`
+
+Single-item updates accept JSON Patch values as strings, numbers, booleans, null,
+objects, or arrays. Pass relation objects directly; do not serialize them into
+JSON strings. Azure DevOps still validates the fields, relation types, URLs, and
+attributes.
+
+After reading the work item's current revision, send the revision test and the
+relation addition in the same update:
+
+```json
+{
+  "action": "update",
+  "id": 12345,
+  "updates": [
+    { "op": "test", "path": "/rev", "value": 9 },
+    {
+      "op": "add",
+      "path": "/relations/-",
+      "value": {
+        "rel": "Hyperlink",
+        "url": "https://example.invalid/evidence",
+        "attributes": { "comment": "Supporting evidence" }
+      }
+    }
+  ]
+}
+```
+
+Replace `9` with the numeric revision from the preceding read. If that revision
+has changed, Azure DevOps rejects the entire patch. Omit `value` for a `remove`
+operation. For a simple hyperlink without a revision guard, use
+`wit_work_item_link_write` with `action: "link"` and an update containing `id`,
+`type: "hyperlink"`, `url`, and optional `comment`.
+
 ### Remove One or More Links from a Work Item
 
 **Tools:** `wit_work_item` with `get` and `expand: Relations`; `wit_work_item_link_write` with `unlink`
