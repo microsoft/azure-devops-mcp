@@ -4776,7 +4776,19 @@ describe("repos tools", () => {
       if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
       const [, , , handler] = call;
 
-      const mockComment = { id: 789, content: "Reply content" };
+      const mockComment = {
+        id: 789,
+        author: {
+          displayName: "Test User",
+          uniqueName: "test.user@example.com",
+          id: "author-id",
+        },
+        content: "Reply content",
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-01T00:05:00Z",
+        lastContentUpdatedDate: "2023-01-01T00:05:00Z",
+        commentType: 1,
+      };
       mockGitApi.createComment.mockResolvedValue(mockComment);
 
       const params = {
@@ -4790,7 +4802,17 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Reply content", commentType: 1 }, "repo123", 456, 789, undefined);
-      expect(result.content[0].text).toBe("Comment successfully added to thread 789.");
+      expect(JSON.parse(result.content[0].text)).toEqual({
+        id: 789,
+        author: {
+          displayName: "Test User",
+          uniqueName: "test.user@example.com",
+        },
+        content: "Reply content",
+        publishedDate: "2023-01-01T00:00:00Z",
+        lastUpdatedDate: "2023-01-01T00:05:00Z",
+        lastContentUpdatedDate: "2023-01-01T00:05:00Z",
+      });
     });
 
     it("should return full response when requested", async () => {

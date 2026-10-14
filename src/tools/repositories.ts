@@ -66,20 +66,22 @@ function trimPullRequestThread(thread: GitPullRequestCommentThread) {
   };
 }
 
+function trimComment(comment: Comment) {
+  return {
+    id: comment.id,
+    author: {
+      displayName: comment.author?.displayName,
+      uniqueName: comment.author?.uniqueName,
+    },
+    content: comment.content,
+    publishedDate: comment.publishedDate,
+    lastUpdatedDate: comment.lastUpdatedDate,
+    lastContentUpdatedDate: comment.lastContentUpdatedDate,
+  };
+}
+
 function trimComments(comments: Comment[] | undefined | null) {
-  return comments
-    ?.filter((comment) => !comment.isDeleted)
-    ?.map((comment) => ({
-      id: comment.id,
-      author: {
-        displayName: comment.author?.displayName,
-        uniqueName: comment.author?.uniqueName,
-      },
-      content: comment.content,
-      publishedDate: comment.publishedDate,
-      lastUpdatedDate: comment.lastUpdatedDate,
-      lastContentUpdatedDate: comment.lastContentUpdatedDate,
-    }));
+  return comments?.filter((comment) => !comment.isDeleted)?.map(trimComment);
 }
 
 function pullRequestStatusStringToInt(status: string): number {
@@ -1219,7 +1221,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
 
-          return { content: [{ type: "text", text: `Comment successfully added to thread ${threadId}.` }] };
+          return { content: [{ type: "text", text: JSON.stringify(trimComment(comment), null, 2) }] };
         }
 
         if (action === "update") {

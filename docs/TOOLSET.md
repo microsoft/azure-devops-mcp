@@ -85,7 +85,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [repo_pull_request_write](#repo_pull_request_write)               | `update_reviewers` | Add or remove pull request reviewers                                 |
 | [repo_pull_request_write](#repo_pull_request_write)               | `vote`             | Cast a vote on a pull request                                        |
 | [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `create`           | Create a new comment thread on a pull request                        |
-| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `reply`            | Reply to a comment in a thread                                       |
+| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `reply`            | Reply to a thread and return the newly created comment               |
 | [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `update`           | Update an existing comment in a thread                               |
 | [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `update_status`    | Update the status of a comment thread                                |
 | [repo_create_branch](#repo_create_branch)                         |                    | Create a branch                                                      |
