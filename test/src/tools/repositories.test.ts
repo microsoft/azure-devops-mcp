@@ -4802,6 +4802,7 @@ describe("repos tools", () => {
       const result = await handler(params);
 
       expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Reply content", commentType: 1 }, "repo123", 456, 789, undefined);
+      expect(mockGitApi.updateThread).not.toHaveBeenCalled();
       expect(JSON.parse(result.content[0].text)).toEqual({
         id: 789,
         author: {
@@ -4813,6 +4814,133 @@ describe("repos tools", () => {
         lastUpdatedDate: "2023-01-01T00:05:00Z",
         lastContentUpdatedDate: "2023-01-01T00:05:00Z",
       });
+    });
+
+    it("should update thread status when replying with a status", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      const mockComment = { id: 789, content: "Reply content" };
+      mockGitApi.createComment.mockResolvedValue(mockComment);
+      mockGitApi.updateThread.mockResolvedValue({ id: 789, status: CommentThreadStatus.Fixed });
+
+      const result = await handler({
+        action: "reply",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        content: "Reply content",
+        project: "TestProject",
+        status: "Fixed",
+      });
+
+      expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "Reply content", commentType: 1 }, "repo123", 456, 789, "TestProject");
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Fixed }, "repo123", 456, 789, "TestProject");
+      expect(JSON.parse(result.content[0].text)).toEqual({
+        comment: {
+          id: 789,
+          author: {},
+          content: "Reply content",
+        },
+        status: CommentThreadStatus.Fixed,
+      });
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("should report a partial failure when status update fails after replying", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createComment.mockResolvedValue({ id: 789, content: "Reply content" });
+      mockGitApi.updateThread.mockRejectedValue(new Error("Thread update failed"));
+
+      const result = await handler({
+        action: "reply",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        content: "Reply content",
+        status: "Fixed",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text)).toEqual({
+        message: "Comment 789 was posted successfully, but the thread status update failed. Do not retry the reply.",
+        comment: {
+          id: 789,
+          author: {},
+          content: "Reply content",
+        },
+        statusUpdate: {
+          succeeded: false,
+          requestedStatus: "Fixed",
+          error: "Thread update failed",
+        },
+      });
+    });
+
+    it("should report a partial failure when status update returns no thread after replying", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createComment.mockResolvedValue({ id: 789, content: "Reply content" });
+      mockGitApi.updateThread.mockResolvedValue(null);
+
+      const result = await handler({
+        action: "reply",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        content: "Reply content",
+        status: "Fixed",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text)).toEqual({
+        message: "Comment 789 was posted successfully, but the thread status update failed. Do not retry the reply.",
+        comment: {
+          id: 789,
+          author: {},
+          content: "Reply content",
+        },
+        statusUpdate: {
+          succeeded: false,
+          requestedStatus: "Fixed",
+          error: "Thread 789 was not updated successfully.",
+        },
+      });
+    });
+
+    it("should report an unknown partial failure when status update rejects without an Error", async () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread_write);
+      if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+      const [, , , handler] = call;
+
+      mockGitApi.createComment.mockResolvedValue({ id: 789, content: "Reply content" });
+      mockGitApi.updateThread.mockRejectedValue("Status update failed");
+
+      const result = await handler({
+        action: "reply",
+        repositoryId: "repo123",
+        pullRequestId: 456,
+        threadId: 789,
+        content: "Reply content",
+        status: "Fixed",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).statusUpdate.error).toBe("Unknown error occurred");
     });
 
     it("should return full response when requested", async () => {
@@ -4958,7 +5086,7 @@ describe("repos tools", () => {
         {
           comments: [{ content: "New thread content", commentType: 1 }],
           threadContext: { filePath: undefined },
-          status: undefined, // Default status would be handled by CommentThreadStatus enum lookup
+          status: CommentThreadStatus.Active,
         },
         "repo123",
         456,
@@ -5000,7 +5128,7 @@ describe("repos tools", () => {
             rightFileStart: { line: 10, offset: 5 },
             rightFileEnd: { line: 12, offset: 15 },
           },
-          status: undefined,
+          status: CommentThreadStatus.Active,
         },
         "repo123",
         456,
@@ -5039,7 +5167,7 @@ describe("repos tools", () => {
             changeTrackingId: 17,
             iterationContext: { firstComparingIteration: 2, secondComparingIteration: 3 },
           },
-          status: undefined,
+          status: CommentThreadStatus.Active,
         },
         "repo123",
         456,
@@ -5097,7 +5225,7 @@ describe("repos tools", () => {
           threadContext: {
             filePath: "/src/file-without-slash.ts", // Should have leading slash added
           },
-          status: undefined,
+          status: CommentThreadStatus.Active,
         },
         "repo123",
         456,
@@ -5133,7 +5261,7 @@ describe("repos tools", () => {
           threadContext: {
             filePath: "/src/file-with-slash.ts", // Should remain unchanged
           },
-          status: undefined,
+          status: CommentThreadStatus.Active,
         },
         "repo123",
         456,
@@ -8892,6 +9020,12 @@ describe("repos tools", () => {
       const r = await h({ action: "update_status", repositoryId: "r", pullRequestId: 1 });
       expect(r.isError).toBe(true);
       expect(r.content[0].text).toContain("threadId is required");
+    });
+    it("repo_pull_request_thread_write update_status: missing status", async () => {
+      const h = getHandler(REPO_TOOLS.repo_pull_request_thread_write);
+      const r = await h({ action: "update_status", repositoryId: "r", pullRequestId: 1, threadId: 1 });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain("status is required");
     });
   });
 

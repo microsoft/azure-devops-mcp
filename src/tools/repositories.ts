@@ -1105,8 +1105,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
-        .default(CommentThreadStatus[CommentThreadStatus.Active])
-        .describe("The thread status. Used for create (defaults to 'Active') and required for update_status."),
+        .describe("The thread status. Used for create (defaults to 'Active'), optionally for reply, and required for update_status."),
       filePath: z.string().optional().describe("The file path for the comment thread. Used for create."),
       fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply and update."),
       rightFileStartLine: z.coerce.number().min(1).optional().describe("Start line in the right file. Used for create."),
@@ -1198,13 +1197,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             changeTrackingId !== undefined && firstComparingIteration !== undefined && secondComparingIteration !== undefined
               ? { changeTrackingId, iterationContext: { firstComparingIteration, secondComparingIteration } }
               : undefined;
+          const threadStatus = status === undefined ? CommentThreadStatus.Active : CommentThreadStatus[status as keyof typeof CommentThreadStatus];
 
-          const thread = await gitApi.createThread(
-            { comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
-            repositoryId,
-            pullRequestId,
-            project
-          );
+          const thread = await gitApi.createThread({ comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: threadStatus }, repositoryId, pullRequestId, project);
 
           return { content: [{ type: "text", text: JSON.stringify(trimPullRequestThread(thread), null, 2) }] };
         }
@@ -1217,6 +1212,61 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           if (!comment) {
             return { content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }], isError: true };
+          }
+
+          if (status !== undefined) {
+            let statusUpdateError: string | undefined;
+            let resultingThreadStatus: CommentThreadStatus | undefined;
+            try {
+              const thread = await gitApi.updateThread({ status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] }, repositoryId, pullRequestId, threadId, project);
+              if (!thread) {
+                statusUpdateError = `Thread ${threadId} was not updated successfully.`;
+              } else {
+                resultingThreadStatus = thread.status;
+              }
+            } catch (error) {
+              statusUpdateError = error instanceof Error ? error.message : "Unknown error occurred";
+            }
+
+            if (statusUpdateError !== undefined) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify(
+                      {
+                        message: `Comment ${comment.id} was posted successfully, but the thread status update failed. Do not retry the reply.`,
+                        comment: trimComment(comment),
+                        statusUpdate: {
+                          succeeded: false,
+                          requestedStatus: status,
+                          error: statusUpdateError,
+                        },
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+                isError: true,
+              };
+            }
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      comment: trimComment(comment),
+                      status: resultingThreadStatus,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
           }
 
           if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
