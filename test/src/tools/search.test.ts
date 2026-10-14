@@ -64,6 +64,7 @@ describe("search tools content spotlighting", () => {
       status: 200,
       statusText: "OK",
       text: jest.fn().mockResolvedValue(payload),
+      json: jest.fn().mockResolvedValue(JSON.parse(payload)),
     });
     global.fetch = fetchMock;
     return fetchMock;
@@ -246,6 +247,110 @@ describe("search tools content spotlighting", () => {
     expect(result.isError).toBeUndefined();
     expect(unwrapSpotlightedContent(result.content[0].text, "wiki search results")).toBe(payload);
     expect(result.content[0].text).not.toBe(payload);
+  });
+
+  it("preserves wiki search responses without results", async () => {
+    const payload = JSON.stringify({ count: 0, infoCode: 0, facets: {} });
+    mockSuccessfulResponse(payload);
+
+    const result = await getHandler(SEARCH_TOOLS.search_wiki)({
+      searchText: "missing",
+      includeFacets: false,
+      skip: 0,
+      top: 10,
+    });
+
+    expect(unwrapSpotlightedContent(result.content[0].text, "wiki search results")).toBe(payload);
+  });
+
+  it("adds wiki-relative page paths to wiki search results", async () => {
+    const payload = JSON.stringify({
+      count: 6,
+      facets: { Project: [{ name: "project", count: 6 }] },
+      results: [
+        {
+          title: "Example page",
+          path: "/docs/Guides/Defining%2DGood%2DEpics.md",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Root page",
+          path: "/Home.md",
+          wiki: { id: "project-wiki", mappedPath: "/" },
+        },
+        {
+          title: "Root page without leading slash",
+          path: "Home.md",
+          wiki: { id: "project-wiki", mappedPath: "/" },
+        },
+        {
+          title: "Existing page path",
+          path: "/docs/Existing.md",
+          pagePath: "/Existing",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Unrelated mapping",
+          path: "/documentation/Unchanged.md",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Missing mapping",
+          path: "/docs/Unchanged.md",
+          wiki: { id: "code-wiki" },
+        },
+      ],
+    });
+    mockSuccessfulResponse(payload);
+
+    const result = await getHandler(SEARCH_TOOLS.search_wiki)({
+      searchText: "page",
+      includeFacets: true,
+      skip: 0,
+      top: 10,
+    });
+
+    const content = JSON.parse(unwrapSpotlightedContent(result.content[0].text, "wiki search results"));
+    expect(content).toEqual({
+      count: 6,
+      facets: { Project: [{ name: "project", count: 6 }] },
+      results: [
+        {
+          title: "Example page",
+          path: "/docs/Guides/Defining%2DGood%2DEpics.md",
+          pagePath: "/Guides/Defining-Good-Epics",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Root page",
+          path: "/Home.md",
+          pagePath: "/Home",
+          wiki: { id: "project-wiki", mappedPath: "/" },
+        },
+        {
+          title: "Root page without leading slash",
+          path: "Home.md",
+          pagePath: "/Home",
+          wiki: { id: "project-wiki", mappedPath: "/" },
+        },
+        {
+          title: "Existing page path",
+          path: "/docs/Existing.md",
+          pagePath: "/Existing",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Unrelated mapping",
+          path: "/documentation/Unchanged.md",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Missing mapping",
+          path: "/docs/Unchanged.md",
+          wiki: { id: "code-wiki" },
+        },
+      ],
+    });
   });
 
   it("sends wiki search filters", async () => {

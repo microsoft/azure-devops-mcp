@@ -81,7 +81,7 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
 
   server.tool(
     SEARCH_TOOLS.search_wiki,
-    "Search Azure DevOps Wiki for a given search text",
+    "Search Azure DevOps Wiki for a given search text. Results include the repository path and a wiki-relative pagePath that can be used with the wiki tool.",
     {
       searchText: z.string().describe("Keywords to search for wiki pages"),
       project: z.array(z.string()).optional().describe("Filter by projects"),
@@ -123,8 +123,11 @@ function configureSearchTools(server: McpServer, tokenProvider: () => Promise<st
         throw new Error(`Azure DevOps Wiki Search API error: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.text();
-      return createExternalContentResponse(result, "wiki search results");
+      const result = (await response.json()) as WikiSearchResponse;
+      const results = result.results?.map(addWikiPagePath);
+      const enrichedResult = results ? { ...result, results } : result;
+
+      return createExternalContentResponse(JSON.stringify(enrichedResult), "wiki search results");
     }
   );
 
@@ -192,7 +195,38 @@ interface SearchResult {
   [key: string]: unknown;
 }
 
+interface WikiSearchResult {
+  path?: string;
+  pagePath?: string;
+  wiki?: {
+    mappedPath?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface WikiSearchResponse {
+  results?: WikiSearchResult[];
+  [key: string]: unknown;
+}
+
 type CombinedResult = { gitItem: GitItem } | { error: string };
+
+function addWikiPagePath(result: WikiSearchResult): WikiSearchResult {
+  if (result.pagePath || !result.path || !result.wiki?.mappedPath) {
+    return result;
+  }
+
+  const mappedPath = result.wiki.mappedPath === "/" ? "" : result.wiki.mappedPath.replace(/\/+$/, "");
+  if (mappedPath && result.path !== mappedPath && !result.path.startsWith(`${mappedPath}/`)) {
+    return result;
+  }
+
+  const relativePath = decodeURIComponent(result.path.slice(mappedPath.length).replace(/\.md$/i, ""));
+  const pagePath = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
+
+  return { ...result, pagePath };
+}
 
 async function fetchCombinedResults(topSearchResults: SearchResult[], gitApi: IGitApi): Promise<CombinedResult[]> {
   const combinedResults: CombinedResult[] = [];
