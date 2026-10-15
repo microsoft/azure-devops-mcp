@@ -206,14 +206,14 @@ interface WikiSearchResult {
 }
 
 interface WikiSearchResponse {
-  results?: WikiSearchResult[];
+  results?: (WikiSearchResult | null)[];
   [key: string]: unknown;
 }
 
 type CombinedResult = { gitItem: GitItem } | { error: string };
 
-function addWikiPagePath(result: WikiSearchResult): WikiSearchResult {
-  if (result.pagePath || !result.path || !result.wiki?.mappedPath) {
+function addWikiPagePath(result: WikiSearchResult | null): WikiSearchResult | null {
+  if (!result || result.pagePath || !result.path || !result.wiki?.mappedPath) {
     return result;
   }
 
@@ -222,7 +222,16 @@ function addWikiPagePath(result: WikiSearchResult): WikiSearchResult {
     return result;
   }
 
-  const relativePath = decodeURIComponent(result.path.slice(mappedPath.length).replace(/\.md$/i, ""));
+  let relativePath: string;
+  try {
+    relativePath = decodeURIComponent(result.path.slice(mappedPath.length).replace(/\.md$/i, ""));
+  } catch (error) {
+    if (error instanceof URIError) {
+      return result;
+    }
+    throw error;
+  }
+
   const pagePath = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
 
   return { ...result, pagePath };

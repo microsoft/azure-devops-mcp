@@ -353,6 +353,82 @@ describe("search tools content spotlighting", () => {
     });
   });
 
+  it("preserves null results and paths with malformed URI encoding", async () => {
+    const payload = JSON.stringify({
+      count: 3,
+      results: [
+        null,
+        {
+          title: "Malformed path",
+          path: "/docs/Invalid%ZZ.md",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Valid path",
+          path: "/docs/Valid%20Page.md",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+      ],
+    });
+    mockSuccessfulResponse(payload);
+
+    const result = await getHandler(SEARCH_TOOLS.search_wiki)({
+      searchText: "page",
+      includeFacets: false,
+      skip: 0,
+      top: 10,
+    });
+
+    const content = JSON.parse(unwrapSpotlightedContent(result.content[0].text, "wiki search results"));
+    expect(content).toEqual({
+      count: 3,
+      results: [
+        null,
+        {
+          title: "Malformed path",
+          path: "/docs/Invalid%ZZ.md",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+        {
+          title: "Valid path",
+          path: "/docs/Valid%20Page.md",
+          pagePath: "/Valid Page",
+          wiki: { id: "code-wiki", mappedPath: "/docs" },
+        },
+      ],
+    });
+  });
+
+  it("rethrows unexpected wiki path decoding errors", async () => {
+    const payload = JSON.stringify({
+      results: [
+        {
+          path: "/docs/Page.md",
+          wiki: { mappedPath: "/docs" },
+        },
+      ],
+    });
+    mockSuccessfulResponse(payload);
+
+    const unexpectedError = new Error("Unexpected decoding failure");
+    const decodeURIComponentSpy = jest.spyOn(globalThis, "decodeURIComponent").mockImplementationOnce(() => {
+      throw unexpectedError;
+    });
+
+    try {
+      await expect(
+        getHandler(SEARCH_TOOLS.search_wiki)({
+          searchText: "page",
+          includeFacets: false,
+          skip: 0,
+          top: 10,
+        })
+      ).rejects.toBe(unexpectedError);
+    } finally {
+      decodeURIComponentSpy.mockRestore();
+    }
+  });
+
   it("sends wiki search filters", async () => {
     const fetchMock = mockSuccessfulResponse(JSON.stringify({ results: [] }));
 
