@@ -152,6 +152,19 @@ describe("configureWorkItemTools", () => {
         "X-VSS-ReadConsistencyLevel": "Eventual",
       });
     });
+
+    it("does not handle authentication in the read-consistency handler", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "wit_query");
+      if (!call) throw new Error("wit_query tool not registered");
+      await call[3]({ action: "wiql", project: "Contoso", wiql: "SELECT [System.Id] FROM WorkItems" });
+      const [, handler]: IRequestHandler[] = mockConnection.getWorkItemTrackingApi.mock.calls[0][1];
+      const response = {} as Parameters<IRequestHandler["canHandleAuthentication"]>[0];
+      expect(handler.canHandleAuthentication(response)).toBe(false);
+      await expect(handler.handleAuthentication({} as Parameters<IRequestHandler["handleAuthentication"]>[0], {} as Parameters<IRequestHandler["handleAuthentication"]>[1], undefined)).rejects.toThrow(
+        "The read-consistency handler does not handle authentication."
+      );
+    });
   });
 
   describe("list_backlogs tool", () => {
