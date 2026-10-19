@@ -1,14 +1,14 @@
 # Toolset
 
-This page lists all available tools provided by the local Azure DevOps MCP server. Use it as a reference to understand what each tool does, what parameters it requires, and how tools are organized by functional area.
+This page lists all available tools provided by the local Azure DevOps MCP server. Use it as a reference to understand what each tool does, what parameters it requires, and how tools are organized by functional area. The names below are the tool names registered by the server; MCP clients may display them with an additional server-specific prefix.
 
 ### Core
 
-| Tool                                                                | Description                            |
-| ------------------------------------------------------------------- | -------------------------------------- |
-| [mcp_ado_core_list_projects](#mcp_ado_core_list_projects)           | List all projects in the organization  |
-| [mcp_ado_core_list_project_teams](#mcp_ado_core_list_project_teams) | List teams within a project            |
-| [mcp_ado_core_get_identity_ids](#mcp_ado_core_get_identity_ids)     | Retrieve identity IDs by search filter |
+| Tool                                                | Description                            |
+| --------------------------------------------------- | -------------------------------------- |
+| [core_list_projects](#core_list_projects)           | List all projects in the organization  |
+| [core_list_project_teams](#core_list_project_teams) | List teams within a project            |
+| [core_get_identity_ids](#core_get_identity_ids)     | Retrieve identity IDs by search filter |
 
 ### Work
 
@@ -39,7 +39,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [wit_work_item](#wit_work_item)                                     | `list_for_iteration`   | Get work items in a specific team iteration                             |
 | [wit_work_item](#wit_work_item)                                     | `get_type`             | Get metadata for a work item type                                       |
 | [wit_work_item_write](#wit_work_item_write)                         | `create`               | Create a new work item                                                  |
-| [wit_work_item_write](#wit_work_item_write)                         | `update`               | Update fields on a single work item; supports `test /rev` concurrency   |
+| [wit_work_item_write](#wit_work_item_write)                         | `update`               | Patch fields and relations; supports `test /rev` concurrency            |
 | [wit_work_item_write](#wit_work_item_write)                         | `update_batch`         | Update multiple work items in one call                                  |
 | [wit_work_item_write](#wit_work_item_write)                         | `add_child`            | Create child work items under a parent                                  |
 | [wit_work_item_comment_write](#wit_work_item_comment_write)         | `add`                  | Add a comment to a work item                                            |
@@ -62,31 +62,33 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 > **Note:** The repository tools are being aligned with the [Azure DevOps remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops#repos) tool structure.
 
-| Tool                                                              | Action             | Description                                                          |
-| ----------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------- |
-| [repo_repository](#repo_repository)                               | `get`              | Get a repository by name or ID                                       |
-| [repo_repository](#repo_repository)                               | `list`             | List repositories in a project                                       |
-| [repo_pull_request](#repo_pull_request)                           | `get`              | Get a pull request by ID                                             |
-| [repo_pull_request](#repo_pull_request)                           | `list`             | List pull requests in a repository or project                        |
-| [repo_pull_request](#repo_pull_request)                           | `list_by_commits`  | Find pull requests that contain specific commit IDs                  |
-| [repo_pull_request_org](#repo_pull_request_org)                   |                    | List the authenticated user's active pull requests organization-wide |
-| [repo_pull_request_thread](#repo_pull_request_thread)             | `list`             | List comment threads on a pull request                               |
-| [repo_pull_request_thread](#repo_pull_request_thread)             | `list_comments`    | List comments in a specific thread                                   |
-| [repo_branch](#repo_branch)                                       | `get`              | Get a branch by name                                                 |
-| [repo_branch](#repo_branch)                                       | `list`             | List branches in a repository                                        |
-| [repo_branch](#repo_branch)                                       | `list_mine`        | List branches the current user has pushed to                         |
-| [repo_file](#repo_file)                                           | `get_content`      | Get the text content of a file at a specific branch, tag, or commit  |
-| [repo_file](#repo_file)                                           | `list_directory`   | List files and folders in a directory                                |
-| [repo_search_commits](#repo_search_commits)                       |                    | Search commits with filtering by text, author, date range, and more  |
-| [repo_pull_request_write](#repo_pull_request_write)               | `create`           | Create a pull request                                                |
-| [repo_pull_request_write](#repo_pull_request_write)               | `update`           | Update a pull request, including setting autocomplete                |
-| [repo_pull_request_write](#repo_pull_request_write)               | `update_reviewers` | Add or remove pull request reviewers                                 |
-| [repo_pull_request_write](#repo_pull_request_write)               | `vote`             | Cast a vote on a pull request                                        |
-| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `create`           | Create a new comment thread on a pull request                        |
-| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `reply`            | Reply to a comment in a thread                                       |
-| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `update`           | Update an existing comment in a thread                               |
-| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `update_status`    | Update the status of a comment thread                                |
-| [repo_create_branch](#repo_create_branch)                         |                    | Create a branch                                                      |
+| Tool                                                              | Action             | Description                                                             |
+| ----------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------- |
+| [repo_repository](#repo_repository)                               | `get`              | Get a repository by name or ID                                          |
+| [repo_repository](#repo_repository)                               | `list`             | List repositories in a project                                          |
+| [repo_pull_request](#repo_pull_request)                           | `get`              | Get a pull request by ID                                                |
+| [repo_pull_request](#repo_pull_request)                           | `list`             | List pull requests in a repository or project                           |
+| [repo_pull_request](#repo_pull_request)                           | `list_by_commits`  | Find pull requests that contain specific commit IDs                     |
+| [repo_pull_request_org](#repo_pull_request_org)                   |                    | List the authenticated user's active pull requests organization-wide    |
+| [repo_pull_request_thread](#repo_pull_request_thread)             | `list`             | List comment threads on a pull request                                  |
+| [repo_pull_request_thread](#repo_pull_request_thread)             | `list_comments`    | List comments in a specific thread                                      |
+| [repo_branch](#repo_branch)                                       | `get`              | Get a branch by name                                                    |
+| [repo_branch](#repo_branch)                                       | `list`             | List branches in a repository                                           |
+| [repo_branch](#repo_branch)                                       | `list_mine`        | List branches the current user has pushed to                            |
+| [repo_file](#repo_file)                                           | `get_content`      | Get the text content of a file at a specific branch, tag, or commit     |
+| [repo_file](#repo_file)                                           | `list_directory`   | List files and folders in a directory                                   |
+| [repo_file_write](#repo_file_write)                               | `create`           | Create a text file on an existing branch and commit the change          |
+| [repo_file_write](#repo_file_write)                               | `update`           | Update a text file on an existing branch and commit the change          |
+| [repo_search_commits](#repo_search_commits)                       |                    | Search commits with filtering by text, author, date range, and more     |
+| [repo_pull_request_write](#repo_pull_request_write)               | `create`           | Create a pull request                                                   |
+| [repo_pull_request_write](#repo_pull_request_write)               | `update`           | Update a pull request, including setting autocomplete                   |
+| [repo_pull_request_write](#repo_pull_request_write)               | `update_reviewers` | Add or remove pull request reviewers                                    |
+| [repo_pull_request_write](#repo_pull_request_write)               | `vote`             | Cast a vote on a pull request                                           |
+| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `create`           | Create a new comment thread on a pull request                           |
+| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `reply`            | Reply to a thread, optionally update its status, and return the comment |
+| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `update`           | Update an existing comment in a thread                                  |
+| [repo_pull_request_thread_write](#repo_pull_request_thread_write) | `update_status`    | Update the status of a comment thread                                   |
+| [repo_create_branch](#repo_create_branch)                         |                    | Create a branch                                                         |
 
 ### Pipelines
 
@@ -141,15 +143,15 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 
 ### Search
 
-| Tool                                                | Description                           |
-| --------------------------------------------------- | ------------------------------------- |
-| [mcp_ado_search_code](#mcp_ado_search_code)         | Search for code across repositories   |
-| [mcp_ado_search_wiki](#mcp_ado_search_wiki)         | Search wiki pages by keywords         |
-| [mcp_ado_search_workitem](#mcp_ado_search_workitem) | Search work items by text and filters |
+| Tool                                | Description                           |
+| ----------------------------------- | ------------------------------------- |
+| [search_code](#search_code)         | Search for code across repositories   |
+| [search_wiki](#search_wiki)         | Search wiki pages by keywords         |
+| [search_workitem](#search_workitem) | Search work items by text and filters |
 
 ### Advanced Security
 
-| Tool                                                                  | Description                                              |
-| --------------------------------------------------------------------- | -------------------------------------------------------- |
-| [mcp_ado_advsec_get_alerts](#mcp_ado_advsec_get_alerts)               | Retrieve Advanced Security alerts for a repository       |
-| [mcp_ado_advsec_get_alert_details](#mcp_ado_advsec_get_alert_details) | Get detailed information about a specific security alert |
+| Tool                                                  | Description                                              |
+| ----------------------------------------------------- | -------------------------------------------------------- |
+| [advsec_get_alerts](#advsec_get_alerts)               | Retrieve Advanced Security alerts for a repository       |
+| [advsec_get_alert_details](#advsec_get_alert_details) | Get detailed information about a specific security alert |

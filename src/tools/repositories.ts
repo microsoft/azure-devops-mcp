@@ -66,20 +66,22 @@ function trimPullRequestThread(thread: GitPullRequestCommentThread) {
   };
 }
 
+function trimComment(comment: Comment) {
+  return {
+    id: comment.id,
+    author: {
+      displayName: comment.author?.displayName,
+      uniqueName: comment.author?.uniqueName,
+    },
+    content: comment.content,
+    publishedDate: comment.publishedDate,
+    lastUpdatedDate: comment.lastUpdatedDate,
+    lastContentUpdatedDate: comment.lastContentUpdatedDate,
+  };
+}
+
 function trimComments(comments: Comment[] | undefined | null) {
-  return comments
-    ?.filter((comment) => !comment.isDeleted)
-    ?.map((comment) => ({
-      id: comment.id,
-      author: {
-        displayName: comment.author?.displayName,
-        uniqueName: comment.author?.uniqueName,
-      },
-      content: comment.content,
-      publishedDate: comment.publishedDate,
-      lastUpdatedDate: comment.lastUpdatedDate,
-      lastContentUpdatedDate: comment.lastContentUpdatedDate,
-    }));
+  return comments?.filter((comment) => !comment.isDeleted)?.map(trimComment);
 }
 
 function pullRequestStatusStringToInt(status: string): number {
@@ -248,7 +250,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         ),
       repositoryId: z.string().optional().describe("The ID or name of the repository. Required for get. Optional for list. When using a name instead of a GUID, project must also be provided."),
       pullRequestId: z.coerce.number().min(1).optional().describe("The ID of the pull request. Required for get."),
-      project: z.string().optional().describe("Project ID or project name. Required for list_by_commits. Optional for get and list."),
+      project: z.string().optional().describe("Project ID or name. Required for list_by_commits and when repositoryId is a name. Optional when repositoryId is a GUID."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to include work item references. Used for get."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include labels. Used for get."),
       includeChangedFiles: z
@@ -300,13 +302,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       queryType,
     }) => {
       try {
-        const connection = await connectionProvider();
-        const gitApi = await connection.getGitApi();
-
         if (action === "get") {
           if (!repositoryId) return { content: [{ type: "text", text: "repositoryId is required for get" }], isError: true };
           if (!pullRequestId) return { content: [{ type: "text", text: "pullRequestId is required for get" }], isError: true };
+          if (!project && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repositoryId)) {
+            return {
+              content: [{ type: "text", text: "When repositoryId is a repository name, project is required. Provide the project name or ID, or use the repository GUID." }],
+              isError: true,
+            };
+          }
 
+          const connection = await connectionProvider();
+          const gitApi = await connection.getGitApi();
           const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project, undefined, undefined, undefined, undefined, includeWorkItemRefs);
           let enhancedResponse: Record<string, unknown> = { ...pullRequest };
 
@@ -355,6 +362,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           return createExternalContentResponse(enhancedResponse, "pull request");
         }
+
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
         if (action === "list") {
           if (!repositoryId && !project) {
@@ -849,7 +859,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       targetRefName: z.string().optional().describe("The target branch name (e.g., 'refs/heads/main'). Required for create. Optional for update."),
       title: z.string().optional().describe("The title of the pull request. Required for create. Optional for update."),
       description: z.string().max(4000).optional().describe("The description of the pull request. Max 4000 characters. Used for create and update."),
-      isDraft: z.boolean().optional().default(false).describe("Whether the pull request is a draft. Used for create and update."),
+      isDraft: z.boolean().optional().describe("Whether the pull request is a draft. Defaults to false for create. When omitted during update, the existing draft state is preserved."),
       workItems: z.string().optional().describe("Work item IDs to associate, space-separated. Used for create."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository. Used for create."),
       labels: z.array(z.string()).optional().describe("Array of label names. Used for create and update."),
@@ -912,7 +922,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
           let pullRequest = await gitApi.createPullRequest(
-            { sourceRefName, targetRefName, title, description, isDraft, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
+            { sourceRefName, targetRefName, title, description, isDraft: isDraft ?? false, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
             repositoryId,
             project
           );
@@ -1095,8 +1105,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
-        .default(CommentThreadStatus[CommentThreadStatus.Active])
-        .describe("The thread status. Used for create (defaults to 'Active') and required for update_status."),
+        .describe("The thread status. Used for create (defaults to 'Active'), optionally for reply, and required for update_status."),
       filePath: z.string().optional().describe("The file path for the comment thread. Used for create."),
       fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply and update."),
       rightFileStartLine: z.coerce.number().min(1).optional().describe("Start line in the right file. Used for create."),
@@ -1188,13 +1197,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             changeTrackingId !== undefined && firstComparingIteration !== undefined && secondComparingIteration !== undefined
               ? { changeTrackingId, iterationContext: { firstComparingIteration, secondComparingIteration } }
               : undefined;
+          const threadStatus = status === undefined ? CommentThreadStatus.Active : CommentThreadStatus[status as keyof typeof CommentThreadStatus];
 
-          const thread = await gitApi.createThread(
-            { comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
-            repositoryId,
-            pullRequestId,
-            project
-          );
+          const thread = await gitApi.createThread({ comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: threadStatus }, repositoryId, pullRequestId, project);
 
           return { content: [{ type: "text", text: JSON.stringify(trimPullRequestThread(thread), null, 2) }] };
         }
@@ -1209,9 +1214,64 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             return { content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }], isError: true };
           }
 
+          if (status !== undefined) {
+            let statusUpdateError: string | undefined;
+            let resultingThreadStatus: CommentThreadStatus | undefined;
+            try {
+              const thread = await gitApi.updateThread({ status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] }, repositoryId, pullRequestId, threadId, project);
+              if (!thread) {
+                statusUpdateError = `Thread ${threadId} was not updated successfully.`;
+              } else {
+                resultingThreadStatus = thread.status;
+              }
+            } catch (error) {
+              statusUpdateError = error instanceof Error ? error.message : "Unknown error occurred";
+            }
+
+            if (statusUpdateError !== undefined) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify(
+                      {
+                        message: `Comment ${comment.id} was posted successfully, but the thread status update failed. Do not retry the reply.`,
+                        comment: trimComment(comment),
+                        statusUpdate: {
+                          succeeded: false,
+                          requestedStatus: status,
+                          error: statusUpdateError,
+                        },
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+                isError: true,
+              };
+            }
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      comment: trimComment(comment),
+                      status: resultingThreadStatus,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
           if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
 
-          return { content: [{ type: "text", text: `Comment successfully added to thread ${threadId}.` }] };
+          return { content: [{ type: "text", text: JSON.stringify(trimComment(comment), null, 2) }] };
         }
 
         if (action === "update") {

@@ -6,6 +6,7 @@ import * as path from "path";
 import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { IRequestHandler } from "azure-devops-node-api/interfaces/common/VsoBaseInterfaces.js";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
@@ -25,6 +26,24 @@ const WORKITEM_TOOLS = {
   wit_work_item_comment_write: "wit_work_item_comment_write",
   wit_work_item_link_write: "wit_work_item_link_write",
 };
+
+type JsonPatchValue = string | number | boolean | null | JsonPatchValue[] | { [key: string]: JsonPatchValue };
+
+const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() => z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(jsonPatchValueSchema)]));
+
+const readConsistencyHandler: IRequestHandler = {
+  prepareRequest(options) {
+    options.headers = { ...options.headers, "X-VSS-ReadConsistencyLevel": "Eventual" };
+  },
+  canHandleAuthentication: () => false,
+  async handleAuthentication() {
+    throw new Error("The read-consistency handler does not handle authentication.");
+  },
+};
+
+function getReadReplicaWorkItemTrackingApi(connection: WebApi) {
+  return connection.getWorkItemTrackingApi(undefined, [connection.authHandler, readConsistencyHandler]);
+}
 
 function getLinkTypeFromName(name: string) {
   switch (name.toLowerCase()) {
@@ -351,7 +370,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (action === "get_results") {
           if (!id) return { content: [{ type: "text", text: "id is required for get_results" }], isError: true };
-          const workItemApi = await connection.getWorkItemTrackingApi();
+          const workItemApi = await getReadReplicaWorkItemTrackingApi(connection);
           const teamContext = { project: resolvedProject, team };
           const queryResult = await workItemApi.queryById(id, teamContext, timePrecision, top);
           if (responseType === "ids") {
@@ -363,7 +382,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (action === "wiql") {
           if (!wiql) return { content: [{ type: "text", text: "wiql is required for wiql" }], isError: true };
-          const workItemApi = await connection.getWorkItemTrackingApi();
+          const workItemApi = await getReadReplicaWorkItemTrackingApi(connection);
           const teamContext = { project: resolvedProject, team };
           const queryResult = await workItemApi.queryByWiql({ query: wiql }, teamContext, timePrecision, top);
           return createExternalContentResponse(queryResult, "wiql query results");
@@ -494,7 +513,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
       if (savePath) {
         const localFileName = fileName ?? attachmentId;
-        if (localFileName.includes("\0") || path.posix.basename(localFileName) !== localFileName || path.win32.basename(localFileName) !== localFileName) {
+        if (!localFileName || localFileName.includes("\0") || path.posix.basename(localFileName) !== localFileName || path.win32.basename(localFileName) !== localFileName) {
           throw new Error("Invalid fileName: path components are not allowed.");
         }
       }
@@ -511,6 +530,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         const workItemApi = await connection.getWorkItemTrackingApi();
         const stream = await workItemApi.getAttachmentContent(attachmentId, fileName, resolvedProject);
+        const responseStream = stream as NodeJS.ReadableStream & { statusCode?: number; statusMessage?: string };
+
+        if (responseStream.statusCode !== undefined && (responseStream.statusCode < 200 || responseStream.statusCode >= 300)) {
+          responseStream.resume();
+          const statusMessage = responseStream.statusMessage ? ` ${responseStream.statusMessage}` : "";
+          throw new Error(`Attachment download failed: HTTP ${responseStream.statusCode}${statusMessage}`);
+        }
 
         const chunks: Buffer[] = [];
         await new Promise<void>((resolve, reject) => {
@@ -530,7 +556,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             throw new Error("Invalid savePath: destination must remain inside the workspace.");
           }
 
-          const localFilePath = path.join(resolvedDirectory, fileName ?? attachmentId);
+          const localFilePath = path.resolve(resolvedDirectory, fileName ?? attachmentId);
           // O_EXCL fails if the file (or a symlink) already exists, so there is no check-then-write race.
           const file = await open(localFilePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0), 0o600);
           try {
@@ -689,15 +715,16 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               .default("add")
               .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
             path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
-            value: z
-              .union([z.string(), z.number(), z.boolean(), z.null()])
+            value: jsonPatchValueSchema
               .optional()
-              .describe("The operation value. Required for add, replace, and test; omit for remove. For a test on '/rev', pass the numeric revision previously read."),
+              .describe(
+                "The JSON operation value, including objects and arrays. Required for add, replace, and test; omit for remove. Pass relation objects directly, not as JSON strings. For a test on '/rev', pass the numeric revision previously read."
+              ),
           })
         )
         .optional()
         .describe(
-          'Field updates for a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
+          'JSON Patch operations for fields and relations on a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
         ),
       batchUpdates: z
         .array(

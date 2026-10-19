@@ -3,8 +3,12 @@
 
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
-import { WebApi } from "azure-devops-node-api";
+import { getBearerHandler, WebApi } from "azure-devops-node-api";
+import { IRequestHandler } from "azure-devops-node-api/interfaces/common/VsoBaseInterfaces.js";
+import { RequestOptions } from "http";
 import { Readable } from "stream";
 import { constants, open, realpath } from "fs/promises";
 import * as path from "path";
@@ -56,6 +60,7 @@ interface WorkItemTrackingApiMock {
 }
 
 interface MockConnection {
+  authHandler: IRequestHandler;
   getWorkApi: jest.Mock;
   getWorkItemTrackingApi: jest.Mock;
   getCoreApi: jest.Mock;
@@ -102,6 +107,7 @@ describe("configureWorkItemTools", () => {
     };
 
     mockConnection = {
+      authHandler: getBearerHandler("test-token"),
       getWorkApi: jest.fn().mockResolvedValue(mockWorkApi),
       getWorkItemTrackingApi: jest.fn().mockResolvedValue(mockWorkItemTrackingApi),
       getCoreApi: jest.fn().mockResolvedValue({ getProjects: jest.fn() }),
@@ -116,6 +122,48 @@ describe("configureWorkItemTools", () => {
     it("registers core tools on the server", () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
+    });
+  });
+
+  describe("read consistency", () => {
+    it.each([
+      ["get", { query: "query" }],
+      ["get_results", { id: "query" }],
+      ["wiql", { wiql: "SELECT [System.Id] FROM WorkItems" }],
+    ] as const)("uses the expected consistency for %s", async (action, params) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "wit_query");
+      if (!call) throw new Error("wit_query tool not registered");
+      const result = await call[3]({ action, project: "Contoso", ...params });
+      expect(result.isError).not.toBe(true);
+
+      if (action === "get") {
+        expect(mockConnection.getWorkItemTrackingApi).toHaveBeenCalledWith();
+        return;
+      }
+
+      expect(mockConnection.getWorkItemTrackingApi).toHaveBeenCalledWith(undefined, [mockConnection.authHandler, expect.any(Object)]);
+      const handlers: IRequestHandler[] = mockConnection.getWorkItemTrackingApi.mock.calls[0][1];
+      const options: RequestOptions = { headers: { Accept: "application/json" } };
+      handlers.forEach((handler) => handler.prepareRequest(options));
+      expect(options.headers).toMatchObject({
+        "Accept": "application/json",
+        "Authorization": "Bearer test-token",
+        "X-VSS-ReadConsistencyLevel": "Eventual",
+      });
+    });
+
+    it("does not handle authentication in the read-consistency handler", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "wit_query");
+      if (!call) throw new Error("wit_query tool not registered");
+      await call[3]({ action: "wiql", project: "Contoso", wiql: "SELECT [System.Id] FROM WorkItems" });
+      const [, handler]: IRequestHandler[] = mockConnection.getWorkItemTrackingApi.mock.calls[0][1];
+      const response = {} as Parameters<IRequestHandler["canHandleAuthentication"]>[0];
+      expect(handler.canHandleAuthentication(response)).toBe(false);
+      await expect(handler.handleAuthentication({} as Parameters<IRequestHandler["handleAuthentication"]>[0], {} as Parameters<IRequestHandler["handleAuthentication"]>[1], undefined)).rejects.toThrow(
+        "The read-consistency handler does not handle authentication."
+      );
     });
   });
 
@@ -4821,8 +4869,9 @@ describe("configureWorkItemTools", () => {
   });
 
   describe("wit_get_work_item_attachment tool", () => {
-    function makeReadableStream(data: Buffer): NodeJS.ReadableStream {
+    function makeReadableStream(data: Buffer, statusCode = 200, statusMessage?: string): NodeJS.ReadableStream {
       const stream = new Readable();
+      Object.assign(stream, { statusCode, statusMessage });
       stream.push(data);
       stream.push(null);
       return stream;
@@ -4958,6 +5007,87 @@ describe("configureWorkItemTools", () => {
       const expectedPath = path.join(path.resolve(process.cwd(), "downloads/attachments"), attachmentId);
       expect(open).toHaveBeenCalledWith(expectedPath, expect.any(Number), 0o600);
       expect(result.content[0].text).toBe(`Attachment saved to: ${expectedPath}`);
+    });
+
+    it.each(["../../escaped.txt", "..\\..\\escaped.txt"])("should reject path components in attachmentId before downloading or writing: %s", async (attachmentId) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      await expect(handler({ project: "TestProject", attachmentId, savePath: "downloads" })).rejects.toThrow("Invalid fileName: path components are not allowed.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(mockWorkItemTrackingApi.getAttachmentContent).not.toHaveBeenCalled();
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it("should not write a non-success attachment response body to disk", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const responseStream = makeReadableStream(Buffer.from("not found"), 404, "Not Found");
+      const resume = jest.spyOn(responseStream, "resume");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(responseStream);
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "missing.txt",
+        savePath: "downloads",
+      });
+
+      expect(resume).toHaveBeenCalled();
+      expect(open).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: Attachment download failed: HTTP 404 Not Found");
+    });
+
+    it("should reject an attachment response below the successful HTTP range", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const responseStream = makeReadableStream(Buffer.from("informational response"), 199);
+      const resume = jest.spyOn(responseStream, "resume");
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(responseStream);
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "attachment.txt",
+      });
+
+      expect(resume).toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error retrieving work item attachment: Attachment download failed: HTTP 199");
+    });
+
+    it("should support attachment streams without HTTP response metadata", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_attachment");
+      if (!call) throw new Error("wit_work_item_attachment tool not registered");
+      const [, , , handler] = call;
+
+      const responseStream = new Readable();
+      responseStream.push(Buffer.from("attachment-data"));
+      responseStream.push(null);
+      mockWorkItemTrackingApi.getAttachmentContent.mockResolvedValue(responseStream);
+
+      const result = await handler({
+        project: "TestProject",
+        attachmentId: "12341234-1234-1234-1234-123412341234",
+        fileName: "attachment.bin",
+      });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].type).toBe("resource");
     });
 
     it("should return an error if the file already exists at the savePath", async () => {
@@ -6186,6 +6316,106 @@ describe("configureWorkItemTools", () => {
   });
 
   describe("update_work_item schema transform coverage", () => {
+    it("should preserve a structured hyperlink and numeric revision through schema parsing and the SDK call", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape, handler] = call;
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const updates = [
+        { op: "test", path: "/rev", value: 9 },
+        {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: "Hyperlink",
+            url: "https://example.invalid/evidence",
+            attributes: { comment: "Supporting evidence" },
+          },
+        },
+        { op: "remove", path: "/relations/0" },
+      ];
+      mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 10 });
+
+      const result = await handler(fullSchema.parse({ action: "update", id: 1, updates }));
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
+      expect(result.isError).not.toBe(true);
+      expect(JSON.parse(result.content[0].text)).toEqual({ id: 1, rev: 10 });
+    });
+
+    it.each([
+      ["string", "/fields/System.Title", '{"literal":"not an object"}'],
+      ["number", "/fields/Microsoft.VSTS.Common.Priority", 2],
+      ["boolean", "/fields/Custom.Flag", false],
+      ["null", "/fields/Custom.Optional", null],
+      ["array", "/relations", [{ rel: "Hyperlink", url: "https://example.invalid/evidence", attributes: { comment: "Evidence" } }]],
+      ["nested JSON", "/fields/Custom.Data", { values: [1, false, null, { text: "unchanged" }] }],
+    ])("should preserve a %s value without stringification or coercion", async (_name, fieldPath, value) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape, handler] = call;
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const updates = [{ op: "replace", path: fieldPath, value }];
+
+      await handler(fullSchema.parse({ action: "update", id: 1, updates }));
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
+    });
+
+    it.each([{ nested: undefined }, { nested: () => "not JSON" }, [Infinity]])("should reject non-JSON nested values: %p", (value) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write not registered");
+      const [, , schemaShape] = call;
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+
+      expect(fullSchema.safeParse({ action: "update", id: 1, updates: [{ op: "add", path: "/relations/-", value }] }).success).toBe(false);
+    });
+
+    it("should advertise and accept structured patch values over MCP", async () => {
+      const provider = new McpServer({ name: "ado-patch-test", version: "1.0.0" });
+      const client = new Client({ name: "ado-patch-client", version: "1.0.0" });
+      configureWorkItemTools(provider, tokenProvider, connectionProvider, userAgentProvider);
+      const [clientTransport, providerTransport] = InMemoryTransport.createLinkedPair();
+      await Promise.all([provider.connect(providerTransport), client.connect(clientTransport)]);
+      try {
+        const catalog = await client.listTools();
+        const tool = catalog.tools.find(({ name }) => name === "wit_work_item_write");
+        if (!tool) throw new Error("wit_work_item_write not advertised");
+        expect(tool.inputSchema).toMatchObject({
+          properties: {
+            updates: {
+              items: {
+                properties: {
+                  value: {
+                    anyOf: expect.arrayContaining([
+                      expect.objectContaining({ type: "object", additionalProperties: expect.anything() }),
+                      expect.objectContaining({ type: "array", items: expect.anything() }),
+                    ]),
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const updates = [
+          { op: "test", path: "/rev", value: 9 },
+          { op: "add", path: "/relations/-", value: { rel: "Hyperlink", url: "https://example.invalid/evidence", attributes: { comment: "Evidence" } } },
+        ];
+        mockWorkItemTrackingApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 10 });
+        const result = await client.callTool({ name: "wit_work_item_write", arguments: { action: "update", id: 1, updates } });
+
+        expect(result.isError).not.toBe(true);
+        expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
+      } finally {
+        await client.close();
+        await provider.close();
+      }
+    });
+
     it("should apply lowercase transform to the op field via Zod schema", async () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
