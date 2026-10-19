@@ -1,8 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import * as fs from "fs";
+import { constants, open, realpath } from "fs/promises";
 import * as path from "path";
+import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
@@ -18,10 +19,16 @@ const WORKITEM_TOOLS = {
   wit_query: "wit_query",
   wit_backlog: "wit_backlog",
   wit_work_item_attachment: "wit_work_item_attachment",
+  wit_work_item_attachment_upload: "wit_work_item_attachment_upload",
+  wit_work_item_attachment_link: "wit_work_item_attachment_link",
   wit_work_item_write: "wit_work_item_write",
   wit_work_item_comment_write: "wit_work_item_comment_write",
   wit_work_item_link_write: "wit_work_item_link_write",
 };
+
+type JsonPatchValue = string | number | boolean | null | JsonPatchValue[] | { [key: string]: JsonPatchValue };
+
+const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() => z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(jsonPatchValueSchema)]));
 
 function getLinkTypeFromName(name: string) {
   switch (name.toLowerCase()) {
@@ -77,7 +84,7 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => entities[character]);
 }
 
-async function resolveCommentMentions(
+async function prepareCommentText(
   text: string,
   format: "Markdown" | "Html" | undefined,
   tokenProvider: () => Promise<string>,
@@ -85,7 +92,6 @@ async function resolveCommentMentions(
   userAgentProvider: () => string
 ): Promise<string> {
   const emailMatches = [...text.matchAll(/@<([^<>\s]+@[^<>\s]+)>/g)];
-  if (emailMatches.length === 0) return text;
 
   const identities = new Map<string, { id: string; displayName: string }>();
   for (const email of new Set(emailMatches.map((match) => match[1]))) {
@@ -96,10 +102,15 @@ async function resolveCommentMentions(
     }
   }
 
-  return text.replace(/@<([^<>\s]+@[^<>\s]+)>/g, (mention, email: string) => {
+  // Encode Markdown transport text once, preserving mention tokens for Azure DevOps.
+  // Encoding ampersands also preserves intentional entity text after one decode.
+  const markdown = format === "Markdown" || format === undefined;
+  return text.replace(/@<([^<>\s]+@[^<>\s]+)>|@<([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>|[&<>]/gi, (mention, email: string | undefined, id: string | undefined) => {
+    if (id) return mention;
+    if (!email) return markdown ? escapeHtml(mention) : mention;
     const identity = identities.get(email);
     if (!identity) return escapeHtml(mention);
-    return format === "Markdown" || format === undefined ? `@<${identity.id}>` : `<a href="#" data-vss-mention="version:2.0,${identity.id}">@${escapeHtml(identity.displayName)}</a>`;
+    return markdown ? `@<${identity.id}>` : `<a href="#" data-vss-mention="version:2.0,${identity.id}">@${escapeHtml(identity.displayName)}</a>`;
   });
 }
 
@@ -130,6 +141,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         .optional()
         .describe("Expand options (None, Fields, Relations, Links, All). Used for: get, list_revisions. For get, cannot be combined with fields."),
       top: z.coerce.number().optional().describe("Maximum number of results to return. Used for: list_comments, my, list_revisions. Defaults vary by action."),
+      continuationToken: z.string().optional().describe("Token for continuing paged results. Used for: list_comments."),
       includeCompleted: z.boolean().optional().default(false).describe("Include completed work items. Used for: my. Defaults to false."),
       type: z.enum(["assignedtome", "myactivity"]).optional().describe("Type of work items to retrieve. Used for: my. Defaults to 'assignedtome'."),
       skip: z.coerce.number().optional().describe("Number of results to skip for pagination. Used for: list_revisions."),
@@ -137,7 +149,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       iterationId: z.string().optional().describe("Iteration ID. Required for: list_for_iteration."),
       workItemType: z.string().optional().describe("Work item type name. Required for: get_type."),
     },
-    async ({ action, project, id, ids, workItemId, fields, asOf, expand, top, includeCompleted, type, skip, team, iterationId, workItemType }) => {
+    async ({ action, project, id, ids, workItemId, fields, asOf, expand, top, continuationToken, includeCompleted, type, skip, team, iterationId, workItemType }) => {
       try {
         const connection = await connectionProvider();
 
@@ -201,7 +213,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
             resolvedProject = result.resolved;
           }
           const workItemApi = await connection.getWorkItemTrackingApi();
-          const comments = await workItemApi.getComments(resolvedProject, workItemId, top ?? 50);
+          const comments = await workItemApi.getComments(resolvedProject, workItemId, top ?? 50, continuationToken);
           return { content: [{ type: "text", text: JSON.stringify(comments, null, 2) }] };
         }
 
@@ -315,7 +327,12 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       team: z.string().optional().describe("Team name or ID. Used for: get_results, wiql."),
       timePrecision: z.boolean().optional().describe("Include time precision in date fields. Used for: get_results, wiql."),
       top: z.coerce.number().default(50).describe("Maximum number of results to return. Used for: get_results, wiql. Defaults to 50."),
-      responseType: z.enum(["full", "ids"]).default("full").describe("Response type: 'full' returns complete results (default), 'ids' returns only work item IDs. Used for: get_results."),
+      responseType: z
+        .enum(["full", "ids"])
+        .default("full")
+        .describe(
+          "Response type: 'full' returns complete results (default). 'ids' returns only work item IDs and supports flat queries only; any other query type is not supported. Used for: get_results."
+        ),
       wiql: z.string().max(32768).optional().describe('The WIQL query string to execute. Required for: wiql. Example: "SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project".'),
     },
     async ({ action, project, query, expand, depth, includeDeleted, useIsoDateFormat, id, team, timePrecision, top, responseType, wiql }) => {
@@ -456,13 +473,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
     "Download a work item attachment by its ID. By default returns the content as a base64-encoded resource. If savePath is provided, saves the file locally to that directory and returns the file path instead. Useful for viewing images (e.g. screenshots) or other files attached to work items such as bugs. If a project is not specified, you will be prompted to select one.",
     {
       project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}"),
+      attachmentId: z.string().describe("The GUID of the attachment. Found in the attachment URL: https://dev.azure.com/{org}/{project}/_apis/wit/attachments/{attachmentId}."),
       fileName: z.string().optional().describe("The file name of the attachment, e.g. 'screenshot.png'. Used to determine the MIME type or the saved file's name."),
       savePath: z
         .string()
         .optional()
         .describe(
-          "Optional local directory path where the file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments'); absolute paths and path traversals are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
+          "Optional local directory path where the downloaded file should be saved. Must be a relative path (e.g. 'temp' or 'downloads/attachments') to an existing directory that resolves (including symlinks) inside the server's working directory; absolute paths are not allowed. If provided, saves the attachment to this directory and returns the file path. If omitted, returns the content as a base64-encoded resource."
         ),
     },
     async ({ project, attachmentId, fileName, savePath }) => {
@@ -477,6 +494,15 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         throw new Error("Invalid fileName: path traversal is not allowed.");
       }
 
+      if (!attachmentId) return { content: [{ type: "text", text: "attachmentId is required for download" }], isError: true };
+
+      if (savePath) {
+        const localFileName = fileName ?? attachmentId;
+        if (!localFileName || localFileName.includes("\0") || path.posix.basename(localFileName) !== localFileName || path.win32.basename(localFileName) !== localFileName) {
+          throw new Error("Invalid fileName: path components are not allowed.");
+        }
+      }
+
       try {
         const connection = await connectionProvider();
 
@@ -489,6 +515,13 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         const workItemApi = await connection.getWorkItemTrackingApi();
         const stream = await workItemApi.getAttachmentContent(attachmentId, fileName, resolvedProject);
+        const responseStream = stream as NodeJS.ReadableStream & { statusCode?: number; statusMessage?: string };
+
+        if (responseStream.statusCode !== undefined && (responseStream.statusCode < 200 || responseStream.statusCode >= 300)) {
+          responseStream.resume();
+          const statusMessage = responseStream.statusMessage ? ` ${responseStream.statusMessage}` : "";
+          throw new Error(`Attachment download failed: HTTP ${responseStream.statusCode}${statusMessage}`);
+        }
 
         const chunks: Buffer[] = [];
         await new Promise<void>((resolve, reject) => {
@@ -500,14 +533,22 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const buffer = Buffer.concat(chunks);
 
         if (savePath) {
-          const resolvedFileName = fileName ?? attachmentId;
-          const localFilePath = path.join(savePath, resolvedFileName);
+          const workspaceRoot = await realpath(process.cwd());
+          const resolvedDirectory = await realpath(path.resolve(workspaceRoot, savePath));
+          const relativeDirectory = path.relative(workspaceRoot, resolvedDirectory);
 
-          if (fs.existsSync(localFilePath)) {
-            throw new Error(`File already exists: ${localFilePath}`);
+          if (relativeDirectory === ".." || relativeDirectory.startsWith(`..${path.sep}`) || path.isAbsolute(relativeDirectory)) {
+            throw new Error("Invalid savePath: destination must remain inside the workspace.");
           }
 
-          fs.writeFileSync(localFilePath, buffer);
+          const localFilePath = path.resolve(resolvedDirectory, fileName ?? attachmentId);
+          // O_EXCL fails if the file (or a symlink) already exists, so there is no check-then-write race.
+          const file = await open(localFilePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0), 0o600);
+          try {
+            await file.writeFile(buffer);
+          } finally {
+            await file.close();
+          }
 
           return {
             content: [{ type: "text", text: `Attachment saved to: ${localFilePath}` }],
@@ -537,6 +578,89 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [{ type: "text", text: `Error retrieving work item attachment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // --- wit_work_item_attachment_upload ----------------------------------------
+  server.tool(
+    WORKITEM_TOOLS.wit_work_item_attachment_upload,
+    "Upload base64-encoded content as a new work item attachment. This tool only uploads the attachment; use wit_work_item_attachment_link separately to link the returned attachment URL to a work item.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      fileName: z.string().describe("The name of the file to upload, e.g. 'screenshot.png'."),
+      content: z.string().describe("Base64-encoded file content to upload."),
+    },
+    async ({ project, fileName, content }) => {
+      try {
+        if (fileName.includes("..")) return { content: [{ type: "text", text: "Invalid fileName: path traversal is not allowed." }], isError: true };
+        if (!content) return { content: [{ type: "text", text: "content is required for upload" }], isError: true };
+        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(content)) return { content: [{ type: "text", text: "content must be valid base64-encoded data" }], isError: true };
+
+        const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project to upload the work item attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const attachmentReference = await workItemApi.createAttachment({}, Readable.from(Buffer.from(content, "base64")), fileName, undefined, resolvedProject);
+
+        return { content: [{ type: "text", text: JSON.stringify(attachmentReference, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error uploading work item attachment: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // --- wit_work_item_attachment_link ------------------------------------------
+  server.tool(
+    WORKITEM_TOOLS.wit_work_item_attachment_link,
+    "Link an uploaded attachment to a work item using the attachment URL returned by wit_work_item_attachment_upload.",
+    {
+      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
+      workItemId: z.coerce.number().min(1).describe("The ID of the work item to link the uploaded attachment to."),
+      attachmentUrl: z.string().url().describe("The attachment URL returned by wit_work_item_attachment_upload."),
+      comment: z.string().optional().describe("Optional comment to include with the attachment link."),
+    },
+    async ({ project, workItemId, attachmentUrl, comment }) => {
+      try {
+        const connection = await connectionProvider();
+        let resolvedProject = project;
+        if (!resolvedProject) {
+          const result = await elicitProject(server, connection, "Select the Azure DevOps project containing the work item to link the attachment to.");
+          if ("response" in result) return result.response;
+          resolvedProject = result.resolved;
+        }
+
+        const patchDocument = [
+          {
+            op: "add",
+            path: "/relations/-",
+            value: {
+              rel: "AttachedFile",
+              url: attachmentUrl,
+              attributes: { comment: comment || "" },
+            },
+          },
+        ];
+        const workItemApi = await connection.getWorkItemTrackingApi();
+        const workItem = await workItemApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+        if (!workItem) throw new Error("Work item not found");
+
+        return { content: [{ type: "text", text: JSON.stringify({ attachmentUrl, workItemId }, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [{ type: "text", text: `Error linking work item attachment: ${errorMessage}` }],
           isError: true,
         };
       }
@@ -576,15 +700,16 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               .default("add")
               .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
             path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
-            value: z
-              .union([z.string(), z.number(), z.boolean(), z.null()])
+            value: jsonPatchValueSchema
               .optional()
-              .describe("The operation value. Required for add, replace, and test; omit for remove. For a test on '/rev', pass the numeric revision previously read."),
+              .describe(
+                "The JSON operation value, including objects and arrays. Required for add, replace, and test; omit for remove. Pass relation objects directly, not as JSON strings. For a test on '/rev', pass the numeric revision previously read."
+              ),
           })
         )
         .optional()
         .describe(
-          'Field updates for a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
+          'JSON Patch operations for fields and relations on a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
         ),
       batchUpdates: z
         .array(
@@ -850,7 +975,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
         const orgUrl = connection.serverUrl;
         const accessToken = await tokenProvider();
         const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
-        const resolvedText = await resolveCommentMentions(text, format, tokenProvider, connectionProvider, userAgentProvider);
+        const resolvedText = await prepareCommentText(text, format, tokenProvider, connectionProvider, userAgentProvider);
 
         if (action === "add") {
           const response = await fetch(

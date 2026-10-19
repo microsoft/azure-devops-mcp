@@ -4,8 +4,29 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
 import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
+import { TestCaseResult, TestOutcome, TestRun } from "azure-devops-node-api/interfaces/TestInterfaces.js";
 import { z } from "zod";
 import { apiVersion } from "../utils.js";
+
+const TEST_RESULT_PAGE_SIZE = 1_000;
+const TEST_RESULT_CONCURRENCY = 5;
+const TEST_OUTCOMES = [
+  "Unspecified",
+  "None",
+  "Passed",
+  "Failed",
+  "Inconclusive",
+  "Timeout",
+  "Aborted",
+  "Blocked",
+  "NotExecuted",
+  "Warning",
+  "Error",
+  "NotApplicable",
+  "Paused",
+  "InProgress",
+  "NotImpacted",
+] as const;
 
 const TEST_PLAN_TOOLS = {
   testplan: "testplan",
@@ -161,38 +182,57 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
     {
       project: z.string().describe("The unique identifier (ID or name) of the Azure DevOps project."),
       buildid: z.coerce.number().min(1).describe("The ID of the build."),
-      outcomes: z.array(z.string()).optional().describe("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
+      outcomes: z.array(z.enum(TEST_OUTCOMES)).optional().describe("Filter results by test outcome, e.g. ['Failed', 'Passed', 'Aborted']."),
     },
     async ({ project, buildid, outcomes }) => {
       try {
         const connection = await connectionProvider();
         const testResultsApi = await connection.getTestResultsApi();
+        const buildUri = `vstfs:///Build/Build/${buildid}`;
+        const testRuns: TestRun[] = [];
 
-        const outcomeFilter = outcomes?.length ? `Outcome eq ${outcomes.join(",")}` : undefined;
-
-        const testResultDetails = await testResultsApi.getTestResultDetailsForBuild(project, buildid, undefined, undefined, outcomeFilter, undefined, true);
-
-        const allResults: any[] = [];
-        if (testResultDetails.resultsForGroup) {
-          for (const group of testResultDetails.resultsForGroup) {
-            if (group.results) {
-              for (const result of group.results) {
-                allResults.push(result);
-              }
-            }
+        for (let skip = 0; ; skip += TEST_RESULT_PAGE_SIZE) {
+          const page = await testResultsApi.getTestRuns(project, buildUri, undefined, undefined, undefined, undefined, undefined, skip, TEST_RESULT_PAGE_SIZE);
+          testRuns.push(...page);
+          if (page.length < TEST_RESULT_PAGE_SIZE) {
+            break;
           }
         }
 
-        const formattedResults = allResults.map((r) => ({
-          id: r.id,
-          testCaseTitle: r.testCaseTitle,
-          outcome: r.outcome,
-          errorMessage: r.errorMessage,
-          stackTrace: r.stackTrace,
-          automatedTestName: r.automatedTestName,
-          automatedTestStorage: r.automatedTestStorage,
-          durationInMs: r.durationInMs,
-          runId: r.testRun?.id,
+        const outcomeFilter = outcomes?.map((outcome) => TestOutcome[outcome]);
+        const runsWithIds = testRuns.filter((run): run is TestRun & { id: number } => run.id !== undefined);
+        const allResults: { result: TestCaseResult; runId: number }[] = [];
+
+        for (let index = 0; index < runsWithIds.length; index += TEST_RESULT_CONCURRENCY) {
+          const batch = runsWithIds.slice(index, index + TEST_RESULT_CONCURRENCY);
+          const batchResults = await Promise.all(
+            batch.map(async (run) => {
+              const results: { result: TestCaseResult; runId: number }[] = [];
+              for (let skip = 0; ; skip += TEST_RESULT_PAGE_SIZE) {
+                const page = await testResultsApi.getTestResults(project, run.id, undefined, skip, TEST_RESULT_PAGE_SIZE, outcomeFilter);
+                results.push(...page.map((result) => ({ result, runId: run.id })));
+                if (page.length < TEST_RESULT_PAGE_SIZE) {
+                  break;
+                }
+              }
+              return results;
+            })
+          );
+          for (const results of batchResults) {
+            allResults.push(...results);
+          }
+        }
+
+        const formattedResults = allResults.map(({ result, runId }) => ({
+          id: result.id,
+          testCaseTitle: result.testCaseTitle,
+          outcome: result.outcome,
+          errorMessage: result.errorMessage,
+          stackTrace: result.stackTrace,
+          automatedTestName: result.automatedTestName,
+          automatedTestStorage: result.automatedTestStorage,
+          durationInMs: result.durationInMs,
+          runId,
         }));
 
         return {

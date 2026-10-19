@@ -4,11 +4,11 @@
 import { describe, expect, it, beforeEach } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
+import { BuildQueryOrder, DefinitionQueryOrder, StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterfaces.js";
 import { configurePipelineTools, runPipeline as runPipelineAction, createPipeline as createPipelineAction, updateBuildStage as updateBuildStageAction } from "../../../src/tools/pipelines";
 import { apiVersion } from "../../../src/utils.js";
 import { mockUpdateBuildStageResponse, mockMultipleArtifacts, mockArtifact } from "../../mocks/pipelines";
-import { Readable } from "stream";
+import { Writable } from "stream";
 import { resolve } from "path";
 import { mkdirSync, createWriteStream } from "fs";
 
@@ -45,6 +45,21 @@ describe("configurePipelineTools", () => {
     it("registers build tools on the server", () => {
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
+    });
+
+    it("registers queryOrder parameters as SDK enum keys", () => {
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const buildCall = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_build");
+      const definitionCall = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_definition");
+      if (!buildCall || !definitionCall) throw new Error("pipeline tools not registered");
+
+      const buildQueryOrder = buildCall[2].queryOrder;
+      expect(buildQueryOrder.safeParse("FinishTimeAscending").success).toBe(true);
+      expect(buildQueryOrder.safeParse("finishTimeAscending").success).toBe(false);
+
+      const definitionQueryOrder = definitionCall[2].queryOrder;
+      expect(definitionQueryOrder.safeParse("LastModifiedDescending").success).toBe(true);
+      expect(definitionQueryOrder.safeParse("lastModifiedDescending").success).toBe(false);
     });
   });
 
@@ -406,6 +421,7 @@ describe("configurePipelineTools", () => {
         repositoryId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         repositoryType: "TfsGit" as const,
         name: "test-build",
+        queryOrder: "LastModifiedDescending",
         top: 10,
       };
 
@@ -416,7 +432,7 @@ describe("configurePipelineTools", () => {
         "test-build",
         "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         "TfsGit",
-        undefined, // queryOrder
+        DefinitionQueryOrder.LastModifiedDescending,
         10, // top
         undefined, // continuationToken
         undefined, // minMetricsTime
@@ -760,6 +776,7 @@ describe("configurePipelineTools", () => {
         project: "test-project",
         definitions: [1, 2],
         top: 5,
+        queryOrder: "FinishTimeAscending",
         branchName: "refs/heads/main",
       };
 
@@ -782,7 +799,7 @@ describe("configurePipelineTools", () => {
         undefined, // continuationToken
         undefined, // maxBuildsPerDefinition
         undefined, // deletedFilter
-        undefined, // queryOrder (default BuildQueryOrder.QueueTimeDescending)
+        BuildQueryOrder.FinishTimeAscending,
         "refs/heads/main", // branchName
         undefined, // buildIds
         undefined, // repositoryId
@@ -2015,36 +2032,29 @@ describe("configurePipelineTools", () => {
   });
 
   describe("pipelines_artifact", () => {
-    let mockWriteStream: any;
-    let mockFileStream: Readable;
+    let mockWriteStream: Writable;
+    let writtenChunks: Buffer[];
 
     beforeEach(() => {
-      mockWriteStream = {
-        write: jest.fn(),
-        end: jest.fn(),
-        on: jest.fn(),
-        once: jest.fn(),
-        emit: jest.fn(),
-      };
-      (createWriteStream as jest.Mock).mockReturnValue(mockWriteStream);
-      (mkdirSync as jest.Mock).mockReturnValue(undefined);
-
-      // Create a mock readable stream
-      mockFileStream = new Readable({
-        read() {
-          this.push(Buffer.from("fake zip content"));
-          this.push(null);
+      writtenChunks = [];
+      mockWriteStream = new Writable({
+        write(chunk, _encoding, callback) {
+          writtenChunks.push(Buffer.from(chunk));
+          callback();
         },
       });
+      (createWriteStream as jest.Mock).mockReturnValue(mockWriteStream);
+      (mkdirSync as jest.Mock).mockReturnValue(undefined);
+      (tokenProvider as jest.Mock).mockResolvedValue("mock-token");
+      (global.fetch as jest.Mock).mockResolvedValue(new Response(Buffer.from("fake zip content")));
     });
 
     it("should download and save an artifact", async () => {
-      const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
-      const mockGetArtifactContentZip = jest.fn().mockResolvedValue(mockFileStream);
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const mockGetArtifact = jest.fn().mockResolvedValue(artifact);
 
       mockConnection.getBuildApi.mockResolvedValue({
         getArtifact: mockGetArtifact,
-        getArtifactContentZip: mockGetArtifactContentZip,
       } as any);
 
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
@@ -2063,10 +2073,36 @@ describe("configurePipelineTools", () => {
       const result = await handler(params);
 
       expect(mockGetArtifact).toHaveBeenCalledWith("test-project", 12345, "drop");
-      expect(mockGetArtifactContentZip).toHaveBeenCalledWith("test-project", 12345, "drop");
+      expect(global.fetch).toHaveBeenCalledWith("https://artifacts.example.test/drop.zip", {
+        headers: { "Authorization": "Bearer mock-token", "User-Agent": "Jest" },
+      });
       expect(mkdirSync).toHaveBeenCalledWith(resolve("temp\\artifacts"), { recursive: true });
       expect(createWriteStream).toHaveBeenCalledWith(expect.stringContaining("drop.zip"));
+      expect(Buffer.concat(writtenChunks).toString()).toBe("fake zip content");
       expect(result.content[0].text).toContain("Artifact drop downloaded");
+    });
+
+    it("should reject a file artifact whose declared size exceeds 1 GB", async () => {
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+      (global.fetch as jest.Mock).mockResolvedValue(new Response(Buffer.from("content"), { headers: { "content-length": String(1024 * 1024 * 1024 + 1) } }));
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "download" as const,
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "temp\\artifacts",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Artifact download exceeds the 1 GB file size limit.");
+      expect(createWriteStream).not.toHaveBeenCalled();
     });
 
     it("should handle artifact not found", async () => {
@@ -2094,13 +2130,97 @@ describe("configurePipelineTools", () => {
       expect(result.content[0].text).toContain("Artifact drop not found");
     });
 
+    it("should handle an artifact without a download URL", async () => {
+      const artifact = { ...mockArtifact, resource: {} };
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "download" as const, project: "test-project", buildId: 12345, artifactName: "drop" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Artifact drop does not have a download URL.");
+      expect(tokenProvider).not.toHaveBeenCalled();
+    });
+
+    it("should handle an unsuccessful artifact download response", async () => {
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+      (global.fetch as jest.Mock).mockResolvedValue(new Response(null, { status: 403, statusText: "Forbidden" }));
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "download" as const, project: "test-project", buildId: 12345, artifactName: "drop" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Artifact download failed: 403 Forbidden");
+    });
+
+    it("should handle an empty artifact response body", async () => {
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, headers: new Headers(), body: null });
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "download" as const, project: "test-project", buildId: 12345, artifactName: "drop" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Artifact download returned an empty response body.");
+    });
+
+    it("should reject a streamed file artifact that exceeds 1 GB", async () => {
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const chunk = new Uint8Array(64 * 1024 * 1024);
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (let index = 0; index < 17; index++) controller.enqueue(chunk);
+          controller.close();
+        },
+      });
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+      (global.fetch as jest.Mock).mockResolvedValue(new Response(body));
+      (createWriteStream as jest.Mock).mockReturnValue(
+        new Writable({
+          write(_chunk, _encoding, callback) {
+            callback();
+          },
+        })
+      );
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "download" as const,
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+        destinationPath: "temp\\artifacts",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Artifact download exceeds the 1 GB file size limit.");
+    });
+
     it("should handle download errors correctly", async () => {
-      const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
-      const mockGetArtifactContentZip = jest.fn().mockRejectedValue(new Error("Network error"));
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const mockGetArtifact = jest.fn().mockResolvedValue(artifact);
+      (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
 
       mockConnection.getBuildApi.mockResolvedValue({
         getArtifact: mockGetArtifact,
-        getArtifactContentZip: mockGetArtifactContentZip,
       } as any);
 
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
@@ -2240,22 +2360,13 @@ describe("configurePipelineTools", () => {
     });
 
     it("should return artifact as base64 binary when destinationPath is not provided", async () => {
-      const mockGetArtifact = jest.fn().mockResolvedValue(mockArtifact);
-
-      // Create a mock readable stream with test content
       const testContent = Buffer.from("fake zip content for binary test");
-      const mockFileStream = new Readable({
-        read() {
-          this.push(testContent);
-          this.push(null);
-        },
-      });
-
-      const mockGetArtifactContentZip = jest.fn().mockResolvedValue(mockFileStream);
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const mockGetArtifact = jest.fn().mockResolvedValue(artifact);
+      (global.fetch as jest.Mock).mockResolvedValue(new Response(testContent));
 
       mockConnection.getBuildApi.mockResolvedValue({
         getArtifact: mockGetArtifact,
-        getArtifactContentZip: mockGetArtifactContentZip,
       } as any);
 
       configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
@@ -2274,7 +2385,6 @@ describe("configurePipelineTools", () => {
       const result = await handler(params);
 
       expect(mockGetArtifact).toHaveBeenCalledWith("test-project", 12345, "drop");
-      expect(mockGetArtifactContentZip).toHaveBeenCalledWith("test-project", 12345, "drop");
 
       // Verify the result contains base64 encoded binary content
       expect(result.content[0].type).toBe("resource");
@@ -2285,6 +2395,27 @@ describe("configurePipelineTools", () => {
       const expectedBase64 = testContent.toString("base64");
       expect(result.content[0].resource.text).toBe(expectedBase64);
       expect(result.content[0].resource.uri).toContain(expectedBase64);
+    });
+
+    it("should reject a base64 artifact whose streamed size exceeds 10 MB", async () => {
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+      (global.fetch as jest.Mock).mockResolvedValue(new Response(Buffer.alloc(10 * 1024 * 1024 + 1)));
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({
+        action: "download" as const,
+        project: "test-project",
+        buildId: 12345,
+        artifactName: "drop",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Artifact download exceeds the 10 MB base64 response size limit.");
     });
   });
 });

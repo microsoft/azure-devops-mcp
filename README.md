@@ -1,18 +1,13 @@
 # Azure DevOps MCP Server
 
-> [!WARNING]
-> We recently completed a full tool consolidation that includes renaming of existing tools. Please see the [Toolset documentation](docs/TOOLSET.md) for the complete list of new tool names.
->
-> If this is a breaking change for your agents or skills, you can temporarily pin the version to `@azure-devops/mcp@2.8.1`
-
-This project gives AI agents access to Azure DevOps through the Model Context Protocol (MCP). Use the hosted remote server for the simplest setup, or run the local server when you need a `stdio` connection.
-
-## Table of Contents
-
 > [!IMPORTANT]
 > We recommend using the [Remote MCP Server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server) instead of this local server. It requires no installation and gets new features first.
 >
 > [Learn more](#remote-mcp-server-recommended)
+
+This project gives AI agents access to Azure DevOps through the Model Context Protocol (MCP). Use the hosted remote server for the simplest setup, or run the local server when you need a `stdio` connection.
+
+## Table of Contents
 
 1. [Overview](#overview)
 2. [Design](#design)

@@ -13,6 +13,7 @@ const MUTATING_TOOL_NAMES = [
   "pipelines_artifact",
   "pipelines_write",
   "repo_create_branch",
+  "repo_file_write",
   "repo_pull_request_thread_write",
   "repo_pull_request_write",
   "testplan_test_case_write",
@@ -20,7 +21,8 @@ const MUTATING_TOOL_NAMES = [
   "testplan_test_suite_write",
   "wiki_upsert_page",
   "wit_backlog",
-  "wit_work_item_attachment",
+  "wit_work_item_attachment_link",
+  "wit_work_item_attachment_upload",
   "wit_work_item_comment_write",
   "wit_work_item_link_write",
   "wit_work_item_write",
@@ -36,7 +38,7 @@ describe("tool annotations", () => {
       .flatMap((fileName) => extractToolNames(readFileSync(join(toolsDirectory, fileName), "utf8")))
       .sort();
 
-    expect(declaredNames).toHaveLength(42);
+    expect(declaredNames).toHaveLength(45);
     expect(declaredNames).toEqual(Object.keys(TOOL_ANNOTATIONS).sort());
   });
 
@@ -54,8 +56,8 @@ describe("tool annotations", () => {
     const registeredNames = registrations.map(([name]) => name).sort();
     const annotatedNames = Object.keys(TOOL_ANNOTATIONS).sort();
 
-    expect(registrations).toHaveLength(42);
-    expect(new Set(registeredNames).size).toBe(42);
+    expect(registrations).toHaveLength(45);
+    expect(new Set(registeredNames).size).toBe(45);
     expect(registeredNames).toEqual(annotatedNames);
 
     for (const [name, annotations] of registrations) {
@@ -67,7 +69,8 @@ describe("tool annotations", () => {
 
   it("marks additive tools as non-destructive", () => {
     expect(TOOL_ANNOTATIONS.repo_create_branch.destructiveHint).toBe(false);
-    expect(TOOL_ANNOTATIONS.wit_work_item_attachment.destructiveHint).toBe(false);
+    expect(TOOL_ANNOTATIONS.wit_work_item_attachment_link.destructiveHint).toBe(false);
+    expect(TOOL_ANNOTATIONS.wit_work_item_attachment_upload.destructiveHint).toBe(false);
     expect(TOOL_ANNOTATIONS.work_iteration_write.destructiveHint).toBe(false);
   });
 

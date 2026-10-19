@@ -19,6 +19,8 @@ import {
   GitPullRequest,
   GitPullRequestCommentThread,
   Comment,
+  ItemContentType,
+  VersionControlChangeType,
   VersionControlRecursionType,
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { z } from "zod";
@@ -36,6 +38,7 @@ const REPO_TOOLS = {
   repo_pull_request_thread: "repo_pull_request_thread",
   repo_branch: "repo_branch",
   repo_file: "repo_file",
+  repo_file_write: "repo_file_write",
   repo_search_commits: "repo_search_commits",
   repo_pull_request_write: "repo_pull_request_write",
   repo_pull_request_thread_write: "repo_pull_request_thread_write",
@@ -63,20 +66,22 @@ function trimPullRequestThread(thread: GitPullRequestCommentThread) {
   };
 }
 
+function trimComment(comment: Comment) {
+  return {
+    id: comment.id,
+    author: {
+      displayName: comment.author?.displayName,
+      uniqueName: comment.author?.uniqueName,
+    },
+    content: comment.content,
+    publishedDate: comment.publishedDate,
+    lastUpdatedDate: comment.lastUpdatedDate,
+    lastContentUpdatedDate: comment.lastContentUpdatedDate,
+  };
+}
+
 function trimComments(comments: Comment[] | undefined | null) {
-  return comments
-    ?.filter((comment) => !comment.isDeleted)
-    ?.map((comment) => ({
-      id: comment.id,
-      author: {
-        displayName: comment.author?.displayName,
-        uniqueName: comment.author?.uniqueName,
-      },
-      content: comment.content,
-      publishedDate: comment.publishedDate,
-      lastUpdatedDate: comment.lastUpdatedDate,
-      lastContentUpdatedDate: comment.lastContentUpdatedDate,
-    }));
+  return comments?.filter((comment) => !comment.isDeleted)?.map(trimComment);
 }
 
 function pullRequestStatusStringToInt(status: string): number {
@@ -245,12 +250,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         ),
       repositoryId: z.string().optional().describe("The ID or name of the repository. Required for get. Optional for list. When using a name instead of a GUID, project must also be provided."),
       pullRequestId: z.coerce.number().min(1).optional().describe("The ID of the pull request. Required for get."),
-      project: z.string().optional().describe("Project ID or project name. Required for list_by_commits. Optional for get and list."),
+      project: z.string().optional().describe("Project ID or name. Required for list_by_commits and when repositoryId is a name. Optional when repositoryId is a GUID."),
       includeWorkItemRefs: z.boolean().optional().default(false).describe("Whether to include work item references. Used for get."),
       includeLabels: z.boolean().optional().default(false).describe("Whether to include labels. Used for get."),
-      includeChangedFiles: z.boolean().optional().default(false).describe("Whether to include the list of changed files. Used for get."),
-      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return. Used for list. Defaults to 100."),
-      skip: z.coerce.number().default(0).describe("The number of pull requests to skip. Used for list. Defaults to 0."),
+      includeChangedFiles: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Whether to include the list of changed files. When changedFilesSummary returns a nextSkip greater than 0, pass nextSkip and nextTop back as skip and top for the next page. Used for get."
+        ),
+      top: z.coerce.number().default(100).describe("The maximum number of pull requests to return (list), or of changed files to return (get with includeChangedFiles). Defaults to 100."),
+      skip: z.coerce.number().default(0).describe("The number of pull requests to skip (list), or of changed files to skip (get with includeChangedFiles). Defaults to 0."),
       created_by_me: z.boolean().default(false).describe("Filter pull requests created by the current user. Used for list."),
       created_by_user: z.string().optional().describe("Filter pull requests created by a specific user email. Used for list."),
       i_am_reviewer: z.boolean().default(false).describe("Filter pull requests where the current user is a reviewer. Used for list."),
@@ -291,13 +302,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       queryType,
     }) => {
       try {
-        const connection = await connectionProvider();
-        const gitApi = await connection.getGitApi();
-
         if (action === "get") {
           if (!repositoryId) return { content: [{ type: "text", text: "repositoryId is required for get" }], isError: true };
           if (!pullRequestId) return { content: [{ type: "text", text: "pullRequestId is required for get" }], isError: true };
+          if (!project && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(repositoryId)) {
+            return {
+              content: [{ type: "text", text: "When repositoryId is a repository name, project is required. Provide the project name or ID, or use the repository GUID." }],
+              isError: true,
+            };
+          }
 
+          const connection = await connectionProvider();
+          const gitApi = await connection.getGitApi();
           const pullRequest = await gitApi.getPullRequest(repositoryId, pullRequestId, project, undefined, undefined, undefined, undefined, includeWorkItemRefs);
           let enhancedResponse: Record<string, unknown> = { ...pullRequest };
 
@@ -320,7 +336,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
               if (iterations?.length) {
                 const latestIteration = iterations[iterations.length - 1];
                 if (latestIteration.id != null) {
-                  const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, latestIteration.id, project);
+                  const changes = await gitApi.getPullRequestIterationChanges(repositoryId, pullRequestId, latestIteration.id, project, top, skip);
                   enhancedResponse = {
                     ...enhancedResponse,
                     changedFilesSummary: {
@@ -346,6 +362,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           return createExternalContentResponse(enhancedResponse, "pull request");
         }
+
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
 
         if (action === "list") {
           if (!repositoryId && !project) {
@@ -620,8 +639,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       versionType: z
         .enum(fileVersionTypeStrings as [string, ...string[]])
         .optional()
-        .default("Commit")
-        .describe("How to interpret the version parameter. Used for get_content. Defaults to 'Commit'."),
+        .describe("How to interpret the version parameter. Defaults to 'Commit' for get_content and 'Branch' for list_directory."),
       recursive: z.boolean().optional().default(false).describe("Whether to list items recursively. Used for list_directory. Defaults to false."),
       recursionDepth: z.coerce.number().min(1).optional().default(1).describe("Maximum depth for recursive listing. Used for list_directory when recursive is true. Defaults to 1."),
     },
@@ -633,7 +651,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         if (action === "get_content") {
           if (!path) return { content: [{ type: "text", text: "path is required for get_content" }], isError: true };
 
-          const versionDescriptor: GitVersionDescriptor | undefined = version ? { version, versionType: GitVersionType[versionType as keyof typeof GitVersionType] } : undefined;
+          const versionDescriptor = buildVersionDescriptor(version, versionType ?? "Commit");
 
           const stream = await gitApi.getItemText(repositoryId, path, project, undefined, undefined, undefined, undefined, false, versionDescriptor, true);
           const content = await streamToString(stream);
@@ -647,7 +665,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         }
 
         if (action === "list_directory") {
-          const versionDescriptor = buildVersionDescriptor(version, versionType === "Commit" ? "Branch" : versionType);
+          const versionDescriptor = buildVersionDescriptor(version, versionType);
           const clampedDepth = Math.min(Math.max(recursionDepth || 1, 1), 10);
           const recursionType = recursive ? VersionControlRecursionType.Full : VersionControlRecursionType.OneLevel;
 
@@ -691,6 +709,76 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         return { content: [{ type: "text", text: `Error with file operation: ${errorMessage}` }], isError: true };
+      }
+    }
+  );
+
+  // --- repo_file_write -------------------------------------------------------
+  server.tool(
+    REPO_TOOLS.repo_file_write,
+    "Create or update a text file in an existing repository branch and commit the change.",
+    {
+      action: z.enum(["create", "update"]).describe("Whether to create a new file or update an existing file."),
+      repositoryId: z.string().describe("The ID or name of the repository."),
+      project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name."),
+      branchName: z.string().min(1).describe("The name of the existing branch to update, without the 'refs/heads/' prefix."),
+      path: z.string().min(1).describe("The absolute repository path of the file, for example '/src/example.ts'."),
+      content: z.string().describe("The complete UTF-8 text content to write to the file."),
+      commitMessage: z.string().min(1).describe("The commit message for the file change."),
+      expectedOldObjectId: z
+        .string()
+        .optional()
+        .describe("The expected current commit ID of the branch. When provided, the push fails if the branch has moved. If omitted, the current branch head is retrieved before pushing."),
+    },
+    async ({ action, repositoryId, project, branchName, path, content, commitMessage, expectedOldObjectId }) => {
+      try {
+        const connection = await connectionProvider();
+        const gitApi = await connection.getGitApi();
+        const refName = `refs/heads/${branchName}`;
+        const refs = await gitApi.getRefs(repositoryId, project, "heads/", false, false, undefined, false, undefined, branchName);
+        const branch = refs.find((ref) => ref.name === refName);
+
+        if (!branch?.objectId) {
+          return { content: [{ type: "text", text: `Error: Branch '${branchName}' not found in repository ${repositoryId}` }], isError: true };
+        }
+
+        if (expectedOldObjectId && expectedOldObjectId !== branch.objectId) {
+          return { content: [{ type: "text", text: `Error: Branch '${branchName}' has moved from expected commit ${expectedOldObjectId}` }], isError: true };
+        }
+
+        const oldObjectId = branch.objectId;
+        const filePath = path.startsWith("/") ? path : `/${path}`;
+        const push = await gitApi.createPush(
+          {
+            refUpdates: [{ name: refName, oldObjectId }],
+            commits: [
+              {
+                comment: commitMessage,
+                changes: [
+                  {
+                    changeType: action === "create" ? VersionControlChangeType.Add : VersionControlChangeType.Edit,
+                    item: { path: filePath },
+                    newContent: { content, contentType: ItemContentType.RawText },
+                  },
+                ],
+              },
+            ],
+          },
+          repositoryId,
+          project
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ pushId: push.pushId, commitId: push.commits?.[0]?.commitId, branchName, path: filePath }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { content: [{ type: "text", text: `Error writing repository file: ${errorMessage}` }], isError: true };
       }
     }
   );
@@ -771,7 +859,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       targetRefName: z.string().optional().describe("The target branch name (e.g., 'refs/heads/main'). Required for create. Optional for update."),
       title: z.string().optional().describe("The title of the pull request. Required for create. Optional for update."),
       description: z.string().max(4000).optional().describe("The description of the pull request. Max 4000 characters. Used for create and update."),
-      isDraft: z.boolean().optional().default(false).describe("Whether the pull request is a draft. Used for create and update."),
+      isDraft: z.boolean().optional().describe("Whether the pull request is a draft. Defaults to false for create. When omitted during update, the existing draft state is preserved."),
       workItems: z.string().optional().describe("Work item IDs to associate, space-separated. Used for create."),
       forkSourceRepositoryId: z.string().optional().describe("The ID of the fork repository. Used for create."),
       labels: z.array(z.string()).optional().describe("Array of label names. Used for create and update."),
@@ -834,7 +922,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
           const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
           let pullRequest = await gitApi.createPullRequest(
-            { sourceRefName, targetRefName, title, description, isDraft, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
+            { sourceRefName, targetRefName, title, description, isDraft: isDraft ?? false, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
             repositoryId,
             project
           );
@@ -1017,14 +1105,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
       status: z
         .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
         .optional()
-        .default(CommentThreadStatus[CommentThreadStatus.Active])
-        .describe("The thread status. Used for create (defaults to 'Active') and required for update_status."),
+        .describe("The thread status. Used for create (defaults to 'Active'), optionally for reply, and required for update_status."),
       filePath: z.string().optional().describe("The file path for the comment thread. Used for create."),
       fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply and update."),
       rightFileStartLine: z.coerce.number().min(1).optional().describe("Start line in the right file. Used for create."),
       rightFileStartOffset: z.number().optional().describe("Start character offset in the right file. Used for create."),
-      rightFileEndLine: z.number().optional().describe("End line in the right file. Used for create."),
-      rightFileEndOffset: z.number().optional().describe("End character offset in the right file. Used for create."),
+      rightFileEndLine: z.number().optional().describe("End line in the right file. Used for create. Must be supplied together with rightFileEndOffset."),
+      rightFileEndOffset: z.number().optional().describe("End character offset in the right file. Used for create. Must be supplied together with rightFileEndLine."),
       changeTrackingId: z.coerce.number().int().min(1).optional().describe("The file change tracking ID from the pull request iteration changes. Used for create."),
       firstComparingIteration: z.coerce.number().int().min(0).optional().describe("The iteration on the left side of the diff. Used for create."),
       secondComparingIteration: z.coerce.number().int().min(1).optional().describe("The iteration on the right side of the diff. Used for create."),
@@ -1110,13 +1197,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             changeTrackingId !== undefined && firstComparingIteration !== undefined && secondComparingIteration !== undefined
               ? { changeTrackingId, iterationContext: { firstComparingIteration, secondComparingIteration } }
               : undefined;
+          const threadStatus = status === undefined ? CommentThreadStatus.Active : CommentThreadStatus[status as keyof typeof CommentThreadStatus];
 
-          const thread = await gitApi.createThread(
-            { comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] },
-            repositoryId,
-            pullRequestId,
-            project
-          );
+          const thread = await gitApi.createThread({ comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: threadStatus }, repositoryId, pullRequestId, project);
 
           return { content: [{ type: "text", text: JSON.stringify(trimPullRequestThread(thread), null, 2) }] };
         }
@@ -1131,9 +1214,64 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
             return { content: [{ type: "text", text: `Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.` }], isError: true };
           }
 
+          if (status !== undefined) {
+            let statusUpdateError: string | undefined;
+            let resultingThreadStatus: CommentThreadStatus | undefined;
+            try {
+              const thread = await gitApi.updateThread({ status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] }, repositoryId, pullRequestId, threadId, project);
+              if (!thread) {
+                statusUpdateError = `Thread ${threadId} was not updated successfully.`;
+              } else {
+                resultingThreadStatus = thread.status;
+              }
+            } catch (error) {
+              statusUpdateError = error instanceof Error ? error.message : "Unknown error occurred";
+            }
+
+            if (statusUpdateError !== undefined) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify(
+                      {
+                        message: `Comment ${comment.id} was posted successfully, but the thread status update failed. Do not retry the reply.`,
+                        comment: trimComment(comment),
+                        statusUpdate: {
+                          succeeded: false,
+                          requestedStatus: status,
+                          error: statusUpdateError,
+                        },
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+                isError: true,
+              };
+            }
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      comment: trimComment(comment),
+                      status: resultingThreadStatus,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
           if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
 
-          return { content: [{ type: "text", text: `Comment successfully added to thread ${threadId}.` }] };
+          return { content: [{ type: "text", text: JSON.stringify(trimComment(comment), null, 2) }] };
         }
 
         if (action === "update") {
