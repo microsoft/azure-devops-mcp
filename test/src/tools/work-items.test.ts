@@ -6,7 +6,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { configureWorkItemTools } from "../../../src/tools/work-items";
-import { WebApi } from "azure-devops-node-api";
+import { getBearerHandler, WebApi } from "azure-devops-node-api";
+import { IRequestHandler } from "azure-devops-node-api/interfaces/common/VsoBaseInterfaces.js";
+import { RequestOptions } from "http";
 import { Readable } from "stream";
 import { constants, open, realpath } from "fs/promises";
 import * as path from "path";
@@ -58,6 +60,7 @@ interface WorkItemTrackingApiMock {
 }
 
 interface MockConnection {
+  authHandler: IRequestHandler;
   getWorkApi: jest.Mock;
   getWorkItemTrackingApi: jest.Mock;
   getCoreApi: jest.Mock;
@@ -104,6 +107,7 @@ describe("configureWorkItemTools", () => {
     };
 
     mockConnection = {
+      authHandler: getBearerHandler("test-token"),
       getWorkApi: jest.fn().mockResolvedValue(mockWorkApi),
       getWorkItemTrackingApi: jest.fn().mockResolvedValue(mockWorkItemTrackingApi),
       getCoreApi: jest.fn().mockResolvedValue({ getProjects: jest.fn() }),
@@ -118,6 +122,35 @@ describe("configureWorkItemTools", () => {
     it("registers core tools on the server", () => {
       configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
       expect(server.tool as jest.Mock).toHaveBeenCalled();
+    });
+  });
+
+  describe("read consistency", () => {
+    it.each([
+      ["get", { query: "query" }],
+      ["get_results", { id: "query" }],
+      ["wiql", { wiql: "SELECT [System.Id] FROM WorkItems" }],
+    ] as const)("uses the expected consistency for %s", async (action, params) => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === "wit_query");
+      if (!call) throw new Error("wit_query tool not registered");
+      const result = await call[3]({ action, project: "Contoso", ...params });
+      expect(result.isError).not.toBe(true);
+
+      if (action === "get") {
+        expect(mockConnection.getWorkItemTrackingApi).toHaveBeenCalledWith();
+        return;
+      }
+
+      expect(mockConnection.getWorkItemTrackingApi).toHaveBeenCalledWith(undefined, [mockConnection.authHandler, expect.any(Object)]);
+      const handlers: IRequestHandler[] = mockConnection.getWorkItemTrackingApi.mock.calls[0][1];
+      const options: RequestOptions = { headers: { Accept: "application/json" } };
+      handlers.forEach((handler) => handler.prepareRequest(options));
+      expect(options.headers).toMatchObject({
+        "Accept": "application/json",
+        "Authorization": "Bearer test-token",
+        "X-VSS-ReadConsistencyLevel": "Eventual",
+      });
     });
   });
 
