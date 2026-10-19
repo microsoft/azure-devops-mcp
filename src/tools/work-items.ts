@@ -6,6 +6,7 @@ import * as path from "path";
 import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
+import { IRequestHandler } from "azure-devops-node-api/interfaces/common/VsoBaseInterfaces.js";
 import { WorkItemExpand, WorkItemRelation } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
@@ -29,6 +30,20 @@ const WORKITEM_TOOLS = {
 type JsonPatchValue = string | number | boolean | null | JsonPatchValue[] | { [key: string]: JsonPatchValue };
 
 const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() => z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(jsonPatchValueSchema)]));
+
+const readConsistencyHandler: IRequestHandler = {
+  prepareRequest(options) {
+    options.headers = { ...options.headers, "X-VSS-ReadConsistencyLevel": "Eventual" };
+  },
+  canHandleAuthentication: () => false,
+  async handleAuthentication() {
+    throw new Error("The read-consistency handler does not handle authentication.");
+  },
+};
+
+function getReadReplicaWorkItemTrackingApi(connection: WebApi) {
+  return connection.getWorkItemTrackingApi(undefined, [connection.authHandler, readConsistencyHandler]);
+}
 
 function getLinkTypeFromName(name: string) {
   switch (name.toLowerCase()) {
@@ -355,7 +370,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (action === "get_results") {
           if (!id) return { content: [{ type: "text", text: "id is required for get_results" }], isError: true };
-          const workItemApi = await connection.getWorkItemTrackingApi();
+          const workItemApi = await getReadReplicaWorkItemTrackingApi(connection);
           const teamContext = { project: resolvedProject, team };
           const queryResult = await workItemApi.queryById(id, teamContext, timePrecision, top);
           if (responseType === "ids") {
@@ -367,7 +382,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (action === "wiql") {
           if (!wiql) return { content: [{ type: "text", text: "wiql is required for wiql" }], isError: true };
-          const workItemApi = await connection.getWorkItemTrackingApi();
+          const workItemApi = await getReadReplicaWorkItemTrackingApi(connection);
           const teamContext = { project: resolvedProject, team };
           const queryResult = await workItemApi.queryByWiql({ query: wiql }, teamContext, timePrecision, top);
           return createExternalContentResponse(queryResult, "wiql query results");
