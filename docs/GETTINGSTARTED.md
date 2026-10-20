@@ -98,7 +98,7 @@ Use `pat` to authenticate with an Azure DevOps [Personal Access Token](https://l
 For example:
 
 ```bash
-export PERSONAL_ACCESS_TOKEN="$(printf '%s' '<email>:<pat>' | base64)"
+export PERSONAL_ACCESS_TOKEN="$(printf '%s' '<email>:<pat>' | base64 -w 0)"
 ```
 
 Then add `"--authentication", "pat"` to the server arguments.
