@@ -1,23 +1,16 @@
 # Troubleshooting
 
-To help you troubleshoot and debug issues, try adding the `LOG_LEVEL` to your `mcp.json`
+To help you troubleshoot and debug issues:
 
-Example
+1. Add `LOG_LEVEL` to your `mcp.json` using this configuration:
 
 ```json
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
   "servers": {
     "ado": {
       "type": "stdio",
       "command": "mcp-server-azuredevops",
-      "args": ["${input:ado_org}"],
+      "args": ["{organization}"],
       "env": {
         "LOG_LEVEL": "debug"
       }
@@ -25,6 +18,8 @@ Example
   }
 }
 ```
+
+2. Replace `{organization}` with your Azure DevOps organization name.
 
 ## Common MCP Issues
 
@@ -84,27 +79,22 @@ For automated scenarios or when you want to use a token stored in an environment
    export ADO_MCP_AUTH_TOKEN="your-azure-devops-token"
    ```
 
-2. **Use the envvar authentication type:**
+2. Replace `{organization}` with your Azure DevOps organization name in the following examples.
+
+3. **Use the envvar authentication type:**
 
    ```bash
-   npx @azure-devops/mcp myorg --authentication envvar
+   npx @azure-devops/mcp {organization} --authentication envvar
    ```
 
-3. **For MCP configuration files, update your `.vscode/mcp.json`:**
+4. **For MCP configuration files, update your `.vscode/mcp.json`:**
    ```json
    {
-     "inputs": [
-       {
-         "id": "ado_org",
-         "type": "promptString",
-         "description": "Azure DevOps organization name (e.g. 'contoso')"
-       }
-     ],
      "servers": {
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "envvar"]
+         "args": ["-y", "@azure-devops/mcp", "{organization}", "--authentication", "envvar"]
        }
      }
    }
@@ -156,10 +146,12 @@ Use one of the non-interactive authentication methods:
    export ADO_MCP_AUTH_TOKEN="your-azure-devops-pat"
    ```
 
-3. Start the server with `--authentication envvar`:
+3. Replace `{organization}` with your Azure DevOps organization name in the following commands.
+
+4. Start the server with `--authentication envvar`:
 
    ```bash
-   npx -y @azure-devops/mcp myorg --authentication envvar
+   npx -y @azure-devops/mcp {organization} --authentication envvar
    ```
 
    For Claude Code:
@@ -167,7 +159,7 @@ Use one of the non-interactive authentication methods:
    ```bash
    claude mcp add azure-devops -s user \
      -e ADO_MCP_AUTH_TOKEN="your-azure-devops-pat" \
-     -- npx -y @azure-devops/mcp myorg --authentication envvar
+     -- npx -y @azure-devops/mcp {organization} --authentication envvar
    ```
 
 **Option 2: Azure CLI authentication**
@@ -178,10 +170,12 @@ Use one of the non-interactive authentication methods:
    az login
    ```
 
-2. Start the server with `--authentication azcli`:
+2. Replace `{organization}` with your Azure DevOps organization name in the following command.
+
+3. Start the server with `--authentication azcli`:
 
    ```bash
-   npx -y @azure-devops/mcp myorg --authentication azcli
+   npx -y @azure-devops/mcp {organization} --authentication azcli
    ```
 
    > **Note:** If your Azure DevOps organization is in a different tenant than your default `az` CLI tenant, you must also pass `--tenant <tenant-id>`. See the [Multi-Tenant Authentication Problems](#multi-tenant-authentication-problems-when-using-azcli) section below.
@@ -210,28 +204,23 @@ Try using Azure login context instead:
    az login
    ```
 
-2. **Configure the MCP server** with the azcli authentication option by updating your `.vscode/mcp.json`.
+1. **Configure the MCP server** with the azcli authentication option by updating your `.vscode/mcp.json`.
 
    ```json
    {
-     "inputs": [
-       {
-         "id": "ado_org",
-         "type": "promptString",
-         "description": "Azure DevOps organization name (e.g. 'contoso')"
-       }
-     ],
      "servers": {
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "azcli"]
+         "args": ["-y", "@azure-devops/mcp", "{organization}", "--authentication", "azcli"]
        }
      }
    }
    ```
 
-3. **Restart VS Code** completely to ensure the MCP server picks up the new configuration.
+1. Replace `{organization}` with your Azure DevOps organization name.
+1. Save the file.
+1. **Restart VS Code** completely to ensure the MCP server picks up the new configuration.
 
 ### Multi-Tenant Authentication Problems when using azcli
 
@@ -263,23 +252,11 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
 
    ```json
    {
-     "inputs": [
-       {
-         "id": "ado_org",
-         "type": "promptString",
-         "description": "Azure DevOps organization name (e.g. 'contoso')"
-       },
-       {
-         "id": "ado_tenant",
-         "type": "promptString",
-         "description": "Azure tenant ID (required for multi-tenant scenarios)"
-       }
-     ],
      "servers": {
        "ado": {
          "type": "stdio",
          "command": "npx",
-         "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "--authentication", "azcli", "--tenant", "${input:ado_tenant}"]
+         "args": ["-y", "@azure-devops/mcp", "{organization}", "--authentication", "azcli", "--tenant", "${input:ado_tenant}"]
        }
      }
    }
@@ -289,33 +266,20 @@ The MCP server may be authenticating with a different tenant than your Azure Dev
 
    ```json
    {
-     "inputs": [
-       {
-         "id": "ado_org",
-         "type": "promptString",
-         "description": "Azure DevOps organization name (e.g. 'contoso')"
-       },
-       {
-         "id": "ado_tenant",
-         "type": "promptString",
-         "description": "Azure tenant ID (required for multi-tenant scenarios)"
-       }
-     ],
      "servers": {
        "ado": {
          "type": "stdio",
          "command": "mcp-server-azuredevops",
-         "args": ["${input:ado_org}", "--tenant", "${input:ado_tenant}"]
+         "args": ["{organization}", "--tenant", "{tenantId}"]
        }
      }
    }
    ```
 
-3. **Restart VS Code** completely to ensure the MCP server picks up the new configuration.
-
-4. **When prompted**, enter:
-   - Your Azure DevOps organization name
-   - The tenant ID from step 1
+3. Replace `{organization}` with your Azure DevOps organization name.
+4. Replace `{tenantId}` with value from step 1.
+5. Save the file.
+6. **Restart VS Code** completely to ensure the MCP server picks up the new configuration.
 
 ## Common Errors
 

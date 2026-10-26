@@ -98,18 +98,11 @@ These steps use Visual Studio Code and GitHub Copilot. For other supported clien
 
 ```json
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
   "servers": {
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
+      "args": ["-y", "@azure-devops/mcp", "{organization}"]
     }
   }
 }
@@ -136,18 +129,11 @@ Add `-d` followed by the domains to the server arguments. For example, this conf
 
 ```json
 {
-  "inputs": [
-    {
-      "id": "ado_org",
-      "type": "promptString",
-      "description": "Azure DevOps organization name  (e.g. 'contoso')"
-    }
-  ],
   "servers": {
     "ado_with_filtered_domains": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}", "-d", "core", "work", "work-items"]
+      "args": ["-y", "@azure-devops/mcp", "{organization}", "-d", "core", "work", "work-items"]
     }
   }
 }
@@ -169,7 +155,7 @@ Set default Azure DevOps project and team values in `.vscode/mcp.json` so tools 
     "ado": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "myorg", "--authentication", "azcli"],
+      "args": ["-y", "@azure-devops/mcp", "{organization}", "--authentication", "azcli"],
       "env": {
         "ado_mcp_project": "Contoso",
         "ado_mcp_team": "Fabrikam Team"
