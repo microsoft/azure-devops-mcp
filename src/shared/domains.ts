@@ -16,7 +16,6 @@ export enum Domain {
   WIKI = "wiki",
   WORK = "work",
   WORK_ITEMS = "work-items",
-  MCP_APPS = "mcp-apps",
 }
 
 export const ALL_DOMAINS = "all";
@@ -81,11 +80,7 @@ export class DomainsManager {
       } else if (domain === ALL_DOMAINS) {
         this.enableAllDomains();
       } else {
-        logger.error(
-          `Error: Specified invalid domain '${domain}'. Please specify exactly as available domains: ${Object.values(Domain)
-            .filter((d) => d !== Domain.MCP_APPS)
-            .join(", ")}`
-        );
+        logger.error(`Error: Specified invalid domain '${domain}'. Please specify exactly as available domains: ${Object.values(Domain).join(", ")}`);
       }
     });
 
@@ -95,9 +90,7 @@ export class DomainsManager {
   }
 
   private enableAllDomains(): void {
-    Object.values(Domain)
-      .filter((domain) => domain !== Domain.MCP_APPS)
-      .forEach((domain) => this.enabledDomains.add(domain));
+    Object.values(Domain).forEach((domain) => this.enabledDomains.add(domain));
   }
 
   /**

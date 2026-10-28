@@ -93,7 +93,7 @@ describe("tool schemas over MCP", () => {
     for (const tool of tools) {
       expect(tool.inputSchema).toMatchObject({ type: "object", properties: expect.any(Object) });
       expect(tool.annotations).toEqual(TOOL_ANNOTATIONS[tool.name]);
-      if (tool.name !== "mcp_apps_ping") expect(Object.keys(tool.inputSchema.properties ?? {})).not.toHaveLength(0);
+      expect(Object.keys(tool.inputSchema.properties ?? {})).not.toHaveLength(0);
     }
     expect(connectionProvider).not.toHaveBeenCalled();
     expect(tokenProvider).not.toHaveBeenCalled();
