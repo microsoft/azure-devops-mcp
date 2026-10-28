@@ -13,6 +13,7 @@ import { StageUpdateType } from "azure-devops-node-api/interfaces/BuildInterface
 import { ConfigurationType, RepositoryType } from "azure-devops-node-api/interfaces/PipelinesInterfaces.js";
 import { mkdirSync, createWriteStream } from "fs";
 import { createExternalContentResponse } from "../shared/content-safety.js";
+import { dateInputSchema } from "../shared/tool-schemas.js";
 import { join, posix, resolve, win32 } from "path";
 import { Readable, Transform } from "stream";
 import { pipeline } from "stream/promises";
@@ -160,8 +161,8 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       definitions: z.array(z.coerce.number().min(1)).optional().describe("Array of build definition IDs to filter builds. Used for: list."),
       queues: z.array(z.coerce.number().min(1)).optional().describe("Array of queue IDs to filter builds. Used for: list."),
       buildNumber: z.string().optional().describe("Build number to filter builds. Used for: list."),
-      minTime: z.coerce.date().optional().describe("Minimum finish time to filter builds. Used for: list."),
-      maxTime: z.coerce.date().optional().describe("Maximum finish time to filter builds. Used for: list."),
+      minTime: dateInputSchema.optional().describe("Minimum finish time to filter builds. Used for: list."),
+      maxTime: dateInputSchema.optional().describe("Maximum finish time to filter builds. Used for: list."),
       requestedFor: z.string().optional().describe("User ID or name who requested the build. Used for: list."),
       reasonFilter: z.number().optional().describe("Reason filter (see BuildReason enum). Used for: list."),
       statusFilter: z.number().optional().describe("Status filter (see BuildStatus enum). Used for: list."),
@@ -320,10 +321,10 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
       queryOrder: z.enum(definitionQueryOrderKeys).optional().describe("Order in which definitions are returned. Used for: list."),
       top: z.number().optional().describe("Maximum number of definitions to return. Used for: list."),
       continuationToken: z.string().optional().describe("Token for continuing paged results. Used for: list."),
-      minMetricsTime: z.coerce.date().optional().describe("Minimum metrics time to filter definitions. Used for: list."),
+      minMetricsTime: dateInputSchema.optional().describe("Minimum metrics time to filter definitions. Used for: list."),
       definitionIds: z.array(z.coerce.number().min(1)).optional().describe("Array of definition IDs to filter. Used for: list."),
-      builtAfter: z.coerce.date().optional().describe("Return definitions that have builds after this date. Used for: list."),
-      notBuiltAfter: z.coerce.date().optional().describe("Return definitions without builds after this date. Used for: list."),
+      builtAfter: dateInputSchema.optional().describe("Return definitions that have builds after this date. Used for: list."),
+      notBuiltAfter: dateInputSchema.optional().describe("Return definitions without builds after this date. Used for: list."),
       includeAllProperties: z.boolean().optional().describe("Whether to include all properties in results. Used for: list."),
       includeLatestBuilds: z.boolean().optional().describe("Whether to include the latest builds for each definition. Used for: list."),
       taskIdFilter: z.string().optional().describe("Task ID to filter build definitions. Used for: list."),

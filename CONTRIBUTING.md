@@ -63,6 +63,14 @@ Key features of our test configuration:
 - **isolatedModules: true** - Enabled in `tsconfig.jest.json` to eliminate ts-jest "hybrid module kind" warnings. This ensures each file is transpiled independently, which is more performant and aligns with how `ts-jest` processes files.
 - **CommonJS modules** - Tests use CommonJS (`module: "CommonJS"`) to ensure compatibility with Jest's test environment.
 
+#### Tool schema compatibility
+
+Tool schemas use Zod 4. Use `z.toJSONSchema(schema, { io: "input", target: "draft-7" })` for input-schema assertions rather than the v3-only `zod-to-json-schema` converter.
+
+For date parameters, reuse `dateInputSchema` from `src/shared/tool-schemas.ts`. It preserves date coercion while advertising a date-time string; bare `z.coerce.date()` cannot be converted to JSON Schema by the MCP SDK's Zod 4 converter. Use `.prefault()` when a default must pass through a transform and remain visible in the input schema.
+
+The protocol tests in `test/src/tool-schemas.test.ts` exercise real MCP tool discovery and calls without contacting Azure DevOps. Run them when changing schemas or upgrading Zod or the MCP SDK. Zod 4 input schemas can use references for recursive values and omit `additionalProperties: false` for objects that strip unknown keys; test runtime behavior as well as schema output. Integer schemas also enforce JavaScript's safe-integer range.
+
 ## 🖊️ Coding style
 
 Follow the established patterns and styles in the repository. If you have suggestions for improvements, please open a new issue for discussion.

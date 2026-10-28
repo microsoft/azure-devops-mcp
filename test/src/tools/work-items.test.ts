@@ -6390,16 +6390,25 @@ describe("configureWorkItemTools", () => {
               items: {
                 properties: {
                   value: {
-                    anyOf: expect.arrayContaining([
-                      expect.objectContaining({ type: "object", additionalProperties: expect.anything() }),
-                      expect.objectContaining({ type: "array", items: expect.anything() }),
-                    ]),
+                    allOf: [{ $ref: expect.stringMatching(/^#\/definitions\//) }],
                   },
                 },
               },
             },
           },
         });
+        const definitions = tool.inputSchema.definitions;
+        if (!definitions || typeof definitions !== "object") throw new Error("Missing recursive JSON Patch schema definitions");
+        expect(Object.values(definitions)).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              anyOf: expect.arrayContaining([
+                expect.objectContaining({ type: "object", additionalProperties: expect.anything() }),
+                expect.objectContaining({ type: "array", items: expect.anything() }),
+              ]),
+            }),
+          ])
+        );
 
         const updates = [
           { op: "test", path: "/rev", value: 9 },
