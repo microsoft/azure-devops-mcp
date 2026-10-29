@@ -72,6 +72,7 @@ This page lists all available tools provided by the local Azure DevOps MCP serve
 | [repo_pull_request_org](#repo_pull_request_org)                   |                    | List the authenticated user's active pull requests organization-wide    |
 | [repo_pull_request_thread](#repo_pull_request_thread)             | `list`             | List comment threads on a pull request                                  |
 | [repo_pull_request_thread](#repo_pull_request_thread)             | `list_comments`    | List comments in a specific thread                                      |
+| [repo_pull_request_thread](#repo_pull_request_thread)             | `get_attachment`   | Download a pull request attachment, such as an image in a comment       |
 | [repo_branch](#repo_branch)                                       | `get`              | Get a branch by name                                                    |
 | [repo_branch](#repo_branch)                                       | `list`             | List branches in a repository                                           |
 | [repo_branch](#repo_branch)                                       | `list_mine`        | List branches the current user has pushed to                            |
