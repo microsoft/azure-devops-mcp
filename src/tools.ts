@@ -9,7 +9,6 @@ import { wrapExternalToolResponse } from "./shared/content-safety.js";
 import { Domain } from "./shared/domains.js";
 import { configureToolsWithAnnotations } from "./shared/tool-annotations.js";
 import { configureAdvSecTools } from "./tools/advanced-security.js";
-import { configureMcpAppsTools } from "./tools/mcp-apps.js";
 import { configurePipelineTools } from "./tools/pipelines.js";
 import { configureCoreTools } from "./tools/core.js";
 import { configureRepoTools } from "./tools/repositories.js";
@@ -28,8 +27,6 @@ function configureAllTools(server: McpServer, tokenProvider: () => Promise<strin
     };
 
     configureIfDomainEnabled(Domain.CORE, () => configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider));
-    // This is a local health-check response and contains no Azure DevOps content.
-    if (enabledDomains.has(Domain.MCP_APPS)) configureMcpAppsTools(server);
     configureIfDomainEnabled(Domain.WORK, () => configureWorkTools(server, tokenProvider, connectionProvider));
     configureIfDomainEnabled(Domain.PIPELINES, () => configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider));
     configureIfDomainEnabled(Domain.REPOSITORIES, () => configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider));

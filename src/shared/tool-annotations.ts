@@ -29,7 +29,6 @@ const TOOL_ANNOTATIONS: Readonly<Record<string, ToolAnnotations>> = {
   core_get_identity_ids: READ_ONLY_ANNOTATIONS,
   core_list_projects: READ_ONLY_ANNOTATIONS,
   core_list_project_teams: READ_ONLY_ANNOTATIONS,
-  mcp_apps_ping: { ...READ_ONLY_ANNOTATIONS, openWorldHint: false },
   pipelines_artifact: MUTATING_ANNOTATIONS,
   pipelines_build: READ_ONLY_ANNOTATIONS,
   pipelines_build_log: READ_ONLY_ANNOTATIONS,

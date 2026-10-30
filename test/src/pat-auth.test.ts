@@ -233,9 +233,9 @@ describe("PAT authentication", () => {
       expect(mockNativeBrokerPlugin).toHaveBeenCalledTimes(1);
     });
 
-    it("uses browser authentication when native broker initialization fails", async () => {
+    it.each([new Error("native broker unavailable"), "native broker unavailable"])("uses browser authentication when native broker initialization rejects with %p", async (error) => {
       mockNativeBrokerPlugin.mockImplementationOnce(() => {
-        throw new Error("native broker unavailable");
+        throw error;
       });
       const acquireTokenInteractive = jest.fn().mockImplementation(async ({ openBrowser }) => {
         await openBrowser("https://login.example.com/no-broker");
@@ -247,6 +247,23 @@ describe("PAT authentication", () => {
 
       expect(PublicClientApplication).toHaveBeenCalledTimes(1);
       expect(open).toHaveBeenCalledWith("https://login.example.com/no-broker");
+    });
+
+    it("retries authentication without reinitializing an unavailable native broker", async () => {
+      mockNativeBrokerPlugin.mockImplementationOnce(() => {
+        throw new Error("native broker unavailable");
+      });
+      const acquireTokenInteractive = jest
+        .fn<() => Promise<{ accessToken: string; account: null }>>()
+        .mockRejectedValueOnce(new Error("interactive authentication failed"))
+        .mockResolvedValueOnce({ accessToken: "retry-token", account: null });
+      (PublicClientApplication as unknown as jest.Mock).mockImplementation(() => ({ acquireTokenInteractive }));
+
+      await expect(createAuthenticator("oauth")()).resolves.toBe("retry-token");
+
+      expect(mockNativeBrokerPlugin).toHaveBeenCalledTimes(1);
+      expect(PublicClientApplication).toHaveBeenCalledTimes(1);
+      expect(acquireTokenInteractive).toHaveBeenCalledTimes(2);
     });
 
     it.each([new Error("broker failure"), { platformBrokerError: { code: "broker_failure" } }])(

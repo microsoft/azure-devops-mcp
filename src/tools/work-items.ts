@@ -13,6 +13,7 @@ import { z } from "zod";
 import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConvert, encodeFormattedValue } from "../utils.js";
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
+import { dateInputSchema } from "../shared/tool-schemas.js";
 import { getUserIdentityFromEmail } from "./auth.js";
 
 const WORKITEM_TOOLS = {
@@ -29,7 +30,9 @@ const WORKITEM_TOOLS = {
 
 type JsonPatchValue = string | number | boolean | null | JsonPatchValue[] | { [key: string]: JsonPatchValue };
 
-const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() => z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(jsonPatchValueSchema)]));
+const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() =>
+  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(z.string(), jsonPatchValueSchema)])
+);
 
 const readConsistencyHandler: IRequestHandler = {
   prepareRequest(options) {
@@ -150,7 +153,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       ids: z.array(z.coerce.number().min(1)).optional().describe("Work item IDs. Required for: get_batch."),
       workItemId: z.coerce.number().min(1).optional().describe("Work item ID. Required for: list_comments, list_revisions."),
       fields: z.array(z.string()).optional().describe("Field names to include in the response. Used for: get, get_batch. For get, cannot be combined with expand."),
-      asOf: z.coerce.date().optional().describe("Retrieve the work item as of a specific date. Used for: get."),
+      asOf: dateInputSchema.optional().describe("Retrieve the work item as of a specific date. Used for: get."),
       expand: z
         .enum(getEnumKeys(WorkItemExpand) as [string, ...string[]])
         .optional()
@@ -712,7 +715,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               .string()
               .transform((val) => val.toLowerCase())
               .pipe(z.enum(["add", "replace", "remove", "test"]))
-              .default("add")
+              .prefault("add")
               .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
             path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
             value: jsonPatchValueSchema
