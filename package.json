@@ -47,8 +47,7 @@
     "open": "^10.2.0",
     "winston": "^3.18.3",
     "yargs": "^18.0.0",
-    "zod": "^3.25.63",
-    "zod-to-json-schema": "^3.24.5"
+    "zod": "^4.6.6"
   },
   "optionalDependencies": {
     "@azure/msal-node-extensions": "^5.3.5"
