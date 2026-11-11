@@ -723,6 +723,7 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
               .describe(
                 "The JSON operation value, including objects and arrays. Required for add, replace, and test; omit for remove. Pass relation objects directly, not as JSON strings. For a test on '/rev', pass the numeric revision previously read."
               ),
+            format: z.enum(["Html", "Markdown"]).optional().describe("Format for large text fields. Optional."),
           })
         )
         .optional()
@@ -806,7 +807,25 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           }
 
           const workItemApi = await connection.getWorkItemTrackingApi();
-          const apiUpdates = updates.map((update) => ({ ...update, op: update.op }));
+          const apiUpdates = updates.map(({ op, path: fieldPath, value, format }) => ({
+            op,
+            path: fieldPath,
+            ...(value !== undefined ? { value: typeof value === "string" ? encodeFormattedValue(value, format) : value } : {}),
+          }));
+
+          updates.forEach(({ path: fieldPath, format }) => {
+            if (format === "Markdown" && fieldPath.startsWith("/fields/")) {
+              const formatPath = `/multilineFieldsFormat${fieldPath.replace("/fields", "")}`;
+              if (!apiUpdates.some((u) => u.path === formatPath)) {
+                apiUpdates.push({
+                  op: "add",
+                  path: formatPath,
+                  value: "Markdown",
+                });
+              }
+            }
+          });
+
           const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id);
           return { content: [{ type: "text", text: JSON.stringify(updatedWorkItem, null, 2) }] };
         }

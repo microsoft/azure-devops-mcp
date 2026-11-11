@@ -2044,6 +2044,48 @@ describe("configureWorkItemTools", () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error updating work item [HTTP 409 Conflict]: Work item was modified by another user.");
     });
+
+    it("should encode Markdown values and add multilineFieldsFormat when format is Markdown", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write tool not registered");
+      const [, , schemaShape, handler] = call;
+
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const params = fullSchema.parse({
+        action: "update",
+        id: 131489,
+        updates: [
+          {
+            op: "Replace",
+            path: "/fields/System.Description",
+            value: "### Summary\nUse `<tag>` and `a > b`.",
+            format: "Markdown",
+          },
+        ],
+      });
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      await handler(params);
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+        null,
+        [
+          {
+            op: "replace",
+            path: "/fields/System.Description",
+            value: "### Summary\nUse `&lt;tag&gt;` and `a &gt; b`.",
+          },
+          {
+            op: "add",
+            path: "/multilineFieldsFormat/System.Description",
+            value: "Markdown",
+          },
+        ],
+        131489
+      );
+    });
   });
 
   describe("get_work_item_type tool", () => {
