@@ -258,7 +258,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .optional()
         .default(false)
         .describe(
-          "Whether to include the list of changed files. When changedFilesSummary returns a nextSkip greater than 0, pass nextSkip and nextTop back as skip and top for the next page. Used for get."
+          "Whether to include the list of changed files, compared against the common commit (iteration 0). When changedFilesSummary returns a nextSkip greater than 0, pass nextSkip and nextTop back as skip and top for the next page. Used for get."
         ),
       top: z.coerce.number().default(100).describe("The maximum number of pull requests to return (list), or of changed files to return (get with includeChangedFiles). Defaults to 100."),
       skip: z.coerce.number().default(0).describe("The number of pull requests to skip (list), or of changed files to skip (get with includeChangedFiles). Defaults to 0."),
@@ -342,7 +342,7 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
                     changedFilesSummary: {
                       changeEntries: changes?.changeEntries ?? [],
                       fileCount: changes?.changeEntries?.length ?? 0,
-                      firstComparingIteration: Math.max(0, latestIteration.id - 1),
+                      firstComparingIteration: 0,
                       secondComparingIteration: latestIteration.id,
                       nextSkip: changes?.nextSkip,
                       nextTop: changes?.nextTop,
