@@ -2086,6 +2086,53 @@ describe("configureWorkItemTools", () => {
         131489
       );
     });
+
+    it("should not duplicate multilineFieldsFormat when already provided in updates", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_write");
+      if (!call) throw new Error("wit_work_item_write tool not registered");
+      const [, , schemaShape, handler] = call;
+
+      const fullSchema = z.object(schemaShape as Parameters<typeof z.object>[0]);
+      const params = fullSchema.parse({
+        action: "update",
+        id: 131489,
+        updates: [
+          {
+            op: "Replace",
+            path: "/fields/System.Description",
+            value: "### Summary\nUse `<tag>` and `a > b`.",
+            format: "Markdown",
+          },
+          {
+            op: "Add",
+            path: "/multilineFieldsFormat/System.Description",
+            value: "Markdown",
+          },
+        ],
+      });
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
+
+      await handler(params);
+
+      expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(
+        null,
+        [
+          {
+            op: "replace",
+            path: "/fields/System.Description",
+            value: "### Summary\nUse `&lt;tag&gt;` and `a &gt; b`.",
+          },
+          {
+            op: "add",
+            path: "/multilineFieldsFormat/System.Description",
+            value: "Markdown",
+          },
+        ],
+        131489
+      );
+    });
   });
 
   describe("get_work_item_type tool", () => {
