@@ -30,6 +30,7 @@ import { WebApiTagDefinition } from "azure-devops-node-api/interfaces/CoreInterf
 import { extractAdoStreamError, getEnumKeys, streamToString, apiVersion } from "../utils.js";
 import { orgName } from "../index.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
+import { getMimeType, readAttachmentStream, saveAttachment, validateAttachmentTarget } from "../shared/attachments.js";
 
 const REPO_TOOLS = {
   repo_repository: "repo_repository",
@@ -493,9 +494,13 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   // --- repo_pull_request_thread ----------------------------------------------
   server.tool(
     REPO_TOOLS.repo_pull_request_thread,
-    "Retrieve pull request thread and comment data. Use the action parameter to specify the operation.",
+    "Retrieve pull request thread and comment data. Use the action parameter to specify the operation. Comment images are pull request attachments; download them with get_attachment to view them.",
     {
-      action: z.enum(["list", "list_comments"]).describe("The action to perform. Options: list (list comment threads on a pull request), list_comments (list comments in a specific thread)."),
+      action: z
+        .enum(["list", "list_comments", "get_attachment"])
+        .describe(
+          "The action to perform. Options: list (list comment threads on a pull request), list_comments (list comments in a specific thread), get_attachment (download a pull request attachment, such as an image embedded in a comment)."
+        ),
       repositoryId: z.string().describe("The ID or name of the repository. When using a name instead of a GUID, project must also be provided."),
       pullRequestId: z.coerce.number().min(1).describe("The ID of the pull request."),
       project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name instead of a GUID."),
@@ -511,8 +516,20 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
         .describe("Filter threads by status. Used for list."),
       authorEmail: z.string().optional().describe("Filter threads by the email of the thread author. Used for list."),
       authorDisplayName: z.string().optional().describe("Filter threads by the display name of the thread author. Used for list."),
+      fileName: z
+        .string()
+        .optional()
+        .describe(
+          "The attachment file name. Required for get_attachment. Found at the end of the attachment URL in a comment: .../_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/attachments/{fileName}."
+        ),
+      savePath: z
+        .string()
+        .optional()
+        .describe(
+          "Optional local directory for get_attachment. Must be a relative path to an existing directory that resolves (including symlinks) inside the server's working directory. If provided, saves the attachment there and returns the file path; otherwise returns the content (images as image content)."
+        ),
     },
-    async ({ action, repositoryId, pullRequestId, project, threadId, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName }) => {
+    async ({ action, repositoryId, pullRequestId, project, threadId, iteration, baseIteration, top, skip, fullResponse, status, authorEmail, authorDisplayName, fileName, savePath }) => {
       try {
         const connection = await connectionProvider();
         const gitApi = await connection.getGitApi();
@@ -561,6 +578,29 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 
           const trimmedComments = trimComments(paginatedComments);
           return { content: [{ type: "text", text: JSON.stringify(trimmedComments, null, 2) }] };
+        }
+
+        if (action === "get_attachment") {
+          if (!fileName) return { content: [{ type: "text", text: "fileName is required for get_attachment" }], isError: true };
+          // Comment URLs encode the file name; the API expects it decoded.
+          const decodedFileName = decodeURIComponent(fileName);
+          validateAttachmentTarget(decodedFileName, savePath);
+          const buffer = await readAttachmentStream(await gitApi.getAttachmentContent(decodedFileName, repositoryId, pullRequestId, project));
+
+          if (savePath) {
+            const localFilePath = await saveAttachment(buffer, savePath, decodedFileName);
+            return { content: [{ type: "text", text: `Attachment saved to: ${localFilePath}` }] };
+          }
+
+          const mimeType = getMimeType(decodedFileName);
+          if (mimeType.startsWith("image/") && mimeType !== "image/svg+xml") {
+            return { content: [{ type: "image", data: buffer.toString("base64"), mimeType }] };
+          }
+          if (mimeType.startsWith("text/") || mimeType === "image/svg+xml") {
+            return createExternalContentResponse(buffer.toString("utf-8"), "pull request attachment");
+          }
+          const base64Data = buffer.toString("base64");
+          return { content: [{ type: "resource", resource: { uri: `data:${mimeType};base64,${base64Data}`, mimeType, blob: base64Data } }] };
         }
 
         return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };

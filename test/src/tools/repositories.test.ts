@@ -15,6 +15,10 @@ import {
 } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 import { getCurrentUserDetails, getUserIdFromEmail } from "../../../src/tools/auth";
 import { z } from "zod";
+import { Readable } from "stream";
+import { gzipSync } from "zlib";
+import { mkdtemp, readFile, rm } from "fs/promises";
+import { join, relative } from "path";
 
 // Mock the auth module
 jest.mock("../../../src/tools/auth", () => ({
@@ -51,6 +55,7 @@ describe("repos tools", () => {
     getPullRequestsByProject: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getThreads: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getComments: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+    getAttachmentContent: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getRefs: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequest: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
     getPullRequestReviewer: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
@@ -87,6 +92,7 @@ describe("repos tools", () => {
       getPullRequestsByProject: jest.fn(),
       getThreads: jest.fn(),
       getComments: jest.fn(),
+      getAttachmentContent: jest.fn(),
       getRefs: jest.fn(),
       getPullRequest: jest.fn(),
       getPullRequestReviewer: jest.fn(),
@@ -121,6 +127,56 @@ describe("repos tools", () => {
     mockGetCurrentUserDetails.mockResolvedValue({
       authenticatedUser: { id: "user123", uniqueName: "testuser@example.com", displayName: "Test User" },
     } as any);
+  });
+
+  describe("repo_pull_request_thread get_attachment", () => {
+    const handlerFor = () => {
+      configureRepoTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === REPO_TOOLS.repo_pull_request_thread);
+      if (!call) throw new Error("repo_pull_request_thread tool not registered");
+      return call[3];
+    };
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const params = { action: "get_attachment", repositoryId: "repo123", pullRequestId: 456, top: 100, skip: 0 };
+
+    it("returns a gzip-encoded comment image decoded as image content", async () => {
+      mockGitApi.getAttachmentContent.mockResolvedValue(Readable.from([gzipSync(png)]));
+      const result = await handlerFor()({ ...params, fileName: "image%20(2).png" });
+      expect(mockGitApi.getAttachmentContent).toHaveBeenCalledWith("image (2).png", "repo123", 456, undefined);
+      expect(result).toEqual({ content: [{ type: "image", data: png.toString("base64"), mimeType: "image/png" }] });
+    });
+
+    it("saves the attachment inside the working directory when savePath is given", async () => {
+      const directory = await mkdtemp(join(process.cwd(), "tmp-pr-attachment-"));
+      try {
+        mockGitApi.getAttachmentContent.mockResolvedValue(Readable.from([png]));
+        const result = await handlerFor()({ ...params, fileName: "shot.png", savePath: relative(process.cwd(), directory) });
+        expect(result.content[0].text).toBe(`Attachment saved to: ${join(directory, "shot.png")}`);
+        expect(await readFile(join(directory, "shot.png"))).toEqual(png);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects file names and save paths that leave the working directory", async () => {
+      for (const extra of [{ fileName: "../secret.png" }, { fileName: "shot.png", savePath: "/tmp" }, { fileName: "shot.png", savePath: "../out" }]) {
+        const result = await handlerFor()({ ...params, ...extra });
+        expect(result.isError).toBe(true);
+      }
+      expect(mockGitApi.getAttachmentContent).not.toHaveBeenCalled();
+    });
+
+    it("reports a failed download instead of returning the error body", async () => {
+      const stream = Object.assign(Readable.from(["Not found"]), { statusCode: 404, statusMessage: "Not Found" });
+      mockGitApi.getAttachmentContent.mockResolvedValue(stream);
+      const result = await handlerFor()({ ...params, fileName: "missing.png" });
+      expect(result).toEqual({ content: [{ type: "text", text: "Error with pull request thread operation: Attachment download failed: HTTP 404 Not Found" }], isError: true });
+    });
+
+    it("requires a file name", async () => {
+      const result = await handlerFor()(params);
+      expect(result).toEqual({ content: [{ type: "text", text: "fileName is required for get_attachment" }], isError: true });
+    });
   });
 
   describe("repo_update_pull_request", () => {

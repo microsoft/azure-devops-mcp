@@ -14,6 +14,7 @@ import { batchApiVersion, markdownCommentsApiVersion, getEnumKeys, safeEnumConve
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 import { dateInputSchema } from "../shared/tool-schemas.js";
+import { getMimeType } from "../shared/attachments.js";
 import { getUserIdentityFromEmail } from "./auth.js";
 
 const WORKITEM_TOOLS = {
@@ -1418,32 +1419,6 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
       }
     }
   );
-}
-
-function getMimeType(fileName: string | undefined): string {
-  const ext = fileName?.split(".").pop()?.toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    svg: "image/svg+xml",
-    webp: "image/webp",
-    pdf: "application/pdf",
-    txt: "text/plain",
-    md: "text/markdown",
-    markdown: "text/markdown",
-    csv: "text/csv",
-    html: "text/html",
-    htm: "text/html",
-    xml: "text/xml",
-    json: "application/json",
-    yaml: "text/yaml",
-    yml: "text/yaml",
-    zip: "application/zip",
-  };
-  return (ext && mimeTypes[ext]) ?? "application/octet-stream";
 }
 
 export { WORKITEM_TOOLS, configureWorkItemTools };
