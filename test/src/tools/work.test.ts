@@ -2270,7 +2270,6 @@ describe("configureWorkTools", () => {
               capacityPerDay: 6,
             },
           ],
-          daysOff: [],
         },
         { project: "TestProject", team: "TestTeam" },
         "test-iteration-id",
@@ -2295,7 +2294,7 @@ describe("configureWorkTools", () => {
       expect(result.content[0].text).toBe(JSON.stringify(expectedResult, null, 2));
     });
 
-    it("should handle updating capacity with multiple activities", async () => {
+    it("should handle updating capacity with multiple activities and empty daysOff", async () => {
       configureWorkTools(server, tokenProvider, connectionProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_capacity_write");
@@ -2345,6 +2344,7 @@ describe("configureWorkTools", () => {
             capacityPerDay: 2,
           },
         ],
+        daysOff: [],
       };
 
       const result = await handler(params);
