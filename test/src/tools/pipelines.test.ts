@@ -2050,7 +2050,7 @@ describe("configurePipelineTools", () => {
     });
 
     it("should download and save an artifact", async () => {
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       const mockGetArtifact = jest.fn().mockResolvedValue(artifact);
 
       mockConnection.getBuildApi.mockResolvedValue({
@@ -2073,7 +2073,7 @@ describe("configurePipelineTools", () => {
       const result = await handler(params);
 
       expect(mockGetArtifact).toHaveBeenCalledWith("test-project", 12345, "drop");
-      expect(global.fetch).toHaveBeenCalledWith("https://artifacts.example.test/drop.zip", {
+      expect(global.fetch).toHaveBeenCalledWith("https://contoso.visualstudio.com/_apis/drop.zip", {
         headers: { "Authorization": "Bearer mock-token", "User-Agent": "Jest" },
       });
       expect(mkdirSync).toHaveBeenCalledWith(resolve("temp\\artifacts"), { recursive: true });
@@ -2083,7 +2083,7 @@ describe("configurePipelineTools", () => {
     });
 
     it("should reject a file artifact whose declared size exceeds 1 GB", async () => {
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
       (global.fetch as jest.Mock).mockResolvedValue(new Response(Buffer.from("content"), { headers: { "content-length": String(1024 * 1024 * 1024 + 1) } }));
 
@@ -2146,8 +2146,46 @@ describe("configurePipelineTools", () => {
       expect(tokenProvider).not.toHaveBeenCalled();
     });
 
+    it.each([
+      "https://attacker.example/drop.zip",
+      "http://dev.azure.com/org/drop.zip",
+      "https://visualstudio.com/drop.zip",
+      "https://evilvisualstudio.com/drop.zip",
+      "https://dev.azure.com.attacker.example/drop.zip",
+    ])("should refuse to send credentials to untrusted artifact download URL %s", async (downloadUrl) => {
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl } };
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "download" as const, project: "test-project", buildId: 12345, artifactName: "drop" });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Refusing to send Azure DevOps credentials to untrusted artifact download URL");
+      expect(tokenProvider).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it.each(["https://dev.azure.com/org/drop.zip", "https://contoso.DevOps.Azure.com/drop.zip"])("should download from trusted artifact host %s", async (downloadUrl) => {
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl } };
+      mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
+
+      configurePipelineTools(server, tokenProvider, connectionProvider, userAgentProvider);
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "pipelines_artifact");
+      if (!call) throw new Error("pipelines_artifact tool not registered");
+      const [, , , handler] = call;
+
+      const result = await handler({ action: "download" as const, project: "test-project", buildId: 12345, artifactName: "drop" });
+
+      expect(result.isError).toBeFalsy();
+      expect(global.fetch).toHaveBeenCalledWith(downloadUrl, expect.anything());
+    });
+
     it("should handle an unsuccessful artifact download response", async () => {
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
       (global.fetch as jest.Mock).mockResolvedValue(new Response(null, { status: 403, statusText: "Forbidden" }));
 
@@ -2163,7 +2201,7 @@ describe("configurePipelineTools", () => {
     });
 
     it("should handle an empty artifact response body", async () => {
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
       (global.fetch as jest.Mock).mockResolvedValue({ ok: true, headers: new Headers(), body: null });
 
@@ -2179,7 +2217,7 @@ describe("configurePipelineTools", () => {
     });
 
     it("should reject a streamed file artifact that exceeds 1 GB", async () => {
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       const chunk = new Uint8Array(64 * 1024 * 1024);
       const body = new ReadableStream<Uint8Array>({
         start(controller) {
@@ -2215,7 +2253,7 @@ describe("configurePipelineTools", () => {
     });
 
     it("should handle download errors correctly", async () => {
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       const mockGetArtifact = jest.fn().mockResolvedValue(artifact);
       (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
 
@@ -2361,7 +2399,7 @@ describe("configurePipelineTools", () => {
 
     it("should return artifact as base64 binary when destinationPath is not provided", async () => {
       const testContent = Buffer.from("fake zip content for binary test");
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       const mockGetArtifact = jest.fn().mockResolvedValue(artifact);
       (global.fetch as jest.Mock).mockResolvedValue(new Response(testContent));
 
@@ -2398,7 +2436,7 @@ describe("configurePipelineTools", () => {
     });
 
     it("should reject a base64 artifact whose streamed size exceeds 10 MB", async () => {
-      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://artifacts.example.test/drop.zip" } };
+      const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl: "https://contoso.visualstudio.com/_apis/drop.zip" } };
       mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
       (global.fetch as jest.Mock).mockResolvedValue(new Response(Buffer.alloc(10 * 1024 * 1024 + 1)));
 
