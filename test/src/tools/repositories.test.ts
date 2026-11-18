@@ -4552,7 +4552,7 @@ describe("repos tools", () => {
       expect(resultData.changedFilesSummary).toEqual({
         changeEntries: mockChangeEntries,
         fileCount: 2,
-        firstComparingIteration: 1,
+        firstComparingIteration: 0,
         secondComparingIteration: 2,
       });
     });

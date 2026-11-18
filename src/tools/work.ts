@@ -371,7 +371,7 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
           })
         )
         .optional()
-        .describe("Array of days off for the team member, each with a start and end date in ISO format."),
+        .describe("Days off for the team member (ISO start/end dates). Replaces existing days off; omitted updates preserve them."),
     },
     async ({ project, team, teamMemberId, iterationId, activities, daysOff }) => {
       try {
@@ -390,11 +390,14 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
             name: a.name,
             capacityPerDay: a.capacityPerDay,
           })),
-          daysOff: (daysOff || []).map((d) => ({
+        };
+
+        if (daysOff !== undefined) {
+          capacityPatch.daysOff = daysOff.map((d) => ({
             start: new Date(d.start),
             end: new Date(d.end),
-          })),
-        };
+          }));
+        }
 
         const updatedCapacity = await workApi.updateCapacityWithIdentityRef(capacityPatch, teamContext, iterationId, teamMemberId);
 
