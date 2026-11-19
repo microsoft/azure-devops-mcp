@@ -23,8 +23,8 @@ import { pipelinesWriteShape, RunPipelineArgs, CreatePipelineArgs, RenamePipelin
 const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
 const MAX_ARTIFACT_FILE_BYTES = 1024 * 1024 * 1024;
 const MAX_ARTIFACT_BASE64_BYTES = 10 * 1024 * 1024;
-const TRUSTED_ARTIFACT_HOSTS = ["dev.azure.com", "devops.azure.com"];
-const TRUSTED_ARTIFACT_HOST_SUFFIXES = [".dev.azure.com", ".devops.azure.com", ".visualstudio.com"];
+const TRUSTED_ARTIFACT_HOSTS = ["dev.azure.com"];
+const TRUSTED_ARTIFACT_HOST_SUFFIXES = [".dev.azure.com", ".visualstudio.com"];
 
 function isTrustedArtifactUrl(url: URL): boolean {
   const hostname = url.hostname.toLowerCase();
@@ -510,7 +510,7 @@ function configurePipelineTools(server: McpServer, tokenProvider: () => Promise<
 
           const downloadUrl = new URL(artifact.resource.downloadUrl);
           if (!isTrustedArtifactUrl(downloadUrl)) {
-            throw new Error(`Refusing to send Azure DevOps credentials to untrusted artifact download URL '${downloadUrl.origin}'.`);
+            throw new Error(`Untrusted artifact download URL '${downloadUrl.origin}'.`);
           }
 
           const accessToken = await tokenProvider();

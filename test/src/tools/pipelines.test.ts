@@ -2152,6 +2152,7 @@ describe("configurePipelineTools", () => {
       "https://visualstudio.com/drop.zip",
       "https://evilvisualstudio.com/drop.zip",
       "https://dev.azure.com.attacker.example/drop.zip",
+      "https://contoso.devops.azure.com/drop.zip",
     ])("should refuse to send credentials to untrusted artifact download URL %s", async (downloadUrl) => {
       const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl } };
       mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
@@ -2164,12 +2165,12 @@ describe("configurePipelineTools", () => {
       const result = await handler({ action: "download" as const, project: "test-project", buildId: 12345, artifactName: "drop" });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Refusing to send Azure DevOps credentials to untrusted artifact download URL");
+      expect(result.content[0].text).toContain(`Untrusted artifact download URL '${new URL(downloadUrl).origin}'.`);
       expect(tokenProvider).not.toHaveBeenCalled();
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it.each(["https://dev.azure.com/org/drop.zip", "https://contoso.DevOps.Azure.com/drop.zip"])("should download from trusted artifact host %s", async (downloadUrl) => {
+    it.each(["https://dev.azure.com/org/drop.zip", "https://ArtProdWcus0.Artifacts.VisualStudio.com/drop.zip"])("should download from trusted artifact host %s", async (downloadUrl) => {
       const artifact = { ...mockArtifact, resource: { ...mockArtifact.resource, downloadUrl } };
       mockConnection.getBuildApi.mockResolvedValue({ getArtifact: jest.fn().mockResolvedValue(artifact) } as any);
 
