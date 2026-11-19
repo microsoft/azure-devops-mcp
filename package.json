@@ -43,7 +43,7 @@
     "@modelcontextprotocol/sdk": "1.32.0",
     "azure-devops-extension-api": "^5.272.3",
     "azure-devops-extension-sdk": "^4.0.2",
-    "azure-devops-node-api": "^15.1.2",
+    "azure-devops-node-api": "^17.0.1",
     "open": "^10.2.0",
     "winston": "^3.18.3",
     "yargs": "^18.0.0",
