@@ -7,16 +7,16 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
   configureWorkItemTools,
-  createWorkItem as createWorkItemAction,
-  updateWorkItem as updateWorkItemAction,
-  updateWorkItemsBatch as updateWorkItemsBatchAction,
-  addChildWorkItems as addChildWorkItemsAction,
-  addWorkItemComment as addWorkItemCommentAction,
-  updateWorkItemComment as updateWorkItemCommentAction,
-  linkWorkItems as linkWorkItemsAction,
-  unlinkWorkItem as unlinkWorkItemAction,
-  linkWorkItemToPullRequest as linkWorkItemToPullRequestAction,
-  addArtifactLink as addArtifactLinkAction,
+  createWorkItemCommand,
+  updateWorkItemCommand,
+  updateWorkItemsBatchCommand,
+  addChildWorkItemsCommand,
+  addWorkItemCommentCommand,
+  updateWorkItemCommentCommand,
+  linkWorkItemsCommand,
+  unlinkWorkItemCommand,
+  linkWorkItemToPullRequestCommand,
+  addArtifactLinkCommand,
 } from "../../../src/tools/work-items";
 import { getBearerHandler, WebApi } from "azure-devops-node-api";
 import { IRequestHandler } from "azure-devops-node-api/interfaces/common/VsoBaseInterfaces.js";
@@ -27,6 +27,7 @@ import * as path from "path";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { CommandContext } from "../../../src/shared/command";
 
 jest.mock("fs/promises");
 import {
@@ -6965,6 +6966,7 @@ describe("wit_work_item_write actions", () => {
   let connectionProvider: jest.Mock;
   let typedConnectionProvider: () => Promise<WebApi>;
   let tokenProvider: () => Promise<string>;
+  let context: CommandContext;
   let fetchMock: jest.Mock;
   const previousFetch = global.fetch;
 
@@ -6973,6 +6975,7 @@ describe("wit_work_item_write actions", () => {
     connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
     typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
     tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    context = { connectionProvider: typedConnectionProvider, tokenProvider, userAgentProvider };
     fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: 1 }), text: async () => "comment" });
     global.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -6988,7 +6991,7 @@ describe("wit_work_item_write actions", () => {
     it("creates the work item with field and markdown-format operations", async () => {
       workItemApi.createWorkItem.mockResolvedValue({ id: 7 });
 
-      const result = await createWorkItemAction({ project: "P", workItemType: "Task", fields: [{ name: "System.Description", value: "**d**", format: "Markdown" }] }, server, typedConnectionProvider);
+      const result = await createWorkItemCommand(server).execute(context, { project: "P", workItemType: "Task", fields: [{ name: "System.Description", value: "**d**", format: "Markdown" }] });
 
       expect(workItemApi.createWorkItem).toHaveBeenCalledWith(
         null,
@@ -7003,7 +7006,7 @@ describe("wit_work_item_write actions", () => {
     });
 
     it("returns an error when workItemType is missing", async () => {
-      const result = await createWorkItemAction({ project: "P", fields: [{ name: "System.Title", value: "T" }] }, server, typedConnectionProvider);
+      const result = await createWorkItemCommand(server).execute(context, { project: "P", fields: [{ name: "System.Title", value: "T" }] });
 
       expect(result).toEqual({ content: [{ type: "text", text: "workItemType is required for create" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7012,7 +7015,7 @@ describe("wit_work_item_write actions", () => {
     it("returns an error when the work item is not created", async () => {
       workItemApi.createWorkItem.mockResolvedValue(null);
 
-      const result = await createWorkItemAction({ project: "P", workItemType: "Task", fields: [{ name: "System.Title", value: "T" }] }, server, typedConnectionProvider);
+      const result = await createWorkItemCommand(server).execute(context, { project: "P", workItemType: "Task", fields: [{ name: "System.Title", value: "T" }] });
 
       expect(result).toEqual({ content: [{ type: "text", text: "Work item was not created" }], isError: true });
     });
@@ -7023,14 +7026,14 @@ describe("wit_work_item_write actions", () => {
       workItemApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 2 });
       const updates = [{ op: "replace" as const, path: "/fields/System.Title", value: "T" }];
 
-      const result = await updateWorkItemAction({ id: 1, updates }, typedConnectionProvider);
+      const result = await updateWorkItemCommand.execute(context, { id: 1, updates });
 
       expect(workItemApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
       expect(textOf(result)).toBe(JSON.stringify({ id: 1, rev: 2 }, null, 2));
     });
 
     it("returns an error when a non-remove operation has no value", async () => {
-      const result = await updateWorkItemAction({ id: 1, updates: [{ op: "add", path: "/fields/System.Title" }] }, typedConnectionProvider);
+      const result = await updateWorkItemCommand.execute(context, { id: 1, updates: [{ op: "add", path: "/fields/System.Title" }] });
 
       expect(result).toEqual({ content: [{ type: "text", text: "value is required for add" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7039,17 +7042,12 @@ describe("wit_work_item_write actions", () => {
 
   describe("updateWorkItemsBatch", () => {
     it("sends one batch request per work item", async () => {
-      const result = await updateWorkItemsBatchAction(
-        {
-          batchUpdates: [
-            { op: "Replace", id: 1, path: "/fields/System.Title", value: "A" },
-            { op: "Add", id: 2, path: "/fields/System.Description", value: "B", format: "Markdown" },
-          ],
-        },
-        typedConnectionProvider,
-        tokenProvider,
-        userAgentProvider
-      );
+      const result = await updateWorkItemsBatchCommand.execute(context, {
+        batchUpdates: [
+          { op: "Replace", id: 1, path: "/fields/System.Title", value: "A" },
+          { op: "Add", id: 2, path: "/fields/System.Description", value: "B", format: "Markdown" },
+        ],
+      });
 
       expect(fetchMock.mock.calls[0][0]).toBe(`${orgUrl}/_apis/wit/$batch?api-version=5.0`);
       expect(fetchBody().map((request: { body: unknown[] }) => request.body)).toEqual([
@@ -7063,7 +7061,7 @@ describe("wit_work_item_write actions", () => {
     });
 
     it("returns an error when batchUpdates is missing", async () => {
-      const result = await updateWorkItemsBatchAction({}, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await updateWorkItemsBatchCommand.execute(context, {});
 
       expect(result).toEqual({ content: [{ type: "text", text: "batchUpdates is required for update_batch" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7072,21 +7070,15 @@ describe("wit_work_item_write actions", () => {
     it("throws when the batch request fails", async () => {
       fetchMock.mockResolvedValue({ ok: false, statusText: "Bad Request" });
 
-      await expect(
-        updateWorkItemsBatchAction({ batchUpdates: [{ op: "Add", id: 1, path: "/fields/System.Title", value: "A" }] }, typedConnectionProvider, tokenProvider, userAgentProvider)
-      ).rejects.toThrow("Failed to update work items in batch: Bad Request");
+      await expect(updateWorkItemsBatchCommand.execute(context, { batchUpdates: [{ op: "Add", id: 1, path: "/fields/System.Title", value: "A" }] })).rejects.toThrow(
+        "Failed to update work items in batch: Bad Request"
+      );
     });
   });
 
   describe("addChildWorkItems", () => {
     it("uses ReproSteps for Bug children", async () => {
-      await addChildWorkItemsAction(
-        { project: "P", parentId: 5, workItemType: "Bug", items: [{ title: "T", description: "D", format: "Html" }] },
-        server,
-        typedConnectionProvider,
-        tokenProvider,
-        userAgentProvider
-      );
+      await addChildWorkItemsCommand(server).execute(context, { project: "P", parentId: 5, workItemType: "Bug", items: [{ title: "T", description: "D", format: "Html" }] });
 
       const [request] = fetchBody();
       expect(request.uri).toBe("/P/_apis/wit/workitems/$Bug?api-version=5.0");
@@ -7097,7 +7089,7 @@ describe("wit_work_item_write actions", () => {
     it("rejects more than 50 children without opening a connection", async () => {
       const items = Array.from({ length: 51 }, (_, i) => ({ title: `T${i}`, description: "D", format: "Markdown" as const }));
 
-      const result = await addChildWorkItemsAction({ project: "P", parentId: 5, workItemType: "Task", items }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await addChildWorkItemsCommand(server).execute(context, { project: "P", parentId: 5, workItemType: "Task", items });
 
       expect(result).toEqual({ content: [{ type: "text", text: "A maximum of 50 child work items can be created in a single call." }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7113,6 +7105,7 @@ describe("wit_work_item_comment_write actions", () => {
   let connectionProvider: jest.Mock;
   let typedConnectionProvider: () => Promise<WebApi>;
   let tokenProvider: () => Promise<string>;
+  let context: CommandContext;
   let fetchMock: jest.Mock;
   const previousFetch = global.fetch;
 
@@ -7121,6 +7114,7 @@ describe("wit_work_item_comment_write actions", () => {
     connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
     typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
     tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    context = { connectionProvider: typedConnectionProvider, tokenProvider, userAgentProvider };
     fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: 1 }), text: async () => "comment" });
     global.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -7134,7 +7128,7 @@ describe("wit_work_item_comment_write actions", () => {
 
   describe("addWorkItemComment", () => {
     it("posts the comment to the work item", async () => {
-      const result = await addWorkItemCommentAction({ project: "P", workItemId: 3, text: "hi", format: "Html" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await addWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, text: "hi", format: "Html" });
 
       expect(fetchMock.mock.calls[0][0]).toBe(`${orgUrl}/P/_apis/wit/workItems/3/comments?format=1&api-version=7.2-preview.4`);
       expect(fetchMock.mock.calls[0][1].method).toBe("POST");
@@ -7143,7 +7137,7 @@ describe("wit_work_item_comment_write actions", () => {
     });
 
     it("returns an error when text is missing", async () => {
-      const result = await addWorkItemCommentAction({ project: "P", workItemId: 3, format: "Markdown" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await addWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, format: "Markdown" });
 
       expect(result).toEqual({ content: [{ type: "text", text: "text is required" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7152,22 +7146,20 @@ describe("wit_work_item_comment_write actions", () => {
     it("throws when the request fails", async () => {
       fetchMock.mockResolvedValue({ ok: false, statusText: "Forbidden" });
 
-      await expect(addWorkItemCommentAction({ project: "P", workItemId: 3, text: "hi", format: "Html" }, server, typedConnectionProvider, tokenProvider, userAgentProvider)).rejects.toThrow(
-        "Failed to add a work item comment: Forbidden"
-      );
+      await expect(addWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, text: "hi", format: "Html" })).rejects.toThrow("Failed to add a work item comment: Forbidden");
     });
   });
 
   describe("updateWorkItemComment", () => {
     it("patches the existing comment", async () => {
-      await updateWorkItemCommentAction({ project: "P", workItemId: 3, commentId: 9, text: "hi", format: "Html" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
+      await updateWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, commentId: 9, text: "hi", format: "Html" });
 
       expect(fetchMock.mock.calls[0][0]).toBe(`${orgUrl}/P/_apis/wit/workItems/3/comments/9?format=1&api-version=7.2-preview.4`);
       expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
     });
 
     it("returns an error when commentId is missing", async () => {
-      const result = await updateWorkItemCommentAction({ project: "P", workItemId: 3, text: "hi", format: "Html" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await updateWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, text: "hi", format: "Html" });
 
       expect(result).toEqual({ content: [{ type: "text", text: "commentId is required for update" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7183,6 +7175,7 @@ describe("wit_work_item_link_write actions", () => {
   let connectionProvider: jest.Mock;
   let typedConnectionProvider: () => Promise<WebApi>;
   let tokenProvider: () => Promise<string>;
+  let context: CommandContext;
   let fetchMock: jest.Mock;
   const previousFetch = global.fetch;
 
@@ -7191,6 +7184,7 @@ describe("wit_work_item_link_write actions", () => {
     connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
     typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
     tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    context = { connectionProvider: typedConnectionProvider, tokenProvider, userAgentProvider };
     fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: 1 }), text: async () => "comment" });
     global.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -7204,19 +7198,13 @@ describe("wit_work_item_link_write actions", () => {
 
   describe("linkWorkItems", () => {
     it("adds work item and hyperlink relations", async () => {
-      await linkWorkItemsAction(
-        {
-          project: "P",
-          updates: [
-            { id: 1, linkToId: 2, type: "parent" },
-            { id: 1, url: "https://example.com", type: "hyperlink", comment: "c" },
-          ],
-        },
-        server,
-        typedConnectionProvider,
-        tokenProvider,
-        userAgentProvider
-      );
+      await linkWorkItemsCommand(server).execute(context, {
+        project: "P",
+        updates: [
+          { id: 1, linkToId: 2, type: "parent" },
+          { id: 1, url: "https://example.com", type: "hyperlink", comment: "c" },
+        ],
+      });
 
       expect(fetchBody()[0].body).toEqual([
         { op: "add", path: "/relations/-", value: { rel: "System.LinkTypes.Hierarchy-Reverse", url: `${orgUrl}/P/_apis/wit/workItems/2`, attributes: { comment: "" } } },
@@ -7225,9 +7213,7 @@ describe("wit_work_item_link_write actions", () => {
     });
 
     it("throws when a hyperlink has no url", async () => {
-      await expect(linkWorkItemsAction({ project: "P", updates: [{ id: 1, type: "hyperlink" }] }, server, typedConnectionProvider, tokenProvider, userAgentProvider)).rejects.toThrow(
-        "url is required for hyperlink links"
-      );
+      await expect(linkWorkItemsCommand(server).execute(context, { project: "P", updates: [{ id: 1, type: "hyperlink" }] })).rejects.toThrow("url is required for hyperlink links");
     });
   });
 
@@ -7242,7 +7228,7 @@ describe("wit_work_item_link_write actions", () => {
       });
       workItemApi.updateWorkItem.mockResolvedValue({ id: 1 });
 
-      const result = await unlinkWorkItemAction({ project: "P", id: 1, type: "related" }, server, typedConnectionProvider);
+      const result = await unlinkWorkItemCommand(server).execute(context, { project: "P", id: 1, type: "related" });
 
       expect(workItemApi.updateWorkItem).toHaveBeenCalledWith(
         null,
@@ -7257,7 +7243,7 @@ describe("wit_work_item_link_write actions", () => {
     });
 
     it("returns an error when type is missing", async () => {
-      const result = await unlinkWorkItemAction({ project: "P", id: 1 }, server, typedConnectionProvider);
+      const result = await unlinkWorkItemCommand(server).execute(context, { project: "P", id: 1 });
 
       expect(result).toEqual({ content: [{ type: "text", text: "type is required for unlink" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7268,7 +7254,7 @@ describe("wit_work_item_link_write actions", () => {
     it("adds a pull request artifact link", async () => {
       workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
 
-      const result = await linkWorkItemToPullRequestAction({ projectId: "proj", repositoryId: "repo", pullRequestId: 8, workItemId: 4 }, typedConnectionProvider);
+      const result = await linkWorkItemToPullRequestCommand.execute(context, { projectId: "proj", repositoryId: "repo", pullRequestId: 8, workItemId: 4 });
 
       expect(workItemApi.updateWorkItem).toHaveBeenCalledWith(
         {},
@@ -7280,7 +7266,7 @@ describe("wit_work_item_link_write actions", () => {
     });
 
     it("returns an error when projectId is missing", async () => {
-      const result = await linkWorkItemToPullRequestAction({ repositoryId: "repo", pullRequestId: 8, workItemId: 4 }, typedConnectionProvider);
+      const result = await linkWorkItemToPullRequestCommand.execute(context, { repositoryId: "repo", pullRequestId: 8, workItemId: 4 });
 
       expect(result).toEqual({ content: [{ type: "text", text: "projectId is required for link_to_pull_request" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
@@ -7291,26 +7277,20 @@ describe("wit_work_item_link_write actions", () => {
     it("builds a branch artifact URI by default", async () => {
       workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
 
-      const result = await addArtifactLinkAction(
-        { project: "P", workItemId: 4, projectId: "proj", repositoryId: "repo", branchName: "main" },
-        server,
-        typedConnectionProvider,
-        tokenProvider,
-        userAgentProvider
-      );
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P", workItemId: 4, projectId: "proj", repositoryId: "repo", branchName: "main" });
 
       expect(JSON.parse(textOf(result))).toEqual({ workItemId: 4, artifactUri: "vstfs:///Git/Ref/proj%2Frepo%2FGBmain", linkType: "Branch", comment: null, success: true });
     });
 
     it("returns an error when branch components are missing", async () => {
-      const result = await addArtifactLinkAction({ project: "P", workItemId: 4, projectId: "proj" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P", workItemId: 4, projectId: "proj" });
 
       expect(result).toEqual({ content: [{ type: "text", text: "For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required." }], isError: true });
       expect(workItemApi.updateWorkItem).not.toHaveBeenCalled();
     });
 
     it("returns an error when workItemId is missing", async () => {
-      const result = await addArtifactLinkAction({ project: "P" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P" });
 
       expect(result).toEqual({ content: [{ type: "text", text: "workItemId is required for add_artifact_link" }], isError: true });
       expect(connectionProvider).not.toHaveBeenCalled();
