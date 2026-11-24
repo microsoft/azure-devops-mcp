@@ -15,6 +15,25 @@ import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { createExternalContentResponse } from "../shared/content-safety.js";
 import { dateInputSchema } from "../shared/tool-schemas.js";
 import { getUserIdentityFromEmail } from "./auth.js";
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  workItemWriteShape,
+  workItemCommentWriteShape,
+  workItemLinkWriteShape,
+  CreateWorkItemArgs,
+  UpdateWorkItemArgs,
+  UpdateWorkItemsBatchArgs,
+  AddChildWorkItemsArgs,
+  WorkItemWriteArgs,
+  AddWorkItemCommentArgs,
+  UpdateWorkItemCommentArgs,
+  WorkItemCommentWriteArgs,
+  LinkWorkItemsArgs,
+  UnlinkWorkItemArgs,
+  LinkWorkItemToPullRequestArgs,
+  AddArtifactLinkArgs,
+  WorkItemLinkWriteArgs,
+} from "./work-items.dto.js";
 
 const WORKITEM_TOOLS = {
   wit_work_item: "wit_work_item",
@@ -28,11 +47,7 @@ const WORKITEM_TOOLS = {
   wit_work_item_link_write: "wit_work_item_link_write",
 };
 
-type JsonPatchValue = string | number | boolean | null | JsonPatchValue[] | { [key: string]: JsonPatchValue };
-
-const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() =>
-  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(z.string(), jsonPatchValueSchema)])
-);
+const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
 
 const readConsistencyHandler: IRequestHandler = {
   prepareRequest(options) {
@@ -130,6 +145,592 @@ async function prepareCommentText(
     if (!identity) return escapeHtml(mention);
     return markdown ? `@<${identity.id}>` : `<a href="#" data-vss-mention="version:2.0,${identity.id}">@${escapeHtml(identity.displayName)}</a>`;
   });
+}
+
+async function createWorkItemAction(args: CreateWorkItemArgs, server: McpServer, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+  const { workItemType, fields } = args;
+  if (!workItemType) return errorResult("workItemType is required for create");
+  if (!fields || fields.length === 0) return errorResult("fields is required for create");
+
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, "Select the Azure DevOps project to create the work item in.");
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+
+  const workItemApi = await connection.getWorkItemTrackingApi();
+
+  const document = fields.map(({ name, value, format }) => ({
+    op: "add",
+    path: `/fields/${name}`,
+    value: encodeFormattedValue(value, format),
+  }));
+
+  fields.forEach(({ name, format }) => {
+    if (format === "Markdown") {
+      document.push({
+        op: "add",
+        path: `/multilineFieldsFormat/${name}`,
+        value: "Markdown",
+      });
+    }
+  });
+
+  const newWorkItem = await workItemApi.createWorkItem(null, document, resolvedProject, workItemType);
+
+  if (!newWorkItem) return errorResult("Work item was not created");
+
+  return { content: [{ type: "text", text: JSON.stringify(newWorkItem, null, 2) }] };
+}
+
+async function updateWorkItemAction(args: UpdateWorkItemArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+  const { id, updates } = args;
+  if (!id) return errorResult("id is required for update");
+  if (!updates || updates.length === 0) return errorResult("updates is required for update");
+  const updateWithoutValue = updates.find((update) => update.op !== "remove" && update.value === undefined);
+  if (updateWithoutValue) return errorResult(`value is required for ${updateWithoutValue.op}`);
+
+  const connection = await connectionProvider();
+  const workItemApi = await connection.getWorkItemTrackingApi();
+  const apiUpdates = updates.map((update) => ({ ...update, op: update.op }));
+  const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id);
+  return { content: [{ type: "text", text: JSON.stringify(updatedWorkItem, null, 2) }] };
+}
+
+async function updateWorkItemsBatchAction(
+  args: UpdateWorkItemsBatchArgs,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
+): Promise<CallToolResult> {
+  const { batchUpdates } = args;
+  if (!batchUpdates || batchUpdates.length === 0) return errorResult("batchUpdates is required for update_batch");
+
+  const connection = await connectionProvider();
+  const orgUrl = connection.serverUrl;
+  const accessToken = await tokenProvider();
+  const uniqueIds = Array.from(new Set(batchUpdates.map((update) => update.id)));
+
+  const body = uniqueIds.map((uid) => {
+    const workItemUpdates = batchUpdates.filter((update) => update.id === uid);
+    const operations = workItemUpdates.map(({ op, path: fieldPath, value, format }) => ({
+      op: op,
+      path: fieldPath,
+      value: encodeFormattedValue(value, format),
+    }));
+
+    workItemUpdates.forEach(({ path: fieldPath, format }) => {
+      if (format === "Markdown") {
+        operations.push({
+          op: "Add",
+          path: `/multilineFieldsFormat${fieldPath.replace("/fields", "")}`,
+          value: "Markdown",
+        });
+      }
+    });
+
+    return {
+      method: "PATCH",
+      uri: `/_apis/wit/workitems/${uid}?api-version=${batchApiVersion}`,
+      headers: { "Content-Type": "application/json-patch+json" },
+      body: operations,
+    };
+  });
+
+  const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
+    method: "PATCH",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "User-Agent": userAgentProvider(),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update work items in batch: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+}
+
+async function addChildWorkItemsAction(
+  args: AddChildWorkItemsArgs,
+  server: McpServer,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
+): Promise<CallToolResult> {
+  const { parentId, workItemType, items } = args;
+  if (!parentId) return errorResult("parentId is required for add_child");
+  if (!workItemType) return errorResult("workItemType is required for add_child");
+  if (!items || items.length === 0) return errorResult("items is required for add_child");
+  if (items.length > 50) return errorResult("A maximum of 50 child work items can be created in a single call.");
+
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, "Select the Azure DevOps project to create child work items in.");
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+  const project = resolvedProject;
+
+  const orgUrl = connection.serverUrl;
+  const accessToken = await tokenProvider();
+
+  const body = items.map((item, x) => {
+    const encodedDescription = encodeFormattedValue(item.description, item.format);
+
+    const ops: { op: string; path: string; value: unknown }[] = [
+      { op: "add", path: "/id", value: `-${x + 1}` },
+      { op: "add", path: "/fields/System.Title", value: item.title },
+      {
+        op: "add",
+        path: "/relations/-",
+        value: {
+          rel: "System.LinkTypes.Hierarchy-Reverse",
+          url: `${connection.serverUrl}/${project}/_apis/wit/workItems/${parentId}`,
+        },
+      },
+    ];
+
+    if (item.areaPath && item.areaPath.trim().length > 0) {
+      ops.push({ op: "add", path: "/fields/System.AreaPath", value: item.areaPath });
+    }
+
+    if (item.iterationPath && item.iterationPath.trim().length > 0) {
+      ops.push({ op: "add", path: "/fields/System.IterationPath", value: item.iterationPath });
+    }
+
+    // check if the work item type is "Bug" to determine which field to use for the description
+    // ReproSteps is used for Bugs, while Description is used for other work item types
+    if (workItemType.toLowerCase() === "bug") {
+      ops.push({ op: "add", path: "/fields/Microsoft.VSTS.TCM.ReproSteps", value: encodedDescription });
+
+      if (item.format && item.format === "Markdown") {
+        ops.push({ op: "add", path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps", value: item.format });
+      }
+    } else {
+      ops.push({ op: "add", path: "/fields/System.Description", value: encodedDescription });
+
+      if (item.format && item.format === "Markdown") {
+        ops.push({ op: "add", path: "/multilineFieldsFormat/System.Description", value: item.format });
+      }
+    }
+
+    return {
+      method: "PATCH",
+      uri: `/${encodeURIComponent(project)}/_apis/wit/workitems/$${encodeURIComponent(workItemType)}?api-version=${batchApiVersion}`,
+      headers: { "Content-Type": "application/json-patch+json" },
+      body: ops,
+    };
+  });
+
+  const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
+    method: "PATCH",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "User-Agent": userAgentProvider(),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update work items in batch: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+}
+
+async function writeWorkItemComment(
+  args: { project?: string; workItemId: number; text: string; format?: AddWorkItemCommentArgs["format"] },
+  method: "POST" | "PATCH",
+  commentPath: string,
+  projectLabel: string,
+  failureMessage: string,
+  server: McpServer,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
+): Promise<CallToolResult> {
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, `Select the Azure DevOps project to ${projectLabel}.`);
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+
+  const orgUrl = connection.serverUrl;
+  const accessToken = await tokenProvider();
+  const formatParameter = (args.format ?? "Markdown") === "Markdown" ? 0 : 1;
+  const resolvedText = await prepareCommentText(args.text, args.format, tokenProvider, connectionProvider, userAgentProvider);
+
+  const response = await fetch(
+    `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${args.workItemId}/${commentPath}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
+    {
+      method,
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": userAgentProvider(),
+      },
+      body: JSON.stringify({ text: resolvedText }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`${failureMessage}: ${response.statusText}`);
+  }
+
+  return { content: [{ type: "text", text: await response.text() }] };
+}
+
+async function addWorkItemCommentAction(
+  args: AddWorkItemCommentArgs,
+  server: McpServer,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
+): Promise<CallToolResult> {
+  const { workItemId, text } = args;
+  if (!workItemId) return errorResult("workItemId is required");
+  if (!text) return errorResult("text is required");
+
+  return writeWorkItemComment(
+    { ...args, workItemId, text },
+    "POST",
+    "comments",
+    "add a work item comment in",
+    "Failed to add a work item comment",
+    server,
+    connectionProvider,
+    tokenProvider,
+    userAgentProvider
+  );
+}
+
+async function updateWorkItemCommentAction(
+  args: UpdateWorkItemCommentArgs,
+  server: McpServer,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
+): Promise<CallToolResult> {
+  const { workItemId, text, commentId } = args;
+  if (!workItemId) return errorResult("workItemId is required");
+  if (!text) return errorResult("text is required");
+  if (!commentId) return errorResult("commentId is required for update");
+
+  return writeWorkItemComment(
+    { ...args, workItemId, text },
+    "PATCH",
+    `comments/${commentId}`,
+    "update the work item comment in",
+    "Failed to update work item comment",
+    server,
+    connectionProvider,
+    tokenProvider,
+    userAgentProvider
+  );
+}
+
+async function linkWorkItemsAction(
+  args: LinkWorkItemsArgs,
+  server: McpServer,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
+): Promise<CallToolResult> {
+  const { updates } = args;
+  if (!updates || updates.length === 0) return errorResult("updates is required for link");
+
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, "Select the Azure DevOps project to link work items in.");
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+
+  const orgUrl = connection.serverUrl;
+  const accessToken = await tokenProvider();
+  const uniqueIds = Array.from(new Set(updates.map((update) => update.id)));
+
+  const body = uniqueIds.map((uid) => ({
+    method: "PATCH",
+    uri: `/_apis/wit/workitems/${uid}?api-version=${batchApiVersion}`,
+    headers: { "Content-Type": "application/json-patch+json" },
+    body: updates
+      .filter((update) => update.id === uid)
+      .map(({ linkToId, url: linkUrl, type: linkTypeName, comment: linkComment }) => {
+        if (linkTypeName === "hyperlink" && !linkUrl) {
+          throw new Error("url is required for hyperlink links");
+        }
+        if (linkTypeName !== "hyperlink" && !linkToId) {
+          throw new Error("linkToId is required for work item links");
+        }
+
+        return {
+          op: "add",
+          path: "/relations/-",
+          value: {
+            rel: getLinkTypeFromName(linkTypeName),
+            url: linkTypeName === "hyperlink" ? linkUrl : `${orgUrl}/${resolvedProject}/_apis/wit/workItems/${linkToId}`,
+            attributes: { comment: linkComment || "" },
+          },
+        };
+      }),
+  }));
+
+  const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
+    method: "PATCH",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "User-Agent": userAgentProvider(),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update work items in batch: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+}
+
+async function unlinkWorkItemAction(args: UnlinkWorkItemArgs, server: McpServer, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+  const { id, type, url } = args;
+  if (!id) return errorResult("id is required for unlink");
+  if (!type) return errorResult("type is required for unlink");
+
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, "Select the Azure DevOps project to unlink work items in.");
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+
+  const workItemApi = await connection.getWorkItemTrackingApi();
+  const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, resolvedProject);
+  const relations: WorkItemRelation[] = workItem.relations ?? [];
+  const linkTypeName = getLinkTypeFromName(type);
+  const matchesUrl = url && url.trim().length > 0;
+  const relationIndexes = relations.map((relation, idx) => (relation.rel === linkTypeName && (!matchesUrl || relation.url === url) ? idx : -1)).filter((idx) => idx !== -1);
+
+  if (relationIndexes.length === 0) {
+    return errorResult(`No matching relations found for link type '${type}'${url ? ` and URL '${url}'` : ""}.\n${JSON.stringify(relations, null, 2)}`);
+  }
+
+  const removedRelations = relationIndexes.map((idx) => relations[idx]);
+  relationIndexes.sort((a, b) => b - a);
+
+  const apiUpdates = relationIndexes.map((idx) => ({ op: "remove", path: `/relations/${idx}` }));
+  const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id, resolvedProject);
+
+  return {
+    content: [
+      {
+        type: "text",
+        text:
+          `Removed ${removedRelations.length} link(s) of type '${type}':\n` + JSON.stringify(removedRelations, null, 2) + `\n\nUpdated work item result:\n` + JSON.stringify(updatedWorkItem, null, 2),
+      },
+    ],
+    isError: false,
+  };
+}
+
+async function linkWorkItemToPullRequestAction(args: LinkWorkItemToPullRequestArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+  const { projectId, repositoryId, pullRequestId, workItemId, pullRequestProjectId } = args;
+  if (!projectId) return errorResult("projectId is required for link_to_pull_request");
+  if (!repositoryId) return errorResult("repositoryId is required for link_to_pull_request");
+  if (pullRequestId === undefined) return errorResult("pullRequestId is required for link_to_pull_request");
+  if (!workItemId) return errorResult("workItemId is required for link_to_pull_request");
+
+  const connection = await connectionProvider();
+  const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+  const artifactProjectId = pullRequestProjectId && pullRequestProjectId.trim() !== "" ? pullRequestProjectId : projectId;
+  const artifactPathValue = `${artifactProjectId}/${repositoryId}/${pullRequestId}`;
+  const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
+
+  const patchDocument = [
+    {
+      op: "add",
+      path: "/relations/-",
+      value: {
+        rel: "ArtifactLink",
+        url: vstfsUrl,
+        attributes: { name: "Pull Request" },
+      },
+    },
+  ];
+
+  const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, projectId);
+
+  if (!workItem) return errorResult("Work item update failed");
+
+  return {
+    content: [{ type: "text", text: JSON.stringify({ workItemId, pullRequestId, success: true }, null, 2) }],
+  };
+}
+
+async function addArtifactLinkAction(
+  args: AddArtifactLinkArgs,
+  server: McpServer,
+  connectionProvider: () => Promise<WebApi>,
+  tokenProvider: () => Promise<string>,
+  userAgentProvider: () => string
+): Promise<CallToolResult> {
+  const { workItemId, projectId, repositoryId, pullRequestId, artifactUri, branchName, commitId, buildId, wikiId, pageId, pagePath, linkType, comment } = args;
+  if (!workItemId) return errorResult("workItemId is required for add_artifact_link");
+
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, "Select the Azure DevOps project to add the artifact link in.");
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+
+  const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+  const effectiveLinkType = linkType ?? "Branch";
+  let finalArtifactUri: string;
+
+  if (artifactUri) {
+    finalArtifactUri = artifactUri;
+  } else {
+    switch (effectiveLinkType) {
+      case "Branch":
+        if (!projectId || !repositoryId || !branchName) {
+          return errorResult("For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required.");
+        }
+        finalArtifactUri = `vstfs:///Git/Ref/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2FGB${encodeURIComponent(branchName)}`;
+        break;
+
+      case "Fixed in Commit":
+        if (!projectId || !repositoryId || !commitId) {
+          return errorResult("For 'Fixed in Commit' links, 'projectId', 'repositoryId', and 'commitId' are required.");
+        }
+        finalArtifactUri = `vstfs:///Git/Commit/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(commitId)}`;
+        break;
+
+      case "Pull Request":
+        if (!projectId || !repositoryId || pullRequestId === undefined) {
+          return errorResult("For 'Pull Request' links, 'projectId', 'repositoryId', and 'pullRequestId' are required.");
+        }
+        finalArtifactUri = `vstfs:///Git/PullRequestId/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(pullRequestId.toString())}`;
+        break;
+
+      case "Build":
+      case "Found in build":
+      case "Integrated in build":
+        if (buildId === undefined) {
+          return errorResult(`For '${effectiveLinkType}' links, 'buildId' is required.`);
+        }
+        finalArtifactUri = `vstfs:///Build/Build/${encodeURIComponent(buildId.toString())}`;
+        break;
+
+      case "Wiki": {
+        if (!projectId || !wikiId) {
+          return errorResult("For 'Wiki' links, 'projectId', 'wikiId', and 'pagePath' are required.");
+        }
+
+        let resolvedPagePath = pagePath;
+
+        if (pageId !== undefined) {
+          const orgUrl = connection.serverUrl;
+          const accessToken = await tokenProvider();
+          const pageResponse = await fetch(`${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wiki/wikis/${encodeURIComponent(wikiId)}/pages/${pageId}?api-version=7.1`, {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "User-Agent": userAgentProvider(),
+            },
+          });
+          if (!pageResponse.ok) {
+            return errorResult(`Failed to look up wiki page ID ${pageId}: ${pageResponse.statusText}`);
+          }
+          const pageData = await pageResponse.json();
+          resolvedPagePath = pageData.path as string;
+        }
+
+        if (!resolvedPagePath) {
+          return errorResult("For 'Wiki' links, 'pageId' or 'pagePath' is required.");
+        }
+
+        const normalizedPath = resolvedPagePath.startsWith("/") ? resolvedPagePath.slice(1) : resolvedPagePath;
+        const encodedPath = normalizedPath.split("/").map(encodeURIComponent).join("%2F");
+        finalArtifactUri = `vstfs:///Wiki/WikiPage/${encodeURIComponent(projectId)}%2F${encodeURIComponent(wikiId)}%2F${encodedPath}`;
+        break;
+      }
+
+      default:
+        return errorResult(`URI building from components is not supported for link type '${effectiveLinkType}'. Please provide the full 'artifactUri' instead.`);
+    }
+  }
+
+  const patchDocument = [
+    {
+      op: "add",
+      path: "/relations/-",
+      value: {
+        rel: "ArtifactLink",
+        url: finalArtifactUri,
+        attributes: {
+          name: getArtifactLinkAttributeName(effectiveLinkType),
+          ...(comment && { comment }),
+        },
+      },
+    },
+  ];
+
+  const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
+
+  if (!workItem) return errorResult("Work item update failed");
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({ workItemId, artifactUri: finalArtifactUri, linkType: effectiveLinkType, comment: comment || null, success: true }, null, 2),
+      },
+    ],
+  };
+}
+
+const workItemWriteErrorPrefixes: Record<WorkItemWriteArgs["action"], string> = {
+  create: "Error creating work item: ",
+  update: "Error updating work item: ",
+  update_batch: "Error updating work items in batch: ",
+  add_child: "Error creating child work items: ",
+};
+
+const workItemCommentWriteErrorPrefixes: Record<WorkItemCommentWriteArgs["action"], string> = {
+  add: "Error adding work item comment: ",
+  update: "Error updating work item comment: ",
+};
+
+const workItemLinkWriteErrorPrefixes: Record<WorkItemLinkWriteArgs["action"], string> = {
+  link: "Error linking work items: ",
+  unlink: "Error unlinking work item: ",
+  link_to_pull_request: "Error linking work item to pull request: ",
+  add_artifact_link: "Error adding artifact link to work item: ",
+};
+
+/** Surfaces 409/412 so agents can recognise optimistic-concurrency (`/rev` test) failures on update. */
+function getUpdateErrorMessage(error: unknown, message: string): string {
+  const statusCode = typeof error === "object" && error !== null && "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : undefined;
+  const statusText = statusCode === 409 ? " Conflict" : statusCode === 412 ? " Precondition Failed" : "";
+  const updateStatus = statusCode !== undefined ? ` [HTTP ${statusCode}${statusText}]` : "";
+  return `Error updating work item${updateStatus}: ${message}`;
 }
 
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
@@ -686,738 +1287,70 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   // --- wit_work_item_write ----------------------------------------------------
-  server.tool(
-    WORKITEM_TOOLS.wit_work_item_write,
-    "Write operations for work items. Use the action parameter to specify the operation.",
-    {
-      action: z
-        .enum(["create", "update", "update_batch", "add_child"])
-        .describe(
-          "The action to perform. Options: create (create a new work item), update (update fields on a single work item), update_batch (update multiple work items in one call), add_child (create child work items under a parent)."
-        ),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      id: z.coerce.number().min(1).optional().describe("Work item ID to update. Required for: update."),
-      workItemType: z.string().optional().describe("The type of work item. Required for: create, add_child."),
-      fields: z
-        .array(
-          z.object({
-            name: z.string().describe("The field name, e.g. 'System.Title'."),
-            value: z.string().describe("The field value."),
-            format: z.enum(["Html", "Markdown"]).optional().describe("Format for large text fields. Optional."),
-          })
-        )
-        .optional()
-        .describe("Field values to set on the work item. Required for: create."),
-      updates: z
-        .array(
-          z.object({
-            op: z
-              .string()
-              .transform((val) => val.toLowerCase())
-              .pipe(z.enum(["add", "replace", "remove", "test"]))
-              .prefault("add")
-              .describe("The operation to perform. Use 'test' with path '/rev' to enforce optimistic concurrency."),
-            path: z.string().describe("The path to operate on, e.g. '/fields/System.Title' or '/rev' for a revision test."),
-            value: jsonPatchValueSchema
-              .optional()
-              .describe(
-                "The JSON operation value, including objects and arrays. Required for add, replace, and test; omit for remove. Pass relation objects directly, not as JSON strings. For a test on '/rev', pass the numeric revision previously read."
-              ),
-          })
-        )
-        .optional()
-        .describe(
-          'JSON Patch operations for fields and relations on a single work item. Required for: update. For a safe read-modify-write, prepend a test operation on "/rev" with value set to the numeric revision returned by the preceding read; Azure DevOps rejects the entire update if the current revision differs.'
-        ),
-      batchUpdates: z
-        .array(
-          z.object({
-            op: z.enum(["Add", "Replace", "Remove"]).default("Add").describe("The operation to perform."),
-            id: z.coerce.number().min(1).describe("The work item ID to update."),
-            path: z.string().describe("The field path, e.g. '/fields/System.Title'."),
-            value: z.string().describe("The new value for the field."),
-            format: z.enum(["Html", "Markdown"]).optional().describe("Format for large text fields. Optional."),
-          })
-        )
-        .optional()
-        .describe("Updates for multiple work items. Required for: update_batch."),
-      parentId: z.coerce.number().min(1).optional().describe("The ID of the parent work item. Required for: add_child."),
-      items: z
-        .array(
-          z.object({
-            title: z.string().describe("The title of the child work item."),
-            description: z.string().describe("The description of the child work item."),
-            format: z.enum(["Markdown", "Html"]).default("Markdown").describe("Format for the description. Defaults to 'Markdown'."),
-            areaPath: z.string().optional().describe("Optional area path for the child work item."),
-            iterationPath: z.string().optional().describe("Optional iteration path for the child work item."),
-          })
-        )
-        .optional()
-        .describe("Child work items to create. Required for: add_child."),
-    },
-    async ({ action, project, id, workItemType, fields, updates, batchUpdates, parentId, items }) => {
-      try {
-        const connection = await connectionProvider();
-
-        let resolvedProject = project;
-
-        if (action === "create") {
-          if (!workItemType) return { content: [{ type: "text", text: "workItemType is required for create" }], isError: true };
-          if (!fields || fields.length === 0) return { content: [{ type: "text", text: "fields is required for create" }], isError: true };
-          if (!resolvedProject) {
-            const result = await elicitProject(server, connection, "Select the Azure DevOps project to create the work item in.");
-            if ("response" in result) return result.response;
-            resolvedProject = result.resolved;
-          }
-
-          const workItemApi = await connection.getWorkItemTrackingApi();
-
-          const document = fields.map(({ name, value, format }) => ({
-            op: "add",
-            path: `/fields/${name}`,
-            value: encodeFormattedValue(value, format),
-          }));
-
-          fields.forEach(({ name, format }) => {
-            if (format === "Markdown") {
-              document.push({
-                op: "add",
-                path: `/multilineFieldsFormat/${name}`,
-                value: "Markdown",
-              });
-            }
-          });
-
-          const newWorkItem = await workItemApi.createWorkItem(null, document, resolvedProject, workItemType);
-
-          if (!newWorkItem) {
-            return { content: [{ type: "text", text: "Work item was not created" }], isError: true };
-          }
-
-          return { content: [{ type: "text", text: JSON.stringify(newWorkItem, null, 2) }] };
+  server.tool(WORKITEM_TOOLS.wit_work_item_write, "Write operations for work items. Use the action parameter to specify the operation.", workItemWriteShape, async (args) => {
+    try {
+      switch (args.action) {
+        case "create":
+          return await createWorkItemAction(args, server, connectionProvider);
+        case "update":
+          return await updateWorkItemAction(args, connectionProvider);
+        case "update_batch":
+          return await updateWorkItemsBatchAction(args, connectionProvider, tokenProvider, userAgentProvider);
+        case "add_child":
+          return await addChildWorkItemsAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+        default: {
+          const unsupportedAction: never = args.action;
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workItemWriteErrorPrefixes).sort().join(", ")}`);
         }
-
-        if (action === "update") {
-          if (!id) return { content: [{ type: "text", text: "id is required for update" }], isError: true };
-          if (!updates || updates.length === 0) return { content: [{ type: "text", text: "updates is required for update" }], isError: true };
-          const updateWithoutValue = updates.find((update) => update.op !== "remove" && update.value === undefined);
-          if (updateWithoutValue) {
-            return { content: [{ type: "text", text: `value is required for ${updateWithoutValue.op}` }], isError: true };
-          }
-
-          const workItemApi = await connection.getWorkItemTrackingApi();
-          const apiUpdates = updates.map((update) => ({ ...update, op: update.op }));
-          const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id);
-          return { content: [{ type: "text", text: JSON.stringify(updatedWorkItem, null, 2) }] };
-        }
-
-        if (action === "update_batch") {
-          if (!batchUpdates || batchUpdates.length === 0) return { content: [{ type: "text", text: "batchUpdates is required for update_batch" }], isError: true };
-
-          const orgUrl = connection.serverUrl;
-          const accessToken = await tokenProvider();
-          const uniqueIds = Array.from(new Set(batchUpdates.map((update) => update.id)));
-
-          const body = uniqueIds.map((uid) => {
-            const workItemUpdates = batchUpdates.filter((update) => update.id === uid);
-            const operations = workItemUpdates.map(({ op, path: fieldPath, value, format }) => ({
-              op: op,
-              path: fieldPath,
-              value: encodeFormattedValue(value, format),
-            }));
-
-            workItemUpdates.forEach(({ path: fieldPath, format }) => {
-              if (format === "Markdown") {
-                operations.push({
-                  op: "Add",
-                  path: `/multilineFieldsFormat${fieldPath.replace("/fields", "")}`,
-                  value: "Markdown",
-                });
-              }
-            });
-
-            return {
-              method: "PATCH",
-              uri: `/_apis/wit/workitems/${uid}?api-version=${batchApiVersion}`,
-              headers: { "Content-Type": "application/json-patch+json" },
-              body: operations,
-            };
-          });
-
-          const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
-            method: "PATCH",
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-              "User-Agent": userAgentProvider(),
-            },
-            body: JSON.stringify(body),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to update work items in batch: ${response.statusText}`);
-          }
-
-          const result = await response.json();
-          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        }
-
-        if (action === "add_child") {
-          if (!parentId) return { content: [{ type: "text", text: "parentId is required for add_child" }], isError: true };
-          if (!workItemType) return { content: [{ type: "text", text: "workItemType is required for add_child" }], isError: true };
-          if (!items || items.length === 0) return { content: [{ type: "text", text: "items is required for add_child" }], isError: true };
-          if (!resolvedProject) {
-            const result = await elicitProject(server, connection, "Select the Azure DevOps project to create child work items in.");
-            if ("response" in result) return result.response;
-            resolvedProject = result.resolved;
-          }
-
-          if (items.length > 50) {
-            return { content: [{ type: "text", text: "A maximum of 50 child work items can be created in a single call." }], isError: true };
-          }
-
-          const orgUrl = connection.serverUrl;
-          const accessToken = await tokenProvider();
-
-          const body = items.map((item, x) => {
-            const encodedDescription = encodeFormattedValue(item.description, item.format);
-
-            const ops: { op: string; path: string; value: unknown }[] = [
-              { op: "add", path: "/id", value: `-${x + 1}` },
-              { op: "add", path: "/fields/System.Title", value: item.title },
-              {
-                op: "add",
-                path: "/relations/-",
-                value: {
-                  rel: "System.LinkTypes.Hierarchy-Reverse",
-                  url: `${connection.serverUrl}/${resolvedProject}/_apis/wit/workItems/${parentId}`,
-                },
-              },
-            ];
-
-            if (item.areaPath && item.areaPath.trim().length > 0) {
-              ops.push({ op: "add", path: "/fields/System.AreaPath", value: item.areaPath });
-            }
-
-            if (item.iterationPath && item.iterationPath.trim().length > 0) {
-              ops.push({ op: "add", path: "/fields/System.IterationPath", value: item.iterationPath });
-            }
-
-            // check if the work item type is "Bug" to determine which field to use for the description
-            // ReproSteps is used for Bugs, while Description is used for other work item types
-            if (workItemType.toLowerCase() === "bug") {
-              ops.push({ op: "add", path: "/fields/Microsoft.VSTS.TCM.ReproSteps", value: encodedDescription });
-
-              if (item.format && item.format === "Markdown") {
-                ops.push({ op: "add", path: "/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps", value: item.format });
-              }
-            } else {
-              ops.push({ op: "add", path: "/fields/System.Description", value: encodedDescription });
-
-              if (item.format && item.format === "Markdown") {
-                ops.push({ op: "add", path: "/multilineFieldsFormat/System.Description", value: item.format });
-              }
-            }
-
-            return {
-              method: "PATCH",
-              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-              uri: `/${encodeURIComponent(resolvedProject!)}/_apis/wit/workitems/$${encodeURIComponent(workItemType!)}?api-version=${batchApiVersion}`,
-              headers: { "Content-Type": "application/json-patch+json" },
-              body: ops,
-            };
-          });
-
-          const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
-            method: "PATCH",
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-              "User-Agent": userAgentProvider(),
-            },
-            body: JSON.stringify(body),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to update work items in batch: ${response.statusText}`);
-          }
-
-          const result = await response.json();
-          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-        }
-
-        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        const statusCode = typeof error === "object" && error !== null && "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : undefined;
-        const statusText = statusCode === 409 ? " Conflict" : statusCode === 412 ? " Precondition Failed" : "";
-        const updateStatus = statusCode !== undefined ? ` [HTTP ${statusCode}${statusText}]` : "";
-        const msgs: Record<string, string> = {
-          create: `Error creating work item: ${errorMessage}`,
-          update: `Error updating work item${updateStatus}: ${errorMessage}`,
-          update_batch: `Error updating work items in batch: ${errorMessage}`,
-          add_child: `Error creating child work items: ${errorMessage}`,
-        };
-        return { content: [{ type: "text", text: msgs[action] ?? `Error: ${errorMessage}` }], isError: true };
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error occurred";
+      if (args.action === "update") return errorResult(getUpdateErrorMessage(error, message));
+      return errorResult(`${workItemWriteErrorPrefixes[args.action]}${message}`);
     }
-  );
+  });
 
   // --- wit_work_item_comment_write --------------------------------------------
-  server.tool(
-    WORKITEM_TOOLS.wit_work_item_comment_write,
-    "Write operations for work item comments. Use the action parameter to specify the operation.",
-    {
-      action: z.enum(["add", "update"]).describe("The action to perform. Options: add (add a comment to a work item), update (update an existing comment on a work item)."),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      workItemId: z.coerce.number().min(1).optional().describe("The ID of the work item. Required for: add, update."),
-      text: z.string().optional().describe("The comment text. Required for: add, update."),
-      commentId: z.coerce.number().min(1).optional().describe("The ID of the comment to update. Required for: update."),
-      format: z.enum(["Markdown", "Html"]).optional().default("Markdown").describe("Format of the comment text. Optional, defaults to 'Markdown'."),
-    },
-    async ({ action, project, workItemId, text, commentId, format }) => {
-      try {
-        const connection = await connectionProvider();
-
-        let resolvedProject = project;
-        if (!resolvedProject) {
-          const label = action === "add" ? "add a work item comment in" : "update the work item comment in";
-          const result = await elicitProject(server, connection, `Select the Azure DevOps project to ${label}.`);
-          if ("response" in result) return result.response;
-          resolvedProject = result.resolved;
+  server.tool(WORKITEM_TOOLS.wit_work_item_comment_write, "Write operations for work item comments. Use the action parameter to specify the operation.", workItemCommentWriteShape, async (args) => {
+    try {
+      switch (args.action) {
+        case "add":
+          return await addWorkItemCommentAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+        case "update":
+          return await updateWorkItemCommentAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+        default: {
+          const unsupportedAction: never = args.action;
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workItemCommentWriteErrorPrefixes).sort().join(", ")}`);
         }
-
-        if (!workItemId) return { content: [{ type: "text", text: "workItemId is required" }], isError: true };
-        if (!text) return { content: [{ type: "text", text: "text is required" }], isError: true };
-
-        const orgUrl = connection.serverUrl;
-        const accessToken = await tokenProvider();
-        const formatParameter = (format ?? "Markdown") === "Markdown" ? 0 : 1;
-        const resolvedText = await prepareCommentText(text, format, tokenProvider, connectionProvider, userAgentProvider);
-
-        if (action === "add") {
-          const response = await fetch(
-            `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
-            {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-                "User-Agent": userAgentProvider(),
-              },
-              body: JSON.stringify({ text: resolvedText }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error(`Failed to add a work item comment: ${response.statusText}`);
-          }
-
-          return { content: [{ type: "text", text: await response.text() }] };
-        }
-
-        if (action === "update") {
-          if (!commentId) return { content: [{ type: "text", text: "commentId is required for update" }], isError: true };
-
-          const response = await fetch(
-            `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments/${commentId}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
-            {
-              method: "PATCH",
-              headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-                "User-Agent": userAgentProvider(),
-              },
-              body: JSON.stringify({ text: resolvedText }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error(`Failed to update work item comment: ${response.statusText}`);
-          }
-
-          return { content: [{ type: "text", text: await response.text() }] };
-        }
-
-        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        const msgs: Record<string, string> = {
-          add: `Error adding work item comment: ${errorMessage}`,
-          update: `Error updating work item comment: ${errorMessage}`,
-        };
-        return { content: [{ type: "text", text: msgs[action] ?? `Error: ${errorMessage}` }], isError: true };
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error occurred";
+      return errorResult(`${workItemCommentWriteErrorPrefixes[args.action]}${message}`);
     }
-  );
+  });
 
   // --- wit_work_item_link_write -----------------------------------------------
-  server.tool(
-    WORKITEM_TOOLS.wit_work_item_link_write,
-    "Write operations for work item links. Use the action parameter to specify the operation.",
-    {
-      action: z
-        .enum(["link", "unlink", "link_to_pull_request", "add_artifact_link"])
-        .describe(
-          "The action to perform. Options: link (link two work items together), unlink (remove links from a work item), link_to_pull_request (link a work item to a pull request), add_artifact_link (add a repository, branch, commit, or build artifact link to a work item)."
-        ),
-      project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
-      // link
-      updates: z
-        .array(
-          z.object({
-            id: z.coerce.number().min(1).describe("The ID of the work item to update."),
-            linkToId: z.coerce.number().min(1).optional().describe("The ID of the work item to link to. Required unless type is 'hyperlink'."),
-            url: z.string().optional().describe("The URL for a hyperlink. Required when type is 'hyperlink'."),
-            type: z
-              .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "hyperlink"])
-              .default("related")
-              .describe("Type of link. Defaults to 'related'."),
-            comment: z.string().optional().describe("Optional comment for the link."),
-          })
-        )
-        .optional()
-        .describe("Link operations to apply. Required for: link."),
-      // unlink
-      id: z.coerce.number().min(1).optional().describe("Work item ID to remove links from. Required for: unlink."),
-      type: z
-        .enum(["parent", "child", "duplicate", "duplicate of", "related", "successor", "predecessor", "tested by", "tests", "affects", "affected by", "artifact", "hyperlink"])
-        .optional()
-        .describe("Link type to remove. Required for: unlink."),
-      url: z.string().optional().describe("URL to match when removing a link. Used for: unlink. If not provided, all links of the specified type are removed."),
-      // link_to_pull_request and add_artifact_link
-      projectId: z.string().optional().describe("The project ID (GUID). Required for: link_to_pull_request, and add_artifact_link (Git/Wiki types)."),
-      repositoryId: z.string().optional().describe("The repository ID. Required for: link_to_pull_request and add_artifact_link (Git types)."),
-      pullRequestId: z.coerce.number().min(1).optional().describe("The pull request ID. Required for: link_to_pull_request; used for: add_artifact_link (Pull Request type)."),
-      workItemId: z.coerce.number().min(1).optional().describe("The work item ID. Required for: link_to_pull_request, add_artifact_link."),
-      pullRequestProjectId: z.string().optional().describe("Project ID containing the pull request. Used for: link_to_pull_request. Defaults to projectId."),
-      // add_artifact_link
-      artifactUri: z.string().optional().describe("The complete VSTFS URI of the artifact. Used for: add_artifact_link. If provided, individual component parameters are ignored."),
-      branchName: z.string().optional().describe("The branch name. Used for: add_artifact_link (Branch type)."),
-      commitId: z.string().optional().describe("The commit SHA hash. Used for: add_artifact_link (Fixed in Commit type)."),
-      buildId: z.coerce.number().min(1).optional().describe("The build ID. Used for: add_artifact_link (Build, Found in build, Integrated in build types)."),
-      wikiId: z.string().optional().describe("The wiki ID (GUID). Used for: add_artifact_link (Wiki type)."),
-      pageId: z.coerce.number().min(1).optional().describe("The numeric wiki page ID. Used for: add_artifact_link (Wiki type). Takes precedence over pagePath."),
-      pagePath: z.string().optional().describe("The full wiki page path. Used for: add_artifact_link (Wiki type) when pageId is not provided."),
-      linkType: z
-        .enum([
-          "Branch",
-          "Build",
-          "Fixed in Changeset",
-          "Fixed in Commit",
-          "Found in build",
-          "Integrated in build",
-          "Model Link",
-          "Pull Request",
-          "Related Workitem",
-          "Result Attachment",
-          "Source Code File",
-          "Tag",
-          "Test Result",
-          "Wiki",
-        ])
-        .optional()
-        .describe("Type of artifact link. Used for: add_artifact_link. Defaults to 'Branch'."),
-      comment: z.string().optional().describe("Comment to include with the artifact link. Used for: add_artifact_link."),
-    },
-    async ({
-      action,
-      project,
-      updates,
-      id,
-      type,
-      url,
-      projectId,
-      repositoryId,
-      pullRequestId,
-      workItemId,
-      pullRequestProjectId,
-      artifactUri,
-      branchName,
-      commitId,
-      buildId,
-      wikiId,
-      pageId,
-      pagePath,
-      linkType,
-      comment,
-    }) => {
-      try {
-        const connection = await connectionProvider();
-
-        let resolvedProject = project;
-
-        if (action === "link") {
-          if (!updates || updates.length === 0) return { content: [{ type: "text", text: "updates is required for link" }], isError: true };
-          if (!resolvedProject) {
-            const result = await elicitProject(server, connection, "Select the Azure DevOps project to link work items in.");
-            if ("response" in result) return result.response;
-            resolvedProject = result.resolved;
-          }
-
-          const orgUrl = connection.serverUrl;
-          const accessToken = await tokenProvider();
-          const uniqueIds = Array.from(new Set(updates.map((update) => update.id)));
-
-          const body = uniqueIds.map((uid) => ({
-            method: "PATCH",
-            uri: `/_apis/wit/workitems/${uid}?api-version=${batchApiVersion}`,
-            headers: { "Content-Type": "application/json-patch+json" },
-            body: updates
-              .filter((update) => update.id === uid)
-              .map(({ linkToId, url: linkUrl, type: linkTypeName, comment: linkComment }) => {
-                if (linkTypeName === "hyperlink" && !linkUrl) {
-                  throw new Error("url is required for hyperlink links");
-                }
-                if (linkTypeName !== "hyperlink" && !linkToId) {
-                  throw new Error("linkToId is required for work item links");
-                }
-
-                return {
-                  op: "add",
-                  path: "/relations/-",
-                  value: {
-                    rel: getLinkTypeFromName(linkTypeName),
-                    url: linkTypeName === "hyperlink" ? linkUrl : `${orgUrl}/${resolvedProject}/_apis/wit/workItems/${linkToId}`,
-                    attributes: { comment: linkComment || "" },
-                  },
-                };
-              }),
-          }));
-
-          const response = await fetch(`${orgUrl}/_apis/wit/$batch?api-version=${batchApiVersion}`, {
-            method: "PATCH",
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-              "User-Agent": userAgentProvider(),
-            },
-            body: JSON.stringify(body),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to update work items in batch: ${response.statusText}`);
-          }
-
-          const result = await response.json();
-          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  server.tool(WORKITEM_TOOLS.wit_work_item_link_write, "Write operations for work item links. Use the action parameter to specify the operation.", workItemLinkWriteShape, async (args) => {
+    try {
+      switch (args.action) {
+        case "link":
+          return await linkWorkItemsAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+        case "unlink":
+          return await unlinkWorkItemAction(args, server, connectionProvider);
+        case "link_to_pull_request":
+          return await linkWorkItemToPullRequestAction(args, connectionProvider);
+        case "add_artifact_link":
+          return await addArtifactLinkAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+        default: {
+          const unsupportedAction: never = args.action;
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workItemLinkWriteErrorPrefixes).sort().join(", ")}`);
         }
-
-        if (action === "unlink") {
-          if (!id) return { content: [{ type: "text", text: "id is required for unlink" }], isError: true };
-          if (!type) return { content: [{ type: "text", text: "type is required for unlink" }], isError: true };
-          if (!resolvedProject) {
-            const result = await elicitProject(server, connection, "Select the Azure DevOps project to unlink work items in.");
-            if ("response" in result) return result.response;
-            resolvedProject = result.resolved;
-          }
-
-          const workItemApi = await connection.getWorkItemTrackingApi();
-          const workItem = await workItemApi.getWorkItem(id, undefined, undefined, WorkItemExpand.Relations, resolvedProject);
-          const relations: WorkItemRelation[] = workItem.relations ?? [];
-          const linkTypeName = getLinkTypeFromName(type);
-
-          let relationIndexes: number[] = [];
-
-          if (url && url.trim().length > 0) {
-            relationIndexes = relations.map((relation, idx) => (relation.rel === linkTypeName && relation.url === url ? idx : -1)).filter((idx) => idx !== -1);
-          } else {
-            relationIndexes = relations.map((relation, idx) => (relation.rel === linkTypeName ? idx : -1)).filter((idx) => idx !== -1);
-          }
-
-          if (relationIndexes.length === 0) {
-            return {
-              content: [{ type: "text", text: `No matching relations found for link type '${type}'${url ? ` and URL '${url}'` : ""}.\n${JSON.stringify(relations, null, 2)}` }],
-              isError: true,
-            };
-          }
-
-          const removedRelations = relationIndexes.map((idx) => relations[idx]);
-          relationIndexes.sort((a, b) => b - a);
-
-          const apiUpdates = relationIndexes.map((idx) => ({ op: "remove", path: `/relations/${idx}` }));
-          const updatedWorkItem = await workItemApi.updateWorkItem(null, apiUpdates, id, resolvedProject);
-
-          return {
-            content: [
-              {
-                type: "text",
-                text:
-                  `Removed ${removedRelations.length} link(s) of type '${type}':\n` +
-                  JSON.stringify(removedRelations, null, 2) +
-                  `\n\nUpdated work item result:\n` +
-                  JSON.stringify(updatedWorkItem, null, 2),
-              },
-            ],
-            isError: false,
-          };
-        }
-
-        if (action === "link_to_pull_request") {
-          if (!projectId) return { content: [{ type: "text", text: "projectId is required for link_to_pull_request" }], isError: true };
-          if (!repositoryId) return { content: [{ type: "text", text: "repositoryId is required for link_to_pull_request" }], isError: true };
-          if (pullRequestId === undefined) return { content: [{ type: "text", text: "pullRequestId is required for link_to_pull_request" }], isError: true };
-          if (!workItemId) return { content: [{ type: "text", text: "workItemId is required for link_to_pull_request" }], isError: true };
-
-          const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-          const artifactProjectId = pullRequestProjectId && pullRequestProjectId.trim() !== "" ? pullRequestProjectId : projectId;
-          const artifactPathValue = `${artifactProjectId}/${repositoryId}/${pullRequestId}`;
-          const vstfsUrl = `vstfs:///Git/PullRequestId/${encodeURIComponent(artifactPathValue)}`;
-
-          const patchDocument = [
-            {
-              op: "add",
-              path: "/relations/-",
-              value: {
-                rel: "ArtifactLink",
-                url: vstfsUrl,
-                attributes: { name: "Pull Request" },
-              },
-            },
-          ];
-
-          const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, projectId);
-
-          if (!workItem) {
-            return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
-          }
-
-          return {
-            content: [{ type: "text", text: JSON.stringify({ workItemId, pullRequestId, success: true }, null, 2) }],
-          };
-        }
-
-        if (action === "add_artifact_link") {
-          if (!workItemId) return { content: [{ type: "text", text: "workItemId is required for add_artifact_link" }], isError: true };
-          if (!resolvedProject) {
-            const result = await elicitProject(server, connection, "Select the Azure DevOps project to add the artifact link in.");
-            if ("response" in result) return result.response;
-            resolvedProject = result.resolved;
-          }
-
-          const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-          const effectiveLinkType = linkType ?? "Branch";
-          let finalArtifactUri: string;
-
-          if (artifactUri) {
-            finalArtifactUri = artifactUri;
-          } else {
-            switch (effectiveLinkType) {
-              case "Branch":
-                if (!projectId || !repositoryId || !branchName) {
-                  return { content: [{ type: "text", text: "For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required." }], isError: true };
-                }
-                finalArtifactUri = `vstfs:///Git/Ref/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2FGB${encodeURIComponent(branchName)}`;
-                break;
-
-              case "Fixed in Commit":
-                if (!projectId || !repositoryId || !commitId) {
-                  return { content: [{ type: "text", text: "For 'Fixed in Commit' links, 'projectId', 'repositoryId', and 'commitId' are required." }], isError: true };
-                }
-                finalArtifactUri = `vstfs:///Git/Commit/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(commitId)}`;
-                break;
-
-              case "Pull Request":
-                if (!projectId || !repositoryId || pullRequestId === undefined) {
-                  return { content: [{ type: "text", text: "For 'Pull Request' links, 'projectId', 'repositoryId', and 'pullRequestId' are required." }], isError: true };
-                }
-                finalArtifactUri = `vstfs:///Git/PullRequestId/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(pullRequestId.toString())}`;
-                break;
-
-              case "Build":
-              case "Found in build":
-              case "Integrated in build":
-                if (buildId === undefined) {
-                  return { content: [{ type: "text", text: `For '${effectiveLinkType}' links, 'buildId' is required.` }], isError: true };
-                }
-                finalArtifactUri = `vstfs:///Build/Build/${encodeURIComponent(buildId.toString())}`;
-                break;
-
-              case "Wiki": {
-                if (!projectId || !wikiId) {
-                  return { content: [{ type: "text", text: "For 'Wiki' links, 'projectId', 'wikiId', and 'pagePath' are required." }], isError: true };
-                }
-
-                let resolvedPagePath = pagePath;
-
-                if (pageId !== undefined) {
-                  const orgUrl = connection.serverUrl;
-                  const accessToken = await tokenProvider();
-                  const pageResponse = await fetch(`${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wiki/wikis/${encodeURIComponent(wikiId)}/pages/${pageId}?api-version=7.1`, {
-                    headers: {
-                      "Authorization": `Bearer ${accessToken}`,
-                      "User-Agent": userAgentProvider(),
-                    },
-                  });
-                  if (!pageResponse.ok) {
-                    return { content: [{ type: "text", text: `Failed to look up wiki page ID ${pageId}: ${pageResponse.statusText}` }], isError: true };
-                  }
-                  const pageData = await pageResponse.json();
-                  resolvedPagePath = pageData.path as string;
-                }
-
-                if (!resolvedPagePath) {
-                  return { content: [{ type: "text", text: "For 'Wiki' links, 'pageId' or 'pagePath' is required." }], isError: true };
-                }
-
-                const normalizedPath = resolvedPagePath.startsWith("/") ? resolvedPagePath.slice(1) : resolvedPagePath;
-                const encodedPath = normalizedPath.split("/").map(encodeURIComponent).join("%2F");
-                finalArtifactUri = `vstfs:///Wiki/WikiPage/${encodeURIComponent(projectId)}%2F${encodeURIComponent(wikiId)}%2F${encodedPath}`;
-                break;
-              }
-
-              default:
-                return {
-                  content: [{ type: "text", text: `URI building from components is not supported for link type '${effectiveLinkType}'. Please provide the full 'artifactUri' instead.` }],
-                  isError: true,
-                };
-            }
-          }
-
-          const patchDocument = [
-            {
-              op: "add",
-              path: "/relations/-",
-              value: {
-                rel: "ArtifactLink",
-                url: finalArtifactUri,
-                attributes: {
-                  name: getArtifactLinkAttributeName(effectiveLinkType),
-                  ...(comment && { comment }),
-                },
-              },
-            },
-          ];
-
-          const workItem = await workItemTrackingApi.updateWorkItem({}, patchDocument, workItemId, resolvedProject);
-
-          if (!workItem) {
-            return { content: [{ type: "text", text: "Work item update failed" }], isError: true };
-          }
-
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({ workItemId, artifactUri: finalArtifactUri, linkType: effectiveLinkType, comment: comment || null, success: true }, null, 2),
-              },
-            ],
-          };
-        }
-
-        return { content: [{ type: "text", text: `Unknown action: ${action}` }], isError: true };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        const msgs: Record<string, string> = {
-          link: `Error linking work items: ${errorMessage}`,
-          unlink: `Error unlinking work item: ${errorMessage}`,
-          link_to_pull_request: `Error linking work item to pull request: ${errorMessage}`,
-          add_artifact_link: `Error adding artifact link to work item: ${errorMessage}`,
-        };
-        return { content: [{ type: "text", text: msgs[action] ?? `Error: ${errorMessage}` }], isError: true };
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error occurred";
+      return errorResult(`${workItemLinkWriteErrorPrefixes[args.action]}${message}`);
     }
-  );
+  });
 }
 
 function getMimeType(fileName: string | undefined): string {
@@ -1446,4 +1379,29 @@ function getMimeType(fileName: string | undefined): string {
   return (ext && mimeTypes[ext]) ?? "application/octet-stream";
 }
 
-export { WORKITEM_TOOLS, configureWorkItemTools };
+export {
+  WORKITEM_TOOLS,
+  configureWorkItemTools,
+  createWorkItemAction,
+  updateWorkItemAction,
+  updateWorkItemsBatchAction,
+  addChildWorkItemsAction,
+  addWorkItemCommentAction,
+  updateWorkItemCommentAction,
+  linkWorkItemsAction,
+  unlinkWorkItemAction,
+  linkWorkItemToPullRequestAction,
+  addArtifactLinkAction,
+};
+export type {
+  CreateWorkItemArgs,
+  UpdateWorkItemArgs,
+  UpdateWorkItemsBatchArgs,
+  AddChildWorkItemsArgs,
+  AddWorkItemCommentArgs,
+  UpdateWorkItemCommentArgs,
+  LinkWorkItemsArgs,
+  UnlinkWorkItemArgs,
+  LinkWorkItemToPullRequestArgs,
+  AddArtifactLinkArgs,
+};
