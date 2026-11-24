@@ -5,22 +5,7 @@ import { z } from "zod";
 import { getEnumKeys } from "../utils.js";
 import { CommentThreadStatus, GitPullRequestMergeStrategy } from "azure-devops-node-api/interfaces/GitInterfaces.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DTOs for the repo_file_write, repo_pull_request_write and
-// repo_pull_request_thread_write tools.
-//
-// Each action's inputs are declared once as a Zod "raw shape". The shapes are
-// the single source of truth: each tool's input schema is composed from them,
-// and the TypeScript argument types are derived via `z.infer` (no hand-written,
-// drift-prone duplicate types). These types are safe to export — they are
-// compile-time only and erased at runtime, so they have no effect on the MCP
-// protocol or a local server.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─── repo_file_write ─────────────────────────────────────────────────────────
-
-/** create/update file inputs (both actions take the same fields). */
-export const fileWriteShape = {
+export const writeRepositoryFileShape = {
   repositoryId: z.string().describe("The ID or name of the repository."),
   project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name."),
   branchName: z.string().min(1).describe("The name of the existing branch to update, without the 'refs/heads/' prefix."),
@@ -33,22 +18,17 @@ export const fileWriteShape = {
     .describe("The expected current commit ID of the branch. When provided, the push fails if the branch has moved. If omitted, the current branch head is retrieved before pushing."),
 };
 
-/** The composed input shape for the grouped `repo_file_write` tool. */
 export const repoFileWriteShape = {
   action: z.enum(["create", "update"]).describe("Whether to create a new file or update an existing file."),
-  ...fileWriteShape,
+  ...writeRepositoryFileShape,
 };
 
-// ─── repo_pull_request_write ─────────────────────────────────────────────────
-
-/** Fields shared by every pull request write action. */
 const pullRequestShape = {
   repositoryId: z.string().optional().describe("The ID or name of the repository. Required for all actions. When using a name instead of a GUID, project must also be provided."),
   pullRequestId: z.coerce.number().min(1).optional().describe("The ID of the pull request. Required for update, update_reviewers, and vote."),
   project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name instead of a GUID."),
 };
 
-/** create inputs. */
 export const createPullRequestShape = {
   ...pullRequestShape,
   sourceRefName: z.string().optional().describe("The source branch name (e.g., 'refs/heads/feature-branch'). Required for create."),
@@ -61,7 +41,6 @@ export const createPullRequestShape = {
   labels: z.array(z.string()).optional().describe("Array of label names. Used for create and update."),
 };
 
-/** update inputs. */
 export const updatePullRequestShape = {
   ...pullRequestShape,
   targetRefName: z.string().optional().describe("The target branch name (e.g., 'refs/heads/main'). Required for create. Optional for update."),
@@ -82,20 +61,17 @@ export const updatePullRequestShape = {
   bypassReason: z.string().optional().describe("Reason for bypassing branch policies. Used for update only when bypassPolicy is true."),
 };
 
-/** update_reviewers inputs. */
 export const updatePullRequestReviewersShape = {
   ...pullRequestShape,
   reviewerIds: z.array(z.string()).optional().describe("List of reviewer IDs. Required for update_reviewers."),
   reviewerAction: z.enum(["add", "remove"]).optional().describe("Whether to add or remove reviewers. Required for update_reviewers."),
 };
 
-/** vote inputs. */
 export const votePullRequestShape = {
   ...pullRequestShape,
   vote: z.enum(["Approved", "ApprovedWithSuggestions", "NoVote", "WaitingForAuthor", "Rejected"]).optional().describe("The vote to cast. Required for vote."),
 };
 
-/** The composed input shape for the grouped `repo_pull_request_write` tool. */
 export const repoPullRequestWriteShape = {
   action: z
     .enum(["create", "update", "update_reviewers", "vote"])
@@ -108,16 +84,12 @@ export const repoPullRequestWriteShape = {
   ...votePullRequestShape,
 };
 
-// ─── repo_pull_request_thread_write ──────────────────────────────────────────
-
-/** Fields shared by every pull request thread write action. */
 const pullRequestThreadShape = {
   repositoryId: z.string().describe("The ID or name of the repository. When using a name instead of a GUID, project must also be provided."),
   pullRequestId: z.coerce.number().min(1).describe("The ID of the pull request."),
   project: z.string().optional().describe("Project ID or project name. Required when repositoryId is a name instead of a GUID."),
 };
 
-/** create inputs. */
 export const createPullRequestThreadShape = {
   ...pullRequestThreadShape,
   content: z.string().optional().describe("The content of the comment. Required for create, reply, and update."),
@@ -135,7 +107,6 @@ export const createPullRequestThreadShape = {
   secondComparingIteration: z.coerce.number().int().min(1).optional().describe("The iteration on the right side of the diff. Used for create."),
 };
 
-/** reply inputs. */
 export const replyToPullRequestThreadShape = {
   ...pullRequestThreadShape,
   threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply, update, and update_status."),
@@ -147,7 +118,6 @@ export const replyToPullRequestThreadShape = {
   fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply and update."),
 };
 
-/** update inputs. */
 export const updatePullRequestCommentShape = {
   ...pullRequestThreadShape,
   threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply, update, and update_status."),
@@ -156,7 +126,6 @@ export const updatePullRequestCommentShape = {
   fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply and update."),
 };
 
-/** update_status inputs. */
 export const updatePullRequestThreadStatusShape = {
   ...pullRequestThreadShape,
   threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply, update, and update_status."),
@@ -166,7 +135,6 @@ export const updatePullRequestThreadStatusShape = {
     .describe("The thread status. Used for create (defaults to 'Active'), optionally for reply, and required for update_status."),
 };
 
-/** The composed input shape for the grouped `repo_pull_request_thread_write` tool. */
 export const repoPullRequestThreadWriteShape = {
   action: z
     .enum(["create", "reply", "update", "update_status"])
@@ -179,8 +147,7 @@ export const repoPullRequestThreadWriteShape = {
   ...createPullRequestThreadShape,
 };
 
-// Per-action schemas + inferred argument DTOs. `z.infer` keeps these types in
-// lockstep with the schemas above.
+export const writeRepositoryFileSchema = z.object(writeRepositoryFileShape);
 export const repoFileWriteSchema = z.object(repoFileWriteShape);
 export const createPullRequestSchema = z.object(createPullRequestShape);
 export const updatePullRequestSchema = z.object(updatePullRequestShape);
@@ -193,6 +160,7 @@ export const updatePullRequestCommentSchema = z.object(updatePullRequestCommentS
 export const updatePullRequestThreadStatusSchema = z.object(updatePullRequestThreadStatusShape);
 export const repoPullRequestThreadWriteSchema = z.object(repoPullRequestThreadWriteShape);
 
+export type WriteRepositoryFileArgs = z.infer<typeof writeRepositoryFileSchema>;
 export type RepoFileWriteArgs = z.infer<typeof repoFileWriteSchema>;
 export type CreatePullRequestArgs = z.infer<typeof createPullRequestSchema>;
 export type UpdatePullRequestArgs = z.infer<typeof updatePullRequestSchema>;

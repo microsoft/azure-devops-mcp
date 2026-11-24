@@ -35,6 +35,7 @@ import {
   repoFileWriteShape,
   repoPullRequestWriteShape,
   repoPullRequestThreadWriteShape,
+  WriteRepositoryFileArgs,
   RepoFileWriteArgs,
   CreatePullRequestArgs,
   UpdatePullRequestArgs,
@@ -198,7 +199,7 @@ function buildVersionDescriptor(version?: string, versionType?: string): GitVers
   };
 }
 
-async function writeRepositoryFile(args: RepoFileWriteArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+async function writeRepositoryFile(args: WriteRepositoryFileArgs & Pick<RepoFileWriteArgs, "action">, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
   const { action, repositoryId, project, branchName, path, content, commitMessage, expectedOldObjectId } = args;
   const connection = await connectionProvider();
   const gitApi = await connection.getGitApi();
@@ -1346,6 +1347,7 @@ export {
   updatePullRequestThreadStatus,
 };
 export type {
+  WriteRepositoryFileArgs,
   RepoFileWriteArgs,
   CreatePullRequestArgs,
   UpdatePullRequestArgs,

@@ -6,15 +6,15 @@ import { WebApi } from "azure-devops-node-api";
 import {
   configureRepoTools,
   REPO_TOOLS,
-  writeRepositoryFile,
-  createPullRequest,
-  updatePullRequest,
-  updatePullRequestReviewers,
-  votePullRequest,
-  createPullRequestThread,
-  replyToPullRequestThread,
-  updatePullRequestComment,
-  updatePullRequestThreadStatus,
+  writeRepositoryFile as writeRepositoryFileAction,
+  createPullRequest as createPullRequestAction,
+  updatePullRequest as updatePullRequestAction,
+  updatePullRequestReviewers as updatePullRequestReviewersAction,
+  votePullRequest as votePullRequestAction,
+  createPullRequestThread as createPullRequestThreadAction,
+  replyToPullRequestThread as replyToPullRequestThreadAction,
+  updatePullRequestComment as updatePullRequestCommentAction,
+  updatePullRequestThreadStatus as updatePullRequestThreadStatusAction,
 } from "../../../src/tools/repositories";
 import {
   PullRequestStatus,
@@ -9425,36 +9425,15 @@ describe("repos tools", () => {
   });
 });
 
-// Direct, isolated unit tests for each repo write action, independent of the
-// tool dispatcher.
-describe("repo write actions", () => {
-  let tokenProvider: () => Promise<string>;
-  let userAgentProvider: () => string;
-  let mockGitApi: Record<string, jest.Mock>;
+describe("repo_file_write actions", () => {
   let connectionProvider: jest.Mock;
   let typedConnectionProvider: () => Promise<WebApi>;
-  const updateDefaults = { deleteSourceBranch: false, transitionWorkItems: true, bypassPolicy: false };
+  let mockGitApi: Record<string, jest.Mock>;
 
   beforeEach(() => {
-    tokenProvider = jest.fn();
-    userAgentProvider = () => "Jest";
-    mockGitApi = {
-      getRefs: jest.fn(),
-      createPush: jest.fn(),
-      createPullRequest: jest.fn(),
-      getPullRequests: jest.fn(),
-      updatePullRequest: jest.fn(),
-      deletePullRequestReviewer: jest.fn(),
-      getPullRequestReviewer: jest.fn(),
-      createPullRequestReviewer: jest.fn(),
-      createThread: jest.fn(),
-      createComment: jest.fn(),
-      updateComment: jest.fn(),
-      updateThread: jest.fn(),
-    };
+    mockGitApi = { getRefs: jest.fn(), createPush: jest.fn() };
     connectionProvider = jest.fn().mockResolvedValue({ getGitApi: jest.fn().mockResolvedValue(mockGitApi) });
     typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
-    mockGetCurrentUserDetails.mockResolvedValue({ authenticatedUser: { id: "user123" } } as any);
   });
 
   describe("writeRepositoryFile", () => {
@@ -9464,7 +9443,7 @@ describe("repo write actions", () => {
       mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "abc" }]);
       mockGitApi.createPush.mockResolvedValue({ pushId: 7, commits: [{ commitId: "def" }] });
 
-      const result = await writeRepositoryFile(fileArgs, typedConnectionProvider);
+      const result = await writeRepositoryFileAction(fileArgs, typedConnectionProvider);
 
       expect(mockGitApi.createPush).toHaveBeenCalledWith(
         {
@@ -9481,12 +9460,37 @@ describe("repo write actions", () => {
     it("returns an error when the branch has moved", async () => {
       mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "abc" }]);
 
-      const result = await writeRepositoryFile({ ...fileArgs, action: "update", expectedOldObjectId: "old" }, typedConnectionProvider);
+      const result = await writeRepositoryFileAction({ ...fileArgs, action: "update", expectedOldObjectId: "old" }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error: Branch 'main' has moved from expected commit old");
       expect(mockGitApi.createPush).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("repo_pull_request_write actions", () => {
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let mockGitApi: Record<string, jest.Mock>;
+  let tokenProvider: () => Promise<string>;
+  let userAgentProvider: () => string;
+  const updateDefaults = { deleteSourceBranch: false, transitionWorkItems: true, bypassPolicy: false };
+
+  beforeEach(() => {
+    tokenProvider = jest.fn();
+    userAgentProvider = () => "Jest";
+    mockGetCurrentUserDetails.mockResolvedValue({ authenticatedUser: { id: "user123" } } as any);
+    mockGitApi = {
+      createPullRequest: jest.fn(),
+      getPullRequests: jest.fn(),
+      updatePullRequest: jest.fn(),
+      deletePullRequestReviewer: jest.fn(),
+      getPullRequestReviewer: jest.fn(),
+      createPullRequestReviewer: jest.fn(),
+    };
+    connectionProvider = jest.fn().mockResolvedValue({ getGitApi: jest.fn().mockResolvedValue(mockGitApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
   });
 
   describe("createPullRequest", () => {
@@ -9495,7 +9499,7 @@ describe("repo write actions", () => {
     it("creates a pull request", async () => {
       mockGitApi.createPullRequest.mockResolvedValue({ pullRequestId: 1, title: "Title", status: PullRequestStatus.Active });
 
-      const result = await createPullRequest({ ...prArgs, workItems: "1 2", labels: ["x"] }, typedConnectionProvider);
+      const result = await createPullRequestAction({ ...prArgs, workItems: "1 2", labels: ["x"] }, typedConnectionProvider);
 
       expect(mockGitApi.createPullRequest).toHaveBeenCalledWith(
         {
@@ -9517,7 +9521,7 @@ describe("repo write actions", () => {
     });
 
     it("returns an error when title is missing without opening a connection", async () => {
-      const result = await createPullRequest({ ...prArgs, title: undefined }, typedConnectionProvider);
+      const result = await createPullRequestAction({ ...prArgs, title: undefined }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("title is required for create");
@@ -9528,7 +9532,7 @@ describe("repo write actions", () => {
       mockGitApi.createPullRequest.mockResolvedValue(null);
       mockGitApi.getPullRequests.mockResolvedValue([]);
 
-      const result = await createPullRequest(prArgs, typedConnectionProvider);
+      const result = await createPullRequestAction(prArgs, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Pull request creation returned no data and no matching PR was found.");
@@ -9539,14 +9543,14 @@ describe("repo write actions", () => {
     it("updates the title", async () => {
       mockGitApi.updatePullRequest.mockResolvedValue({ pullRequestId: 1, title: "New" });
 
-      const result = await updatePullRequest({ ...updateDefaults, repositoryId: "repo", pullRequestId: 1, title: "New" }, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await updatePullRequestAction({ ...updateDefaults, repositoryId: "repo", pullRequestId: 1, title: "New" }, typedConnectionProvider, tokenProvider, userAgentProvider);
 
       expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith({ title: "New" }, "repo", 1, undefined);
       expect(JSON.parse(result.content[0].text as string)).toMatchObject({ pullRequestId: 1, title: "New" });
     });
 
     it("returns an error when pullRequestId is missing without opening a connection", async () => {
-      const result = await updatePullRequest({ ...updateDefaults, repositoryId: "repo", title: "New" }, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await updatePullRequestAction({ ...updateDefaults, repositoryId: "repo", title: "New" }, typedConnectionProvider, tokenProvider, userAgentProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("pullRequestId is required for update");
@@ -9554,7 +9558,7 @@ describe("repo write actions", () => {
     });
 
     it("returns an error when no field to update is provided", async () => {
-      const result = await updatePullRequest({ ...updateDefaults, repositoryId: "repo", pullRequestId: 1 }, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await updatePullRequestAction({ ...updateDefaults, repositoryId: "repo", pullRequestId: 1 }, typedConnectionProvider, tokenProvider, userAgentProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("At least one field");
@@ -9564,7 +9568,7 @@ describe("repo write actions", () => {
 
   describe("updatePullRequestReviewers", () => {
     it("removes reviewers", async () => {
-      const result = await updatePullRequestReviewers({ repositoryId: "repo", pullRequestId: 1, reviewerIds: ["a", "b"], reviewerAction: "remove" }, typedConnectionProvider);
+      const result = await updatePullRequestReviewersAction({ repositoryId: "repo", pullRequestId: 1, reviewerIds: ["a", "b"], reviewerAction: "remove" }, typedConnectionProvider);
 
       expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo", 1, "a", undefined);
       expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo", 1, "b", undefined);
@@ -9572,7 +9576,7 @@ describe("repo write actions", () => {
     });
 
     it("returns an error when reviewerIds is empty without opening a connection", async () => {
-      const result = await updatePullRequestReviewers({ repositoryId: "repo", pullRequestId: 1, reviewerIds: [], reviewerAction: "add" }, typedConnectionProvider);
+      const result = await updatePullRequestReviewersAction({ repositoryId: "repo", pullRequestId: 1, reviewerIds: [], reviewerAction: "add" }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("reviewerIds is required for update_reviewers");
@@ -9584,26 +9588,42 @@ describe("repo write actions", () => {
     it("casts a vote preserving the required flag", async () => {
       mockGitApi.getPullRequestReviewer.mockResolvedValue({ isRequired: true });
 
-      const result = await votePullRequest({ repositoryId: "repo", pullRequestId: 1, vote: "Approved" }, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await votePullRequestAction({ repositoryId: "repo", pullRequestId: 1, vote: "Approved" }, typedConnectionProvider, tokenProvider, userAgentProvider);
 
       expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123", isRequired: true }, "repo", 1, "user123", undefined);
       expect(result.content[0].text).toBe("Successfully cast vote 'Approved' on PR #1.");
     });
 
     it("returns an error when vote is missing without opening a connection", async () => {
-      const result = await votePullRequest({ repositoryId: "repo", pullRequestId: 1 }, typedConnectionProvider, tokenProvider, userAgentProvider);
+      const result = await votePullRequestAction({ repositoryId: "repo", pullRequestId: 1 }, typedConnectionProvider, tokenProvider, userAgentProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("vote is required for vote action");
       expect(connectionProvider).not.toHaveBeenCalled();
     });
   });
+});
+
+describe("repo_pull_request_thread_write actions", () => {
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let mockGitApi: Record<string, jest.Mock>;
+  let tokenProvider: () => Promise<string>;
+  let userAgentProvider: () => string;
+
+  beforeEach(() => {
+    tokenProvider = jest.fn();
+    userAgentProvider = () => "Jest";
+    mockGitApi = { createThread: jest.fn(), createComment: jest.fn(), updateComment: jest.fn(), updateThread: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue({ getGitApi: jest.fn().mockResolvedValue(mockGitApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+  });
 
   describe("createPullRequestThread", () => {
     it("creates a thread on a file range", async () => {
       mockGitApi.createThread.mockResolvedValue({ id: 5, status: CommentThreadStatus.Active, comments: [] });
 
-      const result = await createPullRequestThread(
+      const result = await createPullRequestThreadAction(
         { repositoryId: "repo", pullRequestId: 1, content: "nit", filePath: "a.ts", rightFileStartLine: 2, rightFileStartOffset: 1, rightFileEndLine: 2, rightFileEndOffset: 4 },
         typedConnectionProvider
       );
@@ -9623,7 +9643,7 @@ describe("repo write actions", () => {
     });
 
     it("returns a validation error without opening a connection", async () => {
-      const result = await createPullRequestThread({ repositoryId: "repo", pullRequestId: 1, content: "nit", rightFileEndLine: 2, rightFileEndOffset: 1 }, typedConnectionProvider);
+      const result = await createPullRequestThreadAction({ repositoryId: "repo", pullRequestId: 1, content: "nit", rightFileEndLine: 2, rightFileEndOffset: 1 }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
@@ -9635,14 +9655,14 @@ describe("repo write actions", () => {
     it("replies to a thread", async () => {
       mockGitApi.createComment.mockResolvedValue({ id: 9, content: "ok" });
 
-      const result = await replyToPullRequestThread({ repositoryId: "repo", pullRequestId: 1, threadId: 5, content: "ok", fullResponse: false }, typedConnectionProvider);
+      const result = await replyToPullRequestThreadAction({ repositoryId: "repo", pullRequestId: 1, threadId: 5, content: "ok", fullResponse: false }, typedConnectionProvider);
 
       expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "ok", commentType: 1 }, "repo", 1, 5, undefined);
       expect(JSON.parse(result.content[0].text as string)).toMatchObject({ id: 9, content: "ok" });
     });
 
     it("returns an error when threadId is missing without opening a connection", async () => {
-      const result = await replyToPullRequestThread({ repositoryId: "repo", pullRequestId: 1, content: "ok", fullResponse: false }, typedConnectionProvider);
+      const result = await replyToPullRequestThreadAction({ repositoryId: "repo", pullRequestId: 1, content: "ok", fullResponse: false }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("threadId is required for reply");
@@ -9654,14 +9674,14 @@ describe("repo write actions", () => {
     it("updates a comment", async () => {
       mockGitApi.updateComment.mockResolvedValue({ id: 9 });
 
-      const result = await updatePullRequestComment({ repositoryId: "repo", pullRequestId: 1, threadId: 5, commentId: 9, content: "edited", fullResponse: false }, typedConnectionProvider);
+      const result = await updatePullRequestCommentAction({ repositoryId: "repo", pullRequestId: 1, threadId: 5, commentId: 9, content: "edited", fullResponse: false }, typedConnectionProvider);
 
       expect(mockGitApi.updateComment).toHaveBeenCalledWith({ content: "edited" }, "repo", 1, 5, 9, undefined);
       expect(result.content[0].text).toBe("Comment 9 successfully updated in thread 5.");
     });
 
     it("returns an error when commentId is missing without opening a connection", async () => {
-      const result = await updatePullRequestComment({ repositoryId: "repo", pullRequestId: 1, threadId: 5, content: "edited", fullResponse: false }, typedConnectionProvider);
+      const result = await updatePullRequestCommentAction({ repositoryId: "repo", pullRequestId: 1, threadId: 5, content: "edited", fullResponse: false }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("commentId is required for update");
@@ -9673,7 +9693,7 @@ describe("repo write actions", () => {
     it("updates the thread status", async () => {
       mockGitApi.updateThread.mockResolvedValue({ id: 5, status: CommentThreadStatus.Fixed, comments: [] });
 
-      const result = await updatePullRequestThreadStatus({ repositoryId: "repo", pullRequestId: 1, threadId: 5, status: "Fixed" }, typedConnectionProvider);
+      const result = await updatePullRequestThreadStatusAction({ repositoryId: "repo", pullRequestId: 1, threadId: 5, status: "Fixed" }, typedConnectionProvider);
 
       expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Fixed }, "repo", 1, 5, undefined);
       expect(JSON.parse(result.content[0].text as string)).toMatchObject({ id: 5, status: CommentThreadStatus.Fixed });
@@ -9682,14 +9702,14 @@ describe("repo write actions", () => {
     it("returns an error when the thread is not updated", async () => {
       mockGitApi.updateThread.mockResolvedValue(null);
 
-      const result = await updatePullRequestThreadStatus({ repositoryId: "repo", pullRequestId: 1, threadId: 5, status: "Fixed" }, typedConnectionProvider);
+      const result = await updatePullRequestThreadStatusAction({ repositoryId: "repo", pullRequestId: 1, threadId: 5, status: "Fixed" }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error: Failed to update thread 5. The thread was not updated successfully.");
     });
 
     it("returns an error when status is missing without opening a connection", async () => {
-      const result = await updatePullRequestThreadStatus({ repositoryId: "repo", pullRequestId: 1, threadId: 5 }, typedConnectionProvider);
+      const result = await updatePullRequestThreadStatusAction({ repositoryId: "repo", pullRequestId: 1, threadId: 5 }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("status is required for update_status");
