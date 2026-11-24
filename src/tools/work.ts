@@ -8,8 +8,7 @@ import { TreeStructureGroup, TreeNodeStructureType, WorkItemClassificationNode }
 import { elicitProject, elicitTeam } from "../shared/elicitations.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { workIterationWriteShape, workCapacityWriteShape, CreateIterationsArgs, AssignIterationsArgs, UpdateCapacityArgs, WorkIterationWriteArgs, WorkCapacityWriteArgs } from "./work.dto.js";
-
-const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
+import { Command, CommandContext, CommandRegistry, dispatchAction, errorResult } from "../shared/command.js";
 
 const WORK_TOOLS = {
   work: "work",
@@ -17,102 +16,117 @@ const WORK_TOOLS = {
   work_capacity_write: "work_capacity_write",
 };
 
-async function createIterations(args: CreateIterationsArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const connection = await connectionProvider();
-  const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-  const results = [];
+const createIterationsCommand: Command<CreateIterationsArgs> = {
+  async execute(context: CommandContext, args: CreateIterationsArgs): Promise<CallToolResult> {
+    const connection = await context.connectionProvider();
+    const workItemTrackingApi = await connection.getWorkItemTrackingApi();
+    const results = [];
 
-  for (const { iterationName, startDate, finishDate } of args.iterations) {
-    if (!iterationName) continue;
+    for (const { iterationName, startDate, finishDate } of args.iterations) {
+      if (!iterationName) continue;
 
-    const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
-      {
-        name: iterationName,
-        attributes: {
-          startDate: startDate ? new Date(startDate) : undefined,
-          finishDate: finishDate ? new Date(finishDate) : undefined,
+      const iteration = await workItemTrackingApi.createOrUpdateClassificationNode(
+        {
+          name: iterationName,
+          attributes: {
+            startDate: startDate ? new Date(startDate) : undefined,
+            finishDate: finishDate ? new Date(finishDate) : undefined,
+          },
         },
-      },
-      args.project,
-      TreeStructureGroup.Iterations
-    );
+        args.project,
+        TreeStructureGroup.Iterations
+      );
 
-    if (iteration) {
-      results.push(iteration);
+      if (iteration) {
+        results.push(iteration);
+      }
     }
-  }
 
-  if (results.length === 0) return errorResult("No iterations were created");
+    if (results.length === 0) return errorResult("No iterations were created");
 
-  return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
+  },
+};
 
-async function assignIterations(args: AssignIterationsArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  if (!args.team) return errorResult("Team is required for assign");
+const assignIterationsCommand: Command<AssignIterationsArgs> = {
+  async execute(context: CommandContext, args: AssignIterationsArgs): Promise<CallToolResult> {
+    if (!args.team) return errorResult("Team is required for assign");
 
-  const connection = await connectionProvider();
-  const workApi = await connection.getWorkApi();
-  const teamContext = { project: args.project, team: args.team };
-  const results = [];
+    const connection = await context.connectionProvider();
+    const workApi = await connection.getWorkApi();
+    const teamContext = { project: args.project, team: args.team };
+    const results = [];
 
-  for (const { identifier, path } of args.iterations) {
-    if (!identifier || !path) continue;
+    for (const { identifier, path } of args.iterations) {
+      if (!identifier || !path) continue;
 
-    const assignment = await workApi.postTeamIteration({ path: path, id: identifier }, teamContext);
+      const assignment = await workApi.postTeamIteration({ path: path, id: identifier }, teamContext);
 
-    if (assignment) {
-      results.push(assignment);
+      if (assignment) {
+        results.push(assignment);
+      }
     }
-  }
 
-  if (results.length === 0) return errorResult("No iterations were assigned to the team");
+    if (results.length === 0) return errorResult("No iterations were assigned to the team");
 
-  return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
+  },
+};
 
-async function updateCapacity(args: UpdateCapacityArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const connection = await connectionProvider();
-  const workApi = await connection.getWorkApi();
-  const teamContext = { project: args.project, team: args.team };
+const updateCapacityCommand: Command<UpdateCapacityArgs> = {
+  async execute(context: CommandContext, args: UpdateCapacityArgs): Promise<CallToolResult> {
+    const connection = await context.connectionProvider();
+    const workApi = await connection.getWorkApi();
+    const teamContext = { project: args.project, team: args.team };
 
-  // Define interface for capacity patch
-  interface CapacityPatch {
-    activities: { name: string; capacityPerDay: number }[];
-    daysOff?: { start: Date; end: Date }[];
-  }
+    // Define interface for capacity patch
+    interface CapacityPatch {
+      activities: { name: string; capacityPerDay: number }[];
+      daysOff?: { start: Date; end: Date }[];
+    }
 
-  const capacityPatch: CapacityPatch = {
-    activities: args.activities.map((a) => ({
-      name: a.name,
-      capacityPerDay: a.capacityPerDay,
-    })),
-  };
+    const capacityPatch: CapacityPatch = {
+      activities: args.activities.map((a) => ({
+        name: a.name,
+        capacityPerDay: a.capacityPerDay,
+      })),
+    };
 
-  if (args.daysOff !== undefined) {
-    capacityPatch.daysOff = args.daysOff.map((d) => ({
-      start: new Date(d.start),
-      end: new Date(d.end),
-    }));
-  }
+    if (args.daysOff !== undefined) {
+      capacityPatch.daysOff = args.daysOff.map((d) => ({
+        start: new Date(d.start),
+        end: new Date(d.end),
+      }));
+    }
 
-  const updatedCapacity = await workApi.updateCapacityWithIdentityRef(capacityPatch, teamContext, args.iterationId, args.teamMemberId);
+    const updatedCapacity = await workApi.updateCapacityWithIdentityRef(capacityPatch, teamContext, args.iterationId, args.teamMemberId);
 
-  if (!updatedCapacity) return errorResult("Failed to update team member capacity");
+    if (!updatedCapacity) return errorResult("Failed to update team member capacity");
 
-  const simplifiedResult = {
-    teamMember: updatedCapacity.teamMember
-      ? {
-          displayName: updatedCapacity.teamMember.displayName,
-          id: updatedCapacity.teamMember.id,
-          uniqueName: updatedCapacity.teamMember.uniqueName,
-        }
-      : undefined,
-    activities: updatedCapacity.activities,
-    daysOff: updatedCapacity.daysOff,
-  };
+    const simplifiedResult = {
+      teamMember: updatedCapacity.teamMember
+        ? {
+            displayName: updatedCapacity.teamMember.displayName,
+            id: updatedCapacity.teamMember.id,
+            uniqueName: updatedCapacity.teamMember.uniqueName,
+          }
+        : undefined,
+      activities: updatedCapacity.activities,
+      daysOff: updatedCapacity.daysOff,
+    };
 
-  return { content: [{ type: "text", text: JSON.stringify(simplifiedResult, null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify(simplifiedResult, null, 2) }] };
+  },
+};
+
+const workIterationWriteCommands: CommandRegistry<WorkIterationWriteArgs> = {
+  create: createIterationsCommand,
+  assign: assignIterationsCommand,
+};
+
+const workCapacityWriteCommands: CommandRegistry<WorkCapacityWriteArgs> = {
+  update: updateCapacityCommand,
+};
 
 const workIterationWriteErrorPrefixes: Record<WorkIterationWriteArgs["action"], string> = {
   create: "Error creating iterations: ",
@@ -123,7 +137,9 @@ const workCapacityWriteErrorPrefixes: Record<WorkCapacityWriteArgs["action"], st
   update: "Error updating team capacity: ",
 };
 
-function configureWorkTools(server: McpServer, _: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
+function configureWorkTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>) {
+  const context: CommandContext = { connectionProvider, tokenProvider, userAgentProvider: () => "" };
+
   server.tool(
     WORK_TOOLS.work,
     "Retrieve work-related data for a project or team. Use the action parameter to specify the operation.",
@@ -355,40 +371,14 @@ function configureWorkTools(server: McpServer, _: () => Promise<string>, connect
     }
   );
 
-  server.tool(WORK_TOOLS.work_iteration_write, "Create or assign iterations in an Azure DevOps project. Use the action parameter to specify the operation.", workIterationWriteShape, async (args) => {
-    try {
-      switch (args.action) {
-        case "create":
-          return await createIterations(args, connectionProvider);
-        case "assign":
-          return await assignIterations(args, connectionProvider);
-        default: {
-          const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workIterationWriteErrorPrefixes).sort().join(", ")}`);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${workIterationWriteErrorPrefixes[args.action]}${message}`);
-    }
-  });
+  server.tool(WORK_TOOLS.work_iteration_write, "Create or assign iterations in an Azure DevOps project. Use the action parameter to specify the operation.", workIterationWriteShape, async (args) =>
+    dispatchAction(workIterationWriteCommands, context, args as WorkIterationWriteArgs, workIterationWriteErrorPrefixes)
+  );
 
-  server.tool(WORK_TOOLS.work_capacity_write, "Update the team capacity of a team member for a specific iteration in a project.", workCapacityWriteShape, async (args) => {
-    try {
-      switch (args.action) {
-        case "update":
-          return await updateCapacity(args, connectionProvider);
-        default: {
-          const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workCapacityWriteErrorPrefixes).sort().join(", ")}`);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${workCapacityWriteErrorPrefixes[args.action]}${message}`);
-    }
-  });
+  server.tool(WORK_TOOLS.work_capacity_write, "Update the team capacity of a team member for a specific iteration in a project.", workCapacityWriteShape, async (args) =>
+    dispatchAction(workCapacityWriteCommands, context, args as WorkCapacityWriteArgs, workCapacityWriteErrorPrefixes)
+  );
 }
 
-export { WORK_TOOLS, configureWorkTools, createIterations, assignIterations, updateCapacity };
+export { WORK_TOOLS, configureWorkTools, createIterationsCommand, assignIterationsCommand, updateCapacityCommand };
 export type { CreateIterationsArgs, AssignIterationsArgs, UpdateCapacityArgs };
