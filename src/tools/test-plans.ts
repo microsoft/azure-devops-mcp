@@ -9,17 +9,17 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { apiVersion } from "../utils.js";
 import {
-  testPlanWriteShape,
-  testSuiteWriteShape,
-  testCaseWriteShape,
+  testplanTestPlanWriteShape,
+  testplanTestSuiteWriteShape,
+  testplanTestCaseWriteShape,
   CreateTestPlanArgs,
-  TestPlanWriteArgs,
+  TestplanTestPlanWriteArgs,
   CreateTestSuiteArgs,
   AddTestCasesToSuiteArgs,
-  TestSuiteWriteArgs,
+  TestplanTestSuiteWriteArgs,
   CreateTestCaseArgs,
   UpdateTestCaseStepsArgs,
-  TestCaseWriteArgs,
+  TestplanTestCaseWriteArgs,
 } from "./test-plans.dto.js";
 
 const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
@@ -131,16 +131,16 @@ async function updateTestCaseSteps(args: UpdateTestCaseStepsArgs, connectionProv
   return { content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }] };
 }
 
-const testPlanWriteErrorPrefixes: Record<TestPlanWriteArgs["action"], string> = {
+const testplanTestPlanWriteErrorPrefixes: Record<TestplanTestPlanWriteArgs["action"], string> = {
   create: "Error creating test plan: ",
 };
 
-const testSuiteWriteErrorPrefixes: Record<TestSuiteWriteArgs["action"], string> = {
+const testplanTestSuiteWriteErrorPrefixes: Record<TestplanTestSuiteWriteArgs["action"], string> = {
   create: "Error creating test suite: ",
   add_test_cases: "Error adding test cases to suite: ",
 };
 
-const testCaseWriteErrorPrefixes: Record<TestCaseWriteArgs["action"], string> = {
+const testplanTestCaseWriteErrorPrefixes: Record<TestplanTestCaseWriteArgs["action"], string> = {
   create: "Error creating test case: ",
   update_steps: "Error updating test case steps: ",
 };
@@ -386,24 +386,24 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   // ─── testplan_test_plan_write ─────────────────────────────────────────────────────
-  server.tool(TEST_PLAN_TOOLS.testplan_test_plan_write, "Write operations for test plans. Use the action parameter to specify the operation.", testPlanWriteShape, async (args) => {
+  server.tool(TEST_PLAN_TOOLS.testplan_test_plan_write, "Write operations for test plans. Use the action parameter to specify the operation.", testplanTestPlanWriteShape, async (args) => {
     try {
       switch (args.action) {
         case "create":
           return await createTestPlan(args, connectionProvider);
         default: {
           const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testPlanWriteErrorPrefixes).sort().join(", ")}`);
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testplanTestPlanWriteErrorPrefixes).sort().join(", ")}`);
         }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${testPlanWriteErrorPrefixes[args.action]}${message}`);
+      return errorResult(`${testplanTestPlanWriteErrorPrefixes[args.action]}${message}`);
     }
   });
 
   // ─── testplan_test_suite_write ────────────────────────────────────────────────────
-  server.tool(TEST_PLAN_TOOLS.testplan_test_suite_write, "Write operations for test suites. Use the action parameter to specify the operation.", testSuiteWriteShape, async (args) => {
+  server.tool(TEST_PLAN_TOOLS.testplan_test_suite_write, "Write operations for test suites. Use the action parameter to specify the operation.", testplanTestSuiteWriteShape, async (args) => {
     try {
       switch (args.action) {
         case "create":
@@ -412,17 +412,17 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           return await addTestCasesToSuite(args, connectionProvider);
         default: {
           const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testSuiteWriteErrorPrefixes).sort().join(", ")}`);
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testplanTestSuiteWriteErrorPrefixes).sort().join(", ")}`);
         }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${testSuiteWriteErrorPrefixes[args.action]}${message}`);
+      return errorResult(`${testplanTestSuiteWriteErrorPrefixes[args.action]}${message}`);
     }
   });
 
   // ─── testplan_test_case_write ─────────────────────────────────────────────────────
-  server.tool(TEST_PLAN_TOOLS.testplan_test_case_write, "Write operations for test cases. Use the action parameter to specify the operation.", testCaseWriteShape, async (args) => {
+  server.tool(TEST_PLAN_TOOLS.testplan_test_case_write, "Write operations for test cases. Use the action parameter to specify the operation.", testplanTestCaseWriteShape, async (args) => {
     try {
       switch (args.action) {
         case "create":
@@ -431,12 +431,12 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
           return await updateTestCaseSteps(args, connectionProvider);
         default: {
           const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testCaseWriteErrorPrefixes).sort().join(", ")}`);
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testplanTestCaseWriteErrorPrefixes).sort().join(", ")}`);
         }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${testCaseWriteErrorPrefixes[args.action]}${message}`);
+      return errorResult(`${testplanTestCaseWriteErrorPrefixes[args.action]}${message}`);
     }
   });
 }
