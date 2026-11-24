@@ -51,7 +51,7 @@ export const updatePullRequestShape = {
   status: z.enum(["Active", "Abandoned"]).optional().describe("The new status. Used for update."),
   autoComplete: z.boolean().optional().describe("Set autocomplete when all requirements are met. Used for update."),
   mergeStrategy: z
-    .enum(getEnumKeys(GitPullRequestMergeStrategy) as [string, ...string[]])
+    .enum(getEnumKeys(GitPullRequestMergeStrategy) as [keyof typeof GitPullRequestMergeStrategy, ...(keyof typeof GitPullRequestMergeStrategy)[]])
     .optional()
     .describe("The merge strategy for autocomplete. Used for update."),
   mergeCommitMessage: z.string().optional().describe("Commit message for autocomplete. Used for update."),
@@ -94,7 +94,7 @@ export const createPullRequestThreadShape = {
   ...pullRequestThreadShape,
   content: z.string().optional().describe("The content of the comment. Required for create, reply, and update."),
   status: z
-    .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
+    .enum(getEnumKeys(CommentThreadStatus) as [keyof typeof CommentThreadStatus, ...(keyof typeof CommentThreadStatus)[]])
     .optional()
     .describe("The thread status. Used for create (defaults to 'Active'), optionally for reply, and required for update_status."),
   filePath: z.string().optional().describe("The file path for the comment thread. Used for create."),
@@ -112,7 +112,7 @@ export const replyToPullRequestThreadShape = {
   threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply, update, and update_status."),
   content: z.string().optional().describe("The content of the comment. Required for create, reply, and update."),
   status: z
-    .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
+    .enum(getEnumKeys(CommentThreadStatus) as [keyof typeof CommentThreadStatus, ...(keyof typeof CommentThreadStatus)[]])
     .optional()
     .describe("The thread status. Used for create (defaults to 'Active'), optionally for reply, and required for update_status."),
   fullResponse: z.boolean().optional().default(false).describe("Return full JSON response. Used for reply and update."),
@@ -130,7 +130,7 @@ export const updatePullRequestThreadStatusShape = {
   ...pullRequestThreadShape,
   threadId: z.coerce.number().min(1).optional().describe("The ID of the thread. Required for reply, update, and update_status."),
   status: z
-    .enum(getEnumKeys(CommentThreadStatus) as [string, ...string[]])
+    .enum(getEnumKeys(CommentThreadStatus) as [keyof typeof CommentThreadStatus, ...(keyof typeof CommentThreadStatus)[]])
     .optional()
     .describe("The thread status. Used for create (defaults to 'Active'), optionally for reply, and required for update_status."),
 };
