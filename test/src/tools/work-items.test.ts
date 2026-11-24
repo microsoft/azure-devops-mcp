@@ -1139,7 +1139,7 @@ describe("configureWorkItemTools", () => {
         })
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemComment));
+      expect(JSON.parse(result.content[0].text)).toEqual({ workItemId: 299, commentId: 50, version: 1, createdDate: _mockWorkItemComment.createdDate, url: _mockWorkItemComment.url });
     });
 
     it("should call Add Work Item Comments API with the correct parameters and return the expected result with markdown format", async () => {
@@ -1180,7 +1180,7 @@ describe("configureWorkItemTools", () => {
         })
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify(_mockWorkItemComment));
+      expect(JSON.parse(result.content[0].text)).toEqual({ workItemId: 299, commentId: 50, version: 1, createdDate: _mockWorkItemComment.createdDate, url: _mockWorkItemComment.url });
     });
 
     it("should resolve all email mentions and preserve unresolved Markdown mentions as visible text", async () => {
@@ -1401,8 +1401,7 @@ describe("configureWorkItemTools", () => {
         })
       );
 
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.text).toBe("Updated comment text");
+      expect(JSON.parse(result.content[0].text)).toEqual({ workItemId: 42, commentId: 100, version: 2 });
     });
 
     it("should resolve repeated email mentions before updating a comment", async () => {
@@ -1516,7 +1515,7 @@ describe("configureWorkItemTools", () => {
       if (!call) throw new Error("wit_work_item_link_write tool not registered");
       const [, , , handler] = call;
 
-      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
 
       const params = {
         projectId: "6bfde89e-b22e-422e-814a-e8db432f5a58",
@@ -1546,17 +1545,7 @@ describe("configureWorkItemTools", () => {
 
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, document, params.workItemId, params.projectId);
 
-      expect(result.content[0].text).toBe(
-        JSON.stringify(
-          {
-            workItemId: 131489,
-            pullRequestId: 67890,
-            success: true,
-          },
-          null,
-          2
-        )
-      );
+      expect(JSON.parse(result.content[0].text)).toEqual({ id: _mockWorkItem.id, rev: _mockWorkItem.rev, url: _mockWorkItem.url, added: [{ rel: "ArtifactLink", target: vstfsUrl }] });
     });
 
     it("should handle errors from updateWorkItem and return a descriptive error", async () => {
@@ -1586,7 +1575,7 @@ describe("configureWorkItemTools", () => {
       if (!call) throw new Error("wit_work_item_link_write tool not registered");
 
       const [, , , handler] = call;
-      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
 
       const params = {
         projectId: "6bfde89e-b22e-422e-814a-e8db432f5a58",
@@ -1619,7 +1608,7 @@ describe("configureWorkItemTools", () => {
       if (!call) throw new Error("wit_work_item_link_write tool not registered");
 
       const [, , , handler] = call;
-      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
 
       const params = {
         projectId: "work-item-project-id",
@@ -1658,7 +1647,7 @@ describe("configureWorkItemTools", () => {
       if (!call) throw new Error("wit_work_item_link_write tool not registered");
 
       const [, , , handler] = call;
-      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue([_mockWorkItem]);
+      (mockWorkItemTrackingApi.updateWorkItem as jest.Mock).mockResolvedValue(_mockWorkItem);
 
       // Testing with empty string for pullRequestProjectId
       const params = {
@@ -2608,7 +2597,7 @@ describe("configureWorkItemTools", () => {
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue([{ id: 1, success: true }]),
+        json: jest.fn().mockResolvedValue({ count: 1, value: [{ code: 200, body: JSON.stringify({ id: 1, rev: 2, url: "https://dev.azure.com/contoso/_apis/wit/workItems/1" }) }] }),
       });
 
       const params = {
@@ -2636,7 +2625,56 @@ describe("configureWorkItemTools", () => {
         })
       );
 
-      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, success: true }], null, 2));
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        {
+          id: 1,
+          rev: 2,
+          url: "https://dev.azure.com/contoso/_apis/wit/workItems/1",
+          added: [{ rel: "System.LinkTypes.Related", target: "https://dev.azure.com/contoso/TestProject/_apis/wit/workItems/2" }],
+        },
+      ]);
+    });
+
+    it("should return the error for a failed batch entry instead of reporting the link as added", async () => {
+      configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+
+      const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "wit_work_item_link_write");
+      if (!call) throw new Error("wit_work_item_link_write tool not registered");
+      const [, , , handler] = call;
+
+      mockConnection.serverUrl = "https://dev.azure.com/contoso";
+      (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
+
+      const errorBody = JSON.stringify({ message: "Relation already exists." });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          count: 2,
+          value: [
+            { code: 400, body: errorBody },
+            { code: 200, body: JSON.stringify({ id: 3, rev: 4, url: "https://dev.azure.com/contoso/_apis/wit/workItems/3" }) },
+          ],
+        }),
+      });
+
+      const result = await handler({
+        action: "link",
+        project: "TestProject",
+        updates: [
+          { id: 1, linkToId: 2, type: "related" },
+          { id: 3, linkToId: 4, type: "related" },
+        ],
+      });
+
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        { id: 1, error: errorBody },
+        {
+          id: 3,
+          rev: 4,
+          url: "https://dev.azure.com/contoso/_apis/wit/workItems/3",
+          added: [{ rel: "System.LinkTypes.Related", target: "https://dev.azure.com/contoso/TestProject/_apis/wit/workItems/4" }],
+        },
+      ]);
     });
 
     it("should add a hyperlink to a work item", async () => {
@@ -2662,7 +2700,7 @@ describe("configureWorkItemTools", () => {
       (tokenProvider as jest.Mock).mockResolvedValue("fake-token");
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue([{ id: 1, success: true }]),
+        json: jest.fn().mockResolvedValue({ count: 1, value: [{ code: 200, body: JSON.stringify({ id: 1, rev: 2, url: "https://dev.azure.com/contoso/_apis/wit/workItems/1" }) }] }),
       });
 
       await handler({
@@ -2810,9 +2848,11 @@ describe("configureWorkItemTools", () => {
       expect(mockWorkItemTrackingApi.getWorkItem).toHaveBeenCalledWith(1, undefined, undefined, 1, "TestProject");
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1, "TestProject");
 
-      expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
-      expect(result.content[0].text).toContain("System.LinkTypes.Related");
-      expect(result.content[0].text).toContain("Updated work item result:");
+      expect(JSON.parse(result.content[0].text)).toEqual({
+        id: 1,
+        rev: 5,
+        removed: [{ rel: "System.LinkTypes.Related", target: "https://dev.azure.com/contoso/_apis/wit/workItems/2" }],
+      });
     });
 
     it("should unlink all links of a specific type when no URL is provided", async () => {
@@ -2878,7 +2918,7 @@ describe("configureWorkItemTools", () => {
         "TestProject"
       );
 
-      expect(result.content[0].text).toContain("Removed 2 link(s) of type 'related':");
+      expect(JSON.parse(result.content[0].text).removed).toHaveLength(2);
       expect(result.content[0].text).toContain("System.LinkTypes.Related");
     });
 
@@ -2931,7 +2971,7 @@ describe("configureWorkItemTools", () => {
 
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1, "TestProject");
 
-      expect(result.content[0].text).toContain("Removed 1 link(s) of type 'artifact':");
+      expect(JSON.parse(result.content[0].text).removed).toHaveLength(1);
       expect(result.content[0].text).toContain("ArtifactLink");
     });
 
@@ -3098,7 +3138,7 @@ describe("configureWorkItemTools", () => {
       // Should remove only the matching relation at index 0
       expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/0" }], 1, "TestProject");
 
-      expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
+      expect(JSON.parse(result.content[0].text).removed).toHaveLength(1);
       expect(result.content[0].text).toContain("System.LinkTypes.Related");
     });
 
@@ -3215,7 +3255,7 @@ describe("configureWorkItemTools", () => {
 
         expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith(null, [{ op: "remove", path: "/relations/1" }], 1, "TestProject");
         expect(result.isError).toBe(false);
-        expect(result.content[0].text).toContain("Removed 1 link(s) of type 'related':");
+        expect(JSON.parse(result.content[0].text).removed).toHaveLength(1);
       });
     });
   });
@@ -3347,7 +3387,7 @@ describe("configureWorkItemTools", () => {
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue([{ id: 1, success: true }]),
+        json: jest.fn().mockResolvedValue({ count: 1, value: [{ code: 200, body: JSON.stringify({ id: 1, rev: 2, url: "https://dev.azure.com/contoso/_apis/wit/workItems/1" }) }] }),
       });
 
       const params = {
@@ -3365,7 +3405,14 @@ describe("configureWorkItemTools", () => {
       const result = await handler({ action: "link", ...params });
 
       expect(fetch).toHaveBeenCalled();
-      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, success: true }], null, 2));
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        {
+          id: 1,
+          rev: 2,
+          url: "https://dev.azure.com/contoso/_apis/wit/workItems/1",
+          added: [{ rel: "System.LinkTypes.Related", target: "https://dev.azure.com/contoso/TestProject/_apis/wit/workItems/2" }],
+        },
+      ]);
     });
   });
 
@@ -4153,11 +4200,10 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.workItemId).toBe(1234);
-        expect(response.artifactUri).toBe("vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain");
-        expect(response.linkType).toBe("Branch");
-        expect(response.comment).toBe("Linked to main branch");
-        expect(response.success).toBe(true);
+        expect(response).toEqual({
+          id: 1234,
+          added: [{ rel: "ArtifactLink", target: "vstfs:///Git/Ref/12341234-1234-1234-1234-123412341234%2F12341234-1234-1234-1234-123412341234%2FGBmain" }],
+        });
       });
 
       it("should add artifact link without comment", async () => {
@@ -4199,7 +4245,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.comment).toBe(null);
+        expect(response.added).toHaveLength(1);
       });
 
       it("should return error when workItemId is missing for add_artifact_link", async () => {
@@ -4242,8 +4288,7 @@ describe("configureWorkItemTools", () => {
         expect(mockWorkItemTrackingApi.updateWorkItem).toHaveBeenCalledWith({}, [expect.objectContaining({ value: expect.objectContaining({ attributes: { name: "Branch" } }) })], 1234, "TestProject");
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.linkType).toBe("Branch");
-        expect(response.success).toBe(true);
+        expect(response.added).toEqual([{ rel: "ArtifactLink", target: "vstfs:///Git/Ref/project%2Frepo%2FGBmain" }]);
       });
 
       it("should handle errors when adding artifact link", async () => {
@@ -4310,7 +4355,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should return error for Branch link missing required parameters", async () => {
@@ -4377,7 +4422,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should return error for Fixed in Commit link missing required parameters", async () => {
@@ -4442,7 +4487,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should return error for Pull Request link missing required parameters", async () => {
@@ -4506,7 +4551,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should build Found in build URI from components", async () => {
@@ -4548,7 +4593,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should build Integrated in build URI from components", async () => {
@@ -4590,7 +4635,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should return error for build link types missing buildId", async () => {
@@ -4654,8 +4699,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
-        expect(response.linkType).toBe("Wiki");
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should build Wiki URI from components when pagePath has no leading slash", async () => {
@@ -4699,7 +4743,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should return error for Wiki link missing required parameters", async () => {
@@ -4816,7 +4860,7 @@ describe("configureWorkItemTools", () => {
         );
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.success).toBe(true);
+        expect(response.added[0].rel).toBe("ArtifactLink");
       });
 
       it("should return error when pageId fetch fails", async () => {
