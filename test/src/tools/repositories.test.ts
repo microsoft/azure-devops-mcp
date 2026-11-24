@@ -3,7 +3,19 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { configureRepoTools, REPO_TOOLS } from "../../../src/tools/repositories";
+import {
+  configureRepoTools,
+  REPO_TOOLS,
+  writeRepositoryFile,
+  createPullRequest,
+  updatePullRequest,
+  updatePullRequestReviewers,
+  votePullRequest,
+  createPullRequestThread,
+  replyToPullRequestThread,
+  updatePullRequestComment,
+  updatePullRequestThreadStatus,
+} from "../../../src/tools/repositories";
 import {
   PullRequestStatus,
   GitVersionType,
@@ -9410,5 +9422,291 @@ describe("repos tools", () => {
       expect(r.isError).toBe(true);
       expect(r.content[0].text).toContain("Error creating branch 'new'");
     });
+  });
+});
+
+// Direct, isolated unit tests for each repo write action, independent of the
+// tool dispatcher.
+describe("repo write actions", () => {
+  let tokenProvider: () => Promise<string>;
+  let userAgentProvider: () => string;
+  let mockGitApi: Record<string, jest.Mock>;
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  const updateDefaults = { deleteSourceBranch: false, transitionWorkItems: true, bypassPolicy: false };
+
+  beforeEach(() => {
+    tokenProvider = jest.fn();
+    userAgentProvider = () => "Jest";
+    mockGitApi = {
+      getRefs: jest.fn(),
+      createPush: jest.fn(),
+      createPullRequest: jest.fn(),
+      getPullRequests: jest.fn(),
+      updatePullRequest: jest.fn(),
+      deletePullRequestReviewer: jest.fn(),
+      getPullRequestReviewer: jest.fn(),
+      createPullRequestReviewer: jest.fn(),
+      createThread: jest.fn(),
+      createComment: jest.fn(),
+      updateComment: jest.fn(),
+      updateThread: jest.fn(),
+    };
+    connectionProvider = jest.fn().mockResolvedValue({ getGitApi: jest.fn().mockResolvedValue(mockGitApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+    mockGetCurrentUserDetails.mockResolvedValue({ authenticatedUser: { id: "user123" } } as any);
+  });
+
+  describe("writeRepositoryFile", () => {
+    const fileArgs = { action: "create" as const, repositoryId: "repo", project: "proj", branchName: "main", path: "src/a.ts", content: "hello", commitMessage: "add a" };
+
+    it("pushes a new file to the branch head", async () => {
+      mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "abc" }]);
+      mockGitApi.createPush.mockResolvedValue({ pushId: 7, commits: [{ commitId: "def" }] });
+
+      const result = await writeRepositoryFile(fileArgs, typedConnectionProvider);
+
+      expect(mockGitApi.createPush).toHaveBeenCalledWith(
+        {
+          refUpdates: [{ name: "refs/heads/main", oldObjectId: "abc" }],
+          commits: [{ comment: "add a", changes: [{ changeType: VersionControlChangeType.Add, item: { path: "/src/a.ts" }, newContent: { content: "hello", contentType: ItemContentType.RawText } }] }],
+        },
+        "repo",
+        "proj"
+      );
+      expect(result.isError).toBeUndefined();
+      expect(JSON.parse(result.content[0].text as string)).toEqual({ pushId: 7, commitId: "def", branchName: "main", path: "/src/a.ts" });
+    });
+
+    it("returns an error when the branch has moved", async () => {
+      mockGitApi.getRefs.mockResolvedValue([{ name: "refs/heads/main", objectId: "abc" }]);
+
+      const result = await writeRepositoryFile({ ...fileArgs, action: "update", expectedOldObjectId: "old" }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Branch 'main' has moved from expected commit old");
+      expect(mockGitApi.createPush).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createPullRequest", () => {
+    const prArgs = { repositoryId: "repo", project: "proj", sourceRefName: "refs/heads/feature", targetRefName: "refs/heads/main", title: "Title" };
+
+    it("creates a pull request", async () => {
+      mockGitApi.createPullRequest.mockResolvedValue({ pullRequestId: 1, title: "Title", status: PullRequestStatus.Active });
+
+      const result = await createPullRequest({ ...prArgs, workItems: "1 2", labels: ["x"] }, typedConnectionProvider);
+
+      expect(mockGitApi.createPullRequest).toHaveBeenCalledWith(
+        {
+          sourceRefName: "refs/heads/feature",
+          targetRefName: "refs/heads/main",
+          title: "Title",
+          description: undefined,
+          isDraft: false,
+          workItemRefs: [{ id: "1" }, { id: "2" }],
+          forkSource: undefined,
+          labels: [{ name: "x" }],
+          supportsIterations: true,
+        },
+        "repo",
+        "proj"
+      );
+      expect(result.isError).toBeUndefined();
+      expect(JSON.parse(result.content[0].text as string)).toMatchObject({ pullRequestId: 1, title: "Title", description: "" });
+    });
+
+    it("returns an error when title is missing without opening a connection", async () => {
+      const result = await createPullRequest({ ...prArgs, title: undefined }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("title is required for create");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("returns an error when creation returns no data and no matching PR exists", async () => {
+      mockGitApi.createPullRequest.mockResolvedValue(null);
+      mockGitApi.getPullRequests.mockResolvedValue([]);
+
+      const result = await createPullRequest(prArgs, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Pull request creation returned no data and no matching PR was found.");
+    });
+  });
+
+  describe("updatePullRequest", () => {
+    it("updates the title", async () => {
+      mockGitApi.updatePullRequest.mockResolvedValue({ pullRequestId: 1, title: "New" });
+
+      const result = await updatePullRequest({ ...updateDefaults, repositoryId: "repo", pullRequestId: 1, title: "New" }, typedConnectionProvider, tokenProvider, userAgentProvider);
+
+      expect(mockGitApi.updatePullRequest).toHaveBeenCalledWith({ title: "New" }, "repo", 1, undefined);
+      expect(JSON.parse(result.content[0].text as string)).toMatchObject({ pullRequestId: 1, title: "New" });
+    });
+
+    it("returns an error when pullRequestId is missing without opening a connection", async () => {
+      const result = await updatePullRequest({ ...updateDefaults, repositoryId: "repo", title: "New" }, typedConnectionProvider, tokenProvider, userAgentProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("pullRequestId is required for update");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("returns an error when no field to update is provided", async () => {
+      const result = await updatePullRequest({ ...updateDefaults, repositoryId: "repo", pullRequestId: 1 }, typedConnectionProvider, tokenProvider, userAgentProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("At least one field");
+      expect(mockGitApi.updatePullRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updatePullRequestReviewers", () => {
+    it("removes reviewers", async () => {
+      const result = await updatePullRequestReviewers({ repositoryId: "repo", pullRequestId: 1, reviewerIds: ["a", "b"], reviewerAction: "remove" }, typedConnectionProvider);
+
+      expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo", 1, "a", undefined);
+      expect(mockGitApi.deletePullRequestReviewer).toHaveBeenCalledWith("repo", 1, "b", undefined);
+      expect(result.content[0].text).toBe("Reviewers with IDs a, b removed from pull request 1.");
+    });
+
+    it("returns an error when reviewerIds is empty without opening a connection", async () => {
+      const result = await updatePullRequestReviewers({ repositoryId: "repo", pullRequestId: 1, reviewerIds: [], reviewerAction: "add" }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("reviewerIds is required for update_reviewers");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("votePullRequest", () => {
+    it("casts a vote preserving the required flag", async () => {
+      mockGitApi.getPullRequestReviewer.mockResolvedValue({ isRequired: true });
+
+      const result = await votePullRequest({ repositoryId: "repo", pullRequestId: 1, vote: "Approved" }, typedConnectionProvider, tokenProvider, userAgentProvider);
+
+      expect(mockGitApi.createPullRequestReviewer).toHaveBeenCalledWith({ vote: 10, id: "user123", isRequired: true }, "repo", 1, "user123", undefined);
+      expect(result.content[0].text).toBe("Successfully cast vote 'Approved' on PR #1.");
+    });
+
+    it("returns an error when vote is missing without opening a connection", async () => {
+      const result = await votePullRequest({ repositoryId: "repo", pullRequestId: 1 }, typedConnectionProvider, tokenProvider, userAgentProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("vote is required for vote action");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createPullRequestThread", () => {
+    it("creates a thread on a file range", async () => {
+      mockGitApi.createThread.mockResolvedValue({ id: 5, status: CommentThreadStatus.Active, comments: [] });
+
+      const result = await createPullRequestThread(
+        { repositoryId: "repo", pullRequestId: 1, content: "nit", filePath: "a.ts", rightFileStartLine: 2, rightFileStartOffset: 1, rightFileEndLine: 2, rightFileEndOffset: 4 },
+        typedConnectionProvider
+      );
+
+      expect(mockGitApi.createThread).toHaveBeenCalledWith(
+        {
+          comments: [{ content: "nit", commentType: 1 }],
+          threadContext: { filePath: "/a.ts", rightFileStart: { line: 2, offset: 1 }, rightFileEnd: { line: 2, offset: 4 } },
+          pullRequestThreadContext: undefined,
+          status: CommentThreadStatus.Active,
+        },
+        "repo",
+        1,
+        undefined
+      );
+      expect(JSON.parse(result.content[0].text as string)).toMatchObject({ id: 5 });
+    });
+
+    it("returns a validation error without opening a connection", async () => {
+      const result = await createPullRequestThread({ repositoryId: "repo", pullRequestId: 1, content: "nit", rightFileEndLine: 2, rightFileEndOffset: 1 }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("replyToPullRequestThread", () => {
+    it("replies to a thread", async () => {
+      mockGitApi.createComment.mockResolvedValue({ id: 9, content: "ok" });
+
+      const result = await replyToPullRequestThread({ repositoryId: "repo", pullRequestId: 1, threadId: 5, content: "ok", fullResponse: false }, typedConnectionProvider);
+
+      expect(mockGitApi.createComment).toHaveBeenCalledWith({ content: "ok", commentType: 1 }, "repo", 1, 5, undefined);
+      expect(JSON.parse(result.content[0].text as string)).toMatchObject({ id: 9, content: "ok" });
+    });
+
+    it("returns an error when threadId is missing without opening a connection", async () => {
+      const result = await replyToPullRequestThread({ repositoryId: "repo", pullRequestId: 1, content: "ok", fullResponse: false }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("threadId is required for reply");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updatePullRequestComment", () => {
+    it("updates a comment", async () => {
+      mockGitApi.updateComment.mockResolvedValue({ id: 9 });
+
+      const result = await updatePullRequestComment({ repositoryId: "repo", pullRequestId: 1, threadId: 5, commentId: 9, content: "edited", fullResponse: false }, typedConnectionProvider);
+
+      expect(mockGitApi.updateComment).toHaveBeenCalledWith({ content: "edited" }, "repo", 1, 5, 9, undefined);
+      expect(result.content[0].text).toBe("Comment 9 successfully updated in thread 5.");
+    });
+
+    it("returns an error when commentId is missing without opening a connection", async () => {
+      const result = await updatePullRequestComment({ repositoryId: "repo", pullRequestId: 1, threadId: 5, content: "edited", fullResponse: false }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("commentId is required for update");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updatePullRequestThreadStatus", () => {
+    it("updates the thread status", async () => {
+      mockGitApi.updateThread.mockResolvedValue({ id: 5, status: CommentThreadStatus.Fixed, comments: [] });
+
+      const result = await updatePullRequestThreadStatus({ repositoryId: "repo", pullRequestId: 1, threadId: 5, status: "Fixed" }, typedConnectionProvider);
+
+      expect(mockGitApi.updateThread).toHaveBeenCalledWith({ status: CommentThreadStatus.Fixed }, "repo", 1, 5, undefined);
+      expect(JSON.parse(result.content[0].text as string)).toMatchObject({ id: 5, status: CommentThreadStatus.Fixed });
+    });
+
+    it("returns an error when the thread is not updated", async () => {
+      mockGitApi.updateThread.mockResolvedValue(null);
+
+      const result = await updatePullRequestThreadStatus({ repositoryId: "repo", pullRequestId: 1, threadId: 5, status: "Fixed" }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error: Failed to update thread 5. The thread was not updated successfully.");
+    });
+
+    it("returns an error when status is missing without opening a connection", async () => {
+      const result = await updatePullRequestThreadStatus({ repositoryId: "repo", pullRequestId: 1, threadId: 5 }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("status is required for update_status");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  it("dispatcher returns supported actions for an unknown action without opening a connection", async () => {
+    const server = { tool: jest.fn() } as unknown as McpServer;
+    configureRepoTools(server, tokenProvider, typedConnectionProvider, userAgentProvider);
+    const call = (server.tool as jest.Mock).mock.calls.find(([name]) => name === REPO_TOOLS.repo_pull_request_thread_write);
+    if (!call) throw new Error("repo_pull_request_thread_write tool not registered");
+
+    const result = await call[3]({ action: "bogus", repositoryId: "repo", pullRequestId: 1 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe("Unknown action: bogus. Supported actions: create, reply, update, update_status");
+    expect(connectionProvider).not.toHaveBeenCalled();
   });
 });
