@@ -580,6 +580,46 @@ const addArtifactLinkCommand = (server: McpServer): Command<AddArtifactLinkArgs>
     const { workItemId, projectId, repositoryId, pullRequestId, artifactUri, branchName, commitId, buildId, wikiId, pageId, pagePath, linkType, comment } = args;
     if (!workItemId) return errorResult("workItemId is required for add_artifact_link");
 
+    const effectiveLinkType = linkType ?? "Branch";
+    if (!artifactUri) {
+      switch (effectiveLinkType) {
+        case "Branch":
+          if (!projectId || !repositoryId || !branchName) {
+            return errorResult("For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required.");
+          }
+          break;
+
+        case "Fixed in Commit":
+          if (!projectId || !repositoryId || !commitId) {
+            return errorResult("For 'Fixed in Commit' links, 'projectId', 'repositoryId', and 'commitId' are required.");
+          }
+          break;
+
+        case "Pull Request":
+          if (!projectId || !repositoryId || pullRequestId === undefined) {
+            return errorResult("For 'Pull Request' links, 'projectId', 'repositoryId', and 'pullRequestId' are required.");
+          }
+          break;
+
+        case "Build":
+        case "Found in build":
+        case "Integrated in build":
+          if (buildId === undefined) {
+            return errorResult(`For '${effectiveLinkType}' links, 'buildId' is required.`);
+          }
+          break;
+
+        case "Wiki":
+          if (!projectId || !wikiId) {
+            return errorResult("For 'Wiki' links, 'projectId', 'wikiId', and 'pagePath' are required.");
+          }
+          if (pageId === undefined && !pagePath) {
+            return errorResult("For 'Wiki' links, 'pageId' or 'pagePath' is required.");
+          }
+          break;
+      }
+    }
+
     const connection = await context.connectionProvider();
     let resolvedProject = args.project;
     if (!resolvedProject) {
@@ -589,7 +629,6 @@ const addArtifactLinkCommand = (server: McpServer): Command<AddArtifactLinkArgs>
     }
 
     const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-    const effectiveLinkType = linkType ?? "Branch";
     let finalArtifactUri: string;
 
     if (artifactUri) {
@@ -597,46 +636,30 @@ const addArtifactLinkCommand = (server: McpServer): Command<AddArtifactLinkArgs>
     } else {
       switch (effectiveLinkType) {
         case "Branch":
-          if (!projectId || !repositoryId || !branchName) {
-            return errorResult("For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required.");
-          }
-          finalArtifactUri = `vstfs:///Git/Ref/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2FGB${encodeURIComponent(branchName)}`;
+          finalArtifactUri = `vstfs:///Git/Ref/${encodeURIComponent(projectId!)}%2F${encodeURIComponent(repositoryId!)}%2FGB${encodeURIComponent(branchName!)}`;
           break;
 
         case "Fixed in Commit":
-          if (!projectId || !repositoryId || !commitId) {
-            return errorResult("For 'Fixed in Commit' links, 'projectId', 'repositoryId', and 'commitId' are required.");
-          }
-          finalArtifactUri = `vstfs:///Git/Commit/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(commitId)}`;
+          finalArtifactUri = `vstfs:///Git/Commit/${encodeURIComponent(projectId!)}%2F${encodeURIComponent(repositoryId!)}%2F${encodeURIComponent(commitId!)}`;
           break;
 
         case "Pull Request":
-          if (!projectId || !repositoryId || pullRequestId === undefined) {
-            return errorResult("For 'Pull Request' links, 'projectId', 'repositoryId', and 'pullRequestId' are required.");
-          }
-          finalArtifactUri = `vstfs:///Git/PullRequestId/${encodeURIComponent(projectId)}%2F${encodeURIComponent(repositoryId)}%2F${encodeURIComponent(pullRequestId.toString())}`;
+          finalArtifactUri = `vstfs:///Git/PullRequestId/${encodeURIComponent(projectId!)}%2F${encodeURIComponent(repositoryId!)}%2F${encodeURIComponent(pullRequestId!.toString())}`;
           break;
 
         case "Build":
         case "Found in build":
         case "Integrated in build":
-          if (buildId === undefined) {
-            return errorResult(`For '${effectiveLinkType}' links, 'buildId' is required.`);
-          }
-          finalArtifactUri = `vstfs:///Build/Build/${encodeURIComponent(buildId.toString())}`;
+          finalArtifactUri = `vstfs:///Build/Build/${encodeURIComponent(buildId!.toString())}`;
           break;
 
         case "Wiki": {
-          if (!projectId || !wikiId) {
-            return errorResult("For 'Wiki' links, 'projectId', 'wikiId', and 'pagePath' are required.");
-          }
-
           let resolvedPagePath = pagePath;
 
           if (pageId !== undefined) {
             const orgUrl = connection.serverUrl;
             const accessToken = await context.tokenProvider();
-            const pageResponse = await fetch(`${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wiki/wikis/${encodeURIComponent(wikiId)}/pages/${pageId}?api-version=7.1`, {
+            const pageResponse = await fetch(`${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wiki/wikis/${encodeURIComponent(wikiId!)}/pages/${pageId}?api-version=7.1`, {
               headers: {
                 "Authorization": `Bearer ${accessToken}`,
                 "User-Agent": context.userAgentProvider(),
@@ -655,7 +678,7 @@ const addArtifactLinkCommand = (server: McpServer): Command<AddArtifactLinkArgs>
 
           const normalizedPath = resolvedPagePath.startsWith("/") ? resolvedPagePath.slice(1) : resolvedPagePath;
           const encodedPath = normalizedPath.split("/").map(encodeURIComponent).join("%2F");
-          finalArtifactUri = `vstfs:///Wiki/WikiPage/${encodeURIComponent(projectId)}%2F${encodeURIComponent(wikiId)}%2F${encodedPath}`;
+          finalArtifactUri = `vstfs:///Wiki/WikiPage/${encodeURIComponent(projectId!)}%2F${encodeURIComponent(wikiId!)}%2F${encodedPath}`;
           break;
         }
 

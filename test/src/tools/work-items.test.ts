@@ -7282,10 +7282,19 @@ describe("wit_work_item_link_write actions", () => {
       expect(JSON.parse(textOf(result))).toEqual({ workItemId: 4, artifactUri: "vstfs:///Git/Ref/proj%2Frepo%2FGBmain", linkType: "Branch", comment: null, success: true });
     });
 
+    it("uses artifactUri without requiring link components", async () => {
+      workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
+
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P", workItemId: 4, artifactUri: "vstfs:///Git/Ref/custom" });
+
+      expect(JSON.parse(textOf(result))).toEqual({ workItemId: 4, artifactUri: "vstfs:///Git/Ref/custom", linkType: "Branch", comment: null, success: true });
+    });
+
     it("returns an error when branch components are missing", async () => {
       const result = await addArtifactLinkCommand(server).execute(context, { project: "P", workItemId: 4, projectId: "proj" });
 
       expect(result).toEqual({ content: [{ type: "text", text: "For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required." }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
       expect(workItemApi.updateWorkItem).not.toHaveBeenCalled();
     });
 
