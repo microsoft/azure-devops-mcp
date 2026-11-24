@@ -240,7 +240,7 @@ export const _mockWorkItem = {
 
 export const _mockWorkItemComment = {
   workItemId: 299,
-  commentId: 50,
+  id: 50,
   version: 1,
   text: "Moving to the right area path",
   createdBy: {

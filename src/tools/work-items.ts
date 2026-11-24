@@ -385,7 +385,10 @@ const addWorkItemCommentCommand = (server: McpServer): Command<AddWorkItemCommen
       throw new Error(`Failed to add a work item comment: ${response.statusText}`);
     }
 
-    return { content: [{ type: "text", text: await response.text() }] };
+    const added = JSON.parse(await response.text());
+    return {
+      content: [{ type: "text", text: JSON.stringify({ workItemId: added.workItemId, commentId: added.id, version: added.version, createdDate: added.createdDate, url: added.url }, null, 2) }],
+    };
   },
 });
 
@@ -426,7 +429,12 @@ const updateWorkItemCommentCommand = (server: McpServer): Command<UpdateWorkItem
       throw new Error(`Failed to update work item comment: ${response.statusText}`);
     }
 
-    return { content: [{ type: "text", text: await response.text() }] };
+    const updated = JSON.parse(await response.text());
+    return {
+      content: [
+        { type: "text", text: JSON.stringify({ workItemId: updated.workItemId, commentId: updated.id, version: updated.version, createdDate: updated.createdDate, url: updated.url }, null, 2) },
+      ],
+    };
   },
 });
 
@@ -488,7 +496,12 @@ const linkWorkItemsCommand = (server: McpServer): Command<LinkWorkItemsArgs> => 
     }
 
     const result = await response.json();
-    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    const linked = result.value.map(({ code, body: entryBody }: { code: number; body: string }, index: number) => {
+      if (code < 200 || code >= 300) return { id: uniqueIds[index], error: entryBody };
+      const workItem = JSON.parse(entryBody);
+      return { id: workItem.id, rev: workItem.rev, url: workItem.url, added: body[index].body.map(({ value }) => ({ rel: value.rel, target: value.url })) };
+    });
+    return { content: [{ type: "text", text: JSON.stringify(linked, null, 2) }] };
   },
 });
 
@@ -527,11 +540,11 @@ const unlinkWorkItemCommand = (server: McpServer): Command<UnlinkWorkItemArgs> =
       content: [
         {
           type: "text",
-          text:
-            `Removed ${removedRelations.length} link(s) of type '${type}':\n` +
-            JSON.stringify(removedRelations, null, 2) +
-            `\n\nUpdated work item result:\n` +
-            JSON.stringify(updatedWorkItem, null, 2),
+          text: JSON.stringify(
+            { id: updatedWorkItem.id, rev: updatedWorkItem.rev, url: updatedWorkItem.url, removed: removedRelations.map((relation) => ({ rel: relation.rel, target: relation.url })) },
+            null,
+            2
+          ),
         },
       ],
       isError: false,
@@ -570,7 +583,7 @@ const linkWorkItemToPullRequestCommand: Command<LinkWorkItemToPullRequestArgs> =
     if (!workItem) return errorResult("Work item update failed");
 
     return {
-      content: [{ type: "text", text: JSON.stringify({ workItemId, pullRequestId, success: true }, null, 2) }],
+      content: [{ type: "text", text: JSON.stringify({ id: workItem.id, rev: workItem.rev, url: workItem.url, added: [{ rel: "ArtifactLink", target: vstfsUrl }] }, null, 2) }],
     };
   },
 };
@@ -687,7 +700,7 @@ const addArtifactLinkCommand = (server: McpServer): Command<AddArtifactLinkArgs>
       content: [
         {
           type: "text",
-          text: JSON.stringify({ workItemId, artifactUri: finalArtifactUri, linkType: effectiveLinkType, comment: comment || null, success: true }, null, 2),
+          text: JSON.stringify({ id: workItem.id, rev: workItem.rev, url: workItem.url, added: [{ rel: "ArtifactLink", target: finalArtifactUri }] }, null, 2),
         },
       ],
     };
