@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { configureWorkTools, createIterations, assignIterations, updateCapacity } from "../../../src/tools/work";
+import { configureWorkTools, createIterations as createIterationsAction, assignIterations as assignIterationsAction, updateCapacity as updateCapacityAction } from "../../../src/tools/work";
 import { WebApi } from "azure-devops-node-api";
 import { TreeStructureGroup, TreeNodeStructureType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 
@@ -3318,7 +3318,7 @@ describe("configureWorkTools", () => {
   });
 });
 
-describe("work write actions", () => {
+describe("work_iteration_write actions", () => {
   let mockConnection: { getWorkApi: jest.Mock; getWorkItemTrackingApi: jest.Mock };
   let connectionProvider: jest.Mock;
   let typedConnectionProvider: () => Promise<WebApi>;
@@ -3334,7 +3334,7 @@ describe("work write actions", () => {
       const createOrUpdateClassificationNode = jest.fn().mockResolvedValue({ id: 1, name: "Sprint 1" });
       mockConnection.getWorkItemTrackingApi.mockResolvedValue({ createOrUpdateClassificationNode });
 
-      const result = await createIterations(
+      const result = await createIterationsAction(
         { project: "Fabrikam", iterations: [{ iterationName: "Sprint 1", startDate: "2025-01-01T00:00:00Z" }, { startDate: "2025-02-01T00:00:00Z" }] },
         typedConnectionProvider
       );
@@ -3352,7 +3352,7 @@ describe("work write actions", () => {
     it("propagates API errors to the caller", async () => {
       mockConnection.getWorkItemTrackingApi.mockResolvedValue({ createOrUpdateClassificationNode: jest.fn().mockRejectedValue(new Error("API failure")) });
 
-      await expect(createIterations({ project: "Fabrikam", iterations: [{ iterationName: "Sprint 1" }] }, typedConnectionProvider)).rejects.toThrow("API failure");
+      await expect(createIterationsAction({ project: "Fabrikam", iterations: [{ iterationName: "Sprint 1" }] }, typedConnectionProvider)).rejects.toThrow("API failure");
     });
   });
 
@@ -3361,7 +3361,7 @@ describe("work write actions", () => {
       const postTeamIteration = jest.fn().mockResolvedValue({ id: "iter-1", path: "Fabrikam\\Sprint 1" });
       mockConnection.getWorkApi.mockResolvedValue({ postTeamIteration });
 
-      const result = await assignIterations(
+      const result = await assignIterationsAction(
         { project: "Fabrikam", team: "Fabrikam Team", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }, { identifier: "iter-2" }] },
         typedConnectionProvider
       );
@@ -3373,7 +3373,7 @@ describe("work write actions", () => {
     });
 
     it("returns an error without opening a connection when team is missing", async () => {
-      const result = await assignIterations({ project: "Fabrikam", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }] }, typedConnectionProvider);
+      const result = await assignIterationsAction({ project: "Fabrikam", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }] }, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Team is required for assign");
@@ -3383,10 +3383,22 @@ describe("work write actions", () => {
     it("propagates API errors to the caller", async () => {
       mockConnection.getWorkApi.mockResolvedValue({ postTeamIteration: jest.fn().mockRejectedValue(new Error("API failure")) });
 
-      await expect(assignIterations({ project: "Fabrikam", team: "Fabrikam Team", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }] }, typedConnectionProvider)).rejects.toThrow(
+      await expect(assignIterationsAction({ project: "Fabrikam", team: "Fabrikam Team", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }] }, typedConnectionProvider)).rejects.toThrow(
         "API failure"
       );
     });
+  });
+});
+
+describe("work_capacity_write actions", () => {
+  let mockConnection: { getWorkApi: jest.Mock };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+
+  beforeEach(() => {
+    mockConnection = { getWorkApi: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
   });
 
   describe("updateCapacity", () => {
@@ -3407,7 +3419,7 @@ describe("work write actions", () => {
       });
       mockConnection.getWorkApi.mockResolvedValue({ updateCapacityWithIdentityRef });
 
-      const result = await updateCapacity(args, typedConnectionProvider);
+      const result = await updateCapacityAction(args, typedConnectionProvider);
 
       expect(updateCapacityWithIdentityRef).toHaveBeenCalledWith(
         { activities: [{ name: "Development", capacityPerDay: 6 }], daysOff: [{ start: new Date("2025-01-02T00:00:00Z"), end: new Date("2025-01-03T00:00:00Z") }] },
@@ -3426,7 +3438,7 @@ describe("work write actions", () => {
     it("returns an error when the API returns no capacity", async () => {
       mockConnection.getWorkApi.mockResolvedValue({ updateCapacityWithIdentityRef: jest.fn().mockResolvedValue(null) });
 
-      const result = await updateCapacity(args, typedConnectionProvider);
+      const result = await updateCapacityAction(args, typedConnectionProvider);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Failed to update team member capacity");
@@ -3435,7 +3447,7 @@ describe("work write actions", () => {
     it("propagates API errors to the caller", async () => {
       mockConnection.getWorkApi.mockResolvedValue({ updateCapacityWithIdentityRef: jest.fn().mockRejectedValue(new Error("API failure")) });
 
-      await expect(updateCapacity(args, typedConnectionProvider)).rejects.toThrow("API failure");
+      await expect(updateCapacityAction(args, typedConnectionProvider)).rejects.toThrow("API failure");
     });
   });
 });
