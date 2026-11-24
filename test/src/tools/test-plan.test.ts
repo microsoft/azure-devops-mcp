@@ -4,7 +4,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebApi } from "azure-devops-node-api";
-import { configureTestPlanTools } from "../../../src/tools/test-plans";
+import { configureTestPlanTools, createTestPlan, createTestSuite, addTestCasesToSuite, createTestCase, updateTestCaseSteps } from "../../../src/tools/test-plans";
 import { ITestPlanApi } from "azure-devops-node-api/TestPlanApi";
 import { ITestResultsApi } from "azure-devops-node-api/TestResultsApi";
 import { IWorkItemTrackingApi } from "azure-devops-node-api/WorkItemTrackingApi";
@@ -608,7 +608,7 @@ describe("configureTestPlanTools", () => {
       if (!call) throw new Error("testplan_test_plan_write tool not registered");
       const [, , , handler] = call;
 
-      const result = await handler({ project: "proj1", iteration: "Sprint 1" } as any);
+      const result = await handler({ action: "create" as const, project: "proj1", iteration: "Sprint 1" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("name is required for create");
     });
@@ -619,7 +619,7 @@ describe("configureTestPlanTools", () => {
       if (!call) throw new Error("testplan_test_plan_write tool not registered");
       const [, , , handler] = call;
 
-      const result = await handler({ project: "proj1", name: "Plan" } as any);
+      const result = await handler({ action: "create" as const, project: "proj1", name: "Plan" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("iteration is required for create");
     });
@@ -632,7 +632,7 @@ describe("configureTestPlanTools", () => {
 
       (mockTestPlanApi.createTestPlan as jest.Mock).mockRejectedValue("plain string error");
 
-      const result = await handler({ project: "proj1", name: "Plan", iteration: "Sprint 1" } as any);
+      const result = await handler({ action: "create" as const, project: "proj1", name: "Plan", iteration: "Sprint 1" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown error occurred");
     });
@@ -2929,6 +2929,167 @@ describe("configureTestPlanTools", () => {
       const result = await handler({ action: "unknown_action" as any, project: "proj1" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Unknown action: unknown_action");
+    });
+  });
+});
+
+describe("test plan write actions", () => {
+  let mockConnection: { getTestPlanApi: jest.Mock; getTestApi: jest.Mock; getWorkItemTrackingApi: jest.Mock; serverUrl: string };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+
+  beforeEach(() => {
+    mockConnection = {
+      getTestPlanApi: jest.fn(),
+      getTestApi: jest.fn(),
+      getWorkItemTrackingApi: jest.fn(),
+      serverUrl: "https://dev.azure.com/testorg",
+    };
+    connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+  });
+
+  describe("createTestPlan", () => {
+    it("creates a test plan with converted dates", async () => {
+      const createTestPlanApi = jest.fn().mockResolvedValue({ id: 1 });
+      mockConnection.getTestPlanApi.mockResolvedValue({ createTestPlan: createTestPlanApi });
+
+      const result = await createTestPlan({ project: "proj1", name: "Plan", iteration: "Sprint 1", startDate: "2025-05-01" }, typedConnectionProvider);
+
+      expect(createTestPlanApi).toHaveBeenCalledWith(
+        { name: "Plan", iteration: "Sprint 1", description: undefined, startDate: new Date("2025-05-01"), endDate: undefined, areaPath: undefined },
+        "proj1"
+      );
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 1 }, null, 2));
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("returns an error when iteration is missing", async () => {
+      const result = await createTestPlan({ project: "proj1", name: "Plan" }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("iteration is required for create");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("propagates API errors to the caller", async () => {
+      mockConnection.getTestPlanApi.mockResolvedValue({ createTestPlan: jest.fn().mockRejectedValue(new Error("API Error")) });
+
+      await expect(createTestPlan({ project: "proj1", name: "Plan", iteration: "Sprint 1" }, typedConnectionProvider)).rejects.toThrow("API Error");
+    });
+  });
+
+  describe("createTestSuite", () => {
+    it("creates a static suite under the parent suite", async () => {
+      const createTestSuiteApi = jest.fn().mockResolvedValue({ id: 10 });
+      mockConnection.getTestPlanApi.mockResolvedValue({ createTestSuite: createTestSuiteApi });
+
+      const result = await createTestSuite({ project: "proj1", planId: 1, parentSuiteId: 2, name: "Suite" }, typedConnectionProvider);
+
+      expect(createTestSuiteApi).toHaveBeenCalledWith({ name: "Suite", parentSuite: { id: 2, name: "" }, suiteType: 2 }, "proj1", 1);
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 10 }, null, 2));
+    });
+
+    it("returns an error when parentSuiteId is missing", async () => {
+      const result = await createTestSuite({ project: "proj1", planId: 1, name: "Suite" }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("parentSuiteId is required for create");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("returns an error result without retrying on non-concurrency errors", async () => {
+      mockConnection.getTestPlanApi.mockResolvedValue({ createTestSuite: jest.fn().mockRejectedValue(new Error("Boom")) });
+
+      const result = await createTestSuite({ project: "proj1", planId: 1, parentSuiteId: 2, name: "Suite" }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Error creating test suite: Boom");
+      expect(connectionProvider).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("addTestCasesToSuite", () => {
+    it("joins test case IDs and adds them to the suite", async () => {
+      const addTestCasesToSuiteApi = jest.fn().mockResolvedValue([{ testCase: { id: 1001 } }]);
+      mockConnection.getTestApi.mockResolvedValue({ addTestCasesToSuite: addTestCasesToSuiteApi });
+
+      const result = await addTestCasesToSuite({ project: "proj1", planId: 1, suiteId: 2, testCaseIds: ["1001", "1002"] }, typedConnectionProvider);
+
+      expect(addTestCasesToSuiteApi).toHaveBeenCalledWith("proj1", 1, 2, "1001,1002");
+      expect(result.content[0].text).toBe(JSON.stringify([{ testCase: { id: 1001 } }], null, 2));
+    });
+
+    it("returns an error when testCaseIds is missing", async () => {
+      const result = await addTestCasesToSuite({ project: "proj1", planId: 1, suiteId: 2 }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("testCaseIds is required for add_test_cases");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createTestCase", () => {
+    it("creates a test case work item with the expected patch document", async () => {
+      const createWorkItem = jest.fn().mockResolvedValue({ id: 100 });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({ createWorkItem });
+
+      const result = await createTestCase({ project: "proj1", title: "Case", priority: 2, testsWorkItemId: 5 }, typedConnectionProvider);
+
+      expect(createWorkItem).toHaveBeenCalledWith(
+        {},
+        [
+          { op: "add", path: "/fields/System.Title", value: "Case" },
+          {
+            op: "add",
+            path: "/relations/-",
+            value: { rel: "Microsoft.VSTS.Common.TestedBy-Reverse", url: "https://dev.azure.com/testorg/proj1/_apis/wit/workItems/5" },
+          },
+          { op: "add", path: "/fields/Microsoft.VSTS.Common.Priority", value: 2 },
+        ],
+        "proj1",
+        "Test Case"
+      );
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 100 }, null, 2));
+    });
+
+    it("returns an error when title is missing", async () => {
+      const result = await createTestCase({ project: "proj1" }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("title is required for create");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateTestCaseSteps", () => {
+    it("updates the steps field with the converted XML", async () => {
+      const updateWorkItem = jest.fn().mockResolvedValue({ id: 100 });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({ updateWorkItem });
+
+      const result = await updateTestCaseSteps({ id: 100, steps: "1. Do it|It is done" }, typedConnectionProvider);
+
+      const [, patchDocument, id] = updateWorkItem.mock.calls[0] as [unknown, { path: string; value: string }[], number];
+      expect(id).toBe(100);
+      expect(patchDocument).toHaveLength(1);
+      expect(patchDocument[0].path).toBe("/fields/Microsoft.VSTS.TCM.Steps");
+      expect(patchDocument[0].value).toContain("Do it");
+      expect(patchDocument[0].value).toContain("It is done");
+      expect(result.content[0].text).toBe(JSON.stringify({ id: 100 }, null, 2));
+    });
+
+    it("returns an error when steps is missing", async () => {
+      const result = await updateTestCaseSteps({ id: 100 }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("steps is required for update_steps");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("propagates API errors to the caller", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({ updateWorkItem: jest.fn().mockRejectedValue(new Error("API Error")) });
+
+      await expect(updateTestCaseSteps({ id: 100, steps: "1. Do it" }, typedConnectionProvider)).rejects.toThrow("API Error");
     });
   });
 });
