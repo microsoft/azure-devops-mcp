@@ -5,7 +5,19 @@ import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { configureWorkItemTools } from "../../../src/tools/work-items";
+import {
+  configureWorkItemTools,
+  createWorkItemCommand,
+  updateWorkItemCommand,
+  updateWorkItemsBatchCommand,
+  addChildWorkItemsCommand,
+  addWorkItemCommentCommand,
+  updateWorkItemCommentCommand,
+  linkWorkItemsCommand,
+  unlinkWorkItemCommand,
+  linkWorkItemToPullRequestCommand,
+  addArtifactLinkCommand,
+} from "../../../src/tools/work-items";
 import { getBearerHandler, WebApi } from "azure-devops-node-api";
 import { IRequestHandler } from "azure-devops-node-api/interfaces/common/VsoBaseInterfaces.js";
 import { RequestOptions } from "http";
@@ -14,6 +26,8 @@ import { constants, open, realpath } from "fs/promises";
 import * as path from "path";
 import { QueryExpand } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js";
 import { z } from "zod";
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { CommandContext } from "../../../src/shared/command";
 
 jest.mock("fs/promises");
 import {
@@ -5934,7 +5948,7 @@ describe("configureWorkItemTools", () => {
 
       setupElicitMocks("decline");
 
-      const result = await handler({ action: "add", workItemId: 1, comment: "test comment" });
+      const result = await handler({ action: "add", workItemId: 1, text: "test comment" });
       expect(result.content[0].text).toBe("Project selection cancelled.");
     });
 
@@ -6607,7 +6621,7 @@ describe("configureWorkItemTools", () => {
     it("add_work_item_comment: should return unknown error message for non-Error throws", async () => {
       const handler = getHandler("wit_work_item_comment_write");
       (connectionProvider as jest.Mock).mockRejectedValue("string error");
-      const result = await handler({ action: "add", project: "P", workItemId: 1, comment: "test" });
+      const result = await handler({ action: "add", project: "P", workItemId: 1, text: "test" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error adding work item comment: Unknown error occurred");
     });
@@ -6709,7 +6723,7 @@ describe("configureWorkItemTools", () => {
     it("update_work_items_batch: should return unknown error message for non-Error throws", async () => {
       const handler = getHandler("wit_work_item_write");
       (connectionProvider as jest.Mock).mockRejectedValue("string error");
-      const result = await handler({ action: "update_batch", updates: [{ op: "replace", id: 1, path: "/fields/System.Title", value: "T" }] });
+      const result = await handler({ action: "update_batch", batchUpdates: [{ op: "Replace", id: 1, path: "/fields/System.Title", value: "T" }] });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("Error updating work items in batch: Unknown error occurred");
     });
@@ -6774,45 +6788,48 @@ describe("configureWorkItemTools", () => {
       const handler = getHandler("wit_work_item_write");
       const result = await handler({ action: "invalid_action" as string });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Unknown action: invalid_action");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: add_child, create, update, update_batch");
     });
 
-    it("wit_work_item_write: should use error fallback when action is unknown and error is thrown", async () => {
+    it("wit_work_item_write: should reject unknown action without opening a connection", async () => {
       const handler = getHandler("wit_work_item_write");
       (connectionProvider as jest.Mock).mockRejectedValue(new Error("Connection error"));
       const result = await handler({ action: "invalid_action" as string });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Error: Connection error");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: add_child, create, update, update_batch");
+      expect(connectionProvider).not.toHaveBeenCalled();
     });
 
     it("wit_work_item_comment_write: should return unknown action for unrecognized action", async () => {
       const handler = getHandler("wit_work_item_comment_write");
       const result = await handler({ action: "invalid_action" as string, project: "P", workItemId: 1, text: "test" });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Unknown action: invalid_action");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: add, update");
     });
 
-    it("wit_work_item_comment_write: should use error fallback when action is unknown and error is thrown", async () => {
+    it("wit_work_item_comment_write: should reject unknown action without opening a connection", async () => {
       const handler = getHandler("wit_work_item_comment_write");
       (connectionProvider as jest.Mock).mockRejectedValue(new Error("Connection error"));
       const result = await handler({ action: "invalid_action" as string });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Error: Connection error");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: add, update");
+      expect(connectionProvider).not.toHaveBeenCalled();
     });
 
     it("wit_work_item_link_write: should return unknown action for unrecognized action", async () => {
       const handler = getHandler("wit_work_item_link_write");
       const result = await handler({ action: "invalid_action" as string, project: "P" });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Unknown action: invalid_action");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: add_artifact_link, link, link_to_pull_request, unlink");
     });
 
-    it("wit_work_item_link_write: should use error fallback when action is unknown and error is thrown", async () => {
+    it("wit_work_item_link_write: should reject unknown action without opening a connection", async () => {
       const handler = getHandler("wit_work_item_link_write");
       (connectionProvider as jest.Mock).mockRejectedValue(new Error("Connection error"));
       const result = await handler({ action: "invalid_action" as string });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Error: Connection error");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: add_artifact_link, link, link_to_pull_request, unlink");
+      expect(connectionProvider).not.toHaveBeenCalled();
     });
 
     // wit_work_item required param guards
@@ -6981,6 +6998,375 @@ describe("configureWorkItemTools", () => {
       const result = await handler({ action: "add_child", project: "P", parentId: 1, workItemType: "Task" });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe("items is required for add_child");
+    });
+  });
+});
+
+describe("wit_work_item_write actions", () => {
+  const server = {} as McpServer;
+  const userAgentProvider = () => "Jest";
+  const orgUrl = "https://dev.azure.com/test-org";
+  let workItemApi: { createWorkItem: jest.Mock; updateWorkItem: jest.Mock; getWorkItem: jest.Mock };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let tokenProvider: () => Promise<string>;
+  let context: CommandContext;
+  let fetchMock: jest.Mock;
+  const previousFetch = global.fetch;
+
+  beforeEach(() => {
+    workItemApi = { createWorkItem: jest.fn(), updateWorkItem: jest.fn(), getWorkItem: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+    tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    context = { connectionProvider: typedConnectionProvider, tokenProvider, userAgentProvider };
+    fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: 1 }), text: async () => "comment" });
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = previousFetch;
+  });
+
+  const textOf = (result: CallToolResult) => (result.content[0] as { text: string }).text;
+  const fetchBody = () => JSON.parse(fetchMock.mock.calls[0][1].body);
+
+  describe("createWorkItem", () => {
+    it("creates the work item with field and markdown-format operations", async () => {
+      workItemApi.createWorkItem.mockResolvedValue({ id: 7 });
+
+      const result = await createWorkItemCommand(server).execute(context, { project: "P", workItemType: "Task", fields: [{ name: "System.Description", value: "**d**", format: "Markdown" }] });
+
+      expect(workItemApi.createWorkItem).toHaveBeenCalledWith(
+        null,
+        [
+          { op: "add", path: "/fields/System.Description", value: "**d**" },
+          { op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown" },
+        ],
+        "P",
+        "Task"
+      );
+      expect(textOf(result)).toBe(JSON.stringify({ id: 7 }, null, 2));
+    });
+
+    it("returns an error when workItemType is missing", async () => {
+      const result = await createWorkItemCommand(server).execute(context, { project: "P", fields: [{ name: "System.Title", value: "T" }] });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "workItemType is required for create" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("returns an error when the work item is not created", async () => {
+      workItemApi.createWorkItem.mockResolvedValue(null);
+
+      const result = await createWorkItemCommand(server).execute(context, { project: "P", workItemType: "Task", fields: [{ name: "System.Title", value: "T" }] });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "Work item was not created" }], isError: true });
+    });
+  });
+
+  describe("updateWorkItem", () => {
+    it("applies the JSON patch operations to the work item", async () => {
+      workItemApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 2 });
+      const updates = [{ op: "replace" as const, path: "/fields/System.Title", value: "T" }];
+
+      const result = await updateWorkItemCommand.execute(context, { id: 1, updates });
+
+      expect(workItemApi.updateWorkItem).toHaveBeenCalledWith(null, updates, 1);
+      expect(textOf(result)).toBe(JSON.stringify({ id: 1, rev: 2 }, null, 2));
+    });
+
+    it("returns an error when a non-remove operation has no value", async () => {
+      const result = await updateWorkItemCommand.execute(context, { id: 1, updates: [{ op: "add", path: "/fields/System.Title" }] });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "value is required for add" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateWorkItemsBatch", () => {
+    it("sends one batch request per work item", async () => {
+      const result = await updateWorkItemsBatchCommand.execute(context, {
+        batchUpdates: [
+          { op: "Replace", id: 1, path: "/fields/System.Title", value: "A" },
+          { op: "Add", id: 2, path: "/fields/System.Description", value: "B", format: "Markdown" },
+        ],
+      });
+
+      expect(fetchMock.mock.calls[0][0]).toBe(`${orgUrl}/_apis/wit/$batch?api-version=5.0`);
+      expect(fetchBody().map((request: { body: unknown[] }) => request.body)).toEqual([
+        [{ op: "Replace", path: "/fields/System.Title", value: "A" }],
+        [
+          { op: "Add", path: "/fields/System.Description", value: "B" },
+          { op: "Add", path: "/multilineFieldsFormat/System.Description", value: "Markdown" },
+        ],
+      ]);
+      expect(textOf(result)).toBe(JSON.stringify({ ok: 1 }, null, 2));
+    });
+
+    it("returns an error when batchUpdates is missing", async () => {
+      const result = await updateWorkItemsBatchCommand.execute(context, {});
+
+      expect(result).toEqual({ content: [{ type: "text", text: "batchUpdates is required for update_batch" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("throws when the batch request fails", async () => {
+      fetchMock.mockResolvedValue({ ok: false, statusText: "Bad Request" });
+
+      await expect(updateWorkItemsBatchCommand.execute(context, { batchUpdates: [{ op: "Add", id: 1, path: "/fields/System.Title", value: "A" }] })).rejects.toThrow(
+        "Failed to update work items in batch: Bad Request"
+      );
+    });
+  });
+
+  describe("addChildWorkItems", () => {
+    it("uses ReproSteps for Bug children", async () => {
+      await addChildWorkItemsCommand(server).execute(context, { project: "P", parentId: 5, workItemType: "Bug", items: [{ title: "T", description: "D", format: "Html" }] });
+
+      const [request] = fetchBody();
+      expect(request.uri).toBe("/P/_apis/wit/workitems/$Bug?api-version=5.0");
+      expect(request.body).toContainEqual({ op: "add", path: "/fields/Microsoft.VSTS.TCM.ReproSteps", value: "D" });
+      expect(request.body).toContainEqual({ op: "add", path: "/relations/-", value: { rel: "System.LinkTypes.Hierarchy-Reverse", url: `${orgUrl}/P/_apis/wit/workItems/5` } });
+    });
+
+    it("rejects more than 50 children without opening a connection", async () => {
+      const items = Array.from({ length: 51 }, (_, i) => ({ title: `T${i}`, description: "D", format: "Markdown" as const }));
+
+      const result = await addChildWorkItemsCommand(server).execute(context, { project: "P", parentId: 5, workItemType: "Task", items });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "A maximum of 50 child work items can be created in a single call." }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("wit_work_item_comment_write actions", () => {
+  const server = {} as McpServer;
+  const userAgentProvider = () => "Jest";
+  const orgUrl = "https://dev.azure.com/test-org";
+  let workItemApi: { createWorkItem: jest.Mock; updateWorkItem: jest.Mock; getWorkItem: jest.Mock };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let tokenProvider: () => Promise<string>;
+  let context: CommandContext;
+  let fetchMock: jest.Mock;
+  const previousFetch = global.fetch;
+
+  beforeEach(() => {
+    workItemApi = { createWorkItem: jest.fn(), updateWorkItem: jest.fn(), getWorkItem: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+    tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    context = { connectionProvider: typedConnectionProvider, tokenProvider, userAgentProvider };
+    fetchMock = jest.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ workItemId: 3, id: 9, version: 1, createdDate: "d", url: "u", text: "hi" }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = previousFetch;
+  });
+
+  const textOf = (result: CallToolResult) => (result.content[0] as { text: string }).text;
+  const fetchBody = () => JSON.parse(fetchMock.mock.calls[0][1].body);
+
+  describe("addWorkItemComment", () => {
+    it("posts the comment to the work item", async () => {
+      const result = await addWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, text: "hi", format: "Html" });
+
+      expect(fetchMock.mock.calls[0][0]).toBe(`${orgUrl}/P/_apis/wit/workItems/3/comments?format=1&api-version=7.2-preview.4`);
+      expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+      expect(fetchBody()).toEqual({ text: "hi" });
+      expect(JSON.parse(textOf(result))).toEqual({ workItemId: 3, commentId: 9, version: 1, createdDate: "d", url: "u" });
+    });
+
+    it("returns an error when text is missing", async () => {
+      const result = await addWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, format: "Markdown" });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "text is required" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("throws when the request fails", async () => {
+      fetchMock.mockResolvedValue({ ok: false, statusText: "Forbidden" });
+
+      await expect(addWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, text: "hi", format: "Html" })).rejects.toThrow("Failed to add a work item comment: Forbidden");
+    });
+  });
+
+  describe("updateWorkItemComment", () => {
+    it("patches the existing comment", async () => {
+      const result = await updateWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, commentId: 9, text: "hi", format: "Html" });
+
+      expect(fetchMock.mock.calls[0][0]).toBe(`${orgUrl}/P/_apis/wit/workItems/3/comments/9?format=1&api-version=7.2-preview.4`);
+      expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
+      expect(JSON.parse(textOf(result))).toEqual({ workItemId: 3, commentId: 9, version: 1, createdDate: "d", url: "u" });
+    });
+
+    it("returns an error when commentId is missing", async () => {
+      const result = await updateWorkItemCommentCommand(server).execute(context, { project: "P", workItemId: 3, text: "hi", format: "Html" });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "commentId is required for update" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("wit_work_item_link_write actions", () => {
+  const server = {} as McpServer;
+  const userAgentProvider = () => "Jest";
+  const orgUrl = "https://dev.azure.com/test-org";
+  let workItemApi: { createWorkItem: jest.Mock; updateWorkItem: jest.Mock; getWorkItem: jest.Mock };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let tokenProvider: () => Promise<string>;
+  let context: CommandContext;
+  let fetchMock: jest.Mock;
+  const previousFetch = global.fetch;
+
+  beforeEach(() => {
+    workItemApi = { createWorkItem: jest.fn(), updateWorkItem: jest.fn(), getWorkItem: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+    tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    context = { connectionProvider: typedConnectionProvider, tokenProvider, userAgentProvider };
+    fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ value: [{ code: 200, body: JSON.stringify({ id: 1, rev: 2, url: "u" }) }] }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = previousFetch;
+  });
+
+  const textOf = (result: CallToolResult) => (result.content[0] as { text: string }).text;
+  const fetchBody = () => JSON.parse(fetchMock.mock.calls[0][1].body);
+
+  describe("linkWorkItems", () => {
+    it("adds work item and hyperlink relations", async () => {
+      const result = await linkWorkItemsCommand(server).execute(context, {
+        project: "P",
+        updates: [
+          { id: 1, linkToId: 2, type: "parent" },
+          { id: 1, url: "https://example.com", type: "hyperlink", comment: "c" },
+        ],
+      });
+
+      expect(fetchBody()[0].body).toEqual([
+        { op: "add", path: "/relations/-", value: { rel: "System.LinkTypes.Hierarchy-Reverse", url: `${orgUrl}/P/_apis/wit/workItems/2`, attributes: { comment: "" } } },
+        { op: "add", path: "/relations/-", value: { rel: "Hyperlink", url: "https://example.com", attributes: { comment: "c" } } },
+      ]);
+      expect(JSON.parse(textOf(result))).toEqual([
+        {
+          id: 1,
+          rev: 2,
+          url: "u",
+          added: [
+            { rel: "System.LinkTypes.Hierarchy-Reverse", target: `${orgUrl}/P/_apis/wit/workItems/2` },
+            { rel: "Hyperlink", target: "https://example.com" },
+          ],
+        },
+      ]);
+    });
+
+    it("throws when a hyperlink has no url", async () => {
+      await expect(linkWorkItemsCommand(server).execute(context, { project: "P", updates: [{ id: 1, type: "hyperlink" }] })).rejects.toThrow("url is required for hyperlink links");
+    });
+  });
+
+  describe("unlinkWorkItem", () => {
+    it("removes matching relations in descending index order", async () => {
+      workItemApi.getWorkItem.mockResolvedValue({
+        relations: [
+          { rel: "System.LinkTypes.Related", url: "a" },
+          { rel: "System.LinkTypes.Hierarchy-Forward", url: "b" },
+          { rel: "System.LinkTypes.Related", url: "c" },
+        ],
+      });
+      workItemApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 3, url: "u" });
+
+      const result = await unlinkWorkItemCommand(server).execute(context, { project: "P", id: 1, type: "related" });
+
+      expect(workItemApi.updateWorkItem).toHaveBeenCalledWith(
+        null,
+        [
+          { op: "remove", path: "/relations/2" },
+          { op: "remove", path: "/relations/0" },
+        ],
+        1,
+        "P"
+      );
+      expect(JSON.parse(textOf(result))).toEqual({
+        id: 1,
+        rev: 3,
+        url: "u",
+        removed: [
+          { rel: "System.LinkTypes.Related", target: "a" },
+          { rel: "System.LinkTypes.Related", target: "c" },
+        ],
+      });
+    });
+
+    it("returns an error when type is missing", async () => {
+      const result = await unlinkWorkItemCommand(server).execute(context, { project: "P", id: 1 });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "type is required for unlink" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("linkWorkItemToPullRequest", () => {
+    it("adds a pull request artifact link", async () => {
+      workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
+
+      const result = await linkWorkItemToPullRequestCommand.execute(context, { projectId: "proj", repositoryId: "repo", pullRequestId: 8, workItemId: 4 });
+
+      expect(workItemApi.updateWorkItem).toHaveBeenCalledWith(
+        {},
+        [{ op: "add", path: "/relations/-", value: { rel: "ArtifactLink", url: "vstfs:///Git/PullRequestId/proj%2Frepo%2F8", attributes: { name: "Pull Request" } } }],
+        4,
+        "proj"
+      );
+      expect(JSON.parse(textOf(result))).toEqual({ id: 4, added: [{ rel: "ArtifactLink", target: "vstfs:///Git/PullRequestId/proj%2Frepo%2F8" }] });
+    });
+
+    it("returns an error when projectId is missing", async () => {
+      const result = await linkWorkItemToPullRequestCommand.execute(context, { repositoryId: "repo", pullRequestId: 8, workItemId: 4 });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "projectId is required for link_to_pull_request" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("addArtifactLink", () => {
+    it("builds a branch artifact URI by default", async () => {
+      workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
+
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P", workItemId: 4, projectId: "proj", repositoryId: "repo", branchName: "main" });
+
+      expect(JSON.parse(textOf(result))).toEqual({ id: 4, added: [{ rel: "ArtifactLink", target: "vstfs:///Git/Ref/proj%2Frepo%2FGBmain" }] });
+    });
+
+    it("uses artifactUri without requiring link components", async () => {
+      workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
+
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P", workItemId: 4, artifactUri: "vstfs:///Git/Ref/custom" });
+
+      expect(JSON.parse(textOf(result))).toEqual({ id: 4, added: [{ rel: "ArtifactLink", target: "vstfs:///Git/Ref/custom" }] });
+    });
+
+    it("returns an error when branch components are missing", async () => {
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P", workItemId: 4, projectId: "proj" });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "For 'Branch' links, 'projectId', 'repositoryId', and 'branchName' are required." }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
+      expect(workItemApi.updateWorkItem).not.toHaveBeenCalled();
+    });
+
+    it("returns an error when workItemId is missing", async () => {
+      const result = await addArtifactLinkCommand(server).execute(context, { project: "P" });
+
+      expect(result).toEqual({ content: [{ type: "text", text: "workItemId is required for add_artifact_link" }], isError: true });
+      expect(connectionProvider).not.toHaveBeenCalled();
     });
   });
 });
