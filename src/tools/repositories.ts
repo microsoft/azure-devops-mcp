@@ -48,8 +48,7 @@ import {
   UpdatePullRequestThreadStatusArgs,
   RepoPullRequestThreadWriteArgs,
 } from "./repositories.dto.js";
-
-const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
+import { Command, CommandContext, CommandRegistry, dispatchAction, errorResult } from "../shared/command.js";
 
 const REPO_TOOLS = {
   repo_repository: "repo_repository",
@@ -199,245 +198,255 @@ function buildVersionDescriptor(version?: string, versionType?: string): GitVers
   };
 }
 
-async function writeRepositoryFile(args: WriteRepositoryFileArgs & Pick<RepoFileWriteArgs, "action">, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const { action, repositoryId, project, branchName, path, content, commitMessage, expectedOldObjectId } = args;
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const refName = `refs/heads/${branchName}`;
-  const refs = await gitApi.getRefs(repositoryId, project, "heads/", false, false, undefined, false, undefined, branchName);
-  const branch = refs.find((ref) => ref.name === refName);
+const writeRepositoryFileCommand: Command<WriteRepositoryFileArgs & Pick<RepoFileWriteArgs, "action">> = {
+  async execute(context: CommandContext, args: WriteRepositoryFileArgs & Pick<RepoFileWriteArgs, "action">): Promise<CallToolResult> {
+    const { action, repositoryId, project, branchName, path, content, commitMessage, expectedOldObjectId } = args;
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const refName = `refs/heads/${branchName}`;
+    const refs = await gitApi.getRefs(repositoryId, project, "heads/", false, false, undefined, false, undefined, branchName);
+    const branch = refs.find((ref) => ref.name === refName);
 
-  if (!branch?.objectId) return errorResult(`Error: Branch '${branchName}' not found in repository ${repositoryId}`);
-  if (expectedOldObjectId && expectedOldObjectId !== branch.objectId) return errorResult(`Error: Branch '${branchName}' has moved from expected commit ${expectedOldObjectId}`);
+    if (!branch?.objectId) return errorResult(`Error: Branch '${branchName}' not found in repository ${repositoryId}`);
+    if (expectedOldObjectId && expectedOldObjectId !== branch.objectId) return errorResult(`Error: Branch '${branchName}' has moved from expected commit ${expectedOldObjectId}`);
 
-  const oldObjectId = branch.objectId;
-  const filePath = path.startsWith("/") ? path : `/${path}`;
-  const push = await gitApi.createPush(
-    {
-      refUpdates: [{ name: refName, oldObjectId }],
-      commits: [
+    const oldObjectId = branch.objectId;
+    const filePath = path.startsWith("/") ? path : `/${path}`;
+    const push = await gitApi.createPush(
+      {
+        refUpdates: [{ name: refName, oldObjectId }],
+        commits: [
+          {
+            comment: commitMessage,
+            changes: [
+              {
+                changeType: action === "create" ? VersionControlChangeType.Add : VersionControlChangeType.Edit,
+                item: { path: filePath },
+                newContent: { content, contentType: ItemContentType.RawText },
+              },
+            ],
+          },
+        ],
+      },
+      repositoryId,
+      project
+    );
+
+    return {
+      content: [
         {
-          comment: commitMessage,
-          changes: [
-            {
-              changeType: action === "create" ? VersionControlChangeType.Add : VersionControlChangeType.Edit,
-              item: { path: filePath },
-              newContent: { content, contentType: ItemContentType.RawText },
-            },
-          ],
+          type: "text",
+          text: JSON.stringify({ pushId: push.pushId, commitId: push.commits?.[0]?.commitId, branchName, path: filePath }, null, 2),
         },
       ],
-    },
-    repositoryId,
-    project
-  );
-
-  return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify({ pushId: push.pushId, commitId: push.commits?.[0]?.commitId, branchName, path: filePath }, null, 2),
-      },
-    ],
-  };
-}
+    };
+  },
+};
 
 const repoFileWriteErrorPrefixes: Record<RepoFileWriteArgs["action"], string> = {
   create: "Error writing repository file: ",
   update: "Error writing repository file: ",
 };
 
-async function createPullRequest(args: CreatePullRequestArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const { repositoryId, project, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels } = args;
-  if (!repositoryId) return errorResult("repositoryId is required for create");
-  if (!sourceRefName) return errorResult("sourceRefName is required for create");
-  if (!targetRefName) return errorResult("targetRefName is required for create");
-  if (!title) return errorResult("title is required for create");
+const repoFileWriteCommands: CommandRegistry<RepoFileWriteArgs> = {
+  create: writeRepositoryFileCommand,
+  update: writeRepositoryFileCommand,
+};
 
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
-  const noDataErrorMessage =
-    `Pull request creation returned no data and no matching PR was found. This often means repositoryId="${repositoryId}" was not resolvable. ` +
-    "Try the repository GUID from repo_repository (list action) instead of the Project/RepoName slash format.";
+const createPullRequestCommand: Command<CreatePullRequestArgs> = {
+  async execute(context: CommandContext, args: CreatePullRequestArgs): Promise<CallToolResult> {
+    const { repositoryId, project, sourceRefName, targetRefName, title, description, isDraft, workItems, forkSourceRepositoryId, labels } = args;
+    if (!repositoryId) return errorResult("repositoryId is required for create");
+    if (!sourceRefName) return errorResult("sourceRefName is required for create");
+    if (!targetRefName) return errorResult("targetRefName is required for create");
+    if (!title) return errorResult("title is required for create");
 
-  const forkSource: GitForkRef | undefined = forkSourceRepositoryId ? { repository: { id: forkSourceRepositoryId } } : undefined;
-  const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const workItemRefs = workItems ? workItems.split(" ").map((id) => ({ id: id.trim() })) : [];
+    const noDataErrorMessage =
+      `Pull request creation returned no data and no matching PR was found. This often means repositoryId="${repositoryId}" was not resolvable. ` +
+      "Try the repository GUID from repo_repository (list action) instead of the Project/RepoName slash format.";
 
-  let pullRequest = await gitApi.createPullRequest(
-    { sourceRefName, targetRefName, title, description, isDraft: isDraft ?? false, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
-    repositoryId,
-    project
-  );
+    const forkSource: GitForkRef | undefined = forkSourceRepositoryId ? { repository: { id: forkSourceRepositoryId } } : undefined;
+    const labelDefinitions: WebApiTagDefinition[] | undefined = labels ? labels.map((label) => ({ name: label })) : undefined;
 
-  if (!pullRequest) {
-    const prs = await gitApi.getPullRequests(repositoryId, { sourceRefName, targetRefName, status: PullRequestStatus.Active }, project, undefined, 0, 1);
-    if (!prs || prs.length === 0) return errorResult(noDataErrorMessage);
-    pullRequest = prs[0];
-  }
+    let pullRequest = await gitApi.createPullRequest(
+      { sourceRefName, targetRefName, title, description, isDraft: isDraft ?? false, workItemRefs, forkSource, labels: labelDefinitions, supportsIterations: true },
+      repositoryId,
+      project
+    );
 
-  const trimmedPullRequest = trimPullRequest(pullRequest, true);
-  return { content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }] };
-}
+    if (!pullRequest) {
+      const prs = await gitApi.getPullRequests(repositoryId, { sourceRefName, targetRefName, status: PullRequestStatus.Active }, project, undefined, 0, 1);
+      if (!prs || prs.length === 0) return errorResult(noDataErrorMessage);
+      pullRequest = prs[0];
+    }
 
-async function updatePullRequest(
-  args: UpdatePullRequestArgs,
-  connectionProvider: () => Promise<WebApi>,
-  tokenProvider: () => Promise<string>,
-  userAgentProvider: () => string
-): Promise<CallToolResult> {
-  const {
-    repositoryId,
-    pullRequestId,
-    project,
-    targetRefName,
-    title,
-    description,
-    isDraft,
-    labels,
-    status,
-    autoComplete,
-    mergeStrategy,
-    mergeCommitMessage,
-    deleteSourceBranch,
-    transitionWorkItems,
-    bypassPolicy,
-    bypassReason,
-  } = args;
-  if (!repositoryId) return errorResult("repositoryId is required for update");
-  if (!pullRequestId) return errorResult("pullRequestId is required for update");
+    const trimmedPullRequest = trimPullRequest(pullRequest, true);
+    return { content: [{ type: "text", text: JSON.stringify(trimmedPullRequest, null, 2) }] };
+  },
+};
 
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const updateRequest: Record<string, unknown> = {};
+const updatePullRequestCommand: Command<UpdatePullRequestArgs> = {
+  async execute(context: CommandContext, args: UpdatePullRequestArgs): Promise<CallToolResult> {
+    const {
+      repositoryId,
+      pullRequestId,
+      project,
+      targetRefName,
+      title,
+      description,
+      isDraft,
+      labels,
+      status,
+      autoComplete,
+      mergeStrategy,
+      mergeCommitMessage,
+      deleteSourceBranch,
+      transitionWorkItems,
+      bypassPolicy,
+      bypassReason,
+    } = args;
+    if (!repositoryId) return errorResult("repositoryId is required for update");
+    if (!pullRequestId) return errorResult("pullRequestId is required for update");
 
-  if (title !== undefined) updateRequest.title = title;
-  if (description !== undefined) updateRequest.description = description;
-  if (isDraft !== undefined) updateRequest.isDraft = isDraft;
-  if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
-  if (status !== undefined) {
-    updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
-  }
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const updateRequest: Record<string, unknown> = {};
 
-  if (autoComplete === false) {
-    updateRequest.autoCompleteSetBy = null;
-    updateRequest.completionOptions = null;
-  }
+    if (title !== undefined) updateRequest.title = title;
+    if (description !== undefined) updateRequest.description = description;
+    if (isDraft !== undefined) updateRequest.isDraft = isDraft;
+    if (targetRefName !== undefined) updateRequest.targetRefName = targetRefName;
+    if (status !== undefined) {
+      updateRequest.status = status === "Active" ? PullRequestStatus.Active.valueOf() : PullRequestStatus.Abandoned.valueOf();
+    }
 
-  if (autoComplete) {
-    if (bypassPolicy && !bypassReason) return errorResult("bypassReason is required when bypassPolicy is true");
+    if (autoComplete === false) {
+      updateRequest.autoCompleteSetBy = null;
+      updateRequest.completionOptions = null;
+    }
 
-    const data = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-    updateRequest.autoCompleteSetBy = { id: data.authenticatedUser.id };
+    if (autoComplete) {
+      if (bypassPolicy && !bypassReason) return errorResult("bypassReason is required when bypassPolicy is true");
 
-    const completionOptions: GitPullRequestCompletionOptions = {
-      deleteSourceBranch: deleteSourceBranch || false,
-      transitionWorkItems: transitionWorkItems !== false,
-      bypassPolicy: bypassPolicy === true,
+      const data = await getCurrentUserDetails(context.tokenProvider, context.connectionProvider, context.userAgentProvider);
+      updateRequest.autoCompleteSetBy = { id: data.authenticatedUser.id };
+
+      const completionOptions: GitPullRequestCompletionOptions = {
+        deleteSourceBranch: deleteSourceBranch || false,
+        transitionWorkItems: transitionWorkItems !== false,
+        bypassPolicy: bypassPolicy === true,
+      };
+
+      if (mergeStrategy) completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
+      if (mergeCommitMessage) completionOptions.mergeCommitMessage = mergeCommitMessage;
+      if (bypassPolicy && bypassReason) completionOptions.bypassReason = bypassReason;
+
+      updateRequest.completionOptions = completionOptions;
+    }
+
+    if (Object.keys(updateRequest).length === 0 && !labels) {
+      return errorResult("Error: At least one field (title, description, isDraft, targetRefName, status, autoComplete options, or labels) must be provided for update.");
+    }
+
+    if (labels) {
+      const currentLabels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId, project);
+      for (const currentLabel of currentLabels) {
+        if (currentLabel.id) await gitApi.deletePullRequestLabels(repositoryId, pullRequestId, currentLabel.id, project);
+      }
+      for (const label of labels) {
+        await gitApi.createPullRequestLabel({ name: label }, repositoryId, pullRequestId, project);
+      }
+    }
+
+    const updatedPullRequest =
+      Object.keys(updateRequest).length > 0 ? await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId, project) : await gitApi.getPullRequest(repositoryId, pullRequestId, project);
+
+    const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
+    if (!trimmedUpdatedPullRequest) return { content: [{ type: "text", text: "Pull request updated but API returned no data." }] };
+
+    return { content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }] };
+  },
+};
+
+const updatePullRequestReviewersCommand: Command<UpdatePullRequestReviewersArgs> = {
+  async execute(context: CommandContext, args: UpdatePullRequestReviewersArgs): Promise<CallToolResult> {
+    const { repositoryId, pullRequestId, project, reviewerIds, reviewerAction } = args;
+    if (!repositoryId) return errorResult("repositoryId is required for update_reviewers");
+    if (!pullRequestId) return errorResult("pullRequestId is required for update_reviewers");
+    if (!reviewerIds || reviewerIds.length === 0) return errorResult("reviewerIds is required for update_reviewers");
+    if (!reviewerAction) return errorResult("reviewerAction is required for update_reviewers");
+
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+
+    if (reviewerAction === "remove") {
+      for (const reviewerId of reviewerIds) {
+        await gitApi.deletePullRequestReviewer(repositoryId, pullRequestId, reviewerId, project);
+      }
+      return { content: [{ type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` }] };
+    }
+
+    const updatedReviewers = await gitApi.createPullRequestReviewers(
+      reviewerIds.map((id) => ({ id })),
+      repositoryId,
+      pullRequestId,
+      project
+    );
+
+    const trimmedResponse = updatedReviewers.map((item) => ({
+      displayName: item.displayName,
+      id: item.id,
+      uniqueName: item.uniqueName,
+      vote: item.vote,
+      hasDeclined: item.hasDeclined,
+      isFlagged: item.isFlagged,
+    }));
+
+    return { content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }] };
+  },
+};
+
+const votePullRequestCommand: Command<VotePullRequestArgs> = {
+  async execute(context: CommandContext, args: VotePullRequestArgs): Promise<CallToolResult> {
+    const { repositoryId, pullRequestId, project, vote } = args;
+    if (!repositoryId) return errorResult("repositoryId is required for vote");
+    if (!pullRequestId) return errorResult("pullRequestId is required for vote");
+    if (!vote) return errorResult("vote is required for vote action");
+
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const userDetails = await getCurrentUserDetails(context.tokenProvider, context.connectionProvider, context.userAgentProvider);
+    const userId = userDetails.authenticatedUser.id;
+
+    if (!userId) throw new Error("Could not determine authenticated user ID.");
+
+    const voteMap: Record<string, number> = {
+      Approved: 10,
+      ApprovedWithSuggestions: 5,
+      NoVote: 0,
+      WaitingForAuthor: -5,
+      Rejected: -10,
     };
 
-    if (mergeStrategy) completionOptions.mergeStrategy = GitPullRequestMergeStrategy[mergeStrategy as keyof typeof GitPullRequestMergeStrategy];
-    if (mergeCommitMessage) completionOptions.mergeCommitMessage = mergeCommitMessage;
-    if (bypassPolicy && bypassReason) completionOptions.bypassReason = bypassReason;
+    const existingReviewer = await gitApi.getPullRequestReviewer(repositoryId, pullRequestId, userId, project).catch((error) => {
+      if (!(error instanceof Error) || !/not found|reviewer does not exist/i.test(error.message)) throw error;
+      return undefined;
+    });
 
-    updateRequest.completionOptions = completionOptions;
-  }
+    const reviewerPayload = {
+      vote: voteMap[vote],
+      id: userId,
+      ...(existingReviewer?.isRequired !== undefined ? { isRequired: existingReviewer.isRequired } : {}),
+    };
 
-  if (Object.keys(updateRequest).length === 0 && !labels) {
-    return errorResult("Error: At least one field (title, description, isDraft, targetRefName, status, autoComplete options, or labels) must be provided for update.");
-  }
+    await gitApi.createPullRequestReviewer(reviewerPayload as any, repositoryId, pullRequestId, userId, project);
 
-  if (labels) {
-    const currentLabels = await gitApi.getPullRequestLabels(repositoryId, pullRequestId, project);
-    for (const currentLabel of currentLabels) {
-      if (currentLabel.id) await gitApi.deletePullRequestLabels(repositoryId, pullRequestId, currentLabel.id, project);
-    }
-    for (const label of labels) {
-      await gitApi.createPullRequestLabel({ name: label }, repositoryId, pullRequestId, project);
-    }
-  }
-
-  const updatedPullRequest =
-    Object.keys(updateRequest).length > 0 ? await gitApi.updatePullRequest(updateRequest, repositoryId, pullRequestId, project) : await gitApi.getPullRequest(repositoryId, pullRequestId, project);
-
-  const trimmedUpdatedPullRequest = trimPullRequest(updatedPullRequest, true);
-  if (!trimmedUpdatedPullRequest) return { content: [{ type: "text", text: "Pull request updated but API returned no data." }] };
-
-  return { content: [{ type: "text", text: JSON.stringify(trimmedUpdatedPullRequest, null, 2) }] };
-}
-
-async function updatePullRequestReviewers(args: UpdatePullRequestReviewersArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const { repositoryId, pullRequestId, project, reviewerIds, reviewerAction } = args;
-  if (!repositoryId) return errorResult("repositoryId is required for update_reviewers");
-  if (!pullRequestId) return errorResult("pullRequestId is required for update_reviewers");
-  if (!reviewerIds || reviewerIds.length === 0) return errorResult("reviewerIds is required for update_reviewers");
-  if (!reviewerAction) return errorResult("reviewerAction is required for update_reviewers");
-
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-
-  if (reviewerAction === "remove") {
-    for (const reviewerId of reviewerIds) {
-      await gitApi.deletePullRequestReviewer(repositoryId, pullRequestId, reviewerId, project);
-    }
-    return { content: [{ type: "text", text: `Reviewers with IDs ${reviewerIds.join(", ")} removed from pull request ${pullRequestId}.` }] };
-  }
-
-  const updatedReviewers = await gitApi.createPullRequestReviewers(
-    reviewerIds.map((id) => ({ id })),
-    repositoryId,
-    pullRequestId,
-    project
-  );
-
-  const trimmedResponse = updatedReviewers.map((item) => ({
-    displayName: item.displayName,
-    id: item.id,
-    uniqueName: item.uniqueName,
-    vote: item.vote,
-    hasDeclined: item.hasDeclined,
-    isFlagged: item.isFlagged,
-  }));
-
-  return { content: [{ type: "text", text: JSON.stringify(trimmedResponse, null, 2) }] };
-}
-
-async function votePullRequest(args: VotePullRequestArgs, connectionProvider: () => Promise<WebApi>, tokenProvider: () => Promise<string>, userAgentProvider: () => string): Promise<CallToolResult> {
-  const { repositoryId, pullRequestId, project, vote } = args;
-  if (!repositoryId) return errorResult("repositoryId is required for vote");
-  if (!pullRequestId) return errorResult("pullRequestId is required for vote");
-  if (!vote) return errorResult("vote is required for vote action");
-
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const userDetails = await getCurrentUserDetails(tokenProvider, connectionProvider, userAgentProvider);
-  const userId = userDetails.authenticatedUser.id;
-
-  if (!userId) throw new Error("Could not determine authenticated user ID.");
-
-  const voteMap: Record<string, number> = {
-    Approved: 10,
-    ApprovedWithSuggestions: 5,
-    NoVote: 0,
-    WaitingForAuthor: -5,
-    Rejected: -10,
-  };
-
-  const existingReviewer = await gitApi.getPullRequestReviewer(repositoryId, pullRequestId, userId, project).catch((error) => {
-    if (!(error instanceof Error) || !/not found|reviewer does not exist/i.test(error.message)) throw error;
-    return undefined;
-  });
-
-  const reviewerPayload = {
-    vote: voteMap[vote],
-    id: userId,
-    ...(existingReviewer?.isRequired !== undefined ? { isRequired: existingReviewer.isRequired } : {}),
-  };
-
-  await gitApi.createPullRequestReviewer(reviewerPayload as any, repositoryId, pullRequestId, userId, project);
-
-  return { content: [{ type: "text", text: `Successfully cast vote '${vote}' on PR #${pullRequestId}.` }] };
-}
+    return { content: [{ type: "text", text: `Successfully cast vote '${vote}' on PR #${pullRequestId}.` }] };
+  },
+};
 
 const repoPullRequestWriteErrorPrefixes: Record<RepoPullRequestWriteArgs["action"], string> = {
   create: "Error with pull request write operation: ",
@@ -446,163 +455,178 @@ const repoPullRequestWriteErrorPrefixes: Record<RepoPullRequestWriteArgs["action
   vote: "Error with pull request write operation: ",
 };
 
-async function createPullRequestThread(args: CreatePullRequestThreadArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const {
-    repositoryId,
-    pullRequestId,
-    project,
-    content,
-    status,
-    filePath,
-    rightFileStartLine,
-    rightFileStartOffset,
-    rightFileEndLine,
-    rightFileEndOffset,
-    changeTrackingId,
-    firstComparingIteration,
-    secondComparingIteration,
-  } = args;
-  if (!content) return errorResult("content is required for create");
+const repoPullRequestWriteCommands: CommandRegistry<RepoPullRequestWriteArgs> = {
+  create: createPullRequestCommand,
+  update: updatePullRequestCommand,
+  update_reviewers: updatePullRequestReviewersCommand,
+  vote: votePullRequestCommand,
+};
 
-  const normalizedFilePath = filePath && !filePath.startsWith("/") ? `/${filePath}` : filePath;
-  const threadContext: CommentThreadContext = { filePath: normalizedFilePath };
+const createPullRequestThreadCommand: Command<CreatePullRequestThreadArgs> = {
+  async execute(context: CommandContext, args: CreatePullRequestThreadArgs): Promise<CallToolResult> {
+    const {
+      repositoryId,
+      pullRequestId,
+      project,
+      content,
+      status,
+      filePath,
+      rightFileStartLine,
+      rightFileStartOffset,
+      rightFileEndLine,
+      rightFileEndOffset,
+      changeTrackingId,
+      firstComparingIteration,
+      secondComparingIteration,
+    } = args;
+    if (!content) return errorResult("content is required for create");
 
-  if (rightFileStartLine !== undefined) {
-    if (rightFileStartLine < 1) return errorResult("rightFileStartLine must be greater than or equal to 1.");
-    threadContext.rightFileStart = { line: rightFileStartLine };
-    if (rightFileStartOffset !== undefined) {
-      if (rightFileStartOffset < 1) return errorResult("rightFileStartOffset must be greater than or equal to 1.");
-      threadContext.rightFileStart.offset = rightFileStartOffset;
+    const normalizedFilePath = filePath && !filePath.startsWith("/") ? `/${filePath}` : filePath;
+    const threadContext: CommentThreadContext = { filePath: normalizedFilePath };
+
+    if (rightFileStartLine !== undefined) {
+      if (rightFileStartLine < 1) return errorResult("rightFileStartLine must be greater than or equal to 1.");
+      threadContext.rightFileStart = { line: rightFileStartLine };
+      if (rightFileStartOffset !== undefined) {
+        if (rightFileStartOffset < 1) return errorResult("rightFileStartOffset must be greater than or equal to 1.");
+        threadContext.rightFileStart.offset = rightFileStartOffset;
+      }
     }
-  }
 
-  if (rightFileEndLine !== undefined) {
-    if (rightFileStartLine === undefined) return errorResult("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
-    if (rightFileEndLine < 1) return errorResult("rightFileEndLine must be greater than or equal to 1.");
-    if (rightFileEndOffset === undefined) return errorResult("rightFileEndOffset must be specified if rightFileEndLine is specified.");
-    if (rightFileEndOffset < 1) return errorResult("rightFileEndOffset must be greater than or equal to 1.");
-    threadContext.rightFileEnd = { line: rightFileEndLine, offset: rightFileEndOffset };
-  }
-
-  if (rightFileEndOffset !== undefined && rightFileEndLine === undefined) {
-    return errorResult("rightFileEndLine must be specified if rightFileEndOffset is specified.");
-  }
-
-  if (rightFileStartLine !== undefined && rightFileStartOffset !== undefined && (rightFileEndLine === undefined || rightFileEndOffset === undefined)) {
-    return errorResult("rightFileEndLine and rightFileEndOffset must both be specified when rightFileStartLine and rightFileStartOffset are both specified.");
-  }
-
-  if (
-    rightFileStartLine !== undefined &&
-    rightFileStartLine === rightFileEndLine &&
-    rightFileEndOffset !== undefined &&
-    rightFileStartOffset !== undefined &&
-    rightFileEndOffset < rightFileStartOffset
-  ) {
-    return errorResult("rightFileEndOffset must be greater than or equal to rightFileStartOffset when both are on the same line.");
-  }
-
-  const iterationContextValues = [changeTrackingId, firstComparingIteration, secondComparingIteration];
-  if (iterationContextValues.some((value) => value !== undefined) && iterationContextValues.some((value) => value === undefined)) {
-    return errorResult("changeTrackingId, firstComparingIteration, and secondComparingIteration must all be specified together.");
-  }
-
-  const pullRequestThreadContext =
-    changeTrackingId !== undefined && firstComparingIteration !== undefined && secondComparingIteration !== undefined
-      ? { changeTrackingId, iterationContext: { firstComparingIteration, secondComparingIteration } }
-      : undefined;
-  const threadStatus = status === undefined ? CommentThreadStatus.Active : CommentThreadStatus[status as keyof typeof CommentThreadStatus];
-
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const thread = await gitApi.createThread({ comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: threadStatus }, repositoryId, pullRequestId, project);
-
-  return { content: [{ type: "text", text: JSON.stringify(trimPullRequestThread(thread), null, 2) }] };
-}
-
-async function replyToPullRequestThread(args: ReplyToPullRequestThreadArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const { repositoryId, pullRequestId, project, threadId, content, status, fullResponse } = args;
-  if (!threadId) return errorResult("threadId is required for reply");
-  if (!content) return errorResult("content is required for reply");
-
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const comment = await gitApi.createComment({ content, commentType: 1 }, repositoryId, pullRequestId, threadId, project);
-
-  if (!comment) return errorResult(`Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.`);
-
-  if (status === undefined) {
-    if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
-    return { content: [{ type: "text", text: JSON.stringify(trimComment(comment), null, 2) }] };
-  }
-
-  let statusUpdateError: string | undefined;
-  let resultingThreadStatus: CommentThreadStatus | undefined;
-  try {
-    const thread = await gitApi.updateThread({ status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] }, repositoryId, pullRequestId, threadId, project);
-    if (!thread) {
-      statusUpdateError = `Thread ${threadId} was not updated successfully.`;
-    } else {
-      resultingThreadStatus = thread.status;
+    if (rightFileEndLine !== undefined) {
+      if (rightFileStartLine === undefined) return errorResult("rightFileEndLine must only be specified if rightFileStartLine is also specified.");
+      if (rightFileEndLine < 1) return errorResult("rightFileEndLine must be greater than or equal to 1.");
+      if (rightFileEndOffset === undefined) return errorResult("rightFileEndOffset must be specified if rightFileEndLine is specified.");
+      if (rightFileEndOffset < 1) return errorResult("rightFileEndOffset must be greater than or equal to 1.");
+      threadContext.rightFileEnd = { line: rightFileEndLine, offset: rightFileEndOffset };
     }
-  } catch (error) {
-    statusUpdateError = error instanceof Error ? error.message : "Unknown error occurred";
-  }
 
-  if (statusUpdateError !== undefined) {
-    return errorResult(
-      JSON.stringify(
-        {
-          message: `Comment ${comment.id} was posted successfully, but the thread status update failed. Do not retry the reply.`,
-          comment: trimComment(comment),
-          statusUpdate: {
-            succeeded: false,
-            requestedStatus: status,
-            error: statusUpdateError,
+    if (rightFileEndOffset !== undefined && rightFileEndLine === undefined) {
+      return errorResult("rightFileEndLine must be specified if rightFileEndOffset is specified.");
+    }
+
+    if (rightFileStartLine !== undefined && rightFileStartOffset !== undefined && (rightFileEndLine === undefined || rightFileEndOffset === undefined)) {
+      return errorResult("rightFileEndLine and rightFileEndOffset must both be specified when rightFileStartLine and rightFileStartOffset are both specified.");
+    }
+
+    if (
+      rightFileStartLine !== undefined &&
+      rightFileStartLine === rightFileEndLine &&
+      rightFileEndOffset !== undefined &&
+      rightFileStartOffset !== undefined &&
+      rightFileEndOffset < rightFileStartOffset
+    ) {
+      return errorResult("rightFileEndOffset must be greater than or equal to rightFileStartOffset when both are on the same line.");
+    }
+
+    const iterationContextValues = [changeTrackingId, firstComparingIteration, secondComparingIteration];
+    if (iterationContextValues.some((value) => value !== undefined) && iterationContextValues.some((value) => value === undefined)) {
+      return errorResult("changeTrackingId, firstComparingIteration, and secondComparingIteration must all be specified together.");
+    }
+
+    const pullRequestThreadContext =
+      changeTrackingId !== undefined && firstComparingIteration !== undefined && secondComparingIteration !== undefined
+        ? { changeTrackingId, iterationContext: { firstComparingIteration, secondComparingIteration } }
+        : undefined;
+    const threadStatus = status === undefined ? CommentThreadStatus.Active : CommentThreadStatus[status as keyof typeof CommentThreadStatus];
+
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const thread = await gitApi.createThread({ comments: [{ content, commentType: 1 }], threadContext, pullRequestThreadContext, status: threadStatus }, repositoryId, pullRequestId, project);
+
+    return { content: [{ type: "text", text: JSON.stringify(trimPullRequestThread(thread), null, 2) }] };
+  },
+};
+
+const replyToPullRequestThreadCommand: Command<ReplyToPullRequestThreadArgs> = {
+  async execute(context: CommandContext, args: ReplyToPullRequestThreadArgs): Promise<CallToolResult> {
+    const { repositoryId, pullRequestId, project, threadId, content, status, fullResponse } = args;
+    if (!threadId) return errorResult("threadId is required for reply");
+    if (!content) return errorResult("content is required for reply");
+
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const comment = await gitApi.createComment({ content, commentType: 1 }, repositoryId, pullRequestId, threadId, project);
+
+    if (!comment) return errorResult(`Error: Failed to add comment to thread ${threadId}. The comment was not created successfully.`);
+
+    if (status === undefined) {
+      if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify(trimComment(comment), null, 2) }] };
+    }
+
+    let statusUpdateError: string | undefined;
+    let resultingThreadStatus: CommentThreadStatus | undefined;
+    try {
+      const thread = await gitApi.updateThread({ status: CommentThreadStatus[status as keyof typeof CommentThreadStatus] }, repositoryId, pullRequestId, threadId, project);
+      if (!thread) {
+        statusUpdateError = `Thread ${threadId} was not updated successfully.`;
+      } else {
+        resultingThreadStatus = thread.status;
+      }
+    } catch (error) {
+      statusUpdateError = error instanceof Error ? error.message : "Unknown error occurred";
+    }
+
+    if (statusUpdateError !== undefined) {
+      return errorResult(
+        JSON.stringify(
+          {
+            message: `Comment ${comment.id} was posted successfully, but the thread status update failed. Do not retry the reply.`,
+            comment: trimComment(comment),
+            statusUpdate: {
+              succeeded: false,
+              requestedStatus: status,
+              error: statusUpdateError,
+            },
           },
-        },
-        null,
-        2
-      )
-    );
-  }
+          null,
+          2
+        )
+      );
+    }
 
-  return { content: [{ type: "text", text: JSON.stringify({ comment: trimComment(comment), status: resultingThreadStatus }, null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify({ comment: trimComment(comment), status: resultingThreadStatus }, null, 2) }] };
+  },
+};
 
-async function updatePullRequestComment(args: UpdatePullRequestCommentArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const { repositoryId, pullRequestId, project, threadId, commentId, content, fullResponse } = args;
-  if (!threadId) return errorResult("threadId is required for update");
-  if (!commentId) return errorResult("commentId is required for update");
-  if (!content) return errorResult("content is required for update");
+const updatePullRequestCommentCommand: Command<UpdatePullRequestCommentArgs> = {
+  async execute(context: CommandContext, args: UpdatePullRequestCommentArgs): Promise<CallToolResult> {
+    const { repositoryId, pullRequestId, project, threadId, commentId, content, fullResponse } = args;
+    if (!threadId) return errorResult("threadId is required for update");
+    if (!commentId) return errorResult("commentId is required for update");
+    if (!content) return errorResult("content is required for update");
 
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const comment = await gitApi.updateComment({ content }, repositoryId, pullRequestId, threadId, commentId, project);
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const comment = await gitApi.updateComment({ content }, repositoryId, pullRequestId, threadId, commentId, project);
 
-  if (!comment) return errorResult(`Error: Failed to update comment ${commentId} in thread ${threadId}. The comment was not updated successfully.`);
-  if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
+    if (!comment) return errorResult(`Error: Failed to update comment ${commentId} in thread ${threadId}. The comment was not updated successfully.`);
+    if (fullResponse) return { content: [{ type: "text", text: JSON.stringify(comment, null, 2) }] };
 
-  return { content: [{ type: "text", text: `Comment ${commentId} successfully updated in thread ${threadId}.` }] };
-}
+    return { content: [{ type: "text", text: `Comment ${commentId} successfully updated in thread ${threadId}.` }] };
+  },
+};
 
-async function updatePullRequestThreadStatus(args: UpdatePullRequestThreadStatusArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  const { repositoryId, pullRequestId, project, threadId, status } = args;
-  if (!threadId) return errorResult("threadId is required for update_status");
-  if (!status) return errorResult("status is required for update_status");
+const updatePullRequestThreadStatusCommand: Command<UpdatePullRequestThreadStatusArgs> = {
+  async execute(context: CommandContext, args: UpdatePullRequestThreadStatusArgs): Promise<CallToolResult> {
+    const { repositoryId, pullRequestId, project, threadId, status } = args;
+    if (!threadId) return errorResult("threadId is required for update_status");
+    if (!status) return errorResult("status is required for update_status");
 
-  const connection = await connectionProvider();
-  const gitApi = await connection.getGitApi();
-  const updateRequest: Record<string, unknown> = {
-    status: CommentThreadStatus[status as keyof typeof CommentThreadStatus],
-  };
+    const connection = await context.connectionProvider();
+    const gitApi = await connection.getGitApi();
+    const updateRequest: Record<string, unknown> = {
+      status: CommentThreadStatus[status as keyof typeof CommentThreadStatus],
+    };
 
-  const thread = await gitApi.updateThread(updateRequest, repositoryId, pullRequestId, threadId, project);
+    const thread = await gitApi.updateThread(updateRequest, repositoryId, pullRequestId, threadId, project);
 
-  if (!thread) return errorResult(`Error: Failed to update thread ${threadId}. The thread was not updated successfully.`);
+    if (!thread) return errorResult(`Error: Failed to update thread ${threadId}. The thread was not updated successfully.`);
 
-  return { content: [{ type: "text", text: JSON.stringify(trimPullRequestThread(thread), null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify(trimPullRequestThread(thread), null, 2) }] };
+  },
+};
 
 const repoPullRequestThreadWriteErrorPrefixes: Record<RepoPullRequestThreadWriteArgs["action"], string> = {
   create: "Error with pull request thread write operation: ",
@@ -611,7 +635,16 @@ const repoPullRequestThreadWriteErrorPrefixes: Record<RepoPullRequestThreadWrite
   update_status: "Error with pull request thread write operation: ",
 };
 
+const repoPullRequestThreadWriteCommands: CommandRegistry<RepoPullRequestThreadWriteArgs> = {
+  create: createPullRequestThreadCommand,
+  reply: replyToPullRequestThreadCommand,
+  update: updatePullRequestCommentCommand,
+  update_status: updatePullRequestThreadStatusCommand,
+};
+
 function configureRepoTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+  const context: CommandContext = { connectionProvider, tokenProvider, userAgentProvider };
+
   // --- repo_repository -------------------------------------------------------
   server.tool(
     REPO_TOOLS.repo_repository,
@@ -1146,22 +1179,9 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   );
 
   // --- repo_file_write -------------------------------------------------------
-  server.tool(REPO_TOOLS.repo_file_write, "Create or update a text file in an existing repository branch and commit the change.", repoFileWriteShape, async (args) => {
-    try {
-      switch (args.action) {
-        case "create":
-        case "update":
-          return await writeRepositoryFile(args, connectionProvider);
-        default: {
-          const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(repoFileWriteErrorPrefixes).sort().join(", ")}`);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${repoFileWriteErrorPrefixes[args.action]}${message}`);
-    }
-  });
+  server.tool(REPO_TOOLS.repo_file_write, "Create or update a text file in an existing repository branch and commit the change.", repoFileWriteShape, async (args) =>
+    dispatchAction(repoFileWriteCommands, context, args as RepoFileWriteArgs, repoFileWriteErrorPrefixes)
+  );
 
   // --- repo_search_commits ---------------------------------------------------
   server.tool(
@@ -1223,54 +1243,16 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
   );
 
   // --- repo_pull_request_write -----------------------------------------------
-  server.tool(REPO_TOOLS.repo_pull_request_write, "Write operations for pull requests. Use the action parameter to specify the operation.", repoPullRequestWriteShape, async (args) => {
-    try {
-      switch (args.action) {
-        case "create":
-          return await createPullRequest(args, connectionProvider);
-        case "update":
-          return await updatePullRequest(args, connectionProvider, tokenProvider, userAgentProvider);
-        case "update_reviewers":
-          return await updatePullRequestReviewers(args, connectionProvider);
-        case "vote":
-          return await votePullRequest(args, connectionProvider, tokenProvider, userAgentProvider);
-        default: {
-          const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(repoPullRequestWriteErrorPrefixes).sort().join(", ")}`);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${repoPullRequestWriteErrorPrefixes[args.action]}${message}`);
-    }
-  });
+  server.tool(REPO_TOOLS.repo_pull_request_write, "Write operations for pull requests. Use the action parameter to specify the operation.", repoPullRequestWriteShape, async (args) =>
+    dispatchAction(repoPullRequestWriteCommands, context, args as RepoPullRequestWriteArgs, repoPullRequestWriteErrorPrefixes)
+  );
 
   // --- repo_pull_request_thread_write ----------------------------------------
   server.tool(
     REPO_TOOLS.repo_pull_request_thread_write,
     "Write operations for pull request comment threads. Use the action parameter to specify the operation.",
     repoPullRequestThreadWriteShape,
-    async (args) => {
-      try {
-        switch (args.action) {
-          case "create":
-            return await createPullRequestThread(args, connectionProvider);
-          case "reply":
-            return await replyToPullRequestThread(args, connectionProvider);
-          case "update":
-            return await updatePullRequestComment(args, connectionProvider);
-          case "update_status":
-            return await updatePullRequestThreadStatus(args, connectionProvider);
-          default: {
-            const unsupportedAction: never = args.action;
-            return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(repoPullRequestThreadWriteErrorPrefixes).sort().join(", ")}`);
-          }
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error occurred";
-        return errorResult(`${repoPullRequestThreadWriteErrorPrefixes[args.action]}${message}`);
-      }
-    }
+    async (args) => dispatchAction(repoPullRequestThreadWriteCommands, context, args as RepoPullRequestThreadWriteArgs, repoPullRequestThreadWriteErrorPrefixes)
   );
 
   // --- repo_create_branch ----------------------------------------------------
@@ -1336,19 +1318,18 @@ function configureRepoTools(server: McpServer, tokenProvider: () => Promise<stri
 export {
   REPO_TOOLS,
   configureRepoTools,
-  writeRepositoryFile,
-  createPullRequest,
-  updatePullRequest,
-  updatePullRequestReviewers,
-  votePullRequest,
-  createPullRequestThread,
-  replyToPullRequestThread,
-  updatePullRequestComment,
-  updatePullRequestThreadStatus,
+  writeRepositoryFileCommand,
+  createPullRequestCommand,
+  updatePullRequestCommand,
+  updatePullRequestReviewersCommand,
+  votePullRequestCommand,
+  createPullRequestThreadCommand,
+  replyToPullRequestThreadCommand,
+  updatePullRequestCommentCommand,
+  updatePullRequestThreadStatusCommand,
 };
 export type {
   WriteRepositoryFileArgs,
-  RepoFileWriteArgs,
   CreatePullRequestArgs,
   UpdatePullRequestArgs,
   UpdatePullRequestReviewersArgs,
