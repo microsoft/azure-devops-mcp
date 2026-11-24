@@ -6,6 +6,7 @@ import { WebApi } from "azure-devops-node-api";
 import { TestPlanCreateParams } from "azure-devops-node-api/interfaces/TestPlanInterfaces.js";
 import { TestCaseResult, TestOutcome, TestRun } from "azure-devops-node-api/interfaces/TestInterfaces.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { Command, CommandContext, CommandRegistry, dispatchAction, errorResult } from "../shared/command.js";
 import { z } from "zod";
 import { apiVersion } from "../utils.js";
 import {
@@ -22,114 +23,122 @@ import {
   TestplanTestCaseWriteArgs,
 } from "./test-plans.dto.js";
 
-const errorResult = (text: string): CallToolResult => ({ content: [{ type: "text", text }], isError: true });
+const createTestPlanCommand: Command<CreateTestPlanArgs> = {
+  async execute(context: CommandContext, args: CreateTestPlanArgs): Promise<CallToolResult> {
+    if (!args.name) return errorResult("name is required for create");
+    if (!args.iteration) return errorResult("iteration is required for create");
 
-async function createTestPlan(args: CreateTestPlanArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  if (!args.name) return errorResult("name is required for create");
-  if (!args.iteration) return errorResult("iteration is required for create");
+    const connection = await context.connectionProvider();
+    const testPlanApi = await connection.getTestPlanApi();
+    const testPlanToCreate: TestPlanCreateParams = {
+      name: args.name,
+      iteration: args.iteration,
+      description: args.description,
+      startDate: args.startDate ? new Date(args.startDate) : undefined,
+      endDate: args.endDate ? new Date(args.endDate) : undefined,
+      areaPath: args.areaPath,
+    };
+    const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, args.project);
 
-  const connection = await connectionProvider();
-  const testPlanApi = await connection.getTestPlanApi();
-  const testPlanToCreate: TestPlanCreateParams = {
-    name: args.name,
-    iteration: args.iteration,
-    description: args.description,
-    startDate: args.startDate ? new Date(args.startDate) : undefined,
-    endDate: args.endDate ? new Date(args.endDate) : undefined,
-    areaPath: args.areaPath,
-  };
-  const createdTestPlan = await testPlanApi.createTestPlan(testPlanToCreate, args.project);
+    return { content: [{ type: "text", text: JSON.stringify(createdTestPlan, null, 2) }] };
+  },
+};
 
-  return { content: [{ type: "text", text: JSON.stringify(createdTestPlan, null, 2) }] };
-}
+const createTestSuiteCommand: Command<CreateTestSuiteArgs> = {
+  async execute(context: CommandContext, args: CreateTestSuiteArgs): Promise<CallToolResult> {
+    if (!args.planId) return errorResult("planId is required for create");
+    if (!args.parentSuiteId) return errorResult("parentSuiteId is required for create");
+    if (!args.name) return errorResult("name is required for create");
 
-async function createTestSuite(args: CreateTestSuiteArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  if (!args.planId) return errorResult("planId is required for create");
-  if (!args.parentSuiteId) return errorResult("parentSuiteId is required for create");
-  if (!args.name) return errorResult("name is required for create");
+    const maxRetries = 5;
+    const baseDelay = 500;
 
-  const maxRetries = 5;
-  const baseDelay = 500;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const connection = await context.connectionProvider();
+        const testPlanApi = await connection.getTestPlanApi();
+        const testSuiteToCreate = {
+          name: args.name,
+          parentSuite: { id: args.parentSuiteId, name: "" },
+          suiteType: 2,
+        };
+        const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, args.project, args.planId);
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const connection = await connectionProvider();
-      const testPlanApi = await connection.getTestPlanApi();
-      const testSuiteToCreate = {
-        name: args.name,
-        parentSuite: { id: args.parentSuiteId, name: "" },
-        suiteType: 2,
-      };
-      const createdTestSuite = await testPlanApi.createTestSuite(testSuiteToCreate, args.project, args.planId);
+        return { content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }] };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        const isConcurrencyError = errorMessage.includes("TF26071") || errorMessage.includes("got update") || errorMessage.includes("changed by someone else");
 
-      return { content: [{ type: "text", text: JSON.stringify(createdTestSuite, null, 2) }] };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      const isConcurrencyError = errorMessage.includes("TF26071") || errorMessage.includes("got update") || errorMessage.includes("changed by someone else");
+        if (!isConcurrencyError || attempt >= maxRetries) return errorResult(`Error creating test suite: ${errorMessage}`);
 
-      if (!isConcurrencyError || attempt >= maxRetries) return errorResult(`Error creating test suite: ${errorMessage}`);
-
-      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 200;
-      await new Promise((resolve) => setTimeout(resolve, delay));
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 200;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
-  }
 
-  /* istanbul ignore next */
-  return errorResult("Error creating test suite: Maximum retries exceeded");
-}
+    /* istanbul ignore next */
+    return errorResult("Error creating test suite: Maximum retries exceeded");
+  },
+};
 
-async function addTestCasesToSuite(args: AddTestCasesToSuiteArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  if (!args.planId) return errorResult("planId is required for add_test_cases");
-  if (!args.suiteId) return errorResult("suiteId is required for add_test_cases");
-  if (!args.testCaseIds) return errorResult("testCaseIds is required for add_test_cases");
+const addTestCasesToSuiteCommand: Command<AddTestCasesToSuiteArgs> = {
+  async execute(context: CommandContext, args: AddTestCasesToSuiteArgs): Promise<CallToolResult> {
+    if (!args.planId) return errorResult("planId is required for add_test_cases");
+    if (!args.suiteId) return errorResult("suiteId is required for add_test_cases");
+    if (!args.testCaseIds) return errorResult("testCaseIds is required for add_test_cases");
 
-  const connection = await connectionProvider();
-  const testApi = await connection.getTestApi();
-  const testCaseIdsString = Array.isArray(args.testCaseIds) ? args.testCaseIds.join(",") : args.testCaseIds;
-  const addedTestCases = await testApi.addTestCasesToSuite(args.project, args.planId, args.suiteId, testCaseIdsString);
+    const connection = await context.connectionProvider();
+    const testApi = await connection.getTestApi();
+    const testCaseIdsString = Array.isArray(args.testCaseIds) ? args.testCaseIds.join(",") : args.testCaseIds;
+    const addedTestCases = await testApi.addTestCasesToSuite(args.project, args.planId, args.suiteId, testCaseIdsString);
 
-  return { content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify(addedTestCases, null, 2) }] };
+  },
+};
 
-async function createTestCase(args: CreateTestCaseArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  if (!args.project) return errorResult("project is required for create");
-  if (!args.title) return errorResult("title is required for create");
+const createTestCaseCommand: Command<CreateTestCaseArgs> = {
+  async execute(context: CommandContext, args: CreateTestCaseArgs): Promise<CallToolResult> {
+    if (!args.project) return errorResult("project is required for create");
+    if (!args.title) return errorResult("title is required for create");
 
-  const connection = await connectionProvider();
-  const witClient = await connection.getWorkItemTrackingApi();
-  const patchDocument: any[] = [{ op: "add", path: "/fields/System.Title", value: args.title }];
+    const connection = await context.connectionProvider();
+    const witClient = await connection.getWorkItemTrackingApi();
+    const patchDocument: any[] = [{ op: "add", path: "/fields/System.Title", value: args.title }];
 
-  if (args.testsWorkItemId) {
-    patchDocument.push({
-      op: "add",
-      path: "/relations/-",
-      value: {
-        rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
-        url: `${connection.serverUrl}/${args.project}/_apis/wit/workItems/${args.testsWorkItemId}`,
-      },
-    });
-  }
-  if (args.steps) patchDocument.push({ op: "add", path: "/fields/Microsoft.VSTS.TCM.Steps", value: convertStepsToXml(args.steps) });
-  if (args.priority) patchDocument.push({ op: "add", path: "/fields/Microsoft.VSTS.Common.Priority", value: args.priority });
-  if (args.areaPath) patchDocument.push({ op: "add", path: "/fields/System.AreaPath", value: args.areaPath });
-  if (args.iterationPath) patchDocument.push({ op: "add", path: "/fields/System.IterationPath", value: args.iterationPath });
+    if (args.testsWorkItemId) {
+      patchDocument.push({
+        op: "add",
+        path: "/relations/-",
+        value: {
+          rel: "Microsoft.VSTS.Common.TestedBy-Reverse",
+          url: `${connection.serverUrl}/${args.project}/_apis/wit/workItems/${args.testsWorkItemId}`,
+        },
+      });
+    }
+    if (args.steps) patchDocument.push({ op: "add", path: "/fields/Microsoft.VSTS.TCM.Steps", value: convertStepsToXml(args.steps) });
+    if (args.priority) patchDocument.push({ op: "add", path: "/fields/Microsoft.VSTS.Common.Priority", value: args.priority });
+    if (args.areaPath) patchDocument.push({ op: "add", path: "/fields/System.AreaPath", value: args.areaPath });
+    if (args.iterationPath) patchDocument.push({ op: "add", path: "/fields/System.IterationPath", value: args.iterationPath });
 
-  const workItem = await witClient.createWorkItem({}, patchDocument, args.project, "Test Case");
+    const workItem = await witClient.createWorkItem({}, patchDocument, args.project, "Test Case");
 
-  return { content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }] };
+  },
+};
 
-async function updateTestCaseSteps(args: UpdateTestCaseStepsArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
-  if (!args.id) return errorResult("id is required for update_steps");
-  if (!args.steps) return errorResult("steps is required for update_steps");
+const updateTestCaseStepsCommand: Command<UpdateTestCaseStepsArgs> = {
+  async execute(context: CommandContext, args: UpdateTestCaseStepsArgs): Promise<CallToolResult> {
+    if (!args.id) return errorResult("id is required for update_steps");
+    if (!args.steps) return errorResult("steps is required for update_steps");
 
-  const connection = await connectionProvider();
-  const witClient = await connection.getWorkItemTrackingApi();
-  const patchDocument = [{ op: "add", path: "/fields/Microsoft.VSTS.TCM.Steps", value: convertStepsToXml(args.steps) }];
-  const workItem = await witClient.updateWorkItem({}, patchDocument, args.id);
+    const connection = await context.connectionProvider();
+    const witClient = await connection.getWorkItemTrackingApi();
+    const patchDocument = [{ op: "add", path: "/fields/Microsoft.VSTS.TCM.Steps", value: convertStepsToXml(args.steps) }];
+    const workItem = await witClient.updateWorkItem({}, patchDocument, args.id);
 
-  return { content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }] };
-}
+    return { content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }] };
+  },
+};
 
 const testplanTestPlanWriteErrorPrefixes: Record<TestplanTestPlanWriteArgs["action"], string> = {
   create: "Error creating test plan: ",
@@ -143,6 +152,20 @@ const testplanTestSuiteWriteErrorPrefixes: Record<TestplanTestSuiteWriteArgs["ac
 const testplanTestCaseWriteErrorPrefixes: Record<TestplanTestCaseWriteArgs["action"], string> = {
   create: "Error creating test case: ",
   update_steps: "Error updating test case steps: ",
+};
+
+const testplanTestPlanWriteCommands: CommandRegistry<TestplanTestPlanWriteArgs> = {
+  create: createTestPlanCommand,
+};
+
+const testplanTestSuiteWriteCommands: CommandRegistry<TestplanTestSuiteWriteArgs> = {
+  create: createTestSuiteCommand,
+  add_test_cases: addTestCasesToSuiteCommand,
+};
+
+const testplanTestCaseWriteCommands: CommandRegistry<TestplanTestCaseWriteArgs> = {
+  create: createTestCaseCommand,
+  update_steps: updateTestCaseStepsCommand,
 };
 
 const TEST_RESULT_PAGE_SIZE = 1_000;
@@ -174,6 +197,8 @@ const TEST_PLAN_TOOLS = {
 };
 
 function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider?: () => string) {
+  const context: CommandContext = { connectionProvider, tokenProvider, userAgentProvider: userAgentProvider ?? (() => "") };
+
   // ─── testplan (read-only) ────────────────────────────────────────────
   server.tool(
     TEST_PLAN_TOOLS.testplan,
@@ -386,59 +411,19 @@ function configureTestPlanTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   // ─── testplan_test_plan_write ─────────────────────────────────────────────────────
-  server.tool(TEST_PLAN_TOOLS.testplan_test_plan_write, "Write operations for test plans. Use the action parameter to specify the operation.", testplanTestPlanWriteShape, async (args) => {
-    try {
-      switch (args.action) {
-        case "create":
-          return await createTestPlan(args, connectionProvider);
-        default: {
-          const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testplanTestPlanWriteErrorPrefixes).sort().join(", ")}`);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${testplanTestPlanWriteErrorPrefixes[args.action]}${message}`);
-    }
-  });
+  server.tool(TEST_PLAN_TOOLS.testplan_test_plan_write, "Write operations for test plans. Use the action parameter to specify the operation.", testplanTestPlanWriteShape, async (args) =>
+    dispatchAction(testplanTestPlanWriteCommands, context, args as TestplanTestPlanWriteArgs, testplanTestPlanWriteErrorPrefixes)
+  );
 
   // ─── testplan_test_suite_write ────────────────────────────────────────────────────
-  server.tool(TEST_PLAN_TOOLS.testplan_test_suite_write, "Write operations for test suites. Use the action parameter to specify the operation.", testplanTestSuiteWriteShape, async (args) => {
-    try {
-      switch (args.action) {
-        case "create":
-          return await createTestSuite(args, connectionProvider);
-        case "add_test_cases":
-          return await addTestCasesToSuite(args, connectionProvider);
-        default: {
-          const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testplanTestSuiteWriteErrorPrefixes).sort().join(", ")}`);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${testplanTestSuiteWriteErrorPrefixes[args.action]}${message}`);
-    }
-  });
+  server.tool(TEST_PLAN_TOOLS.testplan_test_suite_write, "Write operations for test suites. Use the action parameter to specify the operation.", testplanTestSuiteWriteShape, async (args) =>
+    dispatchAction(testplanTestSuiteWriteCommands, context, args as TestplanTestSuiteWriteArgs, testplanTestSuiteWriteErrorPrefixes)
+  );
 
   // ─── testplan_test_case_write ─────────────────────────────────────────────────────
-  server.tool(TEST_PLAN_TOOLS.testplan_test_case_write, "Write operations for test cases. Use the action parameter to specify the operation.", testplanTestCaseWriteShape, async (args) => {
-    try {
-      switch (args.action) {
-        case "create":
-          return await createTestCase(args, connectionProvider);
-        case "update_steps":
-          return await updateTestCaseSteps(args, connectionProvider);
-        default: {
-          const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(testplanTestCaseWriteErrorPrefixes).sort().join(", ")}`);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${testplanTestCaseWriteErrorPrefixes[args.action]}${message}`);
-    }
-  });
+  server.tool(TEST_PLAN_TOOLS.testplan_test_case_write, "Write operations for test cases. Use the action parameter to specify the operation.", testplanTestCaseWriteShape, async (args) =>
+    dispatchAction(testplanTestCaseWriteCommands, context, args as TestplanTestCaseWriteArgs, testplanTestCaseWriteErrorPrefixes)
+  );
 }
 
 /*
@@ -506,5 +491,5 @@ function escapeXml(unsafe: string): string {
   });
 }
 
-export { TEST_PLAN_TOOLS, configureTestPlanTools, createTestPlan, createTestSuite, addTestCasesToSuite, createTestCase, updateTestCaseSteps };
+export { TEST_PLAN_TOOLS, configureTestPlanTools, createTestPlanCommand, createTestSuiteCommand, addTestCasesToSuiteCommand, createTestCaseCommand, updateTestCaseStepsCommand };
 export type { CreateTestPlanArgs, CreateTestSuiteArgs, AddTestCasesToSuiteArgs, CreateTestCaseArgs, UpdateTestCaseStepsArgs };
