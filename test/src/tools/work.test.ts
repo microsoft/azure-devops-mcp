@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "@jest/globals";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { configureWorkTools } from "../../../src/tools/work";
+import { configureWorkTools, createIterations, assignIterations, updateCapacity } from "../../../src/tools/work";
 import { WebApi } from "azure-devops-node-api";
 import { TreeStructureGroup, TreeNodeStructureType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 
@@ -1350,7 +1350,8 @@ describe("configureWorkTools", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Unknown action: invalid_action");
+      expect(result.content[0].text).toBe("Unknown action: invalid_action. Supported actions: assign, create");
+      expect(connectionProvider).not.toHaveBeenCalled();
     });
   });
 
@@ -1599,7 +1600,7 @@ describe("configureWorkTools", () => {
       expect(result.content[0].text).toBe("No iterations were created");
     });
 
-    it("should return generic error when connection fails with an unmapped action", async () => {
+    it("should return the action-specific error prefix when the connection fails", async () => {
       configureWorkTools(server, tokenProvider, connectionProvider);
 
       const call = (server.tool as jest.Mock).mock.calls.find(([toolName]) => toolName === "work_iteration_write");
@@ -1609,13 +1610,13 @@ describe("configureWorkTools", () => {
       (connectionProvider as jest.Mock).mockRejectedValueOnce(new Error("Connection failed"));
 
       const result = await handler({
-        action: "invalid_action" as unknown as "create",
+        action: "create" as const,
         project: "Fabrikam",
         iterations: [],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe("Error: Connection failed");
+      expect(result.content[0].text).toBe("Error creating iterations: Connection failed");
     });
   });
 
@@ -3313,6 +3314,128 @@ describe("configureWorkTools", () => {
 
       expect(result.content[0].text).toBe("Team selection cancelled.");
       expect(mockWorkApi.getTeamSettings).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("work write actions", () => {
+  let mockConnection: { getWorkApi: jest.Mock; getWorkItemTrackingApi: jest.Mock };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+
+  beforeEach(() => {
+    mockConnection = { getWorkApi: jest.fn(), getWorkItemTrackingApi: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue(mockConnection);
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+  });
+
+  describe("createIterations", () => {
+    it("creates each named iteration under the project's iteration tree", async () => {
+      const createOrUpdateClassificationNode = jest.fn().mockResolvedValue({ id: 1, name: "Sprint 1" });
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({ createOrUpdateClassificationNode });
+
+      const result = await createIterations(
+        { project: "Fabrikam", iterations: [{ iterationName: "Sprint 1", startDate: "2025-01-01T00:00:00Z" }, { startDate: "2025-02-01T00:00:00Z" }] },
+        typedConnectionProvider
+      );
+
+      expect(createOrUpdateClassificationNode).toHaveBeenCalledTimes(1);
+      expect(createOrUpdateClassificationNode).toHaveBeenCalledWith(
+        { name: "Sprint 1", attributes: { startDate: new Date("2025-01-01T00:00:00Z"), finishDate: undefined } },
+        "Fabrikam",
+        TreeStructureGroup.Iterations
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toBe(JSON.stringify([{ id: 1, name: "Sprint 1" }], null, 2));
+    });
+
+    it("propagates API errors to the caller", async () => {
+      mockConnection.getWorkItemTrackingApi.mockResolvedValue({ createOrUpdateClassificationNode: jest.fn().mockRejectedValue(new Error("API failure")) });
+
+      await expect(createIterations({ project: "Fabrikam", iterations: [{ iterationName: "Sprint 1" }] }, typedConnectionProvider)).rejects.toThrow("API failure");
+    });
+  });
+
+  describe("assignIterations", () => {
+    it("assigns iterations with an identifier and path to the team", async () => {
+      const postTeamIteration = jest.fn().mockResolvedValue({ id: "iter-1", path: "Fabrikam\\Sprint 1" });
+      mockConnection.getWorkApi.mockResolvedValue({ postTeamIteration });
+
+      const result = await assignIterations(
+        { project: "Fabrikam", team: "Fabrikam Team", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }, { identifier: "iter-2" }] },
+        typedConnectionProvider
+      );
+
+      expect(postTeamIteration).toHaveBeenCalledTimes(1);
+      expect(postTeamIteration).toHaveBeenCalledWith({ path: "Fabrikam\\Sprint 1", id: "iter-1" }, { project: "Fabrikam", team: "Fabrikam Team" });
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toBe(JSON.stringify([{ id: "iter-1", path: "Fabrikam\\Sprint 1" }], null, 2));
+    });
+
+    it("returns an error without opening a connection when team is missing", async () => {
+      const result = await assignIterations({ project: "Fabrikam", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }] }, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Team is required for assign");
+      expect(connectionProvider).not.toHaveBeenCalled();
+    });
+
+    it("propagates API errors to the caller", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({ postTeamIteration: jest.fn().mockRejectedValue(new Error("API failure")) });
+
+      await expect(assignIterations({ project: "Fabrikam", team: "Fabrikam Team", iterations: [{ identifier: "iter-1", path: "Fabrikam\\Sprint 1" }] }, typedConnectionProvider)).rejects.toThrow(
+        "API failure"
+      );
+    });
+  });
+
+  describe("updateCapacity", () => {
+    const args = {
+      project: "Fabrikam",
+      team: "Fabrikam Team",
+      teamMemberId: "member-1",
+      iterationId: "iter-1",
+      activities: [{ name: "Development", capacityPerDay: 6 }],
+      daysOff: [{ start: "2025-01-02T00:00:00Z", end: "2025-01-03T00:00:00Z" }],
+    };
+
+    it("updates the capacity and returns a simplified result", async () => {
+      const updateCapacityWithIdentityRef = jest.fn().mockResolvedValue({
+        teamMember: { displayName: "Jane", id: "member-1", uniqueName: "jane@fabrikam.com", url: "https://example" },
+        activities: [{ name: "Development", capacityPerDay: 6 }],
+        daysOff: [],
+      });
+      mockConnection.getWorkApi.mockResolvedValue({ updateCapacityWithIdentityRef });
+
+      const result = await updateCapacity(args, typedConnectionProvider);
+
+      expect(updateCapacityWithIdentityRef).toHaveBeenCalledWith(
+        { activities: [{ name: "Development", capacityPerDay: 6 }], daysOff: [{ start: new Date("2025-01-02T00:00:00Z"), end: new Date("2025-01-03T00:00:00Z") }] },
+        { project: "Fabrikam", team: "Fabrikam Team" },
+        "iter-1",
+        "member-1"
+      );
+      expect(result.isError).toBeUndefined();
+      expect(JSON.parse(result.content[0].text as string)).toEqual({
+        teamMember: { displayName: "Jane", id: "member-1", uniqueName: "jane@fabrikam.com" },
+        activities: [{ name: "Development", capacityPerDay: 6 }],
+        daysOff: [],
+      });
+    });
+
+    it("returns an error when the API returns no capacity", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({ updateCapacityWithIdentityRef: jest.fn().mockResolvedValue(null) });
+
+      const result = await updateCapacity(args, typedConnectionProvider);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe("Failed to update team member capacity");
+    });
+
+    it("propagates API errors to the caller", async () => {
+      mockConnection.getWorkApi.mockResolvedValue({ updateCapacityWithIdentityRef: jest.fn().mockRejectedValue(new Error("API failure")) });
+
+      await expect(updateCapacity(args, typedConnectionProvider)).rejects.toThrow("API failure");
     });
   });
 });
