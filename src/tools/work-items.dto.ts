@@ -3,32 +3,16 @@
 
 import { z } from "zod";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DTOs for the wit_work_item_write, wit_work_item_comment_write and
-// wit_work_item_link_write tools.
-//
-// Each action's inputs are declared once as a Zod "raw shape". The shapes are
-// the single source of truth: each tool's input schema is composed from them,
-// and the TypeScript argument types are derived via `z.infer` (no hand-written,
-// drift-prone duplicate types). These types are safe to export — they are
-// compile-time only and erased at runtime, so they have no effect on the MCP
-// protocol or a local server.
-// ─────────────────────────────────────────────────────────────────────────────
-
 type JsonPatchValue = string | number | boolean | null | JsonPatchValue[] | { [key: string]: JsonPatchValue };
 
 export const jsonPatchValueSchema: z.ZodType<JsonPatchValue> = z.lazy(() =>
   z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonPatchValueSchema), z.record(z.string(), jsonPatchValueSchema)])
 );
 
-/** Optional project shared by the actions that resolve (or elicit) a project. */
 const projectShape = {
   project: z.string().optional().describe("The name or ID of the Azure DevOps project. Reuse from prior context if already known. If not provided, a project selection prompt will be shown."),
 };
 
-// ─── wit_work_item_write ─────────────────────────────────────────────────────
-
-/** create inputs. */
 export const createWorkItemShape = {
   ...projectShape,
   workItemType: z.string().optional().describe("The type of work item. Required for: create, add_child."),
@@ -44,12 +28,10 @@ export const createWorkItemShape = {
     .describe("Field values to set on the work item. Required for: create."),
 };
 
-/** Work item targeted by update; kept separate so the composed shape can keep `id` in its original position. */
 const updateWorkItemIdShape = {
   id: z.coerce.number().min(1).optional().describe("Work item ID to update. Required for: update."),
 };
 
-/** update inputs. */
 export const updateWorkItemShape = {
   ...updateWorkItemIdShape,
   updates: z
@@ -75,7 +57,6 @@ export const updateWorkItemShape = {
     ),
 };
 
-/** update_batch inputs. */
 export const updateWorkItemsBatchShape = {
   batchUpdates: z
     .array(
@@ -91,7 +72,6 @@ export const updateWorkItemsBatchShape = {
     .describe("Updates for multiple work items. Required for: update_batch."),
 };
 
-/** add_child inputs. */
 export const addChildWorkItemsShape = {
   ...projectShape,
   workItemType: z.string().optional().describe("The type of work item. Required for: create, add_child."),
@@ -110,8 +90,7 @@ export const addChildWorkItemsShape = {
     .describe("Child work items to create. Required for: add_child."),
 };
 
-/** The composed input shape for the grouped `wit_work_item_write` tool. */
-export const workItemWriteShape = {
+export const witWorkItemWriteShape = {
   action: z
     .enum(["create", "update", "update_batch", "add_child"])
     .describe(
@@ -125,9 +104,6 @@ export const workItemWriteShape = {
   ...addChildWorkItemsShape,
 };
 
-// ─── wit_work_item_comment_write ─────────────────────────────────────────────
-
-/** add inputs. */
 export const addWorkItemCommentShape = {
   ...projectShape,
   workItemId: z.coerce.number().min(1).optional().describe("The ID of the work item. Required for: add, update."),
@@ -135,7 +111,6 @@ export const addWorkItemCommentShape = {
   format: z.enum(["Markdown", "Html"]).optional().default("Markdown").describe("Format of the comment text. Optional, defaults to 'Markdown'."),
 };
 
-/** update inputs. */
 export const updateWorkItemCommentShape = {
   ...projectShape,
   workItemId: z.coerce.number().min(1).optional().describe("The ID of the work item. Required for: add, update."),
@@ -144,16 +119,12 @@ export const updateWorkItemCommentShape = {
   format: z.enum(["Markdown", "Html"]).optional().default("Markdown").describe("Format of the comment text. Optional, defaults to 'Markdown'."),
 };
 
-/** The composed input shape for the grouped `wit_work_item_comment_write` tool. */
-export const workItemCommentWriteShape = {
+export const witWorkItemCommentWriteShape = {
   action: z.enum(["add", "update"]).describe("The action to perform. Options: add (add a comment to a work item), update (update an existing comment on a work item)."),
   ...updateWorkItemCommentShape,
   ...addWorkItemCommentShape,
 };
 
-// ─── wit_work_item_link_write ────────────────────────────────────────────────
-
-/** link inputs. */
 export const linkWorkItemsShape = {
   ...projectShape,
   updates: z
@@ -173,7 +144,6 @@ export const linkWorkItemsShape = {
     .describe("Link operations to apply. Required for: link."),
 };
 
-/** unlink inputs. */
 export const unlinkWorkItemShape = {
   ...projectShape,
   id: z.coerce.number().min(1).optional().describe("Work item ID to remove links from. Required for: unlink."),
@@ -184,7 +154,6 @@ export const unlinkWorkItemShape = {
   url: z.string().optional().describe("URL to match when removing a link. Used for: unlink. If not provided, all links of the specified type are removed."),
 };
 
-/** link_to_pull_request inputs. */
 export const linkWorkItemToPullRequestShape = {
   projectId: z.string().optional().describe("The project ID (GUID). Required for: link_to_pull_request, and add_artifact_link (Git/Wiki types)."),
   repositoryId: z.string().optional().describe("The repository ID. Required for: link_to_pull_request and add_artifact_link (Git types)."),
@@ -193,7 +162,6 @@ export const linkWorkItemToPullRequestShape = {
   pullRequestProjectId: z.string().optional().describe("Project ID containing the pull request. Used for: link_to_pull_request. Defaults to projectId."),
 };
 
-/** add_artifact_link inputs. */
 export const addArtifactLinkShape = {
   ...projectShape,
   projectId: z.string().optional().describe("The project ID (GUID). Required for: link_to_pull_request, and add_artifact_link (Git/Wiki types)."),
@@ -229,8 +197,7 @@ export const addArtifactLinkShape = {
   comment: z.string().optional().describe("Comment to include with the artifact link. Used for: add_artifact_link."),
 };
 
-/** The composed input shape for the grouped `wit_work_item_link_write` tool. */
-export const workItemLinkWriteShape = {
+export const witWorkItemLinkWriteShape = {
   action: z
     .enum(["link", "unlink", "link_to_pull_request", "add_artifact_link"])
     .describe(
@@ -242,32 +209,30 @@ export const workItemLinkWriteShape = {
   ...addArtifactLinkShape,
 };
 
-// Per-action schemas + inferred argument DTOs. `z.infer` keeps these types in
-// lockstep with the schemas above.
 export const createWorkItemSchema = z.object(createWorkItemShape);
 export const updateWorkItemSchema = z.object(updateWorkItemShape);
 export const updateWorkItemsBatchSchema = z.object(updateWorkItemsBatchShape);
 export const addChildWorkItemsSchema = z.object(addChildWorkItemsShape);
-export const workItemWriteSchema = z.object(workItemWriteShape);
+export const witWorkItemWriteSchema = z.object(witWorkItemWriteShape);
 export const addWorkItemCommentSchema = z.object(addWorkItemCommentShape);
 export const updateWorkItemCommentSchema = z.object(updateWorkItemCommentShape);
-export const workItemCommentWriteSchema = z.object(workItemCommentWriteShape);
+export const witWorkItemCommentWriteSchema = z.object(witWorkItemCommentWriteShape);
 export const linkWorkItemsSchema = z.object(linkWorkItemsShape);
 export const unlinkWorkItemSchema = z.object(unlinkWorkItemShape);
 export const linkWorkItemToPullRequestSchema = z.object(linkWorkItemToPullRequestShape);
 export const addArtifactLinkSchema = z.object(addArtifactLinkShape);
-export const workItemLinkWriteSchema = z.object(workItemLinkWriteShape);
+export const witWorkItemLinkWriteSchema = z.object(witWorkItemLinkWriteShape);
 
 export type CreateWorkItemArgs = z.infer<typeof createWorkItemSchema>;
 export type UpdateWorkItemArgs = z.infer<typeof updateWorkItemSchema>;
 export type UpdateWorkItemsBatchArgs = z.infer<typeof updateWorkItemsBatchSchema>;
 export type AddChildWorkItemsArgs = z.infer<typeof addChildWorkItemsSchema>;
-export type WorkItemWriteArgs = z.infer<typeof workItemWriteSchema>;
+export type WitWorkItemWriteArgs = z.infer<typeof witWorkItemWriteSchema>;
 export type AddWorkItemCommentArgs = z.infer<typeof addWorkItemCommentSchema>;
 export type UpdateWorkItemCommentArgs = z.infer<typeof updateWorkItemCommentSchema>;
-export type WorkItemCommentWriteArgs = z.infer<typeof workItemCommentWriteSchema>;
+export type WitWorkItemCommentWriteArgs = z.infer<typeof witWorkItemCommentWriteSchema>;
 export type LinkWorkItemsArgs = z.infer<typeof linkWorkItemsSchema>;
 export type UnlinkWorkItemArgs = z.infer<typeof unlinkWorkItemSchema>;
 export type LinkWorkItemToPullRequestArgs = z.infer<typeof linkWorkItemToPullRequestSchema>;
 export type AddArtifactLinkArgs = z.infer<typeof addArtifactLinkSchema>;
-export type WorkItemLinkWriteArgs = z.infer<typeof workItemLinkWriteSchema>;
+export type WitWorkItemLinkWriteArgs = z.infer<typeof witWorkItemLinkWriteSchema>;

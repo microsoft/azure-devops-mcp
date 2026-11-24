@@ -17,22 +17,22 @@ import { dateInputSchema } from "../shared/tool-schemas.js";
 import { getUserIdentityFromEmail } from "./auth.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
-  workItemWriteShape,
-  workItemCommentWriteShape,
-  workItemLinkWriteShape,
+  witWorkItemWriteShape,
+  witWorkItemCommentWriteShape,
+  witWorkItemLinkWriteShape,
   CreateWorkItemArgs,
   UpdateWorkItemArgs,
   UpdateWorkItemsBatchArgs,
   AddChildWorkItemsArgs,
-  WorkItemWriteArgs,
+  WitWorkItemWriteArgs,
   AddWorkItemCommentArgs,
   UpdateWorkItemCommentArgs,
-  WorkItemCommentWriteArgs,
+  WitWorkItemCommentWriteArgs,
   LinkWorkItemsArgs,
   UnlinkWorkItemArgs,
   LinkWorkItemToPullRequestArgs,
   AddArtifactLinkArgs,
-  WorkItemLinkWriteArgs,
+  WitWorkItemLinkWriteArgs,
 } from "./work-items.dto.js";
 
 const WORKITEM_TOOLS = {
@@ -147,7 +147,7 @@ async function prepareCommentText(
   });
 }
 
-async function createWorkItemAction(args: CreateWorkItemArgs, server: McpServer, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+async function createWorkItem(args: CreateWorkItemArgs, server: McpServer, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
   const { workItemType, fields } = args;
   if (!workItemType) return errorResult("workItemType is required for create");
   if (!fields || fields.length === 0) return errorResult("fields is required for create");
@@ -185,7 +185,7 @@ async function createWorkItemAction(args: CreateWorkItemArgs, server: McpServer,
   return { content: [{ type: "text", text: JSON.stringify(newWorkItem, null, 2) }] };
 }
 
-async function updateWorkItemAction(args: UpdateWorkItemArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+async function updateWorkItem(args: UpdateWorkItemArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
   const { id, updates } = args;
   if (!id) return errorResult("id is required for update");
   if (!updates || updates.length === 0) return errorResult("updates is required for update");
@@ -199,7 +199,7 @@ async function updateWorkItemAction(args: UpdateWorkItemArgs, connectionProvider
   return { content: [{ type: "text", text: JSON.stringify(updatedWorkItem, null, 2) }] };
 }
 
-async function updateWorkItemsBatchAction(
+async function updateWorkItemsBatch(
   args: UpdateWorkItemsBatchArgs,
   connectionProvider: () => Promise<WebApi>,
   tokenProvider: () => Promise<string>,
@@ -257,7 +257,7 @@ async function updateWorkItemsBatchAction(
   return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
 }
 
-async function addChildWorkItemsAction(
+async function addChildWorkItems(
   args: AddChildWorkItemsArgs,
   server: McpServer,
   connectionProvider: () => Promise<WebApi>,
@@ -348,51 +348,7 @@ async function addChildWorkItemsAction(
   return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
 }
 
-async function writeWorkItemComment(
-  args: { project?: string; workItemId: number; text: string; format?: AddWorkItemCommentArgs["format"] },
-  method: "POST" | "PATCH",
-  commentPath: string,
-  projectLabel: string,
-  failureMessage: string,
-  server: McpServer,
-  connectionProvider: () => Promise<WebApi>,
-  tokenProvider: () => Promise<string>,
-  userAgentProvider: () => string
-): Promise<CallToolResult> {
-  const connection = await connectionProvider();
-  let resolvedProject = args.project;
-  if (!resolvedProject) {
-    const result = await elicitProject(server, connection, `Select the Azure DevOps project to ${projectLabel}.`);
-    if ("response" in result) return result.response;
-    resolvedProject = result.resolved;
-  }
-
-  const orgUrl = connection.serverUrl;
-  const accessToken = await tokenProvider();
-  const formatParameter = (args.format ?? "Markdown") === "Markdown" ? 0 : 1;
-  const resolvedText = await prepareCommentText(args.text, args.format, tokenProvider, connectionProvider, userAgentProvider);
-
-  const response = await fetch(
-    `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${args.workItemId}/${commentPath}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
-    {
-      method,
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "User-Agent": userAgentProvider(),
-      },
-      body: JSON.stringify({ text: resolvedText }),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`${failureMessage}: ${response.statusText}`);
-  }
-
-  return { content: [{ type: "text", text: await response.text() }] };
-}
-
-async function addWorkItemCommentAction(
+async function addWorkItemComment(
   args: AddWorkItemCommentArgs,
   server: McpServer,
   connectionProvider: () => Promise<WebApi>,
@@ -403,20 +359,37 @@ async function addWorkItemCommentAction(
   if (!workItemId) return errorResult("workItemId is required");
   if (!text) return errorResult("text is required");
 
-  return writeWorkItemComment(
-    { ...args, workItemId, text },
-    "POST",
-    "comments",
-    "add a work item comment in",
-    "Failed to add a work item comment",
-    server,
-    connectionProvider,
-    tokenProvider,
-    userAgentProvider
-  );
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, "Select the Azure DevOps project to add a work item comment in.");
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+
+  const orgUrl = connection.serverUrl;
+  const accessToken = await tokenProvider();
+  const formatParameter = (args.format ?? "Markdown") === "Markdown" ? 0 : 1;
+  const resolvedText = await prepareCommentText(text, args.format, tokenProvider, connectionProvider, userAgentProvider);
+
+  const response = await fetch(`${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "User-Agent": userAgentProvider(),
+    },
+    body: JSON.stringify({ text: resolvedText }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to add a work item comment: ${response.statusText}`);
+  }
+
+  return { content: [{ type: "text", text: await response.text() }] };
 }
 
-async function updateWorkItemCommentAction(
+async function updateWorkItemComment(
   args: UpdateWorkItemCommentArgs,
   server: McpServer,
   connectionProvider: () => Promise<WebApi>,
@@ -428,20 +401,40 @@ async function updateWorkItemCommentAction(
   if (!text) return errorResult("text is required");
   if (!commentId) return errorResult("commentId is required for update");
 
-  return writeWorkItemComment(
-    { ...args, workItemId, text },
-    "PATCH",
-    `comments/${commentId}`,
-    "update the work item comment in",
-    "Failed to update work item comment",
-    server,
-    connectionProvider,
-    tokenProvider,
-    userAgentProvider
+  const connection = await connectionProvider();
+  let resolvedProject = args.project;
+  if (!resolvedProject) {
+    const result = await elicitProject(server, connection, "Select the Azure DevOps project to update the work item comment in.");
+    if ("response" in result) return result.response;
+    resolvedProject = result.resolved;
+  }
+
+  const orgUrl = connection.serverUrl;
+  const accessToken = await tokenProvider();
+  const formatParameter = (args.format ?? "Markdown") === "Markdown" ? 0 : 1;
+  const resolvedText = await prepareCommentText(text, args.format, tokenProvider, connectionProvider, userAgentProvider);
+
+  const response = await fetch(
+    `${orgUrl}/${encodeURIComponent(resolvedProject)}/_apis/wit/workItems/${workItemId}/comments/${commentId}?format=${formatParameter}&api-version=${markdownCommentsApiVersion}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": userAgentProvider(),
+      },
+      body: JSON.stringify({ text: resolvedText }),
+    }
   );
+
+  if (!response.ok) {
+    throw new Error(`Failed to update work item comment: ${response.statusText}`);
+  }
+
+  return { content: [{ type: "text", text: await response.text() }] };
 }
 
-async function linkWorkItemsAction(
+async function linkWorkItems(
   args: LinkWorkItemsArgs,
   server: McpServer,
   connectionProvider: () => Promise<WebApi>,
@@ -507,7 +500,7 @@ async function linkWorkItemsAction(
   return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
 }
 
-async function unlinkWorkItemAction(args: UnlinkWorkItemArgs, server: McpServer, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+async function unlinkWorkItem(args: UnlinkWorkItemArgs, server: McpServer, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
   const { id, type, url } = args;
   if (!id) return errorResult("id is required for unlink");
   if (!type) return errorResult("type is required for unlink");
@@ -549,7 +542,7 @@ async function unlinkWorkItemAction(args: UnlinkWorkItemArgs, server: McpServer,
   };
 }
 
-async function linkWorkItemToPullRequestAction(args: LinkWorkItemToPullRequestArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
+async function linkWorkItemToPullRequest(args: LinkWorkItemToPullRequestArgs, connectionProvider: () => Promise<WebApi>): Promise<CallToolResult> {
   const { projectId, repositoryId, pullRequestId, workItemId, pullRequestProjectId } = args;
   if (!projectId) return errorResult("projectId is required for link_to_pull_request");
   if (!repositoryId) return errorResult("repositoryId is required for link_to_pull_request");
@@ -583,7 +576,7 @@ async function linkWorkItemToPullRequestAction(args: LinkWorkItemToPullRequestAr
   };
 }
 
-async function addArtifactLinkAction(
+async function addArtifactLink(
   args: AddArtifactLinkArgs,
   server: McpServer,
   connectionProvider: () => Promise<WebApi>,
@@ -706,32 +699,24 @@ async function addArtifactLinkAction(
   };
 }
 
-const workItemWriteErrorPrefixes: Record<WorkItemWriteArgs["action"], string> = {
+const witWorkItemWriteErrorPrefixes: Record<WitWorkItemWriteArgs["action"], string> = {
   create: "Error creating work item: ",
   update: "Error updating work item: ",
   update_batch: "Error updating work items in batch: ",
   add_child: "Error creating child work items: ",
 };
 
-const workItemCommentWriteErrorPrefixes: Record<WorkItemCommentWriteArgs["action"], string> = {
+const witWorkItemCommentWriteErrorPrefixes: Record<WitWorkItemCommentWriteArgs["action"], string> = {
   add: "Error adding work item comment: ",
   update: "Error updating work item comment: ",
 };
 
-const workItemLinkWriteErrorPrefixes: Record<WorkItemLinkWriteArgs["action"], string> = {
+const witWorkItemLinkWriteErrorPrefixes: Record<WitWorkItemLinkWriteArgs["action"], string> = {
   link: "Error linking work items: ",
   unlink: "Error unlinking work item: ",
   link_to_pull_request: "Error linking work item to pull request: ",
   add_artifact_link: "Error adding artifact link to work item: ",
 };
-
-/** Surfaces 409/412 so agents can recognise optimistic-concurrency (`/rev` test) failures on update. */
-function getUpdateErrorMessage(error: unknown, message: string): string {
-  const statusCode = typeof error === "object" && error !== null && "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : undefined;
-  const statusText = statusCode === 409 ? " Conflict" : statusCode === 412 ? " Precondition Failed" : "";
-  const updateStatus = statusCode !== undefined ? ` [HTTP ${statusCode}${statusText}]` : "";
-  return `Error updating work item${updateStatus}: ${message}`;
-}
 
 function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<string>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
   // --- wit_work_item ----------------------------------------------------------
@@ -1287,68 +1272,71 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
   );
 
   // --- wit_work_item_write ----------------------------------------------------
-  server.tool(WORKITEM_TOOLS.wit_work_item_write, "Write operations for work items. Use the action parameter to specify the operation.", workItemWriteShape, async (args) => {
+  server.tool(WORKITEM_TOOLS.wit_work_item_write, "Write operations for work items. Use the action parameter to specify the operation.", witWorkItemWriteShape, async (args) => {
     try {
       switch (args.action) {
         case "create":
-          return await createWorkItemAction(args, server, connectionProvider);
+          return await createWorkItem(args, server, connectionProvider);
         case "update":
-          return await updateWorkItemAction(args, connectionProvider);
+          return await updateWorkItem(args, connectionProvider);
         case "update_batch":
-          return await updateWorkItemsBatchAction(args, connectionProvider, tokenProvider, userAgentProvider);
+          return await updateWorkItemsBatch(args, connectionProvider, tokenProvider, userAgentProvider);
         case "add_child":
-          return await addChildWorkItemsAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+          return await addChildWorkItems(args, server, connectionProvider, tokenProvider, userAgentProvider);
         default: {
           const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workItemWriteErrorPrefixes).sort().join(", ")}`);
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(witWorkItemWriteErrorPrefixes).sort().join(", ")}`);
         }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error occurred";
-      if (args.action === "update") return errorResult(getUpdateErrorMessage(error, message));
-      return errorResult(`${workItemWriteErrorPrefixes[args.action]}${message}`);
+      if (args.action !== "update") return errorResult(`${witWorkItemWriteErrorPrefixes[args.action]}${message}`);
+      const statusCode = typeof error === "object" && error !== null && "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : undefined;
+      const statusText = statusCode === 409 ? " Conflict" : statusCode === 412 ? " Precondition Failed" : "";
+      const updateStatus = statusCode !== undefined ? ` [HTTP ${statusCode}${statusText}]` : "";
+      return errorResult(`Error updating work item${updateStatus}: ${message}`);
     }
   });
 
   // --- wit_work_item_comment_write --------------------------------------------
-  server.tool(WORKITEM_TOOLS.wit_work_item_comment_write, "Write operations for work item comments. Use the action parameter to specify the operation.", workItemCommentWriteShape, async (args) => {
+  server.tool(WORKITEM_TOOLS.wit_work_item_comment_write, "Write operations for work item comments. Use the action parameter to specify the operation.", witWorkItemCommentWriteShape, async (args) => {
     try {
       switch (args.action) {
         case "add":
-          return await addWorkItemCommentAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+          return await addWorkItemComment(args, server, connectionProvider, tokenProvider, userAgentProvider);
         case "update":
-          return await updateWorkItemCommentAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+          return await updateWorkItemComment(args, server, connectionProvider, tokenProvider, userAgentProvider);
         default: {
           const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workItemCommentWriteErrorPrefixes).sort().join(", ")}`);
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(witWorkItemCommentWriteErrorPrefixes).sort().join(", ")}`);
         }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${workItemCommentWriteErrorPrefixes[args.action]}${message}`);
+      return errorResult(`${witWorkItemCommentWriteErrorPrefixes[args.action]}${message}`);
     }
   });
 
   // --- wit_work_item_link_write -----------------------------------------------
-  server.tool(WORKITEM_TOOLS.wit_work_item_link_write, "Write operations for work item links. Use the action parameter to specify the operation.", workItemLinkWriteShape, async (args) => {
+  server.tool(WORKITEM_TOOLS.wit_work_item_link_write, "Write operations for work item links. Use the action parameter to specify the operation.", witWorkItemLinkWriteShape, async (args) => {
     try {
       switch (args.action) {
         case "link":
-          return await linkWorkItemsAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+          return await linkWorkItems(args, server, connectionProvider, tokenProvider, userAgentProvider);
         case "unlink":
-          return await unlinkWorkItemAction(args, server, connectionProvider);
+          return await unlinkWorkItem(args, server, connectionProvider);
         case "link_to_pull_request":
-          return await linkWorkItemToPullRequestAction(args, connectionProvider);
+          return await linkWorkItemToPullRequest(args, connectionProvider);
         case "add_artifact_link":
-          return await addArtifactLinkAction(args, server, connectionProvider, tokenProvider, userAgentProvider);
+          return await addArtifactLink(args, server, connectionProvider, tokenProvider, userAgentProvider);
         default: {
           const unsupportedAction: never = args.action;
-          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(workItemLinkWriteErrorPrefixes).sort().join(", ")}`);
+          return errorResult(`Unknown action: ${unsupportedAction}. Supported actions: ${Object.keys(witWorkItemLinkWriteErrorPrefixes).sort().join(", ")}`);
         }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error occurred";
-      return errorResult(`${workItemLinkWriteErrorPrefixes[args.action]}${message}`);
+      return errorResult(`${witWorkItemLinkWriteErrorPrefixes[args.action]}${message}`);
     }
   });
 }
@@ -1382,16 +1370,16 @@ function getMimeType(fileName: string | undefined): string {
 export {
   WORKITEM_TOOLS,
   configureWorkItemTools,
-  createWorkItemAction,
-  updateWorkItemAction,
-  updateWorkItemsBatchAction,
-  addChildWorkItemsAction,
-  addWorkItemCommentAction,
-  updateWorkItemCommentAction,
-  linkWorkItemsAction,
-  unlinkWorkItemAction,
-  linkWorkItemToPullRequestAction,
-  addArtifactLinkAction,
+  createWorkItem,
+  updateWorkItem,
+  updateWorkItemsBatch,
+  addChildWorkItems,
+  addWorkItemComment,
+  updateWorkItemComment,
+  linkWorkItems,
+  unlinkWorkItem,
+  linkWorkItemToPullRequest,
+  addArtifactLink,
 };
 export type {
   CreateWorkItemArgs,

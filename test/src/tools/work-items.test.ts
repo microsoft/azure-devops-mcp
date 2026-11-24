@@ -7,16 +7,16 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
   configureWorkItemTools,
-  createWorkItemAction,
-  updateWorkItemAction,
-  updateWorkItemsBatchAction,
-  addChildWorkItemsAction,
-  addWorkItemCommentAction,
-  updateWorkItemCommentAction,
-  linkWorkItemsAction,
-  unlinkWorkItemAction,
-  linkWorkItemToPullRequestAction,
-  addArtifactLinkAction,
+  createWorkItem as createWorkItemAction,
+  updateWorkItem as updateWorkItemAction,
+  updateWorkItemsBatch as updateWorkItemsBatchAction,
+  addChildWorkItems as addChildWorkItemsAction,
+  addWorkItemComment as addWorkItemCommentAction,
+  updateWorkItemComment as updateWorkItemCommentAction,
+  linkWorkItems as linkWorkItemsAction,
+  unlinkWorkItem as unlinkWorkItemAction,
+  linkWorkItemToPullRequest as linkWorkItemToPullRequestAction,
+  addArtifactLink as addArtifactLinkAction,
 } from "../../../src/tools/work-items";
 import { getBearerHandler, WebApi } from "azure-devops-node-api";
 import { IRequestHandler } from "azure-devops-node-api/interfaces/common/VsoBaseInterfaces.js";
@@ -6957,7 +6957,7 @@ describe("configureWorkItemTools", () => {
   });
 });
 
-describe("work item write actions", () => {
+describe("wit_work_item_write actions", () => {
   const server = {} as McpServer;
   const userAgentProvider = () => "Jest";
   const orgUrl = "https://dev.azure.com/test-org";
@@ -6984,7 +6984,7 @@ describe("work item write actions", () => {
   const textOf = (result: CallToolResult) => (result.content[0] as { text: string }).text;
   const fetchBody = () => JSON.parse(fetchMock.mock.calls[0][1].body);
 
-  describe("createWorkItemAction", () => {
+  describe("createWorkItem", () => {
     it("creates the work item with field and markdown-format operations", async () => {
       workItemApi.createWorkItem.mockResolvedValue({ id: 7 });
 
@@ -7018,7 +7018,7 @@ describe("work item write actions", () => {
     });
   });
 
-  describe("updateWorkItemAction", () => {
+  describe("updateWorkItem", () => {
     it("applies the JSON patch operations to the work item", async () => {
       workItemApi.updateWorkItem.mockResolvedValue({ id: 1, rev: 2 });
       const updates = [{ op: "replace" as const, path: "/fields/System.Title", value: "T" }];
@@ -7037,7 +7037,7 @@ describe("work item write actions", () => {
     });
   });
 
-  describe("updateWorkItemsBatchAction", () => {
+  describe("updateWorkItemsBatch", () => {
     it("sends one batch request per work item", async () => {
       const result = await updateWorkItemsBatchAction(
         {
@@ -7078,7 +7078,7 @@ describe("work item write actions", () => {
     });
   });
 
-  describe("addChildWorkItemsAction", () => {
+  describe("addChildWorkItems", () => {
     it("uses ReproSteps for Bug children", async () => {
       await addChildWorkItemsAction(
         { project: "P", parentId: 5, workItemType: "Bug", items: [{ title: "T", description: "D", format: "Html" }] },
@@ -7103,8 +7103,36 @@ describe("work item write actions", () => {
       expect(connectionProvider).not.toHaveBeenCalled();
     });
   });
+});
 
-  describe("addWorkItemCommentAction", () => {
+describe("wit_work_item_comment_write actions", () => {
+  const server = {} as McpServer;
+  const userAgentProvider = () => "Jest";
+  const orgUrl = "https://dev.azure.com/test-org";
+  let workItemApi: { createWorkItem: jest.Mock; updateWorkItem: jest.Mock; getWorkItem: jest.Mock };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let tokenProvider: () => Promise<string>;
+  let fetchMock: jest.Mock;
+  const previousFetch = global.fetch;
+
+  beforeEach(() => {
+    workItemApi = { createWorkItem: jest.fn(), updateWorkItem: jest.fn(), getWorkItem: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+    tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: 1 }), text: async () => "comment" });
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = previousFetch;
+  });
+
+  const textOf = (result: CallToolResult) => (result.content[0] as { text: string }).text;
+  const fetchBody = () => JSON.parse(fetchMock.mock.calls[0][1].body);
+
+  describe("addWorkItemComment", () => {
     it("posts the comment to the work item", async () => {
       const result = await addWorkItemCommentAction({ project: "P", workItemId: 3, text: "hi", format: "Html" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
 
@@ -7130,7 +7158,7 @@ describe("work item write actions", () => {
     });
   });
 
-  describe("updateWorkItemCommentAction", () => {
+  describe("updateWorkItemComment", () => {
     it("patches the existing comment", async () => {
       await updateWorkItemCommentAction({ project: "P", workItemId: 3, commentId: 9, text: "hi", format: "Html" }, server, typedConnectionProvider, tokenProvider, userAgentProvider);
 
@@ -7145,8 +7173,36 @@ describe("work item write actions", () => {
       expect(connectionProvider).not.toHaveBeenCalled();
     });
   });
+});
 
-  describe("linkWorkItemsAction", () => {
+describe("wit_work_item_link_write actions", () => {
+  const server = {} as McpServer;
+  const userAgentProvider = () => "Jest";
+  const orgUrl = "https://dev.azure.com/test-org";
+  let workItemApi: { createWorkItem: jest.Mock; updateWorkItem: jest.Mock; getWorkItem: jest.Mock };
+  let connectionProvider: jest.Mock;
+  let typedConnectionProvider: () => Promise<WebApi>;
+  let tokenProvider: () => Promise<string>;
+  let fetchMock: jest.Mock;
+  const previousFetch = global.fetch;
+
+  beforeEach(() => {
+    workItemApi = { createWorkItem: jest.fn(), updateWorkItem: jest.fn(), getWorkItem: jest.fn() };
+    connectionProvider = jest.fn().mockResolvedValue({ serverUrl: orgUrl, getWorkItemTrackingApi: jest.fn().mockResolvedValue(workItemApi) });
+    typedConnectionProvider = connectionProvider as unknown as () => Promise<WebApi>;
+    tokenProvider = jest.fn().mockResolvedValue("token") as unknown as () => Promise<string>;
+    fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: 1 }), text: async () => "comment" });
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = previousFetch;
+  });
+
+  const textOf = (result: CallToolResult) => (result.content[0] as { text: string }).text;
+  const fetchBody = () => JSON.parse(fetchMock.mock.calls[0][1].body);
+
+  describe("linkWorkItems", () => {
     it("adds work item and hyperlink relations", async () => {
       await linkWorkItemsAction(
         {
@@ -7175,7 +7231,7 @@ describe("work item write actions", () => {
     });
   });
 
-  describe("unlinkWorkItemAction", () => {
+  describe("unlinkWorkItem", () => {
     it("removes matching relations in descending index order", async () => {
       workItemApi.getWorkItem.mockResolvedValue({
         relations: [
@@ -7208,7 +7264,7 @@ describe("work item write actions", () => {
     });
   });
 
-  describe("linkWorkItemToPullRequestAction", () => {
+  describe("linkWorkItemToPullRequest", () => {
     it("adds a pull request artifact link", async () => {
       workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
 
@@ -7231,7 +7287,7 @@ describe("work item write actions", () => {
     });
   });
 
-  describe("addArtifactLinkAction", () => {
+  describe("addArtifactLink", () => {
     it("builds a branch artifact URI by default", async () => {
       workItemApi.updateWorkItem.mockResolvedValue({ id: 4 });
 
