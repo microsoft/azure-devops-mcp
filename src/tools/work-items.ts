@@ -175,12 +175,14 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
 
         if (action === "get") {
           if (!id) return { content: [{ type: "text", text: "id is required for get" }], isError: true };
-          let effectiveExpand = expand;
-          if (fields && fields.length > 0 && effectiveExpand != null) {
-            effectiveExpand = "none";
+          if (fields && fields.length > 0 && expand != null) {
+            return {
+              content: [{ type: "text", text: "`fields` and `expand` cannot be combined for get; drop `fields` to get relations" }],
+              isError: true,
+            };
           }
           const workItemApi = await connection.getWorkItemTrackingApi();
-          const workItem = await workItemApi.getWorkItem(id, fields, asOf, effectiveExpand as unknown as WorkItemExpand, resolvedProject);
+          const workItem = await workItemApi.getWorkItem(id, fields, asOf, expand as unknown as WorkItemExpand, resolvedProject);
           return { content: [{ type: "text", text: JSON.stringify(workItem, null, 2) }] };
         }
 
@@ -388,6 +390,21 @@ function configureWorkItemTools(server: McpServer, tokenProvider: () => Promise<
           const workItemApi = await getReadReplicaWorkItemTrackingApi(connection);
           const teamContext = { project: resolvedProject, team };
           const queryResult = await workItemApi.queryByWiql({ query: wiql }, teamContext, timePrecision, top);
+          if (!queryResult || typeof queryResult !== "object") {
+            return createExternalContentResponse(queryResult, "wiql query results");
+          }
+          const resultData = queryResult as unknown as { workItems?: unknown[]; workItemRelations?: unknown[] };
+          const resultCount = Array.isArray(resultData.workItems) ? resultData.workItems.length : Array.isArray(resultData.workItemRelations) ? resultData.workItemRelations.length : 0;
+          if (top > 0 && resultCount === top) {
+            return createExternalContentResponse(
+              {
+                ...resultData,
+                truncated: true,
+                note: `The result reached the requested top limit of ${top}. Raise top to retrieve more results.`,
+              },
+              "wiql query results"
+            );
+          }
           return createExternalContentResponse(queryResult, "wiql query results");
         }
 
